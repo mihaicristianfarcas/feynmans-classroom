@@ -17,15 +17,17 @@ and delete. The app is set in the system sans; what you read and write (books, n
 a serif.
 
 Every page shows only what it is for. A slim bar along the top holds the pages (with the cards due
-on Review), search, the theme and settings; the reader keeps its own bar of the same height. The
+on Review), the agent (a sparkle, with a dot while it works), search, the theme and settings; the
+reader keeps its own bar of the same height. The agent is one field over any page (⌘J), never a
+page or a form of its own: a request, a short reply, the change shown where it lands. The
 Brain is the graph alone, filling the window, with the item you pick in a card at its side; Today is
-a greeting, the ask field and what's next; Review is the card. Secondary controls stay quiet
+a greeting, a field for the agent and what's next; Review is the card. Secondary controls stay quiet
 (subtle buttons, a disclosure for advanced settings) and explanations are one line.
 
 Motion is quick and quiet: popovers and menus grow from where they open, presses scale slightly,
 tab and nav indicators slide, new content rises a few pixels, and the theme switch crossfades.
-What you do from the keyboard (the ⌘K palette, revealing a card, the reader's shortcuts) doesn't
-animate, and reduced motion keeps only fades. The tokens, controls and motion rules live in
+What you do from the keyboard (the ⌘K palette, the agent's ⌘J panel, revealing a card, the reader's
+shortcuts) doesn't animate, and reduced motion keeps only fades. The tokens, controls and motion rules live in
 `web/src/styles/styles.css`.
 
 ## Accessibility

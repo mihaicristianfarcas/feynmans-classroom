@@ -21,7 +21,7 @@ vi.mock("../server/llm/index.ts", () => ({
   agent: async (options: { cwd: string; prompt: string }) => {
     prompts.push(options.prompt);
     await work(options.cwd);
-    return { data: "Done.", ms: 1, provider: "codex", model: "stand-in" };
+    return { data: { reply: "Done.", open: "" }, ms: 1, provider: "codex", model: "stand-in" };
   },
   structured: async () => {
     throw new Error("no model in tests");
@@ -155,5 +155,26 @@ describe.skipIf(!hasJj)("the agent on a jj vault", () => {
     expect(run.status).toBe("review");
     expect(existsSync(join(vault, "notes/Broken.md"))).toBe(false);
     expect(A.discardRun(run.id).status).toBe("discarded");
+  });
+
+  it("answers without changing anything, keeps the answer on request, and remembers the conversation", async () => {
+    work = () => {};
+    const first = await settled(A.startRun({ task: "What is replication lag?", context: { route: "#/review" } }));
+    expect(first.status).toBe("done");
+    expect(first.where).toBe("Review");
+    const kept = A.keepRun(first.id);
+    expect(kept.kept && existsSync(join(vault, kept.kept))).toBe(true);
+    const second = await settled(A.startRun({ task: "Shorter, please", after: first.id }));
+    expect(second.thread).toBe(first.id);
+    expect(prompts.at(-1)).toContain("They asked: What is replication lag?");
+    expect(prompts.at(-1)).toContain("You replied: Done.");
+  });
+
+  it("tells the agent which note is open", async () => {
+    const note = N.createNote({ title: "Open one", body: "here" });
+    work = () => {};
+    const run = await settled(A.startRun({ task: "Fix the typos in this", context: { noteId: note.id } }));
+    expect(run.where).toBe("Open one");
+    expect(prompts.at(-1)).toContain(`They have this note open: ${note.path}`);
   });
 });

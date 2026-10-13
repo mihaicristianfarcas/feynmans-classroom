@@ -1,9 +1,9 @@
-/* Today: a greeting, a field to ask your library anything, and the few things worth doing next (review
- * what's due, carry on reading, a quiz, a first book to add). */
+/* Today: a greeting, a field for the agent (ask your library anything, or tell it what to do), and the
+ * few things worth doing next (review what's due, carry on reading, a quiz, a first book to add). */
 import { ArrowRight, ArrowUp, Sparkles } from "lucide-react";
 import { useState } from "react";
+import { openAgent } from "../agent/store";
 import { learn } from "../api";
-import { go } from "../app/navigation";
 import { Spinner } from "../components/feedback";
 import { useLoad } from "../lib/useLoad";
 import { under, useVaultEvents } from "../lib/useVaultEvents";
@@ -57,17 +57,19 @@ export function Today() {
         className="ask-bar"
         onSubmit={(e) => {
           e.preventDefault();
-          if (question.trim()) go(`#/ask?q=${encodeURIComponent(question.trim())}`);
+          if (!question.trim()) return;
+          openAgent({ text: question.trim(), send: true });
+          setQuestion("");
         }}
       >
         <Sparkles className="ask-icon" aria-hidden="true" />
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask your library anything…"
-          aria-label="Ask your library"
+          placeholder="Ask your library anything, or tell the agent what to do…"
+          aria-label="Ask or tell the agent"
         />
-        <button className="icon-button ask-send" type="submit" aria-label="Ask" disabled={!question.trim()}>
+        <button className="icon-button ask-send" type="submit" aria-label="Send" disabled={!question.trim()}>
           <ArrowUp aria-hidden="true" />
         </button>
       </form>

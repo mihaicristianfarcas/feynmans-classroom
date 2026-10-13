@@ -1,4 +1,5 @@
-/* Moving around the app: hash routes, opening what a [[link]] points at, and links into a book. */
+/* Moving around the app: hash routes, opening what a [[link]] points at, links into a book, and the
+ * page that shows a file of the vault. */
 import { learn } from "../api";
 import type { SourceRef } from "../api/types";
 
@@ -33,3 +34,14 @@ export const bookLink = (ref: Partial<SourceRef> & { bookId?: string }) =>
   ref.bookId
     ? `#/book/${ref.bookId}${ref.page !== undefined ? `?at=${(ref.page + (ref.y ?? 0)).toFixed(3)}` : ref.block !== undefined ? `?at=${ref.block}` : ""}`
     : "#/library";
+
+/** The page that shows a vault file (a note, a concept, an annotation, a book, a card), or null. */
+export function vaultLink(path: string): string | null {
+  if (/^(notes|concepts)\/.+\.md$/.test(path) || /^library\/[^/]+\/annotations\/.+\.md$/.test(path))
+    return `#/open?target=${encodeURIComponent(path.replace(/\.md$/, ""))}`;
+  const book = /^library\/([^/]+)\//.exec(path);
+  if (book) return `#/open?target=${encodeURIComponent(`library/${book[1]}`)}`;
+  if (path.startsWith("cards/")) return "#/review";
+  if (path.startsWith("figures/")) return "#/library/figures";
+  return null;
+}

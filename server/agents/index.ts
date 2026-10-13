@@ -1,20 +1,24 @@
-/* Agents that change the vault ("turn my chapter 5 highlights into a summary note", "tidy my notes on
- * consensus into one"), with these guardrails:
+/* The agent: one field in the app, for anything the learner wants done or answered ("summarise this
+ * chapter into my DDIA folder", "quiz me on my highlights", "what did I write about consensus?").
  *
- *   1. The CLI's OS sandbox (see llm/): the agent's shell can write only its working folder, read
+ *   1. Where they are (the note, the book and chapter, the selection) goes into the prompt, with the
+ *      conversation so far when they follow up on an earlier request (see where.ts, prompt.ts).
+ *   2. The CLI's OS sandbox (see llm/): the agent's shell can write only its working folder, read
  *      only that and the vault, never touch .jj or .git, never reach the network.
- *   2. Its own jj workspace (workspace.ts): it never edits a file the learner has open, and several
+ *   3. Its own jj workspace (workspace.ts): it never edits a file the learner has open, and several
  *      requests can be worked on at once.
- *   3. Checks (review.ts): app-owned files may not change; a file that can't be read back waits for
+ *   4. Checks (review.ts): app-owned files may not change; a file that can't be read back waits for
  *      the learner's OK. Everything else lands at once, after whatever the learner did meanwhile, and
  *      only if it doesn't clash with it (vault/jj.ts).
- *   4. Undo: each run is one jj change, taken out again with one click. log/agents.jsonl records
- *      every run: the task, the model, the files, the change.
+ *   5. Undo: each run is one jj change, taken out again with one click. log/agents.jsonl records
+ *      every run: the request, where, the model, the files, the change.
  *
  * Without jj the agent can still read and answer, but not write. */
-import type { AgentRun } from "../../shared/vault-types.ts";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import type { AgentContext, AgentRun } from "../../shared/vault-types.ts";
 import { publish } from "../events.ts";
-import { learnerSummary } from "../learn/context.ts";
+import { createNote } from "../learn/notes.ts";
 import { agent } from "../llm/index.ts";
 import {
   appendLog,
@@ -34,7 +38,9 @@ import {
 } from "../vault/index.ts";
 import { writeIndexes } from "../vault/indexes.ts";
 import { abandon, commitIdOf, describeIn, drop, land } from "../vault/jj.ts";
+import { agentPrompt, REPLY_SCHEMA, type Reply } from "./prompt.ts";
 import { isForbidden, needsReview, problemsIn } from "./review.ts";
+import { describeWhere } from "./where.ts";
 import { cleanUpWorkingCopies, createWorkingCopy, removeWorkingCopy, unlinkDerived } from "./workspace.ts";
 
 /** How many requests may be worked on at once (the model calls share a smaller limit besides). */
@@ -79,44 +85,46 @@ export function listRuns(): AgentRun[] {
   return [...runs.values()].sort((a, b) => b.started.localeCompare(a.started)).slice(0, 60);
 }
 
-const PROMPT = (task: string, write: boolean) => `You are the learner's librarian. ${
-  write
-    ? "Your working folder is a copy of their knowledge vault, in a jj workspace of its own: change files here freely; what you change lands in their vault when you finish, and they can undo it with one click."
-    : "Your working folder is their knowledge vault, read-only (this machine keeps no history of the vault, so agents may not write): look, and answer."
-}
-
-Read AGENTS.md first: it explains the layout and the rules. Start from INDEX.md and the folder indexes; search with rg; read only the files you need. The books' text (library/*/text/) and the indexes are read-only.
-
-The learner:
-${learnerSummary()}
-
-Their request:
-"""
-${task}
-"""
-
-Do it well, then reply with a short summary (Markdown) of what you changed and why, naming the files. If the request is unclear or risky, do the safe part and say what you left out.`;
-
-/** Starts a run; returns at once (the run continues, and announces itself on the global event stream). */
-export function startRun(input: { task: string }): AgentRun {
+/** Starts a request; returns at once (the run continues, and announces itself on the global event stream). */
+export function startRun(input: {
+  task: string;
+  context?: AgentContext;
+  /** The run this one follows up on: it joins that run's conversation. */
+  after?: string;
+  tier?: "fast" | "smart";
+}): AgentRun {
   load();
   const task = input.task.trim().slice(0, 4000);
   if (!task) throw new Error("say what the agent should do");
   if ([...runs.values()].filter((r) => r.status === "running").length >= MAX_RUNNING)
-    throw new Error(`${MAX_RUNNING} agents are already working; wait for one to finish`);
+    throw new Error(`${MAX_RUNNING} requests are already being worked on; wait for one to finish`);
+  const previous = input.after ? runs.get(input.after) : undefined;
+  const where = describeWhere(input.context);
+  const id = shortId("r");
   const run = save({
-    id: shortId("r"),
+    id,
     task,
+    thread: previous ? previous.thread || previous.id : undefined,
+    where: where.label || undefined,
+    tier: input.tier === "smart" ? "smart" : "fast",
     mode: vaultIsRepo() ? "write" : "read",
     status: "running",
     started: new Date().toISOString(),
     activity: "getting ready",
   });
-  void execute(run);
+  void execute(run, where.lines);
   return run;
 }
 
-/** Passes the agent's progress on to the page, at most every second and a half. */
+/** The earlier turns of a run's conversation, oldest first. */
+function turnsBefore(run: AgentRun): AgentRun[] {
+  if (!run.thread) return [];
+  return [...runs.values()]
+    .filter((r) => (r.id === run.thread || r.thread === run.thread) && r.id !== run.id && r.started <= run.started)
+    .sort((a, b) => a.started.localeCompare(b.started));
+}
+
+/** Passes the agent's progress on to the panel, at most every second and a half. */
 function reporter(id: string) {
   let last = 0;
   return (text: string) => {
@@ -128,9 +136,10 @@ function reporter(id: string) {
 }
 
 /** The run itself: a working copy, the agent, the checks; then it lands, waits for review, or fails. */
-async function execute(run: AgentRun) {
+async function execute(run: AgentRun, where: string[]) {
   const started = Date.now();
   const write = run.mode === "write";
+  const prompt = agentPrompt({ task: run.task, where, turns: turnsBefore(run), write });
   const finish = (patch: Partial<AgentRun>) =>
     save({ ...runs.get(run.id)!, activity: undefined, ms: Date.now() - started, ...patch });
   let workspace = false;
@@ -144,19 +153,29 @@ async function execute(run: AgentRun) {
       ({ dir, linked } = createWorkingCopy(run.id, base));
       workspace = true;
     }
-    save({ ...runs.get(run.id)!, activity: "the agent is working" });
+    save({ ...runs.get(run.id)!, activity: "reading your vault" });
     const result = await agent({
       cwd: dir,
       write,
       readRoots: write ? [VAULT] : undefined,
-      prompt: PROMPT(run.task, write),
-      tier: "smart",
-      timeoutMs: 15 * 60 * 1000,
+      prompt,
+      schema: REPLY_SCHEMA,
+      tier: run.tier,
+      timeoutMs: (run.tier === "smart" ? 15 : 6) * 60 * 1000,
       onActivity: reporter(run.id),
     });
-    const base = { provider: result.provider, model: result.model, answer: String(result.data || "").trim() };
+    const reply = (result.data || {}) as Partial<Reply>;
+    // the file to open from the reply: one it made, or (for an answer) one that already exists
+    const open = String(reply.open || "").replace(/^\/+/, "");
+    const base = {
+      provider: result.provider,
+      model: result.model,
+      answer: String(reply.reply || "").trim(),
+      open: open && !open.includes("..") ? open : undefined,
+    };
+    const existing = base.open && existsSync(join(VAULT, base.open)) ? base.open : undefined;
     if (!write) {
-      finish({ ...base, status: "done", files: [] });
+      finish({ ...base, open: existing, status: "done", files: [] });
       return;
     }
 
@@ -168,7 +187,7 @@ async function execute(run: AgentRun) {
     workspace = false;
     if (!files.length) {
       abandon(change);
-      finish({ ...base, status: "done", files: [] });
+      finish({ ...base, status: "done", files: [], open: existing });
       return;
     }
     const commit = commitIdOf(change);
@@ -222,7 +241,7 @@ function bringIn(run: AgentRun): AgentRun {
     };
   }
   refresh(run.files);
-  logActivity({ type: "ask", text: `Agent: ${run.task.slice(0, 80)}` });
+  logActivity({ type: "ask", text: `Asked the agent: ${run.task.slice(0, 80)}` });
   return { ...run, status: "merged", review: undefined, commit: commitIdOf(run.change!) || run.commit };
 }
 
@@ -258,4 +277,18 @@ export function undoRun(id: string): AgentRun {
 export function runDiff(id: string): string {
   const run = get(id);
   return run.commit ? diffOf(run.commit) : "";
+}
+
+/** Keeps an answer as a note (for a request that changed nothing). */
+export function keepRun(id: string): AgentRun {
+  const run = get(id);
+  if (!run.answer) throw new Error("there's no answer to keep");
+  if (run.kept) return run;
+  const note = createNote({
+    type: "answer",
+    title: run.task.split("\n")[0].slice(0, 80),
+    body: run.answer,
+    tags: ["ask"],
+  });
+  return save({ ...run, kept: note.path });
 }

@@ -116,8 +116,6 @@ async function routes(): Promise<string[]> {
     "#/review",
     "#/library/figures",
     "#/brain",
-    "#/ask",
-    "#/ask?do=1",
     "#/journey",
     "#/settings",
     "#/welcome",
@@ -246,6 +244,20 @@ async function keyboard(page: Page, bookRoute: string | undefined) {
   await wait(200);
   check("Escape closes the palette", !(await page.$("[role=dialog]")));
 
+  // ⌘J opens the agent with focus in its field, from any page; Escape closes it and gives focus back
+  await open(page, "#/library", "light");
+  await page.keyboard.down(mod);
+  await page.keyboard.press("j");
+  await page.keyboard.up(mod);
+  await wait(200);
+  const inAgent = await page.evaluate(
+    () => !!document.activeElement?.closest("[role=dialog]") && document.activeElement?.tagName === "TEXTAREA",
+  );
+  check("⌘J opens the agent with focus in its field", inAgent, await focused(page));
+  await page.keyboard.press("Escape");
+  await wait(200);
+  check("Escape closes the agent", !(await page.$("[role=dialog]")));
+
   // a dialog keeps focus inside while open, and Escape returns focus to what opened it
   const concept = (await routes()).find((r) => r.startsWith("#/brain/concept/"));
   if (concept) await open(page, concept, "light");
@@ -356,19 +368,29 @@ try {
       check(`axe: ${route} (${theme})`, violations.length === 0, describe(violations));
     }
   }
-  // a note's versions, open, in both themes
+  // the agent's panel and a note's versions, open, in both themes
   const quizNote = ((await fetch(`${BASE}api/notes?type=quiz`).then((r) => r.json())) as { id: string }[])[0];
   const note = quizNote ? `#/notes/${quizNote.id}` : list.find((r) => r.startsWith("#/notes/"));
   for (const theme of ["light", "dark"] as const) {
-    if (!note || (arg("only") && !"versions".includes(arg("only")!))) break;
-    await open(page, note, theme);
-    await page.click('.note-tools [aria-label="Versions"]');
-    await wait(600);
+    if (arg("only") && !"agent".includes(arg("only")!)) break;
+    await open(page, "#/", theme);
+    await page.click(".topnav-tools .agent-button");
+    await wait(300);
     check(
-      `axe: a note's versions (${theme})`,
-      !!(await page.$(".modal")) && (await axe(page)).length === 0,
+      `axe: the agent's panel (${theme})`,
+      !!(await page.$(".agent-panel")) && (await axe(page)).length === 0,
       describe(await axe(page)),
     );
+    if (note) {
+      await open(page, note, theme);
+      await page.click('.note-tools [aria-label="Versions"]');
+      await wait(600);
+      check(
+        `axe: a note's versions (${theme})`,
+        !!(await page.$(".modal")) && (await axe(page)).length === 0,
+        describe(await axe(page)),
+      );
+    }
   }
   if (!arg("only"))
     await keyboard(

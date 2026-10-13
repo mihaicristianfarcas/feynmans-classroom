@@ -3,6 +3,7 @@
 
 import type {
   Activity,
+  AgentContext,
   AgentRun,
   Anchor,
   Annotation,
@@ -15,7 +16,19 @@ import type {
   SourceRef,
 } from "../../../shared/vault-types.ts";
 
-export type { Activity, AgentRun, Anchor, Annotation, AnnotationKind, Note, NoteType, Profile, SavedFigure, SourceRef };
+export type {
+  Activity,
+  AgentContext,
+  AgentRun,
+  Anchor,
+  Annotation,
+  AnnotationKind,
+  Note,
+  NoteType,
+  Profile,
+  SavedFigure,
+  SourceRef,
+};
 /** A link an agent suggested between notes, and what the learner decided. */
 export type SuggestedLink = Connection;
 
