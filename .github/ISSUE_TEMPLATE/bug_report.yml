@@ -1,0 +1,42 @@
+name: Bug report
+description: Something doesn't work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a PDF in the Library
+        2. Select a passage and choose Explain
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The output of `git rev-parse --short HEAD`.
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Model provider
+      options: [Codex, Claude Code, Not related to models]
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Node version (`node --version`), browser.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server output
+      description: Anything the terminal running `npm run dev` printed around the problem. Remove anything private.
+      render: text

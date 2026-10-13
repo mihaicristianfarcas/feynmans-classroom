@@ -2,24 +2,28 @@
   "name": "feynmans-classroom",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "description": "A local-first learning platform: read hard books beside interactive figures, spaced repetition, quizzes, the Feynman technique and a Markdown second brain, on your own Codex or Claude Code subscription.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "dev:server": "tsx watch --clear-screen=false server/index.ts",
+    "dev:server": "tsx watch --clear-screen=false --exclude 'data/**' server/index.ts",
     "dev:web": "vite",
     "build": "vite build",
     "start": "NODE_ENV=production tsx server/index.ts",
-    "sync:kit": "node scripts/sync-kit.mjs",
-    "seed": "tsx scripts/seed.ts",
-    "test": "vitest run",
-    "test:e2e": "tsx tests/e2e.ts",
+    "check": "biome check .",
+    "fix": "biome check --write .",
     "typecheck": "tsc --noEmit -p .",
-    "postinstall": "node scripts/sync-kit.mjs",
-    "test:flow": "tsx tests/reader-flow.ts"
-  },
-  "engines": {
-    "node": ">=20"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "tsx tests/browser/e2e.ts",
+    "test:a11y": "tsx tests/browser/a11y.ts",
+    "verify": "npm run check && npm run typecheck && npm test && npm run build",
+    "sync:anatomy": "node scripts/sync-anatomy.mjs",
+    "postinstall": "node scripts/build-kit.mjs",
+    "prepare": "husky"
   },
   "dependencies": {
     "@anaralabs/lector": "^3.15.5",

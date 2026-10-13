@@ -1,0 +1,18 @@
+# Runs before every commit: no commits on main, staged files formatted and linted, types check.
+# (About two seconds. Bypass only in an emergency: git commit --no-verify. CI runs the same checks.)
+
+branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+if [ "$branch" = "main" ]; then
+  echo "✗ You're on main, which only changes through pull requests."
+  echo "  Move your work to a branch:  git switch -c <branch-name>   (then commit again)"
+  exit 1
+fi
+
+npx biome check --staged --no-errors-on-unmatched --files-ignore-unknown=true || {
+  echo "✗ Formatting or lint problems in the staged files. Fix most of them with: npm run fix"
+  exit 1
+}
+npm run --silent typecheck || {
+  echo "✗ Type errors (npm run typecheck)."
+  exit 1
+}
