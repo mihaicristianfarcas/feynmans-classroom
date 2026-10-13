@@ -69,6 +69,21 @@ one of them where it's easiest to use.
 Concept mastery is the FSRS-predicted recall of a concept's cards right now (or your best
 explanation score when it has no cards), so the graph shows what is actually fading.
 
+### Look and feel
+
+Coal gray and off-white, light or dark (it follows the system until you pick one), with pastel
+accents that each mean one thing: **lavender** for the accent and what the models write (margin
+answers, AI links), **sage** for known and right, **butter** for what's waiting (cards due) and the
+default highlighter, **peach** for figures, **sky** for links and notes, **rose** for wrong, fading
+and delete. The app is set in the system sans; what you read and write (books, notes, answers) is in
+a serif.
+
+Motion is quick and quiet: popovers and menus grow from where they open, presses scale slightly,
+tab and nav indicators slide, new content rises a few pixels, and the theme switch crossfades.
+What you do from the keyboard (the ⌘K palette, revealing a card, the reader's shortcuts) doesn't
+animate, and reduced motion keeps only fades. The tokens, controls and motion rules live in
+`web/src/styles.css`.
+
 ## Figures: fast, deterministic, in one house style
 
 The old way to get a demo was to have an agent write code, check it in a browser and fix it: five
@@ -107,10 +122,11 @@ live stats. Doers drag points, nodes and pistons, scrub protocols and orbit 3D o
 to read what it is. Numbers that move are expressions in a small safe language
 (`shared/scene/expr.ts`: no property access, no globals), so a spec can only compute values.
 
-The finish comes from the **anatomy** skill (`vendor/anatomy/`): monochrome tones that follow the
-theme, thin precise lines, one lit accent, paper-coloured solids with four-tone shading and crisp
-outlines, calm motion. The 3D renderer (`shared/scene/object3d.ts`) is a small mesh-to-SVG engine in
-that finish. The reference figures in `shared/scene/examples.ts` (see them at `#/gallery`) are the
+Figures share the app's palette (below): coal lines on white, the one lit element in the lavender
+accent, pastel inks for red, green and blue, in both themes. The drawing technique comes from the
+**anatomy** skill (`vendor/anatomy/`): thin precise lines, paper-coloured solids with four-tone
+shading and crisp outlines, calm motion. The 3D renderer (`shared/scene/object3d.ts`) is a small
+mesh-to-SVG engine in that style. The reference figures in `shared/scene/examples.ts` (see them at `#/gallery`) are the
 quality bar and the few-shot examples the model sees.
 
 Two qualities per figure: **Quick** (the fast model; ~10–20 s) and **Careful** (your default model;
@@ -297,6 +313,8 @@ web/src/           React: Today, Library, Reader (margin, figures, note, tutor, 
                    Brain, Ask (and Do), Journey, Settings
   Margin.tsx, SelectionMenu.tsx, anchoring.ts, Capture.tsx     the reader's margin and menu
   Notes.tsx, NoteEditor.tsx, Markdown.tsx                      notes, the editor, rendering
+  styles.css, ui.ts   the design system: tokens, controls, motion; sliding indicators
+  app.css, reader.css, notes.css                               pages, the reader, notes and Markdown
   scene/           the player: the universal frame, loop, controls, dragging, zoom
 tests/             vitest units; screenshot and browser-flow scripts
 vendor/anatomy/    the anatomy skill (MIT)
