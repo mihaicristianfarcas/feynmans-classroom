@@ -74,3 +74,10 @@ npm run verify       # formatting, lint, types, unit tests, build: what CI runs
 npm run test:e2e     # browser checks of the running app
 npm run test:a11y    # accessibility checks of the running app
 ```
+
+## License
+
+Copyright © 2026 Mihai-Cristian Farcaș. Free software under the
+[GNU General Public License, version 3 or later](LICENSE): use it, change it and share it; whatever
+you distribute that builds on it is shared under the same terms. The bundled agent skills keep their
+own MIT licenses ([.agents/skills](.agents/skills/README.md)).
