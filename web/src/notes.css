@@ -197,6 +197,8 @@
 .link-list li[data-missing] a { color: var(--muted); border-bottom-style: dashed; }
 .link-list .context { color: var(--muted); font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .ai-badge { margin-left: 6px; font: 600 9px var(--mono); letter-spacing: 0.06em; color: var(--mark); box-shadow: 0 0 0 1px var(--mark); padding: 0 4px; border-radius: 6px; vertical-align: 1px; }
+.suggestion { padding: 8px 10px; margin-bottom: 8px; border-radius: 3px; box-shadow: 0 0 0 1px var(--rule); background: var(--paper); font-size: 13px; display: grid; gap: 6px; }
+.suggestion .context { color: var(--text); font-size: 12.5px; }
 
 /* the editor */
 .note-editor { height: 100%; min-height: 200px; }
@@ -220,8 +222,19 @@
 .reader-note-others { padding: 8px 14px; border-top: 1px solid var(--faint); }
 
 /* ---------- the graph ---------- */
+.g-edge[data-kind="ai"] { stroke: var(--mark); stroke-width: 1.2; stroke-dasharray: 5 3; }
+.g-edge[data-kind="suggested"] { stroke: var(--mark); stroke-width: 1; stroke-dasharray: 1.5 3; opacity: 0.7; }
 .g-edge[data-kind="link"], .g-edge[data-kind="embed"] { stroke: var(--mid); }
 .g-annotation rect { fill: var(--mark); stroke: none; }
+.legend-line { display: inline-block; width: 18px; height: 0; border-top: 1.5px solid var(--mid); }
+.legend-line[data-kind="ai"] { border-top: 1.5px dashed var(--mark); }
+.legend-line[data-kind="suggested"] { border-top: 1.5px dotted var(--mark); }
+.connections-inbox { margin-top: 18px; max-width: 900px; }
+.suggestions { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.suggestions li { display: grid; grid-template-columns: 1fr auto; gap: 2px 16px; padding: 8px 10px; background: var(--card); border-radius: 3px; box-shadow: 0 0 0 1px var(--rule); font-size: 13px; }
+.suggestions li .fine { grid-column: 1; margin: 0; }
+.suggestions li .row { grid-row: 1 / span 2; grid-column: 2; align-self: center; }
+
 /* ---------- small things ---------- */
 .toast { display: flex; gap: 14px; align-items: center; }
 .toast-action { color: inherit; font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -236,6 +249,22 @@
   .file-tree { max-height: 40vh; }
 }
 
+/* ---------- agents at work ---------- */
+.tabs button.tab { appearance: none; border: 0; background: none; cursor: pointer; }
+.agent-runs { display: grid; gap: 14px; }
+.agent-form { display: grid; gap: 8px; }
+.agent-form .fine { margin: 0; max-width: 560px; }
+.run { padding: 12px 14px; background: var(--card); border-radius: 4px; box-shadow: 0 0 0 1px var(--rule); display: grid; gap: 6px; }
+.run[data-status="review"] { box-shadow: 0 0 0 1px var(--mark); }
+.run[data-status="failed"] .eyebrow { color: var(--danger); }
+.run[data-status="undone"], .run[data-status="discarded"] { opacity: 0.7; }
+.run header .fine { margin: 0; }
+.run-task { margin: 0; color: var(--strong); font: 15px/1.45 var(--serif); }
+.run-review { margin: 0; padding-left: 18px; color: var(--mark); font-size: 13px; }
+.run-answer { font-size: 14px; }
+.run-files { list-style: none; padding: 0; margin: 6px 0; font-size: 13px; display: grid; gap: 2px; }
+.run-diff { max-height: 420px; overflow: auto; font: 11.5px/1.45 var(--mono); background: var(--faint); padding: 10px; border-radius: 3px; white-space: pre; margin: 6px 0 0; }
+
 /* ---------- capturing a region of a page ---------- */
 .capture-layer { position: absolute; inset: 0 0 0 34px; z-index: 25; cursor: crosshair; outline: none; }
 .capture-hint { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 6px 12px; border-radius: 6px; background: var(--menu); color: var(--menu-text); font: 12px var(--sans); pointer-events: none; }
@@ -243,3 +272,4 @@
 .capture-pop { position: absolute; width: 370px; padding: 10px; display: grid; gap: 8px; background: var(--card); border-radius: 6px; box-shadow: var(--lift); cursor: default; }
 .capture-pop img { max-width: 100%; max-height: 220px; object-fit: contain; border-radius: 3px; box-shadow: 0 0 0 1px var(--rule); background: #fff; }
 .capture-text { max-height: 200px; overflow: auto; font-size: 13.5px; padding: 6px 8px; background: var(--paper); border-radius: 3px; }
+.radio-row { display: grid; gap: 6px; margin-top: 10px; }

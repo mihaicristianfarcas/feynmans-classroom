@@ -6,8 +6,9 @@ import { retrievability } from "../../shared/fsrs.ts";
 import { agent } from "../llm.ts";
 import { getBook, listBooks, listDemos } from "../store.ts";
 import { activity, annotations, cards, concepts, figures, getProfile, logActivity, notes, reviews, VAULT } from "../vault/index.ts";
+import { listConnections } from "../vault/connections.ts";
 import { chapterFile } from "../vault/library.ts";
-import { allEdges, type Edge } from "../vault/links.ts";
+import { allEdges, resolveLink, type Edge } from "../vault/links.ts";
 import { createNote } from "./notes.ts";
 import { cardState, reviewQueue } from "./cards.ts";
 import { conceptMastery, learnerSummary } from "./context.ts";
@@ -30,9 +31,12 @@ export interface GraphNode {
 export interface GraphEdge {
   from: string;
   to: string;
-  /** link/embed: written in a note; related: a property link; concept: concept to concept;
-   * mentions: note to concept; source: to its book. */
-  kind: "source" | "related" | "mentions" | "link" | "embed" | "concept";
+  /** link/embed: written in a note; related: a property link; ai: a connection the learner accepted;
+   * suggested: one waiting for a decision; concept: concept to concept; mentions: note to concept; source: to its book. */
+  kind: "source" | "related" | "mentions" | "link" | "embed" | "ai" | "suggested" | "concept";
+  /** For suggestions: the connection's id and why it was suggested. */
+  id?: string;
+  why?: string;
 }
 
 /** The knowledge graph, from the vault's links (see vault/links.ts). */
@@ -56,9 +60,15 @@ export function knowledgeGraph(): { nodes: GraphNode[]; edges: GraphEdge[] } {
     edges.push(e);
   };
   // the strongest kind of link between two things is the one drawn: written links first
-  const order: Edge["kind"][] = ["link", "embed", "related", "concept", "mentions", "source"];
+  const order: Edge["kind"][] = ["link", "embed", "ai", "related", "concept", "mentions", "source"];
   const all = allEdges().filter((e) => e.to);
   for (const kind of order) for (const e of all) if (e.kind === kind) add({ from: e.from, to: e.to!, kind: e.kind });
+  for (const c of listConnections()) {
+    if (c.status !== "suggested") continue;
+    const from = notes.byPath(c.from);
+    const to = resolveLink(c.to);
+    if (from && to) add({ from: `note:${from.id}`, to: to.node, kind: "suggested", id: c.id, why: c.why });
+  }
   return { nodes, edges };
 }
 

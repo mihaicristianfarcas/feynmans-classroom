@@ -17,6 +17,8 @@ export interface Settings {
   claude: { fastModel: string; fastEffort: string; smartModel: string; smartEffort: string };
   /** Parallel model calls for quick work (figures, cards, quizzes). */
   concurrency: number;
+  /** Links the agent finds between notes: "suggest" waits for the learner's OK; "auto" adds them (removable). */
+  connections: "suggest" | "auto";
 }
 
 const FILE = () => join(DATA_DIR, "settings.json");
@@ -39,6 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   codex: { fastModel: process.env.CODEX_FAST_MODEL || fastCodexModel() || CODEX.model || "", fastEffort: process.env.CODEX_FAST_EFFORT || "low", smartModel: CODEX.model || "", smartEffort: CODEX.planEffort || "medium" },
   claude: { fastModel: process.env.CLAUDE_FAST_MODEL || "sonnet", fastEffort: "low", smartModel: process.env.CLAUDE_SMART_MODEL || "opus", smartEffort: "medium" },
   concurrency: Number(process.env.LLM_CONCURRENCY) || 3,
+  connections: "suggest",
 };
 
 export function getSettings(): Settings {

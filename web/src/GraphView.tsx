@@ -12,14 +12,15 @@ const radius = (n: N) => (n.kind === "book" ? 0 : n.kind === "concept" ? 5 + n.s
 
 /**
  * The knowledge graph: books, concepts, notes (and, if shown, annotations), joined by their links.
- * Each concept's ring shows how well it's known.
+ * Each concept's ring shows how well it's known. Links you wrote are solid, connections you accepted
+ * from the agent dashed, its pending suggestions dotted.
  */
-export function GraphView({ data, showNotes, showAnnotations = false, highlight, until }: { data: GraphData; showNotes: boolean; showAnnotations?: boolean; highlight: string; until?: number }) {
+export function GraphView({ data, showNotes, showAnnotations = false, showSuggestions = false, highlight, until }: { data: GraphData; showNotes: boolean; showAnnotations?: boolean; showSuggestions?: boolean; highlight: string; until?: number }) {
   const nodes = useMemo<N[]>(() => data.nodes.filter((n) => (showNotes || n.kind !== "note") && (showAnnotations || n.kind !== "annotation")).map((n) => ({ ...n })), [data, showNotes, showAnnotations]);
   const links = useMemo<L[]>(() => {
     const ids = new Set(nodes.map((n) => n.id));
-    return data.edges.filter((e) => ids.has(e.from) && ids.has(e.to)).map((e) => ({ source: e.from, target: e.to, kind: e.kind }));
-  }, [data, nodes]);
+    return data.edges.filter((e) => ids.has(e.from) && ids.has(e.to) && (showSuggestions || e.kind !== "suggested")).map((e) => ({ source: e.from, target: e.to, kind: e.kind }));
+  }, [data, nodes, showSuggestions]);
   const [, setTick] = useState(0);
   const [hover, setHover] = useState<string | null>(null);
   const [view, setView] = useState({ k: 1, x: 0, y: 0 });

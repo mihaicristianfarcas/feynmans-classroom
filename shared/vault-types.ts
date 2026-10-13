@@ -174,3 +174,39 @@ export interface Annotation {
   created: string;
   updated: string;
 }
+
+/* ---------------- connections the agent suggests between notes ---------------- */
+
+export interface Connection {
+  id: string;
+  /** Vault path of the note the link goes in. */
+  from: string;
+  /** The link target as it would be written in [[…]] (a note title, a concept name). */
+  to: string;
+  why: string;
+  status: "suggested" | "accepted" | "rejected" | "removed";
+  by?: { provider: string; model: string };
+  created: string;
+  decided?: string;
+}
+
+/* ---------------- agent runs ---------------- */
+
+export interface AgentRun {
+  id: string;
+  task: string;
+  mode: "read" | "write";
+  status: "running" | "review" | "merged" | "discarded" | "failed" | "undone" | "done";
+  started: string;
+  ms?: number;
+  provider?: string;
+  model?: string;
+  /** Files the run changed: A(dded), M(odified), D(eleted). */
+  files?: { path: string; change: "A" | "M" | "D" }[];
+  /** Why it waits for the learner's OK (it deletes or rewrites their notes). */
+  review?: string[];
+  commit?: string;
+  answer?: string;
+  error?: string;
+  activity?: string;
+}

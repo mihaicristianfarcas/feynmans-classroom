@@ -18,6 +18,9 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { extname, join, resolve } from "node:path";
 import { fileNameOf } from "../shared/links.ts";
 import { appendToNote, bookNote, createNote, deleteNote, linkMention, updateNote } from "./learn/notes.ts";
+import { decideConnection, suggestConnections } from "./learn/connections.ts";
+import { approveRun, discardRun, listRuns, runDiff, startRun, undoRun } from "./agents.ts";
+import { listConnections } from "./vault/connections.ts";
 import { allEdges, backlinks, linkTargets, resolveLink, titleOf, unlinkedMentions } from "./vault/links.ts";
 import { validateScene } from "../shared/scene/validate.ts";
 import type { Note } from "../shared/vault-types.ts";
@@ -115,7 +118,8 @@ export function registerRoutes(app: Hono) {
     const outgoing = allEdges()
       .filter((e) => e.from === node && e.kind !== "source")
       .map((e) => ({ target: e.target, kind: e.kind, to: e.to, path: e.toPath, title: e.to ? titleOf(e.to, e.toPath) : e.target }));
-    return c.json({ ...note, backlinks: backlinks(node), mentions: unlinkedMentions(note), outgoing });
+    const connections = listConnections().filter((x) => x.from === note.path && x.status !== "removed");
+    return c.json({ ...note, backlinks: backlinks(node), mentions: unlinkedMentions(note), outgoing, connections });
   });
   app.post("/api/notes", async (c) => {
     const b = await body<Partial<Note> & { folder?: string; concepts?: string[] }>(c);
@@ -135,6 +139,34 @@ export function registerRoutes(app: Hono) {
   app.delete("/api/notes/:id", (c) => c.json({ ok: deleteNote(c.req.param("id")) }));
   app.post("/api/notes/:id/link-mention", async (c) => c.json(linkMention(c.req.param("id"), (await body<{ path: string }>(c)).path)));
 
+  /* ---------- agents that work on the vault ---------- */
+  app.get("/api/agents", (c) => c.json(listRuns()));
+  app.post("/api/agents", async (c) => {
+    const b = await body<{ task: string }>(c);
+    if (!b.task?.trim() || b.task.trim().length < 8) return c.json({ error: "say what the agent should do" }, 400);
+    return c.json(startRun(b.task));
+  });
+  app.get("/api/agents/:id/diff", (c) => c.json({ diff: runDiff(c.req.param("id")) }));
+  app.post("/api/agents/:id/:action", (c) => {
+    const action = c.req.param("action");
+    const id = c.req.param("id");
+    if (action === "approve") return c.json(approveRun(id));
+    if (action === "discard") return c.json(discardRun(id));
+    if (action === "undo") return c.json(undoRun(id));
+    return c.json({ error: "approve, discard or undo" }, 400);
+  });
+
+  /* ---------- connections the agent suggests ---------- */
+  app.get("/api/connections", (c) => {
+    const path = c.req.query("path");
+    return c.json(listConnections().filter((x) => !path || x.from === path));
+  });
+  app.post("/api/connections/suggest", async (c) => c.json(await suggestConnections((await body<{ path?: string }>(c)).path || undefined)));
+  app.post("/api/connections/:id/:decision", (c) => {
+    const decision = c.req.param("decision");
+    if (!["accept", "reject", "remove"].includes(decision)) return c.json({ error: "accept, reject or remove" }, 400);
+    return c.json(decideConnection(c.req.param("id"), decision as "accept" | "reject" | "remove"));
+  });
   /** The note a book's reading session writes into ("<title> — notes", made on first use). */
   app.post("/api/books/:id/note", (c) => c.json(bookNote(c.req.param("id"))));
 

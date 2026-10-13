@@ -10,6 +10,7 @@ import { linksInValue, linkKey, pageOf, parseWikiLinks, rewriteLinks, type WikiL
 import type { Annotation, Concept, Note } from "../../shared/vault-types.ts";
 import { bookFolder, listBooks } from "../store.ts";
 import type { Book } from "../types.ts";
+import { listConnections } from "./connections.ts";
 import { annotations, changed, concepts, figures, notes, onVaultChange, VAULT } from "./index.ts";
 
 export type NodeKind = "note" | "concept" | "book" | "annotation" | "figure" | "attachment";
@@ -32,7 +33,7 @@ export interface Edge {
   to: string | null;
   toPath?: string;
   target: string;
-  kind: "link" | "embed" | "related" | "mentions" | "source" | "concept";
+  kind: "link" | "embed" | "related" | "ai" | "mentions" | "source" | "concept";
   line: number;
 }
 
@@ -158,6 +159,7 @@ function linkEdges(from: string, fromPath: string, text: string, kindOf: (l: Wik
 export function allEdges(): Edge[] {
   if (edgesCache) return edgesCache;
   const edges: Edge[] = [];
+  const accepted = new Set(listConnections().filter((c) => c.status === "accepted").map((c) => `${c.from}\u0000${linkKey(c.to)}`));
   for (const n of notes.list()) {
     const from = `note:${n.id}`;
     // the body starts after the frontmatter: count its lines so line numbers point into the file
@@ -165,7 +167,7 @@ export function allEdges(): Edge[] {
     for (const e of linkEdges(from, n.path, n.body)) edges.push({ ...e, line: e.line + offset });
     for (const target of linksInValue(n.related)) {
       const r = resolveLink(target);
-      edges.push({ from, fromPath: n.path, to: r?.node ?? null, toPath: r?.path, target, kind: "related", line: 1 });
+      edges.push({ from, fromPath: n.path, to: r?.node ?? null, toPath: r?.path, target, kind: accepted.has(`${n.path}\u0000${linkKey(target)}`) ? "ai" : "related", line: 1 });
     }
     for (const c of n.concepts) {
       const concept = concepts.get(c);

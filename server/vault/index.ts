@@ -12,6 +12,7 @@
  *     library/<book>/           one folder per book: book.json, the file, its text by chapter (text/),
  *                               annotations/ (highlights, explanations, figures made from passages),
  *                               a generated README.md
+ *     brain/connections.jsonl   links the agent suggested between notes, and what you decided
  *     brain/links.tsv           every link in the vault (generated)
  *     log/*.jsonl               reviews, the learning journey, agent runs
  *
@@ -697,6 +698,7 @@ you need, instead of listing everything.
 | \`figures/*.json\` | saved interactive figures (scene specs) |
 | \`attachments/\` | pictures in notes |
 | \`brain/links.tsv\` | generated: every link, \`from<TAB>to<TAB>kind<TAB>line\`; backlinks of X: \`rg -F "<TAB>X<TAB>" brain/links.tsv\` |
+| \`brain/connections.jsonl\` | links suggested between notes and the learner's decisions (\`suggested\`, \`accepted\`, \`rejected\`, \`removed\`) |
 | \`log/reviews.jsonl\` | every flashcard review \`{card, ts, rating 1–4}\` (spaced repetition is replayed from it) |
 | \`log/activity.jsonl\` | the learning journey \`{ts, type, text, bookId?}\` |
 

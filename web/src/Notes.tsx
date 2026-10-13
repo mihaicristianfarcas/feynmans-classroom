@@ -2,7 +2,7 @@
  * live preview, or read), and beside it what links here, what it links to, where it's mentioned
  * without a link, and the connections the agent suggests (accept, reject, or remove later). */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { go, learn, openLink, type NoteDetail } from "./api";
+import { go, learn, openLink, type NoteDetail, type SuggestedLink } from "./api";
 import { Markdown } from "./Markdown";
 import { NoteEditor } from "./NoteEditor";
 import { Spinner, timeAgo, useLoad } from "./Shell";
@@ -374,6 +374,14 @@ function Properties({ note, onSave }: { note: NoteDetail; onSave: (patch: { tags
 /* ---------------- links, mentions, connections ---------------- */
 
 function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => void }) {
+  const [busy, setBusy] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const suggested = note.connections.filter((c) => c.status === "suggested");
+  const accepted = note.connections.filter((c) => c.status === "accepted");
+  const decide = async (c: SuggestedLink, d: "accept" | "reject" | "remove") => {
+    await learn.decideConnection(c.id, d);
+    reload();
+  };
   return (
     <aside className="note-side" aria-label="Links">
       <section>
@@ -434,6 +442,63 @@ function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => void })
             </li>
           ))}
         </ul>
+      </section>
+      <section>
+        <h3 className="side-title">Connections</h3>
+        <p className="fine">An agent reads your vault and suggests notes and concepts this one should link to. You decide.</p>
+        {suggested.map((c) => (
+          <div key={c.id} className="suggestion">
+            <div>
+              <b>[[{c.to}]]</b>
+            </div>
+            <div className="context">{c.why}</div>
+            <div className="row gap">
+              <button className="button" onClick={() => decide(c, "accept")}>
+                Link it
+              </button>
+              <button className="link" onClick={() => decide(c, "reject")}>
+                Not related
+              </button>
+            </div>
+          </div>
+        ))}
+        {accepted.length > 0 && (
+          <ul className="link-list compact">
+            {accepted.map((c) => (
+              <li key={c.id}>
+                <a href={`#/open?target=${encodeURIComponent(c.to)}`} onClick={(e) => (e.preventDefault(), openLink(c.to))}>
+                  {c.to}
+                </a>
+                <span className="ai-badge" title={c.why}>
+                  AI
+                </span>
+                <button className="link danger" title="Remove this link" onClick={() => decide(c, "remove")}>
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <button
+          className="button"
+          disabled={!!busy}
+          onClick={async () => {
+            setBusy(Date.now());
+            setError(null);
+            try {
+              await learn.suggestConnections(note.path);
+              reload();
+            } catch (e) {
+              setError((e as Error).message);
+            } finally {
+              setBusy(null);
+            }
+          }}
+        >
+          {busy ? "Reading your vault…" : "Suggest connections"}
+        </button>
+        {busy && <Spinner label="The agent is reading your notes" since={busy} />}
+        {error && <p className="form-error">{error}</p>}
       </section>
     </aside>
   );

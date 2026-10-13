@@ -11,6 +11,8 @@ export const VAULT_DIR = join(DATA_DIR, "vault");
 export const BOOKS_DIR = join(VAULT_DIR, "library");
 /** Where books lived before they moved into the vault (migrated at startup). */
 export const LEGACY_BOOKS_DIR = join(DATA_DIR, "books");
+/** Scratch working copies of the vault for agents that write (outside the vault, never versioned). */
+export const RUNS_DIR = join(DATA_DIR, "agent-runs");
 export const RUNTIME_DIR = join(ROOT, "runtime");
 export const VENDOR_DIR = join(ROOT, "vendor", "anatomy");
 export const WEB_DIST = join(ROOT, "web", "dist");

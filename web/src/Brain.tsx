@@ -61,9 +61,14 @@ function BrainHome({ tab, theme }: { tab: Tab; theme: "light" | "dark" }) {
 }
 
 function GraphTab({ filter }: { filter: string }) {
-  const { data } = useLoad(() => learn.graph());
+  const { data, reload } = useLoad(() => learn.graph());
   const [notes, setNotes] = useState(true);
   const [annotationsShown, setAnnotationsShown] = useState(false);
+  const [suggestions, setSuggestions] = useState(true);
+  const [busy, setBusy] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const pending = (data?.edges || []).filter((e) => e.kind === "suggested");
+  const label = (id: string) => data?.nodes.find((n) => n.id === id)?.label || id;
   // the learning journey: replay how the graph grew
   const [until, setUntil] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -103,13 +108,20 @@ function GraphTab({ filter }: { filter: string }) {
           <input type="checkbox" checked={annotationsShown} onChange={(e) => setAnnotationsShown(e.target.checked)} />
           Annotations
         </label>
+        <label className="check" title="Links the agent suggests (dotted) until you decide">
+          <input type="checkbox" checked={suggestions} onChange={(e) => setSuggestions(e.target.checked)} />
+          Suggestions
+        </label>
+        <span className="legend-item"><span className="legend-line" data-kind="link" /> your link</span>
+        <span className="legend-item"><span className="legend-line" data-kind="ai" /> accepted</span>
+        <span className="legend-item"><span className="legend-line" data-kind="suggested" /> suggested</span>
         <span className="legend-item"><span className="legend-ring" data-level="strong" /> well known</span>
         <span className="legend-item"><span className="legend-ring" data-level="ok" /> getting there</span>
         <span className="legend-item"><span className="legend-ring" data-level="weak" /> fading</span>
         <span className="legend-item"><span className="legend-ring" data-level="none" /> not studied</span>
         <span className="fine">Drag to move · ⌘-scroll to zoom · click to open</span>
       </div>
-      <GraphView data={data} showNotes={notes} showAnnotations={annotationsShown} highlight={filter} until={until ?? undefined} />
+      <GraphView data={data} showNotes={notes} showAnnotations={annotationsShown} showSuggestions={suggestions} highlight={filter} until={until ?? undefined} />
       {times.length > 1 && (
         <div className="growth">
           <button className="icon-button" onClick={() => (playing ? setPlaying(false) : (setUntil(first), setPlaying(true)))} aria-label={playing ? "Pause" : "Replay your graph's growth"} title="Replay how your graph grew">
@@ -121,6 +133,54 @@ function GraphTab({ filter }: { filter: string }) {
           </span>
         </div>
       )}
+      <section className="connections-inbox">
+        <div className="row gap">
+          <h3 className="sub-title">Connections the agent suggests</h3>
+          <span className="spacer" />
+          <button
+            className="button"
+            disabled={!!busy}
+            onClick={async () => {
+              setBusy(Date.now());
+              setError(null);
+              try {
+                await learn.suggestConnections();
+                reload();
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(null);
+              }
+            }}
+          >
+            {busy ? "Reading your vault…" : "Find connections in recent notes"}
+          </button>
+        </div>
+        {busy && <Spinner label="The agent is reading your notes" since={busy} />}
+        {error && <p className="form-error">{error}</p>}
+        {pending.length === 0 ? (
+          <p className="fine">None waiting. The agent reads your notes (with its own shell, inside your vault) and proposes links worth following; you accept or reject each one.</p>
+        ) : (
+          <ul className="suggestions">
+            {pending.map((e) => (
+              <li key={e.id}>
+                <span>
+                  <b>{label(e.from)}</b> → <b>{label(e.to)}</b>
+                </span>
+                <span className="fine">{e.why}</span>
+                <span className="row gap">
+                  <button className="button" onClick={async () => (await learn.decideConnection(e.id!, "accept"), reload())}>
+                    Link
+                  </button>
+                  <button className="link" onClick={async () => (await learn.decideConnection(e.id!, "reject"), reload())}>
+                    Not related
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

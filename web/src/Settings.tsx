@@ -71,6 +71,21 @@ export function Settings() {
       </section>
 
       <section className="panel">
+        <h2 className="section-title">Agents in your vault</h2>
+        <p className="fine">Agents work with your files using their own shell, inside the CLI's sandbox: they can read only your vault, write only where they're allowed (agents that change things work on their own git branch and land as one commit you can undo), never touch .git, and have no network.</p>
+        <div className="radio-row" role="radiogroup" aria-label="Connections between notes">
+          <label className="check">
+            <input type="radio" name="connections" checked={(s.connections || "suggest") === "suggest"} onChange={() => save({ connections: "suggest" })} />
+            Suggest connections between notes; I accept or reject each
+          </label>
+          <label className="check">
+            <input type="radio" name="connections" checked={s.connections === "auto"} onChange={() => save({ connections: "auto" })} />
+            Add them straight away (marked AI); I remove the ones I don't want
+          </label>
+        </div>
+      </section>
+
+      <section className="panel">
         <h2 className="section-title">You</h2>
         <ProfileForm
           initial={profile}
@@ -89,7 +104,7 @@ export function Settings() {
         <section className="panel">
           <h2 className="section-title">Your vault</h2>
           <p>
-            Everything you make lives as plain Markdown in <code>{vault.path}</code>: {vault.notes} notes, {vault.concepts} concepts, {vault.cards} cards, {vault.figures} figures, {vault.reviews} reviews. Open it in any editor or Obsidian; point an AI agent at it (it has an <code>AGENTS.md</code>). {vault.git ? "Every change is committed to git." : "Install git to keep a history of every change."}
+            Everything you make lives as plain Markdown in <code>{vault.path}</code>: {vault.notes} notes, {vault.concepts} concepts, {vault.annotations} annotations, {vault.cards} cards, {vault.figures} figures, {vault.reviews} reviews. Open it in any editor or Obsidian; point an AI agent at it (it has an <code>AGENTS.md</code>). {vault.git ? "Every change is committed to git." : "Install git to keep a history of every change."}
           </p>
           {vault.history.length > 0 && (
             <ul className="history">

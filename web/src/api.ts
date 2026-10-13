@@ -282,6 +282,7 @@ export interface NoteDetail extends Note {
   backlinks: { from: string; path: string; title: string; kind: string; line: number; context: string }[];
   mentions: { path: string; title: string; context: string }[];
   outgoing: { target: string; kind: string; to: string | null; path?: string; title: string }[];
+  connections: SuggestedLink[];
 }
 export type AnnotationKind = "highlight" | "explain" | "define" | "ask" | "visualize" | "resources" | "comment";
 export interface Rect {
@@ -321,6 +322,33 @@ export interface Annotation {
   tags: string[];
   created: string;
   updated: string;
+}
+/** A link the agent suggested between notes, and what the learner decided. */
+export interface SuggestedLink {
+  id: string;
+  from: string;
+  to: string;
+  why: string;
+  status: "suggested" | "accepted" | "rejected" | "removed";
+  by?: { provider: string; model: string };
+  created: string;
+  decided?: string;
+}
+export interface AgentRun {
+  id: string;
+  task: string;
+  mode: "read" | "write";
+  status: "running" | "review" | "merged" | "discarded" | "failed" | "undone" | "done";
+  started: string;
+  ms?: number;
+  provider?: string;
+  model?: string;
+  files?: { path: string; change: "A" | "M" | "D" }[];
+  review?: string[];
+  commit?: string;
+  answer?: string;
+  error?: string;
+  activity?: string;
 }
 export interface Resolved {
   node: string;
@@ -438,7 +466,7 @@ export interface SavedFigure {
 }
 export interface GraphData {
   nodes: { id: string; kind: "book" | "concept" | "note" | "annotation"; label: string; mastery: number | null; size: number; detail?: string; bookId?: string; path?: string; created: number }[];
-  edges: { from: string; to: string; kind: string }[];
+  edges: { from: string; to: string; kind: string; id?: string; why?: string }[];
 }
 export interface SearchHit {
   kind: "note" | "concept" | "card" | "book" | "annotation";
@@ -473,7 +501,7 @@ export interface Today {
   summary: string;
 }
 export interface SettingsInfo {
-  settings: { provider: "auto" | "codex" | "claude"; codex: Tier; claude: Tier; concurrency: number };
+  settings: { provider: "auto" | "codex" | "claude"; codex: Tier; claude: Tier; concurrency: number; connections?: "suggest" | "auto" };
   active: "codex" | "claude";
   codex: { installed: boolean; version?: string; loggedIn: boolean; detail?: string };
   claude: { installed: boolean; version?: string };
@@ -494,7 +522,7 @@ export const learn = {
   saveProfile: (p: Partial<Profile>) => put<Profile>("/api/profile", p),
   settings: () => call<SettingsInfo>("/api/settings"),
   saveSettings: (s: Partial<SettingsInfo["settings"]>) => put<{ settings: SettingsInfo["settings"]; active: string }>("/api/settings", s),
-  vault: () => call<{ notes: number; concepts: number; cards: number; figures: number; reviews: number; git: boolean; path: string; history: { hash: string; when: string; subject: string }[] }>("/api/vault"),
+  vault: () => call<{ notes: number; concepts: number; annotations: number; cards: number; figures: number; reviews: number; git: boolean; path: string; history: { hash: string; when: string; subject: string }[] }>("/api/vault"),
   today: () => call<Today>("/api/today"),
   journey: () => call<Journey>("/api/journey"),
   graph: () => call<GraphData>("/api/graph"),
@@ -521,6 +549,13 @@ export const learn = {
   followUp: (id: string, question: string) => post<Annotation>(`/api/annotations/${id}/followup`, { question }),
   redraw: (id: string, notes?: string, quality?: "quick" | "careful") => post<Annotation>(`/api/annotations/${id}/redraw`, { notes, quality }),
   toNote: (bookId: string, input: { annotationId?: string; anchor?: Anchor; noteId?: string; mode?: "reference" | "passage" | "embed"; comment?: string }) => post<{ note: Note; annotation: Annotation; markdown: string }>(`/api/books/${bookId}/to-note`, input),
+  connections: (path?: string) => call<SuggestedLink[]>(`/api/connections${path ? `?path=${encodeURIComponent(path)}` : ""}`),
+  suggestConnections: (path?: string) => post<{ suggested: SuggestedLink[]; ms: number }>("/api/connections/suggest", { path }),
+  decideConnection: (id: string, decision: "accept" | "reject" | "remove") => post<SuggestedLink>(`/api/connections/${id}/${decision}`),
+  agents: () => call<AgentRun[]>("/api/agents"),
+  runAgent: (task: string, mode: "read" | "write" = "write") => post<AgentRun>("/api/agents", { task, mode }),
+  agentAction: (id: string, action: "approve" | "discard" | "undo") => post<AgentRun>(`/api/agents/${id}/${action}`),
+  agentDiff: (id: string) => call<{ diff: string }>(`/api/agents/${id}/diff`),
   concepts: () => call<Concept[]>("/api/concepts"),
   concept: (id: string) => call<ConceptDetail>(`/api/concepts/${id}`),
   createConcept: (c: { name: string; summary?: string }) => post<Concept>("/api/concepts", c),
