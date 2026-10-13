@@ -23,6 +23,7 @@
   },
   "include": [
     "server",
+    "shared",
     "web/src",
     "scripts",
     "tests",
