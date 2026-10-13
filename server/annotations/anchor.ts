@@ -11,22 +11,18 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { findQuote, lineAt } from "../../shared/textmatch.ts";
 import type { Anchor } from "../../shared/vault-types.ts";
-import { getBlocks, getPages } from "../store.ts";
-import type { Book, TocEntry } from "../types.ts";
+import { chapterAt } from "../books/locate.ts";
+import { getBlocks, getPages } from "../books/store.ts";
+import type { Book, TocEntry } from "../books/types.ts";
 import { VAULT } from "../vault/index.ts";
 import { chapterFile } from "../vault/library.ts";
 
-const posOf = (l: { page?: number; y?: number; block?: number }) =>
-  l.page !== undefined ? l.page + (l.y ?? 0) : (l.block ?? 0);
-
-export function chapterAt(
+/** The chapter a passage belongs to (a passage before the first chapter counts as the first). */
+export function chapterOf(
   book: Book,
   anchor: Pick<Anchor, "page" | "y" | "block">,
 ): { entry: TocEntry; index: number } | null {
-  const at = posOf(anchor);
-  for (let i = book.toc.length - 1; i >= 0; i--)
-    if (posOf(book.toc[i].start) <= at + 1e-6) return { entry: book.toc[i], index: i };
-  return book.toc[0] ? { entry: book.toc[0], index: 0 } : null;
+  return chapterAt(book, anchor) ?? (book.toc[0] ? { entry: book.toc[0], index: 0 } : null);
 }
 
 /** The top of the quote on its PDF page (0–1), found in the page's extracted lines. */
@@ -52,7 +48,7 @@ export function locateOnPage(
 
 /** The quote in the book's chapter text file: { file, line, score }. */
 export function locateInText(book: Book, anchor: Anchor): Anchor["md"] | undefined {
-  const chapter = chapterAt(book, anchor);
+  const chapter = chapterOf(book, anchor);
   if (!chapter) return undefined;
   // the passage's own chapter first, then its neighbours (a selection near a chapter edge)
   for (const index of [chapter.index, chapter.index + 1, chapter.index - 1]) {

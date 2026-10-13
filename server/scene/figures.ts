@@ -3,20 +3,21 @@
  * A figure made from a passage is a "scene demo": a demo record (anchored to the passage, shown in
  * the margin like every demo) whose content is a scene spec instead of a demo.js. It is drawn by the
  * platform, so it is ready in seconds and always in the house style. The hand-built demo pipeline
- * (generate/build.ts) stays available for the rare figure the scene kinds can't express. */
+ * (server/handbuilt/) stays available for the rare figure the scene kinds can't express. */
 import { join } from "node:path";
 import type { Scene, SceneKind } from "../../shared/scene/types.ts";
+import { validateScene } from "../../shared/scene/validate.ts";
 import type { SavedFigure, SourceRef } from "../../shared/vault-types.ts";
+import { anchorFor } from "../books/placement.ts";
+import { bookDir, getBook, getDemo, listBooks, listDemos, newId, saveDemo } from "../books/store.ts";
+import type { Book, Brief, Demo, TocEntry } from "../books/types.ts";
 import { GENERATION } from "../config.ts";
 import { publish } from "../events.ts";
-import { anchorFor } from "../generate/index.ts";
-import { planChapter } from "../generate/plan.ts";
+import { planChapter } from "../handbuilt/plan.ts";
 import { chapterText, findChapter, passageAround } from "../ingest/index.ts";
 import { queue } from "../jobs.ts";
 import { bookContext, learnerSummary } from "../learn/context.ts";
-import { bookDir, getBook, getDemo, listBooks, listDemos, newId, saveDemo } from "../store.ts";
-import type { Book, Brief, Demo, TocEntry } from "../types.ts";
-import { figures, logActivity, now, shortId } from "../vault/index.ts";
+import { changed, figures, logActivity, now, shortId } from "../vault/index.ts";
 import { generateScene } from "./generate.ts";
 
 const KINDS = ["plot", "sequence", "graph", "object3d", "diagram"];
@@ -326,6 +327,34 @@ export async function standaloneFigure(input: {
     });
   }
   return figure;
+}
+
+/** Keeps a figure that was already drawn (one from a book, say) in the vault. Throws if it isn't a valid scene. */
+export function keepFigure(input: {
+  scene: unknown;
+  title?: string;
+  source?: SourceRef;
+  request?: string;
+}): SavedFigure {
+  const check = validateScene(input.scene);
+  if (!check.ok || !check.scene) throw new Error(check.errors[0] || "not a figure");
+  const figure: SavedFigure = {
+    id: shortId("f"),
+    title: input.title || check.scene.title,
+    scene: check.scene,
+    source: input.source,
+    request: input.request,
+    created: now(),
+  };
+  figures.save(figure);
+  changed(`figure ${figure.title}`);
+  return figure;
+}
+
+/** Deletes a saved figure (to .trash/). */
+export function deleteFigure(id: string) {
+  figures.remove(id);
+  changed("delete figure");
 }
 
 /** After a restart, scene figures that were being drawn are drawn again. */

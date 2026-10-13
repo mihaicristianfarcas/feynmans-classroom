@@ -5,7 +5,7 @@
  *   tutor     Socratic dialogue about the passage (Bloom's two-sigma tutoring, approximated)
  * Every result can be kept: wrong answers become cards, explanations and connections become notes. */
 import type { SourceRef } from "../../shared/vault-types.ts";
-import { structured, text } from "../llm.ts";
+import { structured, text } from "../llm/index.ts";
 import { concepts, logActivity, shortId } from "../vault/index.ts";
 import { upsertConcept } from "./concepts.ts";
 import { type BookContext, bookContext, chapterContext, learnerSummary, sourceLine } from "./context.ts";

@@ -1,8 +1,11 @@
+/* EPUB books: the archive is unpacked with limits (no zip bombs), the spine read in order, each
+ * chapter turned into sanitized blocks, pictures kept as assets, and chapters taken from the
+ * navigation document (or from h1/h2 headings when it is missing). */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, posix } from "node:path";
 import JSZip from "jszip";
 import { parseHTML } from "linkedom";
-import type { Block, TocEntry } from "../types.ts";
+import type { Block, TocEntry } from "../books/types.ts";
 import { htmlToBlocks } from "./html.ts";
 import { titleCase } from "./pdf.ts";
 

@@ -1,7 +1,10 @@
+/* A small in-process job queue for work that takes a while (planning a chapter, drawing figures,
+ * building demos): jobs report progress on their book's event stream, can be cancelled, and
+ * hand-built demo builds share a concurrency limit (CODEX_CONCURRENCY). */
+import { newId } from "./books/store.ts";
+import type { Job } from "./books/types.ts";
 import { CODEX } from "./config.ts";
 import { publish } from "./events.ts";
-import { newId } from "./store.ts";
-import type { Job } from "./types.ts";
 
 type Work = (job: Job, signal: AbortSignal) => Promise<void>;
 

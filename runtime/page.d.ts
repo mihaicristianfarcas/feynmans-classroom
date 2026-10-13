@@ -1,3 +1,4 @@
+// Types for page.mjs, so the server can import it from TypeScript.
 export function runtimeFiles(root?: string): {
   kit: string;
   runtime: string;

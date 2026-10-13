@@ -1,5 +1,7 @@
+/* Markdown and plain-text books: paragraphs become blocks (with minimal inline Markdown), and
+ * chapters come from the headings. */
 import { readFileSync } from "node:fs";
-import type { Block, TocEntry } from "../types.ts";
+import type { Block, TocEntry } from "../books/types.ts";
 import { finishBlockToc, headingToc, type ReflowIngest } from "./epub.ts";
 import { textOfHtml } from "./html.ts";
 

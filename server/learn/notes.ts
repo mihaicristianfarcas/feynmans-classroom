@@ -1,11 +1,13 @@
 /* Notes: Markdown files in notes/ (folders allowed), named by their title as in Obsidian. Renaming
  * one moves the file and carries every link to it along; deleting one moves it to .trash/. */
-import { basename, dirname } from "node:path";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { fileNameOf } from "../../shared/links.ts";
 import type { Note, SourceRef } from "../../shared/vault-types.ts";
-import { getBook } from "../store.ts";
-import { changed, logActivity, notes, now, shortId } from "../vault/index.ts";
-import { carryLinks } from "../vault/links.ts";
+import { getBook } from "../books/store.ts";
+import { listConnections } from "../vault/connections.ts";
+import { changed, logActivity, notes, now, shortId, VAULT } from "../vault/index.ts";
+import { allEdges, backlinks, carryLinks, titleOf, unlinkedMentions } from "../vault/links.ts";
 
 /** A folder under notes/ ("", "DDIA", "DDIA/Chapter 5"), cleaned so it can't leave notes/. */
 export function cleanFolder(folder?: string) {
@@ -131,4 +133,55 @@ export function linkMention(targetId: string, inPath: string): Note {
     return updateNote(other.id, { body: lines.join("\n") });
   }
   return other;
+}
+
+/** Notes matching every filter given, most recently updated first. */
+export function listNotes(filter: { type?: string; book?: string; concept?: string; folder?: string }): Note[] {
+  const { type, book, concept, folder } = filter;
+  return notes
+    .list()
+    .filter(
+      (n) =>
+        (!type || n.type === type) &&
+        (!book || n.source?.bookId === book) &&
+        (!concept || n.concepts.includes(concept)) &&
+        (!folder || n.path.startsWith(`notes/${folder}/`)),
+    )
+    .sort((a, b) => b.updated.localeCompare(a.updated));
+}
+
+/** A note with what the page shows beside it: backlinks, unlinked mentions, links out, suggested connections. */
+export function noteDetail(note: Note) {
+  const node = `note:${note.id}`;
+  const outgoing = allEdges()
+    .filter((e) => e.from === node && e.kind !== "source")
+    .map((e) => ({
+      target: e.target,
+      kind: e.kind,
+      to: e.to,
+      path: e.toPath,
+      title: e.to ? titleOf(e.to, e.toPath) : e.target,
+    }));
+  const connections = listConnections().filter((x) => x.from === note.path && x.status !== "removed");
+  return { ...note, backlinks: backlinks(node), mentions: unlinkedMentions(note), outgoing, connections };
+}
+
+/** The file tree: every note (path and title) and every folder under notes/, empty ones too. */
+export function noteTree() {
+  const folders: string[] = [];
+  const walk = (rel: string) => {
+    for (const entry of readdirSync(join(VAULT, rel), { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+      folders.push(`${rel}/${entry.name}`.replace(/^notes\//, ""));
+      walk(`${rel}/${entry.name}`);
+    }
+  };
+  if (existsSync(join(VAULT, "notes")) && statSync(join(VAULT, "notes")).isDirectory()) walk("notes");
+  return {
+    notes: notes
+      .list()
+      .map((n) => ({ id: n.id, path: n.path, title: n.title, type: n.type, updated: n.updated }))
+      .sort((a, b) => a.path.localeCompare(b.path)),
+    folders: folders.sort(),
+  };
 }

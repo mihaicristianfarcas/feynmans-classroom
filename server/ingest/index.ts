@@ -1,17 +1,12 @@
+/* Adding a book: the uploaded file is stored in a new folder in the library, its text and chapters
+ * are extracted by format (PDF, EPUB, Markdown, plain text), and the folder is named after the
+ * title. Also the text helpers the generators use: a chapter's text, a passage around a place. */
 import { createHash } from "node:crypto";
 import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { extname, join } from "node:path";
-import {
-  createBookDir,
-  getBlocks,
-  getMarkdown,
-  getPages,
-  newId,
-  renameBookDir,
-  saveBook,
-  writeJson,
-} from "../store.ts";
-import type { Book, BookFormat, TocEntry } from "../types.ts";
+import { createBookDir, getBlocks, getMarkdown, getPages, newId, renameBookDir, saveBook } from "../books/store.ts";
+import type { Book, BookFormat, TocEntry } from "../books/types.ts";
+import { writeJson } from "../fs.ts";
 import { ingestEpub } from "./epub.ts";
 import { ingestPdf, pagesText } from "./pdf.ts";
 import { ingestText } from "./text.ts";

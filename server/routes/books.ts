@@ -1,0 +1,113 @@
+/* Routes for books: the library, uploading (any PDF, EPUB, Markdown or text file), a book's file,
+ * text blocks and pictures, finding its chapters, its live event stream, and reading sessions. */
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import type { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
+import { bookDir, bookFolder, deleteBook, getBlocks, getBook, listBooks, listDemos } from "../books/store.ts";
+import { safeJoin } from "../fs.ts";
+import { CONTENT_ONLY, eventStream, readBody, sendFile } from "../http.ts";
+import { detectChapters } from "../ingest/chapters.ts";
+import { formatOf, ingestBook } from "../ingest/index.ts";
+import { queue } from "../jobs.ts";
+import { bookNote } from "../learn/notes.ts";
+import { type ReadingPing, recordReading } from "../learn/reading.ts";
+import { logActivity } from "../vault/index.ts";
+import { exportBook } from "../vault/library.ts";
+
+const MAX_UPLOAD = 200 * 1024 * 1024;
+
+export function bookRoutes(app: Hono) {
+  /** Every book, with how many of its figures are ready and how many are being made. */
+  app.get("/api/books", (c) =>
+    c.json(
+      listBooks().map((book) => {
+        const demos = listDemos(book.id);
+        return {
+          ...book,
+          demoCount: demos.filter((d) => d.status === "ready").length,
+          building: demos.filter((d) => !["ready", "failed"].includes(d.status)).length,
+        };
+      }),
+    ),
+  );
+
+  /** Titles and chapters only, for pickers. */
+  app.get("/api/books-lite", (c) =>
+    c.json(
+      listBooks().map((b) => ({
+        id: b.id,
+        title: b.title,
+        author: b.author,
+        toc: b.toc.map((t) => ({ id: t.id, title: t.title })),
+      })),
+    ),
+  );
+
+  app.post(
+    "/api/books",
+    bodyLimit({
+      maxSize: MAX_UPLOAD + 1024 * 1024,
+      onError: (c) => c.json({ error: "file too large (200 MB max)" }, 413),
+    }),
+    async (c) => {
+      const file = (await c.req.parseBody()).file;
+      if (!(file instanceof File)) return c.json({ error: "send the book as multipart field 'file'" }, 400);
+      if (file.size > MAX_UPLOAD) return c.json({ error: "file too large (200 MB max)" }, 413);
+      if (!formatOf(file.name)) return c.json({ error: "Upload a PDF, EPUB, Markdown or plain-text book." }, 415);
+      const book = await ingestBook({ name: file.name, data: Buffer.from(await file.arrayBuffer()) });
+      if (book.status === "error") return c.json({ error: book.error, book }, 422);
+      try {
+        exportBook(book);
+      } catch (error) {
+        console.warn("[vault] export failed:", (error as Error).message);
+      }
+      logActivity({ type: "book", bookId: book.id, text: `Added ${book.title}` });
+      return c.json(book);
+    },
+  );
+
+  app.get("/api/books/:id", (c) => {
+    const book = getBook(c.req.param("id"));
+    return book ? c.json({ ...book, folder: bookFolder(book.id) }) : c.json({ error: "not found" }, 404);
+  });
+
+  app.delete("/api/books/:id", (c) => {
+    const id = c.req.param("id");
+    queue.cancelBook(id);
+    deleteBook(id);
+    return c.json({ ok: true });
+  });
+
+  app.get("/api/books/:id/file", (c) => {
+    const book = getBook(c.req.param("id"));
+    if (!book) return c.json({ error: "not found" }, 404);
+    return sendFile(join(bookDir(book.id), book.file), { "cache-control": "private, max-age=3600" });
+  });
+
+  app.get("/api/books/:id/blocks", (c) => c.json(getBlocks(c.req.param("id"))));
+
+  /** Pictures inside a reflowable book. */
+  app.get("/api/books/:id/assets/*", (c) => {
+    const id = c.req.param("id");
+    const rel = decodeURIComponent(c.req.path.split(`/api/books/${id}/assets/`)[1] || "");
+    const path = safeJoin(join(bookDir(id), "assets"), rel);
+    if (!path || !existsSync(path)) return c.json({ error: "not found" }, 404);
+    return sendFile(path, { "cache-control": "private, max-age=86400", ...CONTENT_ONLY });
+  });
+
+  /** Asks a model where the chapters are, for books without a usable outline. */
+  app.post("/api/books/:id/detect-chapters", (c) => c.json(detectChapters(c.req.param("id"))));
+
+  /** The note a book's reading session writes into ("<title> — notes", made on first use). */
+  app.post("/api/books/:id/note", (c) => c.json(bookNote(c.req.param("id"))));
+
+  app.get("/api/books/:id/events", (c) => eventStream(c, c.req.param("id")));
+
+  /** The reader's pings while a book is open (they become reading sessions in the journey). */
+  app.post("/api/activity", async (c) => {
+    const ping = await readBody<ReadingPing & { type: string }>(c);
+    if (ping.type !== "read" || !ping.bookId) return c.json({ ok: false }, 400);
+    return c.json({ ok: true, minutes: recordReading(ping) });
+  });
+}

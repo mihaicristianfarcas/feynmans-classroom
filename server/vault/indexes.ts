@@ -11,9 +11,10 @@
  *   brain/links.tsv           every link: from, to, kind, line (backlinks are one rg away)
  *   brain/unresolved.tsv      links to things that don't exist yet */
 import { join } from "node:path";
+import { positionOf } from "../books/locate.ts";
+import { bookFolder, listBooks, onBooksChange } from "../books/store.ts";
+import type { Book, TocEntry } from "../books/types.ts";
 import { conceptMastery } from "../learn/context.ts";
-import { bookFolder, listBooks, onBooksChange } from "../store.ts";
-import type { Book, TocEntry } from "../types.ts";
 import {
   annotations,
   atomicWrite,
@@ -39,17 +40,15 @@ const pagesOf = (e: TocEntry, book: Book) =>
   book.format === "pdf"
     ? `${e.start.page ?? ""}–${Math.max(e.start.page ?? 1, (e.end.page ?? e.start.page ?? 1) - ((e.end.y ?? 1) <= 0.02 ? 1 : 0))}`
     : `blocks ${e.start.block ?? 0}–${e.end.block ?? ""}`;
-const posOf = (l: { page?: number; y?: number; block?: number }) =>
-  l.page !== undefined ? l.page + (l.y ?? 0) : (l.block ?? 0);
 
 function write(rel: string, text: string) {
   wroteItself(rel);
   atomicWrite(join(VAULT, rel), `${HEADER}\n${text.trim()}\n`);
 }
 
-function chapterOf(book: Book, at: number) {
-  return [...book.toc].reverse().find((c) => posOf(c.start) <= at + 1e-6) || book.toc[0];
-}
+/** The chapter at a reading position (before the first chapter counts as the first). */
+const chapterOf = (book: Book, at: number) =>
+  [...book.toc].reverse().find((c) => positionOf(c.start) <= at + 1e-6) || book.toc[0];
 
 export function writeIndexes() {
   const books = listBooks().filter((b) => b.status === "ready");
@@ -69,7 +68,7 @@ export function writeIndexes() {
     const mine = annotations.list().filter((a) => a.bookId === book.id);
     const fromBook = notes.list().filter((n) => n.source?.bookId === book.id);
     const bookConcepts = concepts.list().filter((c) => c.sources.some((s) => s.bookId === book.id));
-    const at = (a: (typeof mine)[number]) => posOf({ page: a.anchor.page, y: a.anchor.y, block: a.anchor.block });
+    const at = (a: (typeof mine)[number]) => positionOf(a.anchor);
     const lines = [
       `# ${book.title}`,
       "",

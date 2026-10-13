@@ -1,3 +1,4 @@
+// Reading books: Markdown and text, PDF line joining and chapter titles, page text, and EPUBs.
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

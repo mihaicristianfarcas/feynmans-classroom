@@ -1,3 +1,5 @@
+// Annotations: anchoring a selection (boxes, quote, context, the place in the book's Markdown), the
+// annotation files, sending passages to notes, and placing annotations an agent wrote by hand.
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,9 +11,9 @@ process.env.DATA_DIR = dir;
 
 let V: typeof import("../server/vault/index.ts");
 let A: typeof import("../server/annotations/index.ts");
-let R: typeof import("../server/annotations/routes.ts");
+let R: typeof import("../server/annotations/to-note.ts");
 let N: typeof import("../server/learn/notes.ts");
-let book: import("../server/types.ts").Book;
+let book: import("../server/books/types.ts").Book;
 
 beforeAll(async () => {
   V = await import("../server/vault/index.ts");
@@ -19,7 +21,7 @@ beforeAll(async () => {
   const { ingestBook } = await import("../server/ingest/index.ts");
   const { exportBook } = await import("../server/vault/library.ts");
   A = await import("../server/annotations/index.ts");
-  R = await import("../server/annotations/routes.ts");
+  R = await import("../server/annotations/to-note.ts");
   N = await import("../server/learn/notes.ts");
   book = await ingestBook({
     name: "Tiny Physics.pdf",

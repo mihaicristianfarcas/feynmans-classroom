@@ -1,3 +1,4 @@
+// Running Codex: event parsing, errors, retries and fallbacks, against a fake codex binary.
 import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,9 +14,9 @@ writeFileSync(
 chmodSync(bin, 0o755);
 process.env.CODEX_BIN = bin;
 
-let runCodex: typeof import("../server/codex.ts").runCodex;
+let runCodex: typeof import("../server/llm/codex.ts").runCodex;
 beforeAll(async () => {
-  ({ runCodex } = await import("../server/codex.ts"));
+  ({ runCodex } = await import("../server/llm/codex.ts"));
 });
 const run = (events: unknown[], exit = 0) => {
   process.env.FAKE_CODEX_EVENTS = JSON.stringify(events);

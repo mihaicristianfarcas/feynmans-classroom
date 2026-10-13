@@ -5,9 +5,9 @@
 import { basename } from "node:path";
 import { fileNameOf } from "../../shared/links.ts";
 import type { Concept, SourceRef } from "../../shared/vault-types.ts";
-import { locateInBlocks, locateInPages } from "../anchor.ts";
-import { structured } from "../llm.ts";
-import { getBlocks, getBook, getPages } from "../store.ts";
+import { locateInBlocks, locateInPages } from "../books/locate.ts";
+import { getBlocks, getBook, getPages } from "../books/store.ts";
+import { structured } from "../llm/index.ts";
 import { changed, concepts, logActivity, now, slugify } from "../vault/index.ts";
 import { carryLinks } from "../vault/links.ts";
 import { chapterContext, learnerSummary, sourceLine } from "./context.ts";

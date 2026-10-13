@@ -8,8 +8,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { linkKey, linksInValue, pageOf, parseWikiLinks, rewriteLinks, type WikiLink } from "../../shared/links.ts";
 import type { Annotation, Concept, Note } from "../../shared/vault-types.ts";
-import { bookFolder, listBooks } from "../store.ts";
-import type { Book } from "../types.ts";
+import { bookFolder, listBooks } from "../books/store.ts";
+import type { Book } from "../books/types.ts";
 import { listConnections } from "./connections.ts";
 import { annotations, changed, concepts, figures, notes, onVaultChange, VAULT } from "./index.ts";
 
