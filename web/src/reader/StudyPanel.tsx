@@ -36,7 +36,7 @@ export function TutorTab({
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState<number | null>(null);
   const [mode, setMode] = useState<"answer" | "socratic">("answer");
-  const modes = useIndicator<HTMLDivElement>(mode);
+  const modes = useIndicator<HTMLFieldSetElement>(mode);
   const end = useRef<HTMLDivElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: scrolls to the newest message when one arrives or the tutor starts answering
   useEffect(() => {
@@ -125,7 +125,8 @@ export function TutorTab({
           }}
         />
         <div className="row gap">
-          <div className="segmented" role="group" aria-label="Tutor style" ref={modes}>
+          <fieldset className="segmented" ref={modes}>
+            <legend className="visually-hidden">Tutor style</legend>
             <button type="button" aria-pressed={mode === "answer"} onClick={() => setMode("answer")}>
               Answer me
             </button>
@@ -137,7 +138,7 @@ export function TutorTab({
             >
               Socratic
             </button>
-          </div>
+          </fieldset>
           <span className="spacer" />
           {messages.length > 0 && (
             <button type="button" className="link" onClick={() => setMessages([])}>
@@ -266,7 +267,7 @@ export function StudyTab({
             <li key={c.id}>
               <a href={`#/brain/concept/${c.id}`}>{c.name}</a>
               <Mastery value={c.mastery} />
-              <button type="button" className="link" onClick={() => setExplain(c)}>
+              <button type="button" className="link" aria-haspopup="dialog" onClick={() => setExplain(c)}>
                 Explain it
               </button>
             </li>

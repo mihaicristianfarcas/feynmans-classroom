@@ -1,3 +1,4 @@
+/* The learner's profile form (used on the Welcome page and in Settings). */
 import { useState } from "react";
 import type { Profile } from "../api";
 

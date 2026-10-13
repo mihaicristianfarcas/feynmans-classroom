@@ -1,3 +1,6 @@
+/* The two book views the reader uses: a PDF (pdf.js pages with a selectable text layer) and a
+ * reflowable book (sanitized HTML blocks), both drawing the book's highlights and answering the same
+ * questions about positions (where am I, where is this passage, which boxes does it cover). */
 import { CanvasLayer, CustomLayer, Page, Pages, Root, TextLayer, usePdf, usePdfJump } from "@anaralabs/lector";
 import { GlobalWorkerOptions } from "pdfjs-dist/legacy/build/pdf.mjs";
 import workerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
@@ -34,6 +37,49 @@ export interface ReaderHandle {
   count(): number;
   /** The passage's boxes on screen (client coordinates), if its page or block is rendered. */
   boxesOf(anchor: Anchor, key: string): DOMRect[] | null;
+  /** Selects the passage at a client y (for annotating without a mouse); false if nothing is there. */
+  selectAt(clientY: number): boolean;
+}
+
+/** Makes `range` the document's selection. */
+function select(range: Range) {
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+}
+
+/**
+ * In a PDF's text layer: the line at `clientY` and the lines after it, up to a paragraph break (a gap
+ * taller than a line and a half) or six lines.
+ */
+function selectPdfLines(scroller: HTMLElement, clientY: number): boolean {
+  const page = [...scroller.querySelectorAll<HTMLElement>(".textLayer")].find((layer) => {
+    const r = layer.getBoundingClientRect();
+    return clientY >= r.top && clientY <= r.bottom;
+  });
+  if (!page) return false;
+  const spans = [...page.querySelectorAll<HTMLElement>("span")]
+    .filter((s) => s.textContent?.trim())
+    .map((s) => ({ el: s, rect: s.getBoundingClientRect() }))
+    .filter((s) => s.rect.height > 0)
+    .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left);
+  const startAt = spans.findIndex((s) => s.rect.bottom >= clientY);
+  if (startAt < 0) return false;
+  const lineHeight = spans[startAt].rect.height;
+  let end = startAt;
+  let lines = 1;
+  for (let i = startAt + 1; i < spans.length; i++) {
+    const gap = spans[i].rect.top - spans[i - 1].rect.top;
+    if (gap > lineHeight * 0.5) {
+      if (gap > lineHeight * 1.6 || ++lines > 6) break;
+    }
+    end = i;
+  }
+  const range = document.createRange();
+  range.setStartBefore(spans[startAt].el);
+  range.setEndAfter(spans[end].el);
+  select(range);
+  return true;
 }
 
 /** What the views draw over the text: highlights and underlines for the book's annotations. */
@@ -159,6 +205,10 @@ const PdfInner = forwardRef<ReaderHandle, Omit<PdfProps, "url" | "dark">>(functi
         pending.current = { loc, clientY, tries: 0 };
         jumpToPage(loc.page ?? 1, { behavior: "auto", align: "start" } as never);
         requestAnimationFrame(() => requestAnimationFrame(settleJump));
+      },
+      selectAt(clientY) {
+        const scroller = viewportRef.current;
+        return scroller ? selectPdfLines(scroller, clientY) : false;
       },
     }),
     [doc, jumpToPage, pageEl, settleJump, viewportRef],
@@ -314,6 +364,17 @@ export const HtmlReader = forwardRef<ReaderHandle, HtmlProps>(function HtmlReade
           top: rect.top + (loc.y ?? 0) * rect.height - clientY,
           behavior: smooth ? "smooth" : "auto",
         });
+      },
+      selectAt(clientY) {
+        const root = scrollRef.current;
+        const el = [...(root?.querySelectorAll<HTMLElement>("[data-block]") ?? [])].find(
+          (b) => b.getBoundingClientRect().bottom >= clientY && b.textContent?.trim(),
+        );
+        if (!el) return false;
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        select(range);
+        return true;
       },
     }),
     [blocks],

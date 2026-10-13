@@ -749,7 +749,7 @@
   padding-left: 8px;
   flex: none;
   font: 11.5px var(--sans);
-  color: var(--ink-4);
+  color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
 .mcard-excerpt {
@@ -884,7 +884,7 @@
 .mcard-foot .fine {
   margin: 0;
   font-size: 12px;
-  color: var(--ink-4);
+  color: var(--ink-3);
 }
 .mcard-ask {
   position: relative;

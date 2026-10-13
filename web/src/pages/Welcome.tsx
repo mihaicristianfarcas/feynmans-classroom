@@ -1,3 +1,4 @@
+/* The first-run page: who you are and how you learn, before anything else. */
 import { useState } from "react";
 import { learn, type Profile } from "../api";
 import { go } from "../app/navigation";

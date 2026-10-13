@@ -1,3 +1,4 @@
+/* React's way into the scene player: mounts a figure from its spec and keeps the theme in step. */
 import { useEffect, useRef } from "react";
 import { normalize, type Scene } from "../../../shared/scene/index.ts";
 import { type PlayerOptions, ScenePlayer } from "./player";

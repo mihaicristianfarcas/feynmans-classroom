@@ -1,7 +1,7 @@
 /* Study tools that open from a passage, a concept or a note: make cards, explain it back, connect
  * it to the world, draw a figure. Each one saves into the vault. */
 import { Shapes, X } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   type DraftCard,
@@ -11,10 +11,12 @@ import {
   type SavedFigure,
   type SourceRef,
 } from "../api";
+import { useFocusTrap } from "../lib/a11y";
 import { SceneView } from "../scene/SceneView";
 import { Spinner } from "./feedback";
 import { Markdown } from "./Markdown";
 
+/** A dialog over the page (in a portal), with a title, a close button and the keyboard behaviour dialogs need. */
 export function Modal({
   title,
   eyebrow,
@@ -29,23 +31,29 @@ export function Modal({
   wide?: boolean;
 }) {
   const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    (
-      box.current?.querySelector<HTMLElement>(".modal-body textarea, .modal-body input:not([type=checkbox])") ||
-      box.current?.querySelector<HTMLElement>("button")
-    )?.focus();
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  const titleId = useId();
+  // focus goes to the first field (or button), Tab stays inside, Escape closes, focus returns to the opener
+  useFocusTrap(box, true, {
+    onEscape: onClose,
+    initial: ".modal-body textarea, .modal-body input:not([type=checkbox])",
+  });
   // in a portal: a page's own transforms (its entrance animation) must not become the backdrop's frame
   return createPortal(
+    // biome-ignore lint/a11y/noStaticElementInteractions: a click outside closes it; Escape does the same from the keyboard
     <div className="modal-back" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`modal ${wide ? "wide" : ""}`} role="dialog" aria-label={title} ref={box}>
+      <div
+        className={`modal ${wide ? "wide" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        ref={box}
+      >
         <header className="modal-head">
           <div>
             {eyebrow && <div className="eyebrow">{eyebrow}</div>}
-            <h2 className="modal-title">{title}</h2>
+            <h2 className="modal-title" id={titleId}>
+              {title}
+            </h2>
           </div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
             <X aria-hidden="true" />
@@ -423,19 +431,21 @@ export function FigureRequest({
       }}
     >
       <input
+        // biome-ignore lint/a11y/noAutofocus: only when the caller opened this to type a request
         autoFocus={autoFocus}
         value={request}
         onChange={(e) => setRequest(e.target.value)}
         placeholder="What should it show? (optional: e.g. “what happens if a message is lost”)"
         aria-label="What should the figure show?"
       />
-      <div className="chips" role="group" aria-label="Kind of figure">
+      <fieldset className="chips">
+        <legend className="visually-hidden">Kind of figure</legend>
         {KIND_CHOICES.map((k) => (
           <button key={k.id} type="button" className="chip" aria-pressed={kind === k.id} onClick={() => setKind(k.id)}>
             {k.label}
           </button>
         ))}
-      </div>
+      </fieldset>
       <div className="figure-request-row">
         <label className="check" title="Careful uses the stronger model: slower, more thorough">
           <input

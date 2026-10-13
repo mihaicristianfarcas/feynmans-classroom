@@ -76,6 +76,7 @@ export function Shell({
   const mac = /Mac|iPhone|iPad/.test(navigator.platform);
   return (
     <div className="shell">
+      <SkipLink />
       <nav className="side" aria-label="Main">
         <a className="brand" href="#/" title="Today">
           <span className="brand-mark" aria-hidden="true" />
@@ -106,7 +107,9 @@ export function Shell({
           <ThemeButton theme={theme} setTheme={setTheme} />
         </div>
       </nav>
-      <main className={full ? "page page-full" : "page"}>{children}</main>
+      <main id="main" tabIndex={-1} className={full ? "page page-full" : "page"}>
+        {children}
+      </main>
     </div>
   );
 }
@@ -122,5 +125,21 @@ export function ThemeButton({ theme, setTheme }: { theme: "light" | "dark"; setT
     >
       {theme === "light" ? <Moon aria-hidden="true" /> : <Sun aria-hidden="true" />}
     </button>
+  );
+}
+
+/** The first thing Tab reaches: jumps past the navigation to the page's content (#main, or `target`). */
+export function SkipLink({ target = "main", label = "Skip to content" }: { target?: string; label?: string }) {
+  return (
+    <a
+      className="skip-link"
+      href={`#${target}`}
+      onClick={(e) => {
+        e.preventDefault();
+        document.getElementById(target)?.focus();
+      }}
+    >
+      {label}
+    </a>
   );
 }

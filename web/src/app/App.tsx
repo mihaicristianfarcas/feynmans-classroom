@@ -1,6 +1,6 @@
 /* The app: picks the page from the URL's hash (#/library, #/book/<id>, #/notes/<id>…), sends a new
  * learner to the welcome page first, and puts every page except the reader inside the Shell. */
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { learn } from "../api";
 import { Notes } from "../notes/Notes";
 import { Ask } from "../pages/Ask";
@@ -34,6 +34,20 @@ type Route =
         | "welcome"
         | "open";
     };
+
+const TITLES: Record<Exclude<Route["name"], "book">, string> = {
+  today: "Today",
+  library: "Library",
+  notes: "Notes",
+  review: "Review",
+  brain: "Brain",
+  ask: "Ask",
+  journey: "Journey",
+  settings: "Settings",
+  gallery: "Figure gallery",
+  welcome: "Welcome",
+  open: "Opening a link",
+};
 
 /** The page the URL's hash names. */
 function route(): Route {
@@ -69,6 +83,19 @@ export function App() {
   useEffect(() => {
     if (onboarded === false && current.name === "today") location.hash = "#/welcome";
   }, [onboarded, current]);
+  // each page names itself in the title, and after a move, keyboard and screen-reader users start at its content
+  const shown = useRef(current);
+  useEffect(() => {
+    if (current.name !== "book") document.title = `${TITLES[current.name]} · Feynman’s Classroom`;
+    // only after moving to another page (compared with the last one, so a re-run effect doesn't count)
+    if (shown.current === current) return;
+    shown.current = current;
+    requestAnimationFrame(() => {
+      // unless the new page already put focus somewhere on purpose (a search field, say)
+      const main = document.getElementById("main");
+      if (main && !main.contains(document.activeElement)) main.focus({ preventScroll: true });
+    });
+  }, [current]);
 
   let page: ReactNode;
   if (current.name === "book")

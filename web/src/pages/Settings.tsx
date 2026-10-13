@@ -1,3 +1,5 @@
+/* Settings: who you are, which subscription does the thinking (Codex or Claude Code), the models and
+ * effort for quick and careful work, and the vault's folder and history. */
 import { useState } from "react";
 import { learn, type SettingsInfo } from "../api";
 import { Spinner } from "../components/feedback";

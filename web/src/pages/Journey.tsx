@@ -1,3 +1,5 @@
+/* The Journey page: study days, recall over time, solid and fading concepts, the timeline, and the
+ * vault's history. */
 import { learn } from "../api";
 import { Mastery, Spinner } from "../components/feedback";
 import { timeAgo } from "../lib/time";

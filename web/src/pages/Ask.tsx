@@ -1,3 +1,5 @@
+/* Ask: put a question to your whole vault (an agent reads it and answers with sources), or, under Do,
+ * give an agent work to do on it. */
 import { ArrowUp, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { learn } from "../api";
@@ -97,6 +99,7 @@ function AskPanel({ theme }: { theme: "light" | "dark" }) {
       >
         <Sparkles className="ask-icon" aria-hidden="true" />
         <input
+          // biome-ignore lint/a11y/noAutofocus: the page exists to ask a question; it's the first thing on it
           autoFocus
           value={question}
           onChange={(e) => setQuestion(e.target.value)}

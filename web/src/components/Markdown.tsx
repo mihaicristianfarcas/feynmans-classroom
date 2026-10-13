@@ -374,7 +374,7 @@ function EmbeddedFile({
           {r.kind === "annotation" ? `${r.title.split(":")[0]}${r.page ? ` · p. ${r.page}` : ""}` : r.kind}
         </span>
         <a
-          href="#"
+          href={`#/open?target=${encodeURIComponent(target)}${sub ? `&sub=${encodeURIComponent(sub)}` : ""}`}
           onClick={(e) => {
             e.preventDefault();
             openLink(target, sub);

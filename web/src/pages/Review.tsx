@@ -1,3 +1,5 @@
+/* Review: flashcards due today, interleaved across decks and scheduled with FSRS-6. Space reveals the
+ * answer, 1–4 rate it; a card can be typed first, edited, or skipped. Also the mixed quiz. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { humanInterval } from "../../../shared/fsrs.ts";
 import { type CardView, learn, type Quiz } from "../api";
@@ -165,6 +167,7 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
             <textarea
               className="flash-typed"
               rows={3}
+              // biome-ignore lint/a11y/noAutofocus: "type it first" was chosen: the field is the next step
               autoFocus
               value={typed}
               onChange={(e) => setTyped(e.target.value)}

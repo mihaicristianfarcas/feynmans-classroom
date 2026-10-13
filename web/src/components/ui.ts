@@ -1,7 +1,7 @@
 /* Small pieces of the design system that need a little script. */
 import { useLayoutEffect, useRef } from "react";
 
-const ACTIVE = '[aria-current="page"], [aria-pressed="true"]';
+const ACTIVE = '[aria-current="page"], [aria-pressed="true"], [aria-selected="true"]';
 
 /**
  * Slides an indicator to the active item of a tab list, a segmented control or the side nav: sets

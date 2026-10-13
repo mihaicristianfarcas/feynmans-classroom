@@ -1,6 +1,7 @@
 /* The menu that appears over a selected passage: Highlight · Explain · Visualize · Ask · Define, and
  * more (add the passage or a reference to your note, find resources, make cards, connect it to
- * today, teach it back, copy). Keys work too: H E V A D, N for "add to note". */
+ * today, teach it back, copy). Keys work too: H E V A D, N for "add to note". It is a toolbar: the
+ * arrow keys move between its buttons, Escape steps back out of a panel and then closes it. */
 import {
   ArrowUp,
   BookA,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FigureRequest } from "../components/tools";
+import { useArrowKeys } from "../lib/a11y";
 
 export type SelectionAction =
   | { kind: "highlight"; color?: string }
@@ -45,16 +47,31 @@ export function SelectionMenu({
   side,
   onAction,
   noteTitle,
+  takeFocus = false,
+  onClose,
 }: {
   x: number;
   y: number;
   side: "top" | "bottom";
   onAction: (a: SelectionAction) => void;
   noteTitle?: string;
+  /** Opened from the keyboard: focus starts on the first button. */
+  takeFocus?: boolean;
+  /** Escape in the main row (the reader puts focus back in the book). */
+  onClose?: () => void;
 }) {
   const [mode, setMode] = useState<"menu" | "ask" | "visualize" | "more">("menu");
   const [question, setQuestion] = useState("");
   const box = useRef<HTMLDivElement>(null);
+  const row = useRef<HTMLDivElement>(null);
+  const more = useRef<HTMLDivElement>(null);
+  useArrowKeys(row, { selector: "button" });
+  useArrowKeys(more, { selector: '[role="menuitem"]', orientation: "vertical" });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: focus moves when the panel changes, and on opening only when asked
+  useEffect(() => {
+    if (mode === "menu" && takeFocus) row.current?.querySelector<HTMLElement>("button")?.focus();
+    if (mode === "more") more.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+  }, [mode]);
   const bar = useRef(0);
   useLayoutEffect(() => {
     const el = box.current;
@@ -94,11 +111,21 @@ export function SelectionMenu({
       data-mode={mode}
       data-side={side}
       onMouseDown={(e) => !(e.target as HTMLElement).closest("input, textarea") && e.preventDefault()}
+      onKeyDown={(e) => {
+        if (e.key !== "Escape") return;
+        // the reader closes the menu on Escape; a panel steps back to the main row first
+        e.stopPropagation();
+        if (mode === "menu") onClose?.();
+        else {
+          setMode("menu");
+          requestAnimationFrame(() => row.current?.querySelector<HTMLElement>("button")?.focus());
+        }
+      }}
       role="toolbar"
       aria-label="Do something with this passage"
     >
       {mode === "menu" && (
-        <div className="sel-row">
+        <div className="sel-row" ref={row}>
           <span className="sel-highlight">
             <button
               type="button"
@@ -165,7 +192,14 @@ export function SelectionMenu({
             <Plus aria-hidden="true" />
             Note
           </button>
-          <button type="button" className="sel-btn icon" onClick={() => setMode("more")} aria-label="More" title="More">
+          <button
+            type="button"
+            className="sel-btn icon"
+            onClick={() => setMode("more")}
+            aria-label="More"
+            aria-haspopup="menu"
+            title="More"
+          >
             <Ellipsis aria-hidden="true" />
           </button>
         </div>
@@ -179,11 +213,12 @@ export function SelectionMenu({
           }}
         >
           <input
+            // biome-ignore lint/a11y/noAutofocus: the field opens because Ask was chosen; typing is the next step
             autoFocus
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="Ask about this passage…"
-            onKeyDown={(e) => e.key === "Escape" && setMode("menu")}
+            aria-label="Your question about this passage"
           />
           <button className="sel-send" type="submit" disabled={!question.trim()} aria-label="Ask">
             <ArrowUp aria-hidden="true" />
@@ -201,7 +236,7 @@ export function SelectionMenu({
         </div>
       )}
       {mode === "more" && (
-        <div className="sel-more menu" role="menu">
+        <div className="sel-more menu" role="menu" aria-label="More" ref={more}>
           <button type="button" role="menuitem" onClick={() => onAction({ kind: "note", mode: "passage" })}>
             <Quote aria-hidden="true" />
             Add the passage to {noteTitle ? `“${noteTitle}”` : "your note"}
