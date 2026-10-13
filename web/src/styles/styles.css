@@ -27,6 +27,7 @@
   --ink-3: #69696d; /* the lightest text: 4.6:1 or more on every surface (WCAG AA) */
   --ink-4: #888688; /* not for text: disabled controls, icons, rules (3:1) */
   --on-ink: #f8f7f4;
+  --on-pastel: #2b2b2f; /* icons and text on a pastel itself (not its soft fill): dark in both themes */
   --menu: #2b2b2f;
   --menu-ink: #f1efea;
 
@@ -100,6 +101,7 @@
   --ink-3: #949398;
   --ink-4: #757479;
   --on-ink: #1d1d20;
+  --on-pastel: #1d1d20;
   --menu: #36363c;
   --menu-ink: #f1efea;
 
@@ -1269,6 +1271,61 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 ::view-transition-new(root) {
   animation-duration: 220ms;
   animation-timing-function: ease;
+}
+
+/* ---------- side panels: a width you drag from their inner edge (components/Panel.tsx) ---------- */
+/* the edge takes no room: a wider strip to grab, and a line that lights once you rest on it (or focus it) */
+.panel-edge {
+  position: relative;
+  z-index: 4;
+  flex: none;
+  width: 0;
+  align-self: stretch;
+  outline: none;
+  touch-action: none;
+}
+.panel-edge::before {
+  content: "";
+  position: absolute;
+  inset: 0 -5px;
+  cursor: col-resize;
+}
+.panel-edge::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1px;
+  width: 2px;
+  background: var(--accent-ink);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .panel-edge:hover::after {
+    opacity: 0.55;
+    transition-delay: 150ms;
+  }
+}
+:root[data-resizing] .panel-edge:active::after {
+  opacity: 1;
+  transition-delay: 0ms;
+}
+.panel-edge:focus-visible::after {
+  left: -1.5px;
+  width: 3px;
+  opacity: 1;
+  transition: none;
+}
+/* while dragging, the whole page keeps the resize cursor and nothing gets selected */
+:root[data-resizing],
+:root[data-resizing] * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+:root[data-resizing] iframe {
+  pointer-events: none;
 }
 
 /* ---------- popovers: grow from where they were opened ---------- */

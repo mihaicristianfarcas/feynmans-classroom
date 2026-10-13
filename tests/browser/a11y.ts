@@ -1,6 +1,7 @@
 // Accessibility checks of the running app: axe-core's WCAG 2.2 A and AA rules on every page, in both
 // themes, and the keyboard essentials (a skip link, focus that can always be seen, the ⌘K palette and
-// dialogs that keep focus and close with Escape, the reader usable without a mouse).
+// dialogs that keep focus and close with Escape, side panels resized and closed from their edge, the
+// reader usable without a mouse).
 //   npm run test:a11y                  checks APP_URL (default http://localhost:5173/, so npm run dev)
 //   npm run test:a11y -- --serve       starts the built app (npm run build first) on a throwaway vault
 //                                      seeded with a small book, and checks that (what CI does)
@@ -304,6 +305,28 @@ async function keyboard(page: Page, bookRoute: string | undefined) {
     check("Escape closes the card and focus returns to the item", back, await focused(page));
   } else check("the graph's items can be reached with the keyboard", false, "no graph item in the Tab order");
 
+  // a side panel's edge: the arrow keys resize it, Enter closes it and focus goes to its button, which opens it again
+  await open(page, "#/notes", "light");
+  const edge = await page.$(".notes-page > .panel-edge");
+  if (edge) {
+    const width = () => page.evaluate(() => document.querySelector(".file-tree")?.getBoundingClientRect().width ?? 0);
+    const before = await width();
+    await edge.focus();
+    await page.keyboard.press("ArrowRight");
+    check("the arrow keys resize a side panel from its edge", (await width()) > before, `${before} → ${await width()}`);
+    await page.keyboard.press("Enter");
+    await wait(200);
+    const toggle = await page.evaluate(() => document.activeElement?.getAttribute("aria-expanded"));
+    check(
+      "Enter on the edge closes the panel and focus goes to its button",
+      !(await page.$(".file-tree")) && toggle === "false",
+      await focused(page),
+    );
+    await page.keyboard.press("Enter");
+    await wait(200);
+    check("its button opens it again at its default width", (await width()) === 260, `${await width()}`);
+  } else check("the notes list has an edge to resize it", false);
+
   // the reader: its panes are tabs you can move between with the arrow keys
   if (bookRoute) {
     await open(page, bookRoute, "light");
@@ -368,7 +391,7 @@ try {
       check(`axe: ${route} (${theme})`, violations.length === 0, describe(violations));
     }
   }
-  // the agent's panel and a note's versions, open, in both themes
+  // the agent's panel, a note's versions and the Brain's legend and card, open, in both themes
   const quizNote = ((await fetch(`${BASE}api/notes?type=quiz`).then((r) => r.json())) as { id: string }[])[0];
   const note = quizNote ? `#/notes/${quizNote.id}` : list.find((r) => r.startsWith("#/notes/"));
   for (const theme of ["light", "dark"] as const) {
@@ -391,6 +414,21 @@ try {
         describe(await axe(page)),
       );
     }
+    await open(page, "#/brain", theme);
+    await page.click('.graph-tools [aria-label="Legend"]');
+    await page.evaluate(() =>
+      document.querySelector("[data-node] .g-disc")?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })),
+    );
+    await page.evaluate(() =>
+      document.querySelector("[data-node] .g-disc")?.dispatchEvent(new PointerEvent("pointerup", { bubbles: true })),
+    );
+    await wait(500);
+    check(
+      `axe: the Brain's legend and a card (${theme})`,
+      !!(await page.$(".legend-card")) && !!(await page.$(".node-card-edge")) && (await axe(page)).length === 0,
+      describe(await axe(page)),
+    );
+    await page.click('.graph-tools [aria-label="Legend"]');
   }
   if (!arg("only"))
     await keyboard(

@@ -331,17 +331,21 @@
   color: var(--sky-ink);
 }
 
-/* ---------- the notes page ---------- */
+/* ---------- the notes page: the list, the note, its links (each side as wide as you drag it) ---------- */
 .notes-page {
-  display: grid;
-  grid-template-columns: 260px 1fr;
+  display: flex;
   height: 100%;
   min-height: 0;
 }
 .file-tree {
+  flex: none;
+  width: var(--notes-list-w, 260px);
+  max-width: 40%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
   border-right: 1px solid var(--line);
   background: var(--bg);
 }
@@ -463,24 +467,32 @@
 }
 
 .note-pane {
-  display: grid;
-  grid-template-columns: 1fr 300px;
+  flex: 1;
+  display: flex;
   min-height: 0;
   min-width: 0;
   background: var(--surface);
 }
 .note-pane.empty-pane,
 .note-pane.center-note {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr;
   place-items: center;
   background: var(--bg);
+}
+/* the button that brings the note list back, when no note is open */
+.pane-corner {
+  position: absolute;
+  top: 10px;
+  left: 10px;
 }
 .empty-pane .empty {
   max-width: 520px;
   padding: 24px;
 }
 .note-main {
+  flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -488,6 +500,14 @@
 }
 .note-head {
   padding: 22px 32px 12px;
+}
+/* the list's button, the folders, the links' button: the buttons sit in the padding, the folders line up with the title */
+.note-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  margin: -12px -24px 4px -30px;
 }
 .crumbs {
   margin: 0;
@@ -694,10 +714,14 @@
   max-width: 760px;
 }
 .note-side {
+  flex: none;
+  width: var(--notes-links-w, 300px);
+  max-width: 45%;
+  min-width: 0;
   display: grid;
   align-content: start;
   gap: 22px;
-  overflow: auto;
+  overflow: hidden auto;
   padding: 18px 16px 32px;
   border-left: 1px solid var(--line);
   background: var(--bg);
@@ -843,27 +867,42 @@
   color: var(--sky-ink);
 }
 
+/* narrower: the links go below the note, then the list above it (the buttons still hide and show them) */
 @media (max-width: 1100px) {
-  .note-pane {
-    grid-template-columns: 1fr;
+  .note-pane:not(.empty-pane, .center-note) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .note-pane > .panel-edge {
+    display: none;
   }
   .note-side {
+    width: auto;
+    max-width: none;
     border-left: 0;
     border-top: 1px solid var(--line);
   }
 }
 @media (max-width: 760px) {
   .notes-page {
-    grid-template-columns: 1fr;
+    flex-direction: column;
     height: auto;
   }
+  .notes-page > .panel-edge {
+    display: none;
+  }
   .file-tree {
+    width: auto;
+    max-width: none;
     max-height: 40vh;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
   .note-head {
     padding: 18px 16px 10px;
+  }
+  .note-bar {
+    margin: -10px -8px 4px;
   }
   .note-read {
     padding: 16px 16px 40vh;

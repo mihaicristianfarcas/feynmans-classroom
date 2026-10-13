@@ -38,13 +38,15 @@ web/src/           the React app (Vite)
   app/             the shell (a slim bar along the top): routing, navigation, theme, the ⌘K palette
   agent/           the agent's panel (⌘J), its button, the runs it shows, where the learner is
   pages/           Today, Library (and Figures), Review, Journey, Settings, Welcome, Gallery;
-                   brain/: the graph that fills the page, the card beside it, a concept's page
+                   brain/: the graph that fills the page, the card beside it, its legend, a concept's page
   reader/          the reader: book views, margin, selection menu, figures pane, note, tutor, capture, gutter
   notes/           notes: the file tree (with folders), the note pane, its versions and links sidebar, the editor
-  components/      shared pieces: Markdown, dialogs and study tools, quiz, graph, profile form
+  components/      shared pieces: Markdown, dialogs and study tools, quiz, graph, side panels' edges and
+                   buttons, profile form
   scene/           the figure player (the universal frame around every figure)
   api/             typed calls to the server, and the live book hook
-  lib/             small helpers: accessibility (focus traps, arrow keys, announcements), loading, time
+  lib/             small helpers: accessibility (focus traps, arrow keys, announcements), loading, time,
+                   side panels' widths
   styles/          the design system and page styles
 runtime/           the runtime hand-built demos run on, in a sandboxed iframe
 vendor/anatomy/    the anatomy skill (MIT): the drawing kit hand-built demos use

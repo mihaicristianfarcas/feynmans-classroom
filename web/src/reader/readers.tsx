@@ -392,11 +392,13 @@ export const HtmlReader = forwardRef<ReaderHandle, HtmlProps>(function HtmlReade
       });
     };
     el.addEventListener("scroll", handler, { passive: true });
-    window.addEventListener("resize", handler);
+    // the text reflows when the window or the study panel beside it changes width
+    const resize = new ResizeObserver(handler);
+    resize.observe(el);
     onReady();
     return () => {
       el.removeEventListener("scroll", handler);
-      window.removeEventListener("resize", handler);
+      resize.disconnect();
       cancelAnimationFrame(frame);
     };
   }, [onScroll, onReady]);

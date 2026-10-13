@@ -1,4 +1,4 @@
-/* The card at the side of the Brain's graph, for the item you picked: a concept's summary, recall and
+/* The card at the left of the Brain's graph, for the item you picked: a concept's summary, recall and
  * sources (with a way to explain it back), a note's text, a book or an annotation in brief. Its links
  * pick other items in the graph, and links the agent suggests can be accepted or turned down there.
  * SuggestionsCard lists every suggested link, and asks the agent for more. */
@@ -12,8 +12,12 @@ import { Markdown } from "../../components/Markdown";
 import { ExplainBack } from "../../components/tools";
 import { announce } from "../../lib/a11y";
 import { useLoad } from "../../lib/useLoad";
+import { panelId } from "../../lib/usePanel";
 
 type Node = GraphData["nodes"][number];
+
+/** The card's name as a side panel: the Brain keeps its width under it, and its edge controls the card. */
+export const CARD_PANEL = "brain-card";
 type Edge = GraphData["edges"][number];
 
 const EYEBROW: Record<Node["kind"], string> = {
@@ -49,7 +53,7 @@ function Frame({
 }) {
   const titleId = useId();
   return (
-    <aside className="node-card" aria-labelledby={titleId} data-leaving={leaving || undefined}>
+    <aside className="node-card" id={panelId(CARD_PANEL)} aria-labelledby={titleId} data-leaving={leaving || undefined}>
       <div className="node-card-body">
         <header className="node-card-head">
           <span className="eyebrow">{eyebrow}</span>

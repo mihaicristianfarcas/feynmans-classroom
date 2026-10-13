@@ -1,21 +1,37 @@
 /* One note on the notes page: its title, properties (tags, aliases, what it's about) and body (edit
  * with a live preview, or read: quizzes play there), its saved versions, and what links to it in the
- * sidebar. It follows changes made elsewhere (the agent, another editor) as they land, and if they land
- * while you're typing in it, asks which text to keep. */
+ * sidebar (resized from its edge; the buttons above the note hide and show it and the note list). It
+ * follows changes made elsewhere (the agent, another editor) as they land, and if they land while you're
+ * typing in it, asks which text to keep. */
 import { ArrowUpRight, History, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { learn, type NoteDetail } from "../api";
 import { go } from "../app/navigation";
 import { Markdown } from "../components/Markdown";
+import { PanelEdge, PanelToggle } from "../components/Panel";
 import { NoteContext } from "../components/QuizBlock";
 import { useIndicator } from "../components/ui";
 import { timeAgo } from "../lib/time";
+import type { Panel } from "../lib/usePanel";
 import { useVaultEvents } from "../lib/useVaultEvents";
 import { NoteEditor } from "./NoteEditor";
 import { NoteSidebar } from "./NoteSidebar";
 import { Versions } from "./Versions";
 
-export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" | "dark"; onChanged: () => void }) {
+export function NotePane({
+  id,
+  theme,
+  onChanged,
+  list,
+  links,
+}: {
+  id: string;
+  theme: "light" | "dark";
+  onChanged: () => void;
+  /** The note list on the left and the links on the right: their buttons sit above the note. */
+  list: Panel;
+  links: Panel;
+}) {
   const [note, setNote] = useState<NoteDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [body, setBody] = useState("");
@@ -121,9 +137,14 @@ export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" 
         <header className="note-head">
           {/* the title is an editable field below; the heading names the page for screen readers */}
           <h1 className="visually-hidden">{note.title}</h1>
-          <div className="crumbs fine">
-            notes{folder.map((f) => ` / ${f}`)}
-            {note.type !== "note" && <span className="badge-type">{note.type}</span>}
+          <div className="note-bar">
+            <PanelToggle panel={list} side="left" label="note list" className="icon-button small" />
+            <div className="crumbs fine">
+              notes{folder.map((f) => ` / ${f}`)}
+              {note.type !== "note" && <span className="badge-type">{note.type}</span>}
+            </div>
+            <span className="spacer" />
+            <PanelToggle panel={links} side="right" label="links" className="icon-button small" />
           </div>
           <input
             ref={titleRef}
@@ -242,7 +263,8 @@ export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" 
           )}
         </div>
       </div>
-      <NoteSidebar note={note} reload={load} />
+      <PanelEdge panel={links} side="right" label="links" />
+      {links.open && <NoteSidebar note={note} reload={load} panel={links} />}
       {versions && (
         <Versions
           note={note}
