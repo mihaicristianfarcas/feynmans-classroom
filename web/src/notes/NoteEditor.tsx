@@ -257,6 +257,7 @@ export function NoteEditor({
   value,
   onChange,
   placeholder = "Write…",
+  label = "Note text",
   autoFocus = false,
   onBlur,
   extensions = [],
@@ -264,6 +265,8 @@ export function NoteEditor({
   value: string;
   onChange: (text: string) => void;
   placeholder?: string;
+  /** What screen readers call the editor. */
+  label?: string;
   autoFocus?: boolean;
   onBlur?: () => void;
   extensions?: Extension[];
@@ -298,6 +301,8 @@ export function NoteEditor({
           autocompletion({ override: [completeLinks], icons: false }),
           highlightSelectionMatches(),
           EditorView.lineWrapping,
+          // a named, multi-line text field, in the Tab order (CodeMirror's own element is a contenteditable)
+          EditorView.contentAttributes.of({ "aria-label": label, "aria-multiline": "true", tabindex: "0" }),
           placeholderExt(placeholder),
           livePreview,
           pictures,

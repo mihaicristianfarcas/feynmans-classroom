@@ -1,3 +1,6 @@
+/* The reader (#/book/<id>): the book on the right and, on the left, its panes (the margin, figures,
+ * your note, the tutor, the study tools). It keeps your place, follows the reading line, and has
+ * keyboard shortcuts for everything (press ? to see them). */
 import { ArrowLeft, CircleHelp, Crop, Layers, Pin, PinOff, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -15,9 +18,10 @@ import {
   useBookLive,
   withFigs,
 } from "../api";
-import { ThemeButton, useDueCount } from "../app/Shell";
+import { SkipLink, ThemeButton, useDueCount } from "../app/Shell";
 import { CardDrafter, Connector, ExplainBack } from "../components/tools";
 import { useIndicator } from "../components/ui";
+import { useArrowKeys, useFocusTrap } from "../lib/a11y";
 import { blockAnchor, pdfAnchor } from "./anchoring";
 import { CaptureLayer } from "./Capture";
 import { DemoPanel } from "./DemoPanel";
@@ -56,6 +60,8 @@ interface Selection {
   chapterId?: string;
   /** Reading position where the selection starts (page + fraction, or block). */
   at?: number;
+  /** Made from the keyboard: the menu takes focus. */
+  byKeyboard?: boolean;
 }
 
 function savedPos(bookId: string): number | null {
@@ -261,6 +267,14 @@ export function Reader({
   const onReady = useCallback(() => {
     if (restored.current || !book) return;
     restored.current = true;
+    // the book's scrolling text is a Tab stop (the arrow keys scroll it) and the skip link's target
+    const scroller = reader.current?.scroller();
+    if (scroller) {
+      scroller.id = "book-text";
+      scroller.tabIndex = 0;
+      scroller.setAttribute("role", "region");
+      scroller.setAttribute("aria-label", `${book.title}: the book`);
+    }
     const saved = savedPos(book.id);
     const box = pane.current?.getBoundingClientRect();
     if (saved && box) setTimeout(() => reader.current?.jumpTo(locOfPos(book, saved), box.top + box.height * LINE), 120);
@@ -365,7 +379,49 @@ export function Reader({
     [demos, index, jumpToDemo, nextAfterPos, pos],
   );
 
-  // keyboard: [ and ] step through figures, h holds, ? help, Esc closes
+  // selecting a passage opens the menu; clicking a highlight opens its card
+  const annotationsRef = useRef(annotations);
+  annotationsRef.current = annotations;
+  /** Opens the menu for what is selected in the book: true if it opened, false if nothing is selected, null if the selection can't be anchored. */
+  const menuForSelection = useCallback(
+    (byKeyboard: boolean): boolean | null => {
+      const sel = window.getSelection();
+      const text = sel?.toString().replace(/\s+/g, " ").trim() || "";
+      const root = pane.current;
+      if (!sel || sel.rangeCount === 0 || text.length < 2 || !root?.contains(sel.anchorNode)) return false;
+      const anchor = book?.format === "pdf" ? pdfAnchor(sel, root) : blockAnchor(sel);
+      if (!anchor) {
+        setSelection(null);
+        return null;
+      }
+      const rect = sel.getRangeAt(0).getBoundingClientRect();
+      const box = root.getBoundingClientRect();
+      // above the selection when there's room (as in most readers), else below; always inside the pane
+      const above = rect.top - box.top > 70;
+      const y = above ? rect.top - box.top - 48 : Math.min(box.height - 60, rect.bottom - box.top + 10);
+      const at = reader.current?.positionAt(Math.max(box.top + 1, rect.top + 2));
+      setSelection({
+        text,
+        anchor,
+        x: rect.left - box.left + rect.width / 2,
+        y: Math.max(8, y),
+        side: above ? "top" : "bottom",
+        chapterId: at != null ? chapterOfRef.current(at)?.id : undefined,
+        at: at ?? undefined,
+        byKeyboard,
+      });
+      return true;
+    },
+    [book],
+  );
+  /** S: selects the passage at the reading line and opens the menu, for annotating without a mouse. */
+  const selectAtLine = useCallback(() => {
+    const box = pane.current?.getBoundingClientRect();
+    if (!box || !reader.current?.selectAt(box.top + box.height * LINE)) return;
+    setTimeout(() => menuForSelection(true), 0);
+  }, [menuForSelection]);
+
+  // keyboard: [ and ] step through figures, h holds, s selects the passage at the reading line, c captures, ? help, Esc closes
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
@@ -376,7 +432,10 @@ export function Reader({
       else if (event.key === "h" && active) setHeldId((id) => (id ? null : active.id));
       else if (event.key === "?") setHelp((v) => !v);
       else if (event.key === "c" && book?.format === "pdf") setCapturing((v) => !v);
-      else if (event.key === "Escape") {
+      else if (event.key === "s") {
+        event.preventDefault();
+        selectAtLine();
+      } else if (event.key === "Escape") {
         setHelp(false);
         setSelection(null);
         setFocused(null);
@@ -385,19 +444,18 @@ export function Reader({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [step, active, selection, book]);
-
-  // selecting a passage opens the menu; clicking a highlight opens its card
-  const annotationsRef = useRef(annotations);
-  annotationsRef.current = annotations;
+  }, [step, active, selection, book, selectAtLine]);
   useEffect(() => {
+    // a selection made with the keyboard (Shift and the arrows, with caret browsing on) opens the menu when Shift is let go
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Shift" && pane.current?.contains(document.activeElement)) menuForSelection(false);
+    };
     const onUp = (event: MouseEvent) => {
       if ((event.target as Element | null)?.closest?.(".sel-menu, .modal-back, .margin, .pane-tabs")) return;
       setTimeout(() => {
-        const sel = window.getSelection();
-        const text = sel?.toString().replace(/\s+/g, " ").trim() || "";
         const root = pane.current;
-        if (!sel || sel.rangeCount === 0 || text.length < 2 || !root?.contains(sel.anchorNode)) {
+        const opened = menuForSelection(false);
+        if (opened === false) {
           setSelection(null);
           // a click (no selection) on a marked passage: open its card
           if (root?.contains(event.target as Node) && reader.current) {
@@ -417,30 +475,16 @@ export function Reader({
               setFocused(hit.id);
             }
           }
-          return;
         }
-        const anchor = book?.format === "pdf" ? pdfAnchor(sel, root) : blockAnchor(sel);
-        if (!anchor) return setSelection(null);
-        const rect = sel.getRangeAt(0).getBoundingClientRect();
-        const box = root.getBoundingClientRect();
-        // above the selection when there's room (as in most readers), else below; always inside the pane
-        const above = rect.top - box.top > 70;
-        const y = above ? rect.top - box.top - 48 : Math.min(box.height - 60, rect.bottom - box.top + 10);
-        const at = reader.current?.positionAt(Math.max(box.top + 1, rect.top + 2));
-        setSelection({
-          text,
-          anchor,
-          x: rect.left - box.left + rect.width / 2,
-          y: Math.max(8, y),
-          side: above ? "top" : "bottom",
-          chapterId: at != null ? chapterOfRef.current(at)?.id : undefined,
-          at: at ?? undefined,
-        });
       }, 10);
     };
     document.addEventListener("mouseup", onUp);
-    return () => document.removeEventListener("mouseup", onUp);
-  }, [book]);
+    document.addEventListener("keyup", onKeyUp);
+    return () => {
+      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("keyup", onKeyUp);
+    };
+  }, [menuForSelection]);
 
   const ensureNote = useCallback(async () => {
     if (workingNote) return workingNote;
@@ -469,6 +513,8 @@ export function Reader({
       if (!sel || !book) return;
       setSelection(null);
       window.getSelection()?.removeAllRanges();
+      // a menu used from the keyboard gives focus back to the book (a dialog the action opens returns it there too)
+      if (sel.byKeyboard) document.getElementById("book-text")?.focus({ preventScroll: true });
       const annotate = async (input: Parameters<typeof learn.annotate>[1], focus = true) => {
         try {
           const a = await learn.annotate(book.id, input);
@@ -530,7 +576,10 @@ export function Reader({
   );
 
   const marks = useMemo(() => ({ annotations, focused, hovered }), [annotations, focused, hovered]);
-  const tabs = useIndicator<HTMLElement>(tab);
+  const tabs = useIndicator<HTMLDivElement>(tab);
+  useArrowKeys(tabs, { selector: '[role="tab"]', select: true });
+  const helpBox = useRef<HTMLDivElement>(null);
+  useFocusTrap(helpBox, help, { onEscape: () => setHelp(false) });
 
   if (failed) return <div className="center-note">Could not open this book: {failed}</div>;
   if (!book) return <div className="center-note">Opening…</div>;
@@ -545,13 +594,14 @@ export function Reader({
 
   return (
     <div className="reader-app">
+      <SkipLink target="book-text" label="Skip to the book" />
       <header className="topbar">
         <a className="icon-button" href="#/library" title="Library" aria-label="Back to the library">
           <ArrowLeft aria-hidden="true" />
         </a>
-        <span className="book-name" title={book.title}>
+        <h1 className="book-name" title={book.title}>
           {book.title}
-        </span>
+        </h1>
         <select
           className="toc-select"
           value={chapter?.id || ""}
@@ -652,9 +702,18 @@ export function Reader({
       <main className="split" ref={split}>
         <section className="demo-pane" aria-label="Study panel">
           <div className="pane-head">
-            <nav className="pane-tabs segmented" aria-label="Study panel" ref={tabs}>
+            <div className="pane-tabs segmented" role="tablist" aria-label="Study panel" ref={tabs}>
               {(["margin", "figures", "note", "tutor", "study"] as Tab[]).map((t) => (
-                <button type="button" key={t} className="pane-tab" aria-pressed={tab === t} onClick={() => setTab(t)}>
+                <button
+                  type="button"
+                  key={t}
+                  id={`pane-tab-${t}`}
+                  className="pane-tab"
+                  role="tab"
+                  aria-selected={tab === t}
+                  aria-controls="pane-panel"
+                  onClick={() => setTab(t)}
+                >
                   {t === "margin"
                     ? "Margin"
                     : t === "figures"
@@ -664,12 +723,17 @@ export function Reader({
                         : t === "tutor"
                           ? "Tutor"
                           : "Study"}
-                  {t === "margin" && counted > 0 && <span className="tab-count">{counted}</span>}
+                  {t === "margin" && counted > 0 && (
+                    <span className="tab-count">
+                      {counted}
+                      <span className="visually-hidden"> annotations</span>
+                    </span>
+                  )}
                 </button>
               ))}
-            </nav>
+            </div>
           </div>
-          <div className="pane-body">
+          <div className="pane-body" role="tabpanel" id="pane-panel" aria-labelledby={`pane-tab-${tab}`}>
             {tab === "margin" && (
               <Margin
                 book={book}
@@ -735,7 +799,7 @@ export function Reader({
           </div>
         </section>
         <section className="book-pane" ref={pane} aria-label="Book">
-          <div className="gutter" aria-hidden="false">
+          <div className="gutter">
             <span className="reading-line" style={{ top: `${LINE * 100}%` }} title="Reading line" />
             {noteMarkers.map((m) => (
               <button
@@ -793,6 +857,11 @@ export function Reader({
               side={selection.side}
               onAction={onAction}
               noteTitle={workingNote?.title}
+              takeFocus={selection.byKeyboard}
+              onClose={() => {
+                setSelection(null);
+                document.getElementById("book-text")?.focus({ preventScroll: true });
+              }}
             />
           )}
           {capturing && (
@@ -840,7 +909,7 @@ export function Reader({
         />
       )}
       {help && (
-        <div className="help-pop" role="dialog" aria-label="Help">
+        <div className="help-pop" role="dialog" aria-label="Help" ref={helpBox}>
           <button
             type="button"
             className="icon-button help-close"
@@ -858,6 +927,10 @@ export function Reader({
             <li>
               Select, then <kbd>H</kbd> highlight · <kbd>E</kbd> explain · <kbd>V</kbd> visualize · <kbd>A</kbd> ask ·{" "}
               <kbd>D</kbd> define · <kbd>N</kbd> add the passage to your note
+            </li>
+            <li>
+              Without a mouse: <kbd>Tab</kbd> to the book (or use “Skip to the book”), scroll with the arrow keys, and
+              press <kbd>S</kbd> to select the passage at the reading line; the menu opens with focus in it
             </li>
             <li>Click a marked passage to open its card; ask follow-ups in the card</li>
             <li>

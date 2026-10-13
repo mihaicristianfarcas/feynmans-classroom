@@ -1,3 +1,5 @@
+/* The library: the shelf of books, uploading a new one (a button you can also drop a file on), and
+ * whether Codex and the browser check are ready. */
 import { Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api, type Book, type Status } from "../api";
@@ -44,8 +46,17 @@ export function Library() {
         </p>
       </header>
 
-      <div
+      <input
+        ref={input}
+        type="file"
+        accept=".pdf,.epub,.md,.markdown,.txt"
+        hidden
+        onChange={(e) => upload(e.target.files?.[0])}
+      />
+      <button
+        type="button"
         className={`dropzone ${drag ? "drag" : ""}`}
+        aria-describedby="upload-formats"
         onDragOver={(e) => {
           e.preventDefault();
           setDrag(true);
@@ -57,17 +68,8 @@ export function Library() {
           upload(e.dataTransfer.files[0]);
         }}
         onClick={() => input.current?.click()}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
+        disabled={!!uploading}
       >
-        <input
-          ref={input}
-          type="file"
-          accept=".pdf,.epub,.md,.markdown,.txt"
-          hidden
-          onChange={(e) => upload(e.target.files?.[0])}
-        />
         <span className="well drop-icon" data-tone={drag ? "lavender" : undefined} aria-hidden="true">
           <Upload />
         </span>
@@ -76,13 +78,19 @@ export function Library() {
         ) : (
           <span className="drop-text">
             <span className="drop-title">Drop a book here, or choose one</span>
-            <span className="fine">PDF with selectable text, EPUB, Markdown or plain text</span>
+            <span className="fine" id="upload-formats">
+              PDF with selectable text, EPUB, Markdown or plain text
+            </span>
           </span>
         )}
-      </div>
-      {error && <p className="form-error">{error}</p>}
+      </button>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
 
-      <section className="shelf stagger">
+      <section className="shelf stagger" aria-label="Your books">
         {books === null ? (
           <Spinner label="Loading your shelf" />
         ) : books.length === 0 ? (

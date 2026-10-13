@@ -32,7 +32,7 @@ export function ReaderNote({
   const [body, setBody] = useState(note?.body ?? "");
   const [mode, setMode] = useState<"edit" | "read">("edit");
   const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
-  const modes = useIndicator<HTMLDivElement>(`${mode}-${note?.id}`);
+  const modes = useIndicator<HTMLFieldSetElement>(`${mode}-${note?.id}`);
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const current = useRef(note);
@@ -122,14 +122,15 @@ export function ReaderNote({
         </select>
         {note && (
           <>
-            <div className="segmented" role="group" aria-label="Mode" ref={modes}>
+            <fieldset className="segmented" ref={modes}>
+              <legend className="visually-hidden">Mode</legend>
               <button type="button" aria-pressed={mode === "edit"} onClick={() => setMode("edit")}>
                 Edit
               </button>
               <button type="button" aria-pressed={mode === "read"} onClick={() => setMode("read")}>
                 Read
               </button>
-            </div>
+            </fieldset>
             <span className="fine">
               {state === "saving" ? "Saving…" : state === "saved" ? "Saved" : `Edited ${timeAgo(note.updated)}`}
             </span>

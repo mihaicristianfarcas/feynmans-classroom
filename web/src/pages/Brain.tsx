@@ -1,3 +1,5 @@
+/* The Brain: the knowledge graph, and the concepts, notes and figures in your vault, each as a tab;
+ * and a concept's own page (what it is, how well you know it, its cards, notes and sources). */
 import { ArrowLeft, Pause, Play, Shapes } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { type Concept, learn, type Note } from "../api";
@@ -215,7 +217,7 @@ function GraphTab({ filter }: { filter: string }) {
       )}
       <section className="connections-inbox">
         <div className="row gap">
-          <h3 className="sub-title">Connections the agent suggests</h3>
+          <h2 className="sub-title">Connections the agent suggests</h2>
           <span className="spacer" />
           <button
             type="button"
@@ -485,17 +487,17 @@ function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
         <Mastery value={c.mastery} wide />
       </header>
       <div className="concept-actions">
-        <button type="button" className="button primary" onClick={() => setTool("explain")}>
+        <button type="button" className="button primary" aria-haspopup="dialog" onClick={() => setTool("explain")}>
           Explain it back
         </button>
-        <button type="button" className="button" onClick={() => setTool("cards")}>
+        <button type="button" className="button" aria-haspopup="dialog" onClick={() => setTool("cards")}>
           Make cards
         </button>
-        <button type="button" className="button" onClick={() => setTool("figure")}>
+        <button type="button" className="button" aria-haspopup="dialog" onClick={() => setTool("figure")}>
           <Shapes aria-hidden="true" />
           Draw it
         </button>
-        <button type="button" className="button" onClick={() => setTool("connect")}>
+        <button type="button" className="button" aria-haspopup="dialog" onClick={() => setTool("connect")}>
           Connect
         </button>
         <a
@@ -537,6 +539,7 @@ function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
           </div>
         </div>
       ) : (
+        // biome-ignore lint/a11y/noStaticElementInteractions: double-click is a shortcut; the Edit button below does the same
         <section
           className="concept-text"
           onDoubleClick={() => {

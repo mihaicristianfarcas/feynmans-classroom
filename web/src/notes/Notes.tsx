@@ -256,7 +256,7 @@ function NotePane({ id, theme, onChanged }: { id: string; theme: "light" | "dark
     }
   });
   const [saving, setSaving] = useState<"idle" | "saving" | "saved">("idle");
-  const modes = useIndicator<HTMLDivElement>(mode);
+  const modes = useIndicator<HTMLFieldSetElement>(mode);
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -333,6 +333,8 @@ function NotePane({ id, theme, onChanged }: { id: string; theme: "light" | "dark
     <div className="note-pane">
       <div className="note-main">
         <header className="note-head">
+          {/* the title is an editable field below; the heading names the page for screen readers */}
+          <h1 className="visually-hidden">{note.title}</h1>
           <div className="crumbs fine">
             notes{folder.map((f) => ` / ${f}`)}
             {note.type !== "note" && <span className="badge-type">{note.type}</span>}
@@ -351,7 +353,8 @@ function NotePane({ id, theme, onChanged }: { id: string; theme: "light" | "dark
             title="The title is the file name: renaming updates every link to this note"
           />
           <div className="row gap note-tools">
-            <div className="segmented" role="group" aria-label="Mode" ref={modes}>
+            <fieldset className="segmented" ref={modes}>
+              <legend className="visually-hidden">Mode</legend>
               {(["edit", "read"] as const).map((m) => (
                 <button
                   type="button"
@@ -367,7 +370,7 @@ function NotePane({ id, theme, onChanged }: { id: string; theme: "light" | "dark
                   {m === "edit" ? "Edit" : "Read"}
                 </button>
               ))}
-            </div>
+            </fieldset>
             <span className="fine">
               {saving === "saving"
                 ? "Saving…"
@@ -487,9 +490,9 @@ function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => void })
   return (
     <aside className="note-side" aria-label="Links">
       <section>
-        <h3 className="side-title">
+        <h2 className="side-title">
           Linked here <span className="count">{note.backlinks.length}</span>
-        </h3>
+        </h2>
         {note.backlinks.length === 0 ? (
           <p className="fine">Nothing links to this note yet.</p>
         ) : (
@@ -523,9 +526,9 @@ function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => void })
       </section>
       {note.mentions.length > 0 && (
         <section>
-          <h3 className="side-title">
+          <h2 className="side-title">
             Mentioned, not linked <span className="count">{note.mentions.length}</span>
-          </h3>
+          </h2>
           <ul className="link-list">
             {note.mentions.map((m, i) => (
               <li
@@ -555,9 +558,9 @@ function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => void })
         </section>
       )}
       <section>
-        <h3 className="side-title">
+        <h2 className="side-title">
           Links out <span className="count">{note.outgoing.length}</span>
-        </h3>
+        </h2>
         <ul className="link-list compact">
           {note.outgoing.map((o, i) => (
             <li
@@ -581,7 +584,7 @@ function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => void })
         </ul>
       </section>
       <section>
-        <h3 className="side-title">Connections</h3>
+        <h2 className="side-title">Connections</h2>
         <p className="fine">
           An agent reads your vault and suggests notes and concepts this one should link to. You decide.
         </p>

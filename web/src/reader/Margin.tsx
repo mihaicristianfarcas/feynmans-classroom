@@ -10,6 +10,7 @@ import { memo, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo,
 import { type Annotation, type Book, type Demo, learn } from "../api";
 import { Spinner } from "../components/feedback";
 import { Markdown } from "../components/Markdown";
+import { useArrowKeys } from "../lib/a11y";
 import { timeAgo } from "../lib/time";
 import { SceneView } from "../scene/SceneView";
 import type { ReaderHandle } from "./readers";
@@ -167,11 +168,28 @@ export function Margin({
   }, [shown, layout]);
   useEffect(() => () => leader.current?.style.setProperty("opacity", "0"), [leader]);
 
+  // a card opened or closed from the keyboard keeps focus: the open card, or the collapsed one it came from
+  const lastFocused = useRef(focused);
+  useEffect(() => {
+    const was = lastFocused.current;
+    lastFocused.current = focused;
+    const active = document.activeElement;
+    if (active && active !== document.body && !box.current?.contains(active)) return;
+    const id = focused ?? was;
+    const card = id ? cards.current.get(id) : undefined;
+    requestAnimationFrame(() =>
+      card?.querySelector<HTMLElement>(focused ? ".mcard.open" : ".mcard.collapsed")?.focus({ preventScroll: true }),
+    );
+  }, [focused]);
+
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const visible = shown.map((id) => byId.get(id)).filter((x): x is MarginItem => !!x);
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: a click on the empty margin closes the open card; Escape does the same
+    // biome-ignore lint/a11y/noStaticElementInteractions: as above
     <div className="margin" ref={box} onClick={(e) => e.target === box.current && setFocused(null)}>
       {visible.map((item) => (
+        // biome-ignore lint/a11y/noStaticElementInteractions: hovering or focusing a card marks its passage in the book
         <div
           key={item.id}
           className="margin-slot"
@@ -181,6 +199,8 @@ export function Margin({
           }}
           onMouseEnter={() => setHovered(item.id)}
           onMouseLeave={() => setHovered(null)}
+          onFocus={() => setHovered(item.id)}
+          onBlur={() => setHovered(null)}
         >
           {item.annotation ? (
             <AnnotationCard
@@ -254,6 +274,12 @@ const AnnotationCard = memo(function AnnotationCard({
   const [menu, setMenu] = useState(false);
   const [comment, setComment] = useState(a.body);
   const [redrawing, setRedrawing] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const menuBox = useRef<HTMLDivElement>(null);
+  useArrowKeys(menuBox, { selector: '[role="menuitem"]', orientation: "vertical" });
+  useEffect(() => {
+    if (menu) menuBox.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+  }, [menu]);
   const where = a.anchor.page !== undefined ? `p. ${a.anchor.page}` : "";
   const label = a.kind === "visualize" && a.title ? "Figure" : KIND[a.kind];
   const pending = a.status === "pending";
@@ -293,11 +319,14 @@ const AnnotationCard = memo(function AnnotationCard({
     );
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: only keeps clicks inside the card from closing it
     <article
       className="mcard open"
       data-kind={a.kind}
       data-status={a.status}
       data-color={a.color}
+      tabIndex={-1}
+      aria-label={`${label}${where ? `, ${where}` : ""}`}
       onClick={(e) => e.stopPropagation()}
     >
       <header className="mcard-head">
@@ -310,13 +339,27 @@ const AnnotationCard = memo(function AnnotationCard({
             className="mcard-icon"
             aria-label="More"
             title="More"
+            aria-haspopup="menu"
             aria-expanded={menu}
+            ref={menuButton}
             onClick={() => setMenu((m) => !m)}
           >
             <Ellipsis aria-hidden="true" />
           </button>
           {menu && (
-            <div className="menu" role="menu" onMouseLeave={() => setMenu(false)}>
+            <div
+              className="menu"
+              role="menu"
+              aria-label="More"
+              ref={menuBox}
+              onMouseLeave={() => setMenu(false)}
+              onKeyDown={(e) => {
+                if (e.key !== "Escape") return;
+                e.stopPropagation(); // closes the menu, not the card
+                setMenu(false);
+                menuButton.current?.focus();
+              }}
+            >
               <button
                 type="button"
                 role="menuitem"
@@ -398,7 +441,8 @@ const AnnotationCard = memo(function AnnotationCard({
       {a.request && a.kind !== "comment" && <p className="mcard-request">{a.request}</p>}
       {a.kind === "highlight" || a.kind === "comment" ? (
         <div className="mcard-comment">
-          <div className="colors" role="group" aria-label="Colour">
+          <fieldset className="colors">
+            <legend className="visually-hidden">Colour</legend>
             {COLORS.map((c) => (
               <button
                 type="button"
@@ -410,10 +454,11 @@ const AnnotationCard = memo(function AnnotationCard({
                 onClick={() => learn.updateAnnotation(a.id, { color: c })}
               />
             ))}
-          </div>
+          </fieldset>
           <textarea
             rows={2}
             value={comment}
+            aria-label="Your comment"
             placeholder="Add a comment…"
             onChange={(e) => setComment(e.target.value)}
             onBlur={() =>
@@ -486,6 +531,7 @@ const AnnotationCard = memo(function AnnotationCard({
           <input
             value={ask}
             onChange={(e) => setAsk(e.target.value)}
+            aria-label={a.kind === "visualize" ? "What should change in the figure" : "A follow-up question"}
             placeholder={a.kind === "visualize" ? "What should change? (redraws it)" : "Ask a follow-up…"}
             disabled={!!asking}
           />
@@ -495,7 +541,7 @@ const AnnotationCard = memo(function AnnotationCard({
         </form>
       )}
       {asking && <Spinner label={a.kind === "visualize" ? "Redrawing" : "Thinking"} since={asking} />}
-      <span className="sr-only">{book.title}</span>
+      <span className="visually-hidden">{book.title}</span>
     </article>
   );
 });
@@ -538,7 +584,14 @@ const DemoCard = memo(function DemoCard({
       </button>
     );
   return (
-    <article className="mcard open" data-kind="figure" onClick={(e) => e.stopPropagation()}>
+    // biome-ignore lint/a11y/useKeyWithClickEvents: only keeps clicks inside the card from closing it
+    <article
+      className="mcard open"
+      data-kind="figure"
+      tabIndex={-1}
+      aria-label={`${demo.fig}: ${demo.brief.title}`}
+      onClick={(e) => e.stopPropagation()}
+    >
       <header className="mcard-head">
         <span className="mcard-kind">{demo.fig}</span>
         <span className="spacer" />

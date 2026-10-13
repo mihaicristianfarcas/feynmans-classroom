@@ -86,8 +86,8 @@ try {
   await page.waitForSelector(".margin", { timeout: 20000 });
   check(
     "the reader opens on the margin",
-    !!(await page.$(".pane-tab[aria-pressed=true]")) &&
-      (await page.$eval(".pane-tab[aria-pressed=true]", (e) => e.textContent || "")).startsWith("Margin"),
+    !!(await page.$(".pane-tab[aria-selected=true]")) &&
+      (await page.$eval(".pane-tab[aria-selected=true]", (e) => e.textContent || "")).startsWith("Margin"),
   );
   await clickTab(page, "Figures");
   await page.waitForSelector(".demo-frame", { timeout: 20000 });

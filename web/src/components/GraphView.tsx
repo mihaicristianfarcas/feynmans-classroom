@@ -1,3 +1,6 @@
+/* The knowledge graph as a force-directed picture: concepts, notes, books and figures as nodes, links
+ * as lines, mastery as a ring. Hover or focus a node to see what it is; click or press Enter to open it.
+ * The same graph is available as lists (the Brain's other tabs) for anyone who prefers them. */
 import {
   forceCollide,
   forceLink,
@@ -13,6 +16,7 @@ import { Maximize2, Minus, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GraphData } from "../api";
 import { go, openLink } from "../app/navigation";
+import { useArrowKeys } from "../lib/a11y";
 
 type N = SimulationNodeDatum & GraphData["nodes"][number];
 type L = SimulationLinkDatum<N> & { kind: string };
@@ -133,6 +137,38 @@ export function GraphView({
   const fewNotes = nodes.filter((n) => n.kind === "note").length <= 30;
   const matches = (n: N) => !!q && n.label.toLowerCase().includes(q);
 
+  const describe = (n: N) =>
+    n.kind === "concept"
+      ? `Concept: ${n.label}, ${n.mastery === null ? "not studied yet" : `${Math.round(n.mastery * 100)}% recall`}`
+      : `${n.kind === "annotation" ? "Annotation" : n.kind === "book" ? "Book" : "Note"}: ${n.label}`;
+  /** A node reached by keyboard shows its tip, and comes into view if the graph was zoomed or panned away from it. */
+  const onFocusNode = (n: N) => {
+    setHover(n.id);
+    const sx = (n.x ?? 0) * view.k + view.x;
+    const sy = (n.y ?? 0) * view.k + view.y;
+    if (sx < 40 || sx > W - 40 || sy < 40 || sy > H - 40)
+      setView((v) => ({ ...v, x: W / 2 - (n.x ?? 0) * v.k, y: H / 2 - (n.y ?? 0) * v.k }));
+  };
+  const keys = (n: N) => ({
+    tabIndex: -1,
+    role: "link",
+    "aria-label": describe(n),
+    onFocus: () => onFocusNode(n),
+    onBlur: () => setHover(null),
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        open(n);
+      }
+    },
+  });
+  useArrowKeys(svg, { selector: "[data-node]", orientation: "both" });
+  const counts = ["concept", "note", "book"]
+    .map((kind) => [kind, nodes.filter((n) => n.kind === kind).length] as const)
+    .filter(([, count]) => count)
+    .map(([kind, count]) => `${count} ${kind}${count === 1 ? "" : "s"}`)
+    .join(", ");
+
   const open = (n: N) => {
     if (n.kind === "book") go(`#/book/${n.bookId}`);
     else if (n.kind === "concept") go(`#/brain/concept/${n.id.slice(8)}`);
@@ -142,10 +178,18 @@ export function GraphView({
 
   return (
     <div className="graph-wrap">
+      <p className="visually-hidden" id="graph-help">
+        Use the arrow keys to move between the items in the graph, and Enter to open one. The same items are listed in
+        the Concepts and Notes tabs.
+      </p>
+      {/* biome-ignore lint/a11y/useSemanticElements: an SVG can't be a fieldset; role=group names the drawing's items as a set */}
       <svg
         ref={svg}
         className="graph"
         viewBox={`0 0 ${W} ${H}`}
+        role="group"
+        aria-label={`Knowledge graph: ${counts || "empty"}`}
+        aria-describedby="graph-help"
         onPointerDown={(e) => {
           const target = (e.target as Element).closest("[data-node]");
           const node = target ? nodes.find((n) => n.id === target.getAttribute("data-node")) : undefined;
@@ -191,6 +235,7 @@ export function GraphView({
           });
         }}
       >
+        <title>Knowledge graph</title>
         <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
           {links.map((l, i) => {
             const a = l.source as N,
@@ -229,6 +274,7 @@ export function GraphView({
                   data-hit={hit || undefined}
                   onPointerEnter={() => setHover(n.id)}
                   onPointerLeave={() => setHover(null)}
+                  {...keys(n)}
                 >
                   <rect x={-w / 2} y={-13} width={w} height={26} rx={3} />
                   <text textAnchor="middle" y={4}>
@@ -258,6 +304,7 @@ export function GraphView({
                 data-level={m === null ? "none" : m >= 0.8 ? "strong" : m >= 0.55 ? "ok" : "weak"}
                 onPointerEnter={() => setHover(n.id)}
                 onPointerLeave={() => setHover(null)}
+                {...keys(n)}
               >
                 {n.kind === "note" ? (
                   <rect x={-r} y={-r} width={r * 2} height={r * 2} />

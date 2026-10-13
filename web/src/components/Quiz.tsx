@@ -1,5 +1,8 @@
-import { useState } from "react";
+/* Quizzes and pretests: one question at a time, multiple choice or short answer, with feedback right
+ * after each answer; misses can become flashcards in one click. */
+import { useEffect, useState } from "react";
 import { learn, type Question, type Quiz } from "../api";
+import { announce } from "../lib/a11y";
 import { Spinner } from "./feedback";
 import { Markdown } from "./Markdown";
 
@@ -188,6 +191,7 @@ export function QuizRunner({
           <button
             type="button"
             className="button primary"
+            // biome-ignore lint/a11y/noAutofocus: after the feedback (announced above), Next is where the learner goes
             autoFocus
             onClick={() => {
               setText("");
@@ -204,10 +208,15 @@ export function QuizRunner({
 
 function Feedback({ q, answer, theme }: { q: Question; answer: Answer; theme: "light" | "dark" }) {
   const right = answer.score >= 0.7;
+  const verdict = right ? "Right." : answer.score > 0.3 ? "Partly." : "Not quite.";
+  // read out for screen readers as soon as it appears (focus moves on to Next)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per answer
+  useEffect(() => {
+    announce(`${verdict} ${answer.feedback || ""} ${q.explanation}`);
+  }, []);
   return (
     <div className="quiz-feedback" data-right={right || undefined}>
-      <b>{right ? "Right." : answer.score > 0.3 ? "Partly." : "Not quite."}</b>{" "}
-      {answer.feedback && <span>{answer.feedback} </span>}
+      <b>{verdict}</b> {answer.feedback && <span>{answer.feedback} </span>}
       <Markdown text={q.explanation} theme={theme} />
       {q.quote && <blockquote className="quote">“{q.quote}”</blockquote>}
     </div>

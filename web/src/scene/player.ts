@@ -199,11 +199,14 @@ export class ScenePlayer {
     this.root.dataset.theme = this.opts.theme;
     if (this.opts.compact) this.root.dataset.compact = "";
     const corner = (name: string, text: string) => h("span", { class: "sc-corner", "data-corner": name, text });
+    const parts = [...this.infos.values()].filter((p) => p.info).length;
     const stage = h("div", {
       class: "sc-stage",
       tabindex: "0",
       role: "img",
       "aria-label": `${spec.title}. ${spec.caption}`,
+      "aria-roledescription": "interactive figure",
+      "aria-description": `Space plays and pauses, the left and right arrows step${parts ? ", the up and down arrows read its parts" : ""}, plus and minus zoom.`,
     });
     stage.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="sc-svg" viewBox="0 0 ${WIDTH} ${HEIGHT}" aria-hidden="true"></svg>`;
     const info = h("div", { class: "sc-info", "aria-live": "polite" });
@@ -351,7 +354,7 @@ export class ScenePlayer {
       this.controls.set(p.id, { buttons });
       return h("div", { class: "sc-param", "data-kind": "choice" }, [
         h("span", { class: "sc-param-label", text: p.label }),
-        h("span", { class: "sc-choices", role: "group" }, buttons),
+        h("span", { class: "sc-choices", role: "group", "aria-label": p.label }, buttons),
       ]);
     }
     const input = h("input", {
@@ -545,16 +548,19 @@ export class ScenePlayer {
       b.addEventListener("click", () => reveal(i));
       return b;
     });
-    const box = h("div", { class: "sc-predict", role: "dialog", "aria-label": "Predict first" }, [
+    // a question inside the figure, not a dialog: it doesn't take focus when the figure scrolls into view
+    const box = h("div", { class: "sc-predict", role: "group", "aria-label": "Predict first" }, [
       h("div", { class: "sc-predict-head" }, [h("span", { text: "Predict first" }), skip]),
       h("p", { text: p.question }),
       h("div", { class: "sc-predict-choices" }, choices),
     ]);
     this.el.plate.append(box);
     const close = () => {
+      const hadFocus = box.contains(document.activeElement);
       box.remove();
       this.predicting = false;
       this.restart();
+      if (hadFocus) this.el.stage.focus({ preventScroll: true });
     };
     skip.addEventListener("click", close);
     const reveal = (i: number) => {
@@ -567,9 +573,11 @@ export class ScenePlayer {
       const watch = h("button", { class: "sc-btn", type: "button", text: "Watch it" });
       watch.addEventListener("click", close);
       box.append(
-        h("p", { class: "sc-answer", text: `${right ? "Right." : "Not quite."} ${p.explain}` }),
+        h("p", { class: "sc-answer", role: "status", text: `${right ? "Right." : "Not quite."} ${p.explain}` }),
         h("div", {}, [watch]),
       );
+      // the choices are disabled now: focus moves on to what comes next
+      if (box.contains(document.activeElement) || document.activeElement === document.body) watch.focus();
       this.opts.onEvent?.({ type: "predict", correct: right });
     };
   }
@@ -701,7 +709,17 @@ export class ScenePlayer {
         this.setPlaying(!this.playing);
       } else if (event.key === "ArrowRight") this.stepBy(1);
       else if (event.key === "ArrowLeft") this.stepBy(-1);
-      else if (event.key === "+" || event.key === "=") this.setZoom((this.view.zoom || 1) * 1.25);
+      else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        // read the figure's parts one by one: what tapping a part does, for the keyboard (the info box is announced)
+        const ids = [...this.infos.entries()].filter(([, p]) => p.info).map(([id]) => id);
+        if (!ids.length) return;
+        event.preventDefault();
+        const at = this.picked ? ids.indexOf(this.picked) : -1;
+        const to = event.key === "ArrowDown" ? at + 1 : at < 0 ? ids.length - 1 : at - 1;
+        this.picked = ids[(to + ids.length) % ids.length];
+        this.showInfo();
+        this.wake();
+      } else if (event.key === "+" || event.key === "=") this.setZoom((this.view.zoom || 1) * 1.25);
       else if (event.key === "-") this.setZoom((this.view.zoom || 1) / 1.25);
       else if (event.key === "0") this.resetView();
     });

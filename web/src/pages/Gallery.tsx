@@ -1,3 +1,4 @@
+/* The figure gallery (#/gallery): every reference scene, the visual test bench for the scene engine. */
 import { useEffect, useState } from "react";
 import { EXAMPLES } from "../../../shared/scene/examples.ts";
 import { SceneView } from "../scene/SceneView";

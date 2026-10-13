@@ -8,7 +8,7 @@
   --sc-paper: #ffffff;
   --sc-text: #55555b;
   --sc-strong: #2b2b2f;
-  --sc-muted: #87868c;
+  --sc-muted: #69696d;
   --sc-hi: #2b2b2f;
   --sc-mid: #8a898f;
   --sc-lo: #bbb8b2;
@@ -46,7 +46,7 @@
   --sc-paper: #252529;
   --sc-text: #bebcb7;
   --sc-strong: #edebe6;
-  --sc-muted: #8c8b90;
+  --sc-muted: #949398;
   --sc-hi: #dedcd6;
   --sc-mid: #8c8b90;
   --sc-lo: #56555b;
@@ -132,7 +132,7 @@
   cursor: grabbing;
 }
 .sc-stage:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--sc-lit) 50%, transparent);
+  outline: 2px solid var(--sc-strong);
   outline-offset: 4px;
   border-radius: 4px;
 }
@@ -468,8 +468,8 @@
 }
 .sc-range:focus-visible::-webkit-slider-thumb {
   box-shadow:
-    0 0 0 1px var(--sc-lit),
-    0 0 0 4px color-mix(in srgb, var(--sc-lit) 22%, transparent);
+    0 0 0 2px var(--sc-strong),
+    0 0 0 5px color-mix(in srgb, var(--sc-lit) 30%, transparent);
 }
 .sc-range:disabled {
   opacity: 0.35;

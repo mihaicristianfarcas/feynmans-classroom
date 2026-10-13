@@ -34,15 +34,6 @@
         // page styles override the base controls (.button, inputs) in places; a specificity cleanup
         // has to come before this can be turned on
         "noImportantStyles": "off"
-      },
-      "a11y": {
-        // the interface doesn't meet these yet: warnings until the accessibility pass fixes the code
-        "noAutofocus": "warn",
-        "noStaticElementInteractions": "warn",
-        "noSvgWithoutTitle": "warn",
-        "useKeyWithClickEvents": "warn",
-        "useSemanticElements": "warn",
-        "useValidAnchor": "warn"
       }
     }
   },

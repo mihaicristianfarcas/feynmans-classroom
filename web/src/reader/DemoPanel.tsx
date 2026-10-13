@@ -1,3 +1,6 @@
+/* The reader's Figures pane: the figure for where you are in the book (the one whose passage the
+ * reading line last passed), its progress while it's being drawn, redrawing and hand-building it,
+ * and the chapter's figures as a list. */
 import { ChevronDown, ChevronUp, Shapes } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type Book, type Demo, type Job, learn, type TocEntry } from "../api";
