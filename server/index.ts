@@ -2,6 +2,7 @@
  * interrupted, keeps the indexes fresh, and serves the API (and, in production, the app) on
  * 127.0.0.1:PORT. */
 import { serve } from "@hono/node-server";
+import { prepareAgents } from "./agents/index.ts";
 import { migrateHighlightNotes, resumeAnnotations } from "./annotations/index.ts";
 import { createApp } from "./app.ts";
 import { migrateLegacyBooks } from "./books/store.ts";
@@ -26,6 +27,7 @@ startIndexing();
 resumeAnnotations();
 resumeInterrupted();
 resumeFigures();
+prepareAgents();
 
 serve({ fetch: createApp().fetch, port: PORT, hostname: process.env.HOST || "127.0.0.1" }, (info) => {
   const codex = codexStatus();

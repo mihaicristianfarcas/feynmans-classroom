@@ -1,7 +1,7 @@
 /* Setting the vault up on startup: its folders, the guide for agents (templates/AGENTS.md, imported
- * by CLAUDE.md), the managed block of its .gitignore, migrations from older layouts, git, and the
- * first load of every collection. */
-import { spawnSync } from "node:child_process";
+ * by CLAUDE.md), the managed block of its .gitignore (jj reads it too), migrations from older
+ * layouts, the jj repository (adopting a git history if there is one), and the first load of every
+ * collection. */
 import {
   copyFileSync,
   existsSync,
@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import { fileNameOf } from "../../shared/links.ts";
 import { annotations, COLLECTIONS, cards, concepts, figures, notes } from "./collections.ts";
 import { asString, parseFrontmatter, VAULT } from "./files.ts";
-import { changed, hasGit, vaultIsRepo } from "./git.ts";
+import { changed, hasJj, jj, vaultIsRepo } from "./jj.ts";
 import { reviews } from "./logs.ts";
 import { startWatching } from "./watch.ts";
 
@@ -100,7 +100,21 @@ function migrateV1() {
 }
 
 let ready = false;
-/** Prepares the vault on startup: folders, migrations, AGENTS.md, .gitignore, git, the indexes in memory, the watcher. */
+/** Makes the vault a jj repository, colocated with git. A vault that was already a git repository keeps
+ * its history (jj imports it); the branches agents used under git are dropped, as jj needs none. */
+function initRepository() {
+  if (!hasJj || existsSync(join(VAULT, ".jj"))) return;
+  const hadGit = existsSync(join(VAULT, ".git"));
+  const init = jj(["git", "init"]);
+  if (!init.ok) {
+    console.warn("[vault] could not start a jj repository:", init.stderr);
+    return;
+  }
+  if (hadGit) jj(["bookmark", "delete", "glob:agent/*"]);
+  changed(hadGit ? "vault moved to jj" : "vault created");
+}
+
+/** Prepares the vault on startup: folders, migrations, AGENTS.md, .gitignore, jj, the indexes in memory, the watcher. */
 export function initVault() {
   if (ready) return;
   ready = true;
@@ -110,10 +124,7 @@ export function initVault() {
   // Claude Code reads CLAUDE.md; Codex reads AGENTS.md
   writeFileSync(join(VAULT, "CLAUDE.md"), "@AGENTS.md\n");
   writeGitignore();
-  if (hasGit && !existsSync(join(VAULT, ".git"))) {
-    spawnSync("git", ["init", "-q"], { cwd: VAULT });
-    changed("vault created");
-  }
+  initRepository();
   for (const c of COLLECTIONS) c.load();
   startWatching();
 }
@@ -127,7 +138,8 @@ export function vaultStats() {
     figures: figures.items.size,
     annotations: annotations.items.size,
     reviews: reviews().length,
-    git: vaultIsRepo(),
+    versioned: vaultIsRepo(),
+    jj: hasJj,
     path: VAULT,
   };
 }

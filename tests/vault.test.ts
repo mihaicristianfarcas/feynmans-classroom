@@ -1,4 +1,4 @@
-// The vault's files: collections, frontmatter round trips, logs, the profile and git.
+// The vault's files: collections, frontmatter round trips, logs, the profile and jj.
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

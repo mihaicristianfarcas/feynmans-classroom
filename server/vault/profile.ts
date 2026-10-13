@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { Profile } from "../../shared/vault-types.ts";
 import { wroteItself } from "./changes.ts";
 import { asArray, atomicWrite, parseFrontmatter, stringifyFrontmatter, VAULT } from "./files.ts";
-import { changed } from "./git.ts";
+import { changed } from "./jj.ts";
 
 export const DEFAULT_PROFILE: Profile = {
   name: "",

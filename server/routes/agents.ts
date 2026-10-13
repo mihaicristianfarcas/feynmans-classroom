@@ -8,8 +8,8 @@ export function agentRoutes(app: Hono) {
   app.get("/api/agents", (c) => c.json(listRuns()));
   app.post("/api/agents", async (c) => {
     const b = await readBody<{ task: string }>(c);
-    if (!b.task?.trim() || b.task.trim().length < 8) return c.json({ error: "say what the agent should do" }, 400);
-    return c.json(startRun(b.task));
+    if (!b.task?.trim()) return c.json({ error: "say what the agent should do" }, 400);
+    return c.json(startRun({ task: b.task }));
   });
   app.get("/api/agents/:id/diff", (c) => c.json({ diff: runDiff(c.req.param("id")) }));
   app.post("/api/agents/:id/:action", (c) => {

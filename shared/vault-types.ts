@@ -215,8 +215,11 @@ export interface AgentRun {
   model?: string;
   /** Files the run changed: A(dded), M(odified), D(eleted). */
   files?: { path: string; change: "A" | "M" | "D" }[];
-  /** Why it waits for the learner's OK (it deletes or rewrites their notes). */
+  /** Why it waits for the learner's OK (a file it wrote can't be read). */
   review?: string[];
+  /** The jj change it made: what Undo takes out again. */
+  change?: string;
+  /** That change's commit: its diff stays readable after an undo. */
   commit?: string;
   answer?: string;
   error?: string;

@@ -1,17 +1,17 @@
 /* Agents that change the vault ("turn my chapter 5 highlights into a summary note", "tidy my notes on
- * consensus into one"), with the guardrails agreed on:
+ * consensus into one"), with these guardrails:
  *
- *   1. The OS sandbox of the CLI (see llm.ts): the agent's shell can write only its working folder,
- *      read only that and the vault, never touch .git, never reach the network.
- *   2. Its own branch: the agent works in a git worktree of the vault (DATA_DIR/agent-runs/<id>), so it
- *      never edits a file you have open. The vault's derived files (the books' text, the indexes) are
- *      linked in read-only.
- *   3. Checks before anything lands: every changed file must parse; app-owned files (logs, profile,
- *      book.json, AGENTS.md…) must be untouched; deleting files or rewriting your notes waits for
- *      your OK (you see the diff). Otherwise the branch is merged.
- *   4. Undo: every run lands as one merge commit, reverted with one click. log/agents.jsonl records
- *      each run: the task, the model, the files, the commit. */
-import { existsSync } from "node:fs";
+ *   1. The CLI's OS sandbox (see llm/): the agent's shell can write only its working folder, read
+ *      only that and the vault, never touch .jj or .git, never reach the network.
+ *   2. Its own jj workspace (workspace.ts): it never edits a file the learner has open, and several
+ *      requests can be worked on at once.
+ *   3. Checks (review.ts): app-owned files may not change; a file that can't be read back waits for
+ *      the learner's OK. Everything else lands at once, after whatever the learner did meanwhile, and
+ *      only if it doesn't clash with it (vault/jj.ts).
+ *   4. Undo: each run is one jj change, taken out again with one click. log/agents.jsonl records
+ *      every run: the task, the model, the files, the change.
+ *
+ * Without jj the agent can still read and answer, but not write. */
 import type { AgentRun } from "../../shared/vault-types.ts";
 import { publish } from "../events.ts";
 import { learnerSummary } from "../learn/context.ts";
@@ -19,19 +19,26 @@ import { agent } from "../llm/index.ts";
 import {
   appendLog,
   changed,
-  commitNow,
-  git,
-  gitIdentity,
+  checkpoint,
+  diffOf,
+  filesOf,
+  logActivity,
   readLog,
   reloadFile,
   shortId,
+  takeSelfWrite,
   touched,
   VAULT,
   vaultIsRepo,
+  wroteItself,
 } from "../vault/index.ts";
 import { writeIndexes } from "../vault/indexes.ts";
-import { changesIn, isForbidden, needsReview, problemsIn } from "./review.ts";
-import { branch, createWorkingCopy, dirOf, removeWorkingCopy, unlinkDerived } from "./workspace.ts";
+import { abandon, commitIdOf, describeIn, drop, land } from "../vault/jj.ts";
+import { isForbidden, needsReview, problemsIn } from "./review.ts";
+import { cleanUpWorkingCopies, createWorkingCopy, removeWorkingCopy, unlinkDerived } from "./workspace.ts";
+
+/** How many requests may be worked on at once (the model calls share a smaller limit besides). */
+const MAX_RUNNING = 4;
 
 const runs = new Map<string, AgentRun>();
 let loaded = false;
@@ -40,9 +47,14 @@ function load() {
   if (loaded) return;
   loaded = true;
   for (const r of readLog<AgentRun>("agents.jsonl")) runs.set(r.id, r);
-  // a run that was going when the server stopped can't be resumed
-  for (const r of runs.values())
-    if (r.status === "running") save({ ...r, status: "failed", error: "the server stopped during the run" });
+  for (const r of runs.values()) {
+    if (r.status === "running")
+      save({ ...r, status: "failed", activity: undefined, error: "the server stopped during the run" });
+    // runs from before the vault moved to jj: their branches are gone
+    else if (r.status === "review" && !r.change)
+      save({ ...r, status: "discarded", error: "left waiting when the vault moved to jj" });
+  }
+  if (vaultIsRepo()) cleanUpWorkingCopies(new Set());
 }
 /** Records a run's new state in the log and announces it. */
 function save(run: AgentRun) {
@@ -52,17 +64,28 @@ function save(run: AgentRun) {
   publish("global", { type: "agent", data: run });
   return run;
 }
+const get = (id: string) => {
+  load();
+  const run = runs.get(id);
+  if (!run) throw new Error("run not found");
+  return run;
+};
+
+/** At startup: settles runs a restart interrupted and clears their working copies. */
+export const prepareAgents = () => load();
 
 export function listRuns(): AgentRun[] {
   load();
-  return [...runs.values()].sort((a, b) => b.started.localeCompare(a.started)).slice(0, 50);
+  return [...runs.values()].sort((a, b) => b.started.localeCompare(a.started)).slice(0, 60);
 }
 
-const PROMPT = (
-  task: string,
-) => `You are the learner's librarian. Your working folder is a copy of their knowledge vault, on its own branch: change files here freely; nothing reaches the real vault until it passes checks (and, for deletions or rewrites of their notes, until they approve).
+const PROMPT = (task: string, write: boolean) => `You are the learner's librarian. ${
+  write
+    ? "Your working folder is a copy of their knowledge vault, in a jj workspace of its own: change files here freely; what you change lands in their vault when you finish, and they can undo it with one click."
+    : "Your working folder is their knowledge vault, read-only (this machine keeps no history of the vault, so agents may not write): look, and answer."
+}
 
-Read AGENTS.md first: it explains the layout and the rules. Start from INDEX.md and the folder indexes; search with rg; read only the files you need. The books' text (library/*/text/) and the indexes are read-only links.
+Read AGENTS.md first: it explains the layout and the rules. Start from INDEX.md and the folder indexes; search with rg; read only the files you need. The books' text (library/*/text/) and the indexes are read-only.
 
 The learner:
 ${learnerSummary()}
@@ -75,158 +98,164 @@ ${task}
 Do it well, then reply with a short summary (Markdown) of what you changed and why, naming the files. If the request is unclear or risky, do the safe part and say what you left out.`;
 
 /** Starts a run; returns at once (the run continues, and announces itself on the global event stream). */
-export function startRun(task: string): AgentRun {
+export function startRun(input: { task: string }): AgentRun {
   load();
-  if (!vaultIsRepo())
-    throw new Error("agents that write need git (the vault's history is how their changes are checked and undone)");
-  if ([...runs.values()].some((r) => r.status === "running"))
-    throw new Error("an agent is already working on the vault; wait for it to finish");
-  const id = shortId("r");
+  const task = input.task.trim().slice(0, 4000);
+  if (!task) throw new Error("say what the agent should do");
+  if ([...runs.values()].filter((r) => r.status === "running").length >= MAX_RUNNING)
+    throw new Error(`${MAX_RUNNING} agents are already working; wait for one to finish`);
   const run = save({
-    id,
-    task: task.trim().slice(0, 2000),
-    mode: "write",
+    id: shortId("r"),
+    task,
+    mode: vaultIsRepo() ? "write" : "read",
     status: "running",
     started: new Date().toISOString(),
-    activity: "preparing a working copy",
+    activity: "getting ready",
   });
   void execute(run);
   return run;
 }
 
-/** The run itself: working copy, agent, commit, checks; then merge, wait for review, or fail. */
+/** Passes the agent's progress on to the page, at most every second and a half. */
+function reporter(id: string) {
+  let last = 0;
+  return (text: string) => {
+    if (Date.now() - last < 1500) return;
+    last = Date.now();
+    const current = runs.get(id);
+    if (current?.status === "running") save({ ...current, activity: text });
+  };
+}
+
+/** The run itself: a working copy, the agent, the checks; then it lands, waits for review, or fails. */
 async function execute(run: AgentRun) {
   const started = Date.now();
+  const write = run.mode === "write";
+  const finish = (patch: Partial<AgentRun>) =>
+    save({ ...runs.get(run.id)!, activity: undefined, ms: Date.now() - started, ...patch });
+  let workspace = false;
   try {
     writeIndexes();
-    commitNow(`before agent: ${run.task.slice(0, 80)}`);
-    const { dir, linked } = createWorkingCopy(run.id);
-    save({ ...run, activity: "the agent is working" });
-    let last = 0;
+    let dir = VAULT;
+    let linked: string[] = [];
+    if (write) {
+      const base = checkpoint();
+      if (!base) throw new Error("the vault's history isn't available");
+      ({ dir, linked } = createWorkingCopy(run.id, base));
+      workspace = true;
+    }
+    save({ ...runs.get(run.id)!, activity: "the agent is working" });
     const result = await agent({
       cwd: dir,
-      write: true,
-      readRoots: [VAULT],
-      prompt: PROMPT(run.task),
+      write,
+      readRoots: write ? [VAULT] : undefined,
+      prompt: PROMPT(run.task, write),
       tier: "smart",
       timeoutMs: 15 * 60 * 1000,
-      onActivity: (text) => {
-        if (Date.now() - last < 1500) return;
-        last = Date.now();
-        save({ ...runs.get(run.id)!, activity: text });
-      },
+      onActivity: reporter(run.id),
     });
+    const base = { provider: result.provider, model: result.model, answer: String(result.data || "").trim() };
+    if (!write) {
+      finish({ ...base, status: "done", files: [] });
+      return;
+    }
+
     unlinkDerived(dir, linked);
-    git(["add", "-A"], dir);
-    const committed = git([...gitIdentity, "commit", "-q", "-m", `agent: ${run.task.slice(0, 100)}`], dir);
-    const base = {
-      ...runs.get(run.id)!,
-      activity: undefined,
-      ms: Date.now() - started,
-      provider: result.provider,
-      model: result.model,
-      answer: String(result.data || "").trim(),
-    };
-    if (!committed.ok) {
-      save({ ...base, status: "done", files: [] });
-      removeWorkingCopy(run.id);
-      return;
-    }
-    const { files, removed } = changesIn(dir);
+    const change = describeIn(dir, `agent: ${run.task.split("\n")[0].slice(0, 100)}`);
+    const files = filesOf("@", dir);
     const problems = problemsIn(dir, files);
-    if (problems.some(isForbidden)) {
-      save({ ...base, status: "failed", files, error: problems.join("; ") });
-      removeWorkingCopy(run.id);
-      return;
-    }
-    const review = needsReview(files, removed, problems);
-    if (review.length) {
-      save({ ...base, status: "review", files, review });
-      return;
-    }
-    save(merge({ ...base, files }));
-  } catch (error) {
-    save({
-      ...runs.get(run.id)!,
-      status: "failed",
-      activity: undefined,
-      ms: Date.now() - started,
-      error: (error as Error).message.slice(0, 600),
-    });
     removeWorkingCopy(run.id);
+    workspace = false;
+    if (!files.length) {
+      abandon(change);
+      finish({ ...base, status: "done", files: [] });
+      return;
+    }
+    const commit = commitIdOf(change);
+    if (problems.some(isForbidden)) {
+      abandon(change);
+      finish({ ...base, status: "failed", files, commit, error: problems.join("; ") });
+      return;
+    }
+    if (problems.length) {
+      finish({ ...base, status: "review", files, change, commit, review: needsReview(problems) });
+      return;
+    }
+    save(
+      bringIn({ ...runs.get(run.id)!, ...base, activity: undefined, ms: Date.now() - started, files, change, commit }),
+    );
+  } catch (error) {
+    if (workspace) removeWorkingCopy(run.id);
+    finish({ status: "failed", error: (error as Error).message.slice(0, 600) });
   }
 }
 
-/** Brings a run's branch into the vault as one merge commit, and reloads what it changed. */
-function merge(run: AgentRun): AgentRun {
-  commitNow("your edits before an agent's changes");
-  const merged = git([
-    ...gitIdentity,
-    "merge",
-    "--no-ff",
-    "-q",
-    "-m",
-    `agent: ${run.task.slice(0, 100)}`,
-    branch(run.id),
-  ]);
-  if (!merged.ok) {
-    git(["merge", "--abort"]);
-    removeWorkingCopy(run.id);
+/** jj is about to write these files: the watcher shouldn't take them for the learner's own edits. */
+function expect(files: AgentRun["files"]) {
+  for (const f of files || []) wroteItself(f.path);
+}
+/** It didn't write them after all. */
+function unexpect(files: AgentRun["files"]) {
+  for (const f of files || []) takeSelfWrite(f.path);
+}
+
+/** Reloads and announces the files a run changed (after it lands or is undone). */
+function refresh(files: AgentRun["files"]) {
+  for (const f of files || []) {
+    reloadFile(f.path);
+    touched(f.path);
+  }
+}
+
+/** Lands a run's change in the vault, after everything the learner did meanwhile. */
+function bringIn(run: AgentRun): AgentRun {
+  expect(run.files);
+  const landed = land(run.change!);
+  if (!landed.ok) {
+    unexpect(run.files);
+    if (!landed.clash) abandon(run.change!);
     return {
       ...run,
       status: "failed",
-      error: `its changes clash with edits you made meanwhile: ${merged.stderr.trim().slice(0, 300) || merged.stdout.trim().slice(0, 300)}`,
+      review: undefined,
+      error: landed.clash ? `${landed.error}; ask again and it will start from your latest version` : landed.error,
     };
   }
-  const commit = git(["rev-parse", "HEAD"]).stdout.trim();
-  for (const f of run.files || []) {
-    reloadFile(f.path);
-    touched(f.path);
-  }
-  removeWorkingCopy(run.id);
-  return { ...run, status: "merged", commit, review: undefined };
+  refresh(run.files);
+  logActivity({ type: "ask", text: `Agent: ${run.task.slice(0, 80)}` });
+  return { ...run, status: "merged", review: undefined, commit: commitIdOf(run.change!) || run.commit };
 }
 
 export function approveRun(id: string): AgentRun {
-  load();
-  const run = runs.get(id);
-  if (run?.status !== "review") throw new Error("nothing waiting for approval");
-  return save(merge(run));
+  const run = get(id);
+  if (run.status !== "review" || !run.change) throw new Error("nothing waiting for approval");
+  return save(bringIn(run));
 }
 
 export function discardRun(id: string): AgentRun {
-  load();
-  const run = runs.get(id);
-  if (run?.status !== "review") throw new Error("nothing waiting for approval");
-  removeWorkingCopy(id);
+  const run = get(id);
+  if (run.status !== "review") throw new Error("nothing waiting for approval");
+  if (run.change) abandon(run.change);
   return save({ ...run, status: "discarded" });
 }
 
-/** Reverts a merged run (one commit), unless your later edits touch the same lines. */
+/** Takes a landed run's change out of the vault, unless later edits touch the same lines. */
 export function undoRun(id: string): AgentRun {
-  load();
-  const run = runs.get(id);
-  if (run?.status !== "merged" || !run.commit) throw new Error("only a merged run can be undone");
-  commitNow("your edits before undoing an agent run");
-  const reverted = git([...gitIdentity, "revert", "-m", "1", "--no-edit", run.commit]);
-  if (!reverted.ok) {
-    git(["revert", "--abort"]);
-    throw new Error(`can't undo cleanly: you've edited the same lines since (${reverted.stderr.trim().slice(0, 200)})`);
-  }
-  for (const f of run.files || []) {
-    reloadFile(f.path);
-    touched(f.path);
-  }
+  const run = get(id);
+  if (run.status !== "merged" || !run.change) throw new Error("only a run that changed your vault can be undone");
+  expect(run.files);
+  const dropped = drop(run.change);
+  if (!dropped.ok) unexpect(run.files);
+  if (!dropped.ok)
+    throw new Error(
+      dropped.clash ? "can't undo it cleanly: you've changed the same lines since" : `can't undo it: ${dropped.error}`,
+    );
+  refresh(run.files);
   return save({ ...run, status: "undone" });
 }
 
 /** The changes a run made (or proposes), as a unified diff. */
 export function runDiff(id: string): string {
-  load();
-  const run = runs.get(id);
-  if (!run) throw new Error("run not found");
-  if (run.status === "review" && existsSync(dirOf(id)))
-    return git(["diff", "--no-color", "HEAD~1", "HEAD"], dirOf(id)).stdout;
-  if (run.commit) return git(["diff", "--no-color", `${run.commit}^1`, run.commit]).stdout;
-  return "";
+  const run = get(id);
+  return run.commit ? diffOf(run.commit) : "";
 }

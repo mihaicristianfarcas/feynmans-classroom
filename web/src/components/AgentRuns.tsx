@@ -1,6 +1,5 @@
-/* Ask an agent to work on the vault. It writes on its own branch inside the CLI's sandbox; the
- * changes land only after the checks (and your OK, when it deletes files or rewrites your notes), and
- * every run can be undone. */
+/* Ask an agent to work on the vault. It writes in its own jj workspace inside the CLI's sandbox; the
+ * changes land after the checks, after whatever you did meanwhile, and every run can be undone. */
 import { useEffect, useState } from "react";
 import { type AgentRun, learn } from "../api";
 import { timeAgo } from "../lib/time";
@@ -118,7 +117,7 @@ export function AgentRuns({ theme }: { theme: "light" | "dark" }) {
                   type="button"
                   className="button"
                   onClick={() => act(run, "undo")}
-                  title="Revert this run's commit"
+                  title="Take this run's change out of the vault"
                 >
                   Undo
                 </button>

@@ -17,9 +17,9 @@ does its thinking on **your own Codex or Claude Code subscription** (no API keys
   after, the Feynman technique (explain it, get your gaps back), a Socratic tutor, and connections
   from the idea to today's world and to your own goals.
 - **A second brain.** Books, annotations, notes, concepts, cards and figures live in one folder of
-  plain files (a valid Obsidian vault), versioned by git, with indexes kept for people and agents.
-  See it as a graph built from your links (and the connections an agent suggests, which you accept
-  or reject); ask it questions; have an agent reorganise it, on its own branch, with undo.
+  plain files (a valid Obsidian vault), versioned by Jujutsu (jj), with indexes kept for people and
+  agents. See it as a graph built from your links (and the connections an agent suggests, which you
+  accept or reject); ask it questions; have an agent reorganise it, in its own copy, with undo.
 
 ## Quick start
 
@@ -36,8 +36,9 @@ select a passage.
 
 Production: `npm run build && npm start` serves the app and the API from one port (8787).
 
-Requirements: Node 22+, the Codex CLI or Claude Code, git (for the vault's history), and Chrome or
-Chromium only for the optional hand-built demos and the screenshot tests.
+Requirements: Node 22+, the Codex CLI or Claude Code, [Jujutsu](https://www.jj-vcs.dev/) (`brew install
+jj`; for the vault's history and the agent's changes), and Chrome or Chromium only for the optional
+hand-built demos and the screenshot tests.
 
 ## Documentation
 

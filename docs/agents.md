@@ -28,17 +28,26 @@ commands under the Codex sandbox):
 |---|---|
 | read and search the vault (or its working copy) | yes |
 | write its working copy (agents that change things) | yes |
-| write the live vault, anything else, or `.git` | no |
+| write the live vault, anything else, `.jj` or `.git` | no |
 | look around your home folder | no |
 | reach the network | no |
 
 - **Ask** (and connection suggestions) run read-only, directly in the vault.
-- **Do** (Ask → Do) gives an agent work: "turn my chapter 5 highlights into a summary note". It works in
-  a **git worktree of the vault** (its own branch, outside the vault), with the books' text and the
-  indexes linked in read-only, so it never edits a note you have open. When it's done the server
-  checks the diff: every file must still parse, app-owned files (logs, profile, `book.json`,
-  `AGENTS.md`…) must be untouched, and **deleting files or taking lines out of your notes waits for
-  your OK** (you see the diff). Then it merges, as one commit with an **Undo** button. Every run is
-  recorded in `log/agents.jsonl` (task, model, files, commit).
+- **Do** (Ask → Do) gives an agent work: "turn my chapter 5 highlights into a summary note". It works
+  in a **jj workspace of the vault** (`DATA_DIR/agent-runs/<id>`, outside the
+  vault), starting from the latest saved change, with the books' text and the indexes linked in
+  read-only, so it never edits a note you have open. When it's done, what it wrote becomes one jj
+  change, checked: app-owned files (logs, profile, `book.json`, `AGENTS.md`…) must be untouched (or
+  the run fails and nothing lands), and every file must still parse (or it waits for your OK, with
+  the diff). Everything else lands at once: every run can be undone.
+- **Landing.** The change is moved onto everything you did meanwhile without touching your files,
+  checked for conflicts, and only then do the files follow. If it clashes with something you
+  changed meanwhile, it doesn't land at all ("ask again and it starts from your latest version"), so
+  conflict markers never reach a note. Several agents can work at once (up to four).
+- **Undo** takes the change out of the history (jj's `abandon`, with what came after it moved onto
+  its parent). It's tried first without touching your files and refused, untouched, if you've since
+  changed the same lines. A change already pushed somewhere gets its reverse added instead.
+- Every run is recorded in `log/agents.jsonl` (the task, the model, the files, the jj change).
+- Without jj an agent can still read your vault and answer, but not change it.
 - Book text is material, never instructions, in every prompt; a passage that tries to give orders
   can't get past the sandbox and the checks anyway.

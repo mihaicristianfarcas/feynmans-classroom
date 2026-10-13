@@ -8,6 +8,8 @@ Every setting has a default; set environment variables to change them (for `npm 
 | `DATA_DIR` | `./data` | books, figures, the vault, settings |
 | `LLM_PROVIDER` | `auto` | `codex`, `claude` or `auto` (Settings overrides) |
 | `CODEX_BIN` / `CLAUDE_BIN` | `codex` / `claude` | the CLIs |
+| `JJ_BIN` | `jj` | Jujutsu, which keeps the vault's history |
+| `VAULT_SITTING_MS` | `180000` | how long the vault stays quiet before the change in progress is closed (a new entry in its history) |
 | `CODEX_FAST_MODEL` | Codex's "fast and affordable" model | quick tier on Codex |
 | `CODEX_FAST_EFFORT` | `low` | quick tier effort |
 | `CODEX_MODEL` | from `~/.codex/config.toml` | careful tier, and hand-built demos |
@@ -32,6 +34,7 @@ PORT=8797 WEB_PORT=5183 npx vite
 - Figures are as true as the model's reading of the passage; every number they show comes from
   their own expressions, so check the readout against the text when it matters.
 - Hand-built demos need Codex (they run in its sandbox).
-- Agents that write need git (their changes are checked, merged and undone through the vault's history).
+- The agent changes files only where Jujutsu (jj) is installed (its changes are checked, landed and
+  undone through the vault's history); without jj it can still read your vault and answer.
 - Capture works on PDF pages; in EPUBs, pictures are already in the text.
 - Speed and how much you can generate follow your plan's limits.

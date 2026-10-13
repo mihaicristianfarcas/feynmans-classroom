@@ -26,9 +26,11 @@ what counts as a vulnerability.
   Hand-built demos are code written by Codex in a sandbox and run in a sandboxed iframe with no
   network and no access to the app.
 - **Agents are confined.** Agents that read or change the vault run in the Codex or Claude Code
-  OS sandbox: they can read only their folder, write only their working copy, never touch `.git`,
-  and have no network. Their changes are checked, and deletions wait for your approval; every run
-  can be undone. `tests/agent-sandbox.test.ts` verifies the sandbox.
+  OS sandbox: they can read only their folder, write only their working copy (a jj workspace
+  outside the vault), never touch `.jj` or `.git`, and have no network. Their changes are checked
+  (the app's own files may not change, every file must still parse) before they land, they never
+  overwrite edits you made meanwhile, and every run can be undone. `tests/agent-sandbox.test.ts`
+  verifies the sandbox.
 - **Your data stays yours.** Nothing is sent anywhere except through the model CLI you logged in
   to.
 

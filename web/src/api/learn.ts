@@ -27,6 +27,14 @@ import type {
   Today,
 } from "./types";
 
+/** A saved version of the vault, or of one file in it (jj's change and commit ids). */
+export interface Version {
+  change: string;
+  commit: string;
+  when: string;
+  subject: string;
+}
+
 export const learn = {
   profile: () => call<Profile>("/api/profile"),
   saveProfile: (p: Partial<Profile>) => put<Profile>("/api/profile", p),
@@ -41,9 +49,10 @@ export const learn = {
       cards: number;
       figures: number;
       reviews: number;
-      git: boolean;
+      versioned: boolean;
+      jj: boolean;
       path: string;
-      history: { hash: string; when: string; subject: string }[];
+      history: Version[];
     }>("/api/vault"),
   today: () => call<Today>("/api/today"),
   journey: () => call<Journey>("/api/journey"),
