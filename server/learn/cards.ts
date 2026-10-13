@@ -3,7 +3,7 @@
  * state is replayed from the review log with FSRS-6. Review sessions interleave decks. */
 import { type MemoryState, preview, type Rating, review } from "../../shared/fsrs.ts";
 import type { Card, SourceRef } from "../../shared/vault-types.ts";
-import { structured } from "../llm.ts";
+import { structured } from "../llm/index.ts";
 import { cards, changed, getProfile, logActivity, logReview, now, reviews, shortId } from "../vault/index.ts";
 import { upsertConcept } from "./concepts.ts";
 import { bookContext, learnerSummary, sourceLine } from "./context.ts";
@@ -222,6 +222,36 @@ export function saveDrafts(
       bookId: meta.source?.bookId,
       concepts: [...new Set(saved.flatMap((c) => c.concepts))],
       text: `Made ${saved.length} card${saved.length === 1 ? "" : "s"}`,
+    });
+  return saved;
+}
+
+/* ---------------- browsing ---------------- */
+
+/** Cards in a deck and/or about a concept, newest first, with their memory state. */
+export function listCards(filter: { deck?: string; concept?: string }): CardView[] {
+  return cards
+    .list()
+    .filter((k) => (!filter.deck || k.deck === filter.deck) && (!filter.concept || k.concepts.includes(filter.concept)))
+    .sort((a, b) => b.created.localeCompare(a.created))
+    .map((k) => viewCard(k));
+}
+
+/** Every deck and how many cards it holds. */
+export function deckCounts(): { name: string; count: number }[] {
+  const decks = new Map<string, number>();
+  for (const k of cards.list()) decks.set(k.deck, (decks.get(k.deck) || 0) + 1);
+  return [...decks].map(([name, count]) => ({ name, count }));
+}
+
+/** Saves the cards that have both sides, and records them in the journey. */
+export function saveNewCards(list: (Partial<Card> & { front: string; back: string })[]): Card[] {
+  const saved = list.filter((x) => x.front?.trim() && x.back?.trim()).map((x) => saveCard(x));
+  if (saved.length)
+    logActivity({
+      type: "card",
+      text: `Made ${saved.length} card${saved.length === 1 ? "" : "s"}`,
+      concepts: [...new Set(saved.flatMap((k) => k.concepts))],
     });
   return saved;
 }

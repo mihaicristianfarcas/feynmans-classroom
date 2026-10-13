@@ -3,9 +3,9 @@
  * not versioned. */
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { bookDir, bookFolder, listBooks } from "../books/store.ts";
+import type { Book } from "../books/types.ts";
 import { chapterText } from "../ingest/index.ts";
-import { bookDir, bookFolder, listBooks } from "../store.ts";
-import type { Book } from "../types.ts";
 import { slugify, VAULT } from "./index.ts";
 
 /** The book's folder name under library/. */

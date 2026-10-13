@@ -1,3 +1,6 @@
+/* Where things live and how the server is tuned: the data and vault folders, the port, and the
+ * Codex, Claude Code and generation settings, each overridable from the environment (the full list
+ * is in docs/configuration.md). Also finds a Chrome for the browser checks. */
 import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -41,6 +44,11 @@ export const CODEX = {
     .filter(Boolean),
   /** Hard stop for a single codex exec call. */
   timeoutMs: num(process.env.CODEX_TIMEOUT_MS, 20 * 60 * 1000),
+};
+
+/** How the platform drives Claude Code. */
+export const CLAUDE = {
+  bin: process.env.CLAUDE_BIN || "claude",
 };
 
 export const GENERATION = {

@@ -3,9 +3,9 @@
 
 import { retrievability } from "../../shared/fsrs.ts";
 import type { SourceRef } from "../../shared/vault-types.ts";
-import { chapterRange } from "../anchor.ts";
+import { chapterRange } from "../books/locate.ts";
+import { getBook } from "../books/store.ts";
 import { chapterText, findChapter, passageAround } from "../ingest/index.ts";
-import { getBook } from "../store.ts";
 import { cards, concepts, getProfile, notes } from "../vault/index.ts";
 import { cardState } from "./cards.ts";
 

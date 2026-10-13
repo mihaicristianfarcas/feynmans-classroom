@@ -8,7 +8,7 @@ import { normalize, type Scene, type SceneKind } from "../../shared/scene/index.
 import { coerceToSchema, KIND_SCHEMAS, sceneSchema } from "../../shared/scene/schema.ts";
 import { validateScene } from "../../shared/scene/validate.ts";
 import { ROOT } from "../config.ts";
-import { structured } from "../llm.ts";
+import { structured } from "../llm/index.ts";
 
 const DIR = join(ROOT, "server", "scene");
 let guideCache: { guide: string; kinds: Record<string, string> } | null = null;

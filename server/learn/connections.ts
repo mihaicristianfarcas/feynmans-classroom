@@ -5,7 +5,7 @@
  * turned down is suggested again. With the "auto" setting the links are added straight away. */
 import { linkKey, parseWikiLinks } from "../../shared/links.ts";
 import type { Connection } from "../../shared/vault-types.ts";
-import { agent } from "../llm.ts";
+import { agent } from "../llm/index.ts";
 import { getSettings } from "../settings.ts";
 import { listConnections, saveConnections } from "../vault/connections.ts";
 import { changed, logActivity, notes, now, shortId, VAULT } from "../vault/index.ts";

@@ -1,8 +1,11 @@
+// The agents' sandboxes: the settings both CLIs get, and real shell commands under Codex's sandbox
+// (reads and writes inside the folder work; the home folder, .git, the live vault and the network don't).
+// The live part runs only where Codex is installed.
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { claudeSandbox, codexProfile } from "../server/llm.ts";
+import { claudeSandbox, codexProfile } from "../server/llm/sandbox.ts";
 
 describe("the agents' sandbox settings", () => {
   it("give Codex a profile that reads only system files, its tools and its folders", () => {

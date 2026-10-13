@@ -1,5 +1,9 @@
+/* PDF books: positioned lines per page (running heads and page numbers removed) and per-page
+ * Markdown, from pdf-inspector (pdf.js when it isn't available), and chapters from the outline or,
+ * without one, from lines in noticeably larger type. Only the text layer is read, so a scanned PDF
+ * needs OCR first. */
 import { readFileSync } from "node:fs";
-import type { PageLine, PageText, TocEntry } from "../types.ts";
+import type { PageLine, PageText, TocEntry } from "../books/types.ts";
 
 type PdfJs = typeof import("pdfjs-dist/legacy/build/pdf.mjs");
 let pdfjs: PdfJs | null = null;

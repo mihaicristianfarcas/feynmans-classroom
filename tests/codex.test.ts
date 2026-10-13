@@ -1,5 +1,6 @@
+// The arguments the server passes to `codex exec`, and how its commands read in the progress line.
 import { describe, expect, it } from "vitest";
-import { codexArgs } from "../server/codex.ts";
+import { codexArgs } from "../server/llm/codex.ts";
 
 describe("codexArgs", () => {
   it("starts a sandboxed, network-less build turn in the workspace", () => {
@@ -29,7 +30,7 @@ describe("codexArgs", () => {
   });
 });
 
-import { friendlyCommand } from "../server/codex.ts";
+import { friendlyCommand } from "../server/llm/codex.ts";
 
 describe("friendlyCommand", () => {
   it("turns Codex's shell commands into progress words", () => {

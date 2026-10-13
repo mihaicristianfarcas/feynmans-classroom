@@ -1,3 +1,4 @@
+// FSRS-6 scheduling: stability, retrievability, intervals and replaying a review log.
 import { describe, expect, it } from "vitest";
 import { forgetting, intervalDays, replay, retrievability, review } from "../shared/fsrs.ts";
 

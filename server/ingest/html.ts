@@ -1,5 +1,8 @@
+/* Turning book HTML into sanitized blocks: paragraphs, headings, lists, tables, figures and math,
+ * with only harmless inline tags kept and every attribute dropped except a picture's src and alt.
+ * Book content is never trusted. */
 import { parseHTML } from "linkedom";
-import type { Block } from "../types.ts";
+import type { Block } from "../books/types.ts";
 
 const BLOCK_TAGS = new Set([
   "p",

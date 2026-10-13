@@ -1,3 +1,4 @@
+// The check a hand-built demo must pass (server/handbuilt/workspace/check.mjs), run on small demos.
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -5,7 +6,7 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const ROOT = resolve(import.meta.dirname, "..");
-const CHECK = join(ROOT, "server", "generate", "workspace", "check.mjs");
+const CHECK = join(ROOT, "server", "handbuilt", "workspace", "check.mjs");
 const env = { ...process.env, CLASSROOM_LINKEDOM: join(ROOT, "node_modules", "linkedom", "esm", "index.js") };
 const check = (demo: string) => {
   const out = join(mkdtempSync(join(tmpdir(), "classroom-check-")), "report.json");

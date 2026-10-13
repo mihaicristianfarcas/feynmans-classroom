@@ -1,3 +1,5 @@
+// The figure engine: the expression language, every reference figure, validation, time and steps,
+// and that specs can't inject markup.
 import { describe, expect, it } from "vitest";
 import { EXAMPLES } from "../shared/scene/examples.ts";
 import { compile, evalNum, fillTemplate, formatNumber } from "../shared/scene/expr.ts";

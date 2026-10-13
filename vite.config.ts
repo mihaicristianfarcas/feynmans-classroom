@@ -1,3 +1,4 @@
+// The web app's dev server and build: React, the app in web/, and /api proxied to the API server.
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
