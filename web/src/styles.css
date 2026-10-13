@@ -210,3 +210,9 @@ textarea { width: 100%; font: 13px/1.45 var(--sans); color: var(--strong); backg
 @media (prefers-reduced-motion: reduce) {
   .anchor, .pending-diamond { animation: none !important; transition: none; }
 }
+
+/* ---------- figure gallery ---------- */
+.gallery { max-width: 1280px; margin: 0 auto; padding: 32px 20px 60px; }
+.page-title { font: 600 26px/1.2 var(--serif); color: var(--strong); margin: 0 0 6px; }
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(520px, 1fr)); gap: 26px; }
+.gallery-item { min-width: 0; }
