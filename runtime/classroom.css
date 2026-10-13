@@ -1,0 +1,71 @@
+*{box-sizing:border-box}
+html,body{height:100%}
+html{color-scheme:light}
+body[data-theme="dark"]{color-scheme:dark}
+body{margin:0;background:var(--anatomy-page);color:var(--anatomy-text);font:13px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+.cr-root{display:flex;flex-direction:column;gap:10px;padding:14px 16px 14px}
+.cr-figure{margin:0;display:flex;flex-direction:column}
+.cr-plate{display:flex;padding:44px 18px 46px}
+.cr-stage{flex:1 1 auto;display:flex;align-items:center;justify-content:center;min-width:0;outline:none;touch-action:pan-y}
+.cr-stage:focus-visible{outline:1px solid var(--anatomy-muted);outline-offset:6px}
+.cr-root .iso-svg{width:100%;height:auto;max-height:max(220px,calc(100vh - 260px))}
+.cr-legend{margin-top:8px}
+.cr-bar,.cr-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.cr-button{appearance:none;border:0;border-radius:3px;padding:6px 10px;background:var(--anatomy-card);color:var(--anatomy-strong);box-shadow:0 0 0 1px var(--anatomy-mid);font:500 10.5px/1 var(--anatomy-mono);letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:box-shadow .2s var(--anatomy-ease),background .2s var(--anatomy-ease)}
+.cr-button:hover{box-shadow:0 0 0 1px var(--anatomy-hi)}
+.cr-button:focus-visible{outline:1px solid var(--anatomy-hi);outline-offset:2px}
+.cr-button[disabled]{opacity:.45;cursor:default;box-shadow:0 0 0 1px var(--anatomy-lo)}
+.cr-control{display:inline-flex;align-items:center;gap:8px;min-height:28px;color:var(--anatomy-text);font:11px/1.2 var(--anatomy-mono);letter-spacing:.02em}
+.cr-control[data-type="range"]{flex:1 1 260px;max-width:420px}
+.cr-label{white-space:nowrap;color:var(--anatomy-text)}
+.cr-value{min-width:64px;color:var(--anatomy-strong);font-variant-numeric:tabular-nums;text-align:right}
+.cr-control input[type="range"]{flex:1 1 auto;min-width:80px;accent-color:var(--anatomy-hi);height:18px}
+.cr-control input[type="checkbox"]{accent-color:var(--anatomy-hi);margin:0}
+.cr-control select{font:11px var(--anatomy-mono);color:var(--anatomy-strong);background:var(--anatomy-card);border:0;border-radius:3px;box-shadow:0 0 0 1px var(--anatomy-mid);padding:5px 6px}
+.cr-stats{display:flex;flex-wrap:wrap;gap:4px 18px;padding-top:8px;border-top:1px solid var(--anatomy-faint);font:11px/1.6 var(--anatomy-mono);font-variant-numeric:tabular-nums}
+.cr-stat{display:inline-flex;gap:6px;white-space:nowrap}
+.cr-stat-label{color:var(--anatomy-muted)}
+.cr-stat b{font-weight:500;color:var(--anatomy-strong)}
+.cr-eyebrow{font:500 10.5px/1 var(--anatomy-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--anatomy-muted)}
+.cr-predict{position:absolute;left:18px;right:18px;bottom:52px;z-index:3;display:grid;gap:10px;padding:14px 16px;background:var(--anatomy-card);box-shadow:0 0 0 1px var(--anatomy-hi),var(--anatomy-lift);border-radius:2px}
+.cr-predict-head{display:flex;justify-content:space-between;align-items:center}
+.cr-predict-q{margin:0;color:var(--anatomy-strong);font-size:14px;line-height:1.45}
+.cr-predict-a{margin:0;color:var(--anatomy-text)}
+.cr-choices{display:flex;flex-wrap:wrap;gap:8px}
+.cr-choice{text-transform:none;letter-spacing:0;font:12px/1.2 ui-sans-serif,system-ui,sans-serif;padding:7px 10px}
+.cr-choice[data-right]{box-shadow:0 0 0 1.5px var(--anatomy-green);opacity:1}
+.cr-choice[data-wrong]{box-shadow:0 0 0 1.5px var(--anatomy-red);opacity:1}
+.cr-skip{appearance:none;border:0;background:none;color:var(--anatomy-muted);font:10.5px var(--anatomy-mono);text-transform:uppercase;letter-spacing:.08em;cursor:pointer}
+.cr-error{position:absolute;inset:auto 18px 52px 18px;z-index:4;display:grid;gap:4px;padding:10px 12px;background:var(--anatomy-card);box-shadow:0 0 0 1px var(--anatomy-red);color:var(--anatomy-text);font:12px/1.4 var(--anatomy-mono)}
+.cr-error strong{color:var(--anatomy-red);font-weight:500}
+@media (max-width:560px){.cr-root{padding:10px}.cr-plate{padding:40px 8px 44px}.cr-control[data-type="range"]{flex-basis:100%;max-width:none}}
+@media (prefers-reduced-motion:reduce){.cr-button{transition:none}}
+/* d2: simple 2D figures in the anatomy finish */
+.d2-line{fill:none;stroke:var(--anatomy-mid);stroke-width:1.1px;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.d2-shape{stroke:var(--anatomy-mid);stroke-width:1.1px;stroke-linejoin:round;vector-effect:non-scaling-stroke;color:var(--anatomy-mid)}
+.d2-dot{stroke:none;fill:currentColor;color:var(--anatomy-hi)}
+.d2-text{fill:currentColor;color:var(--anatomy-mid);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.d2-text[data-mono]{font-family:var(--anatomy-mono);letter-spacing:.02em}
+.d2-text[data-italic]{font-style:italic;font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif}
+[data-tone="hi"]:is(.d2-line,.d2-shape){stroke:var(--anatomy-hi);stroke-width:1.5px}
+[data-tone="mid"]:is(.d2-line,.d2-shape){stroke:var(--anatomy-mid)}
+[data-tone="lo"]:is(.d2-line,.d2-shape){stroke:var(--anatomy-lo)}
+[data-tone="faint"]:is(.d2-line,.d2-shape){stroke:var(--anatomy-faint);stroke-width:1px}
+[data-tone="lit"]:is(.d2-line,.d2-shape){stroke:var(--anatomy-lit);stroke-width:2px}
+[data-tone="red"]:is(.d2-line,.d2-shape){stroke:var(--anatomy-red)}
+[data-tone="green"]:is(.d2-line,.d2-shape){stroke:var(--anatomy-green)}
+[data-tone="blue"]:is(.d2-line,.d2-shape){stroke:var(--anatomy-blue)}
+:is(.d2-shape,.d2-dot,.d2-text)[data-tone="hi"]{color:var(--anatomy-hi)}
+:is(.d2-shape,.d2-dot,.d2-text)[data-tone="mid"]{color:var(--anatomy-mid)}
+:is(.d2-shape,.d2-dot,.d2-text)[data-tone="lo"]{color:var(--anatomy-lo)}
+:is(.d2-shape,.d2-dot,.d2-text)[data-tone="faint"]{color:var(--anatomy-faint)}
+:is(.d2-shape,.d2-dot,.d2-text)[data-tone="lit"]{color:var(--anatomy-lit)}
+:is(.d2-shape,.d2-dot,.d2-text)[data-tone="red"]{color:var(--anatomy-red)}
+:is(.d2-shape,.d2-dot,.d2-text)[data-tone="green"]{color:var(--anatomy-green)}
+:is(.d2-shape,.d2-dot,.d2-text)[data-tone="blue"]{color:var(--anatomy-blue)}
+.d2-shape[data-fill="paper"]{fill:var(--anatomy-card)}
+.d2-shape[data-fill="none"]{fill:none}
+.d2-shape[data-fill="tone"]{fill:color-mix(in srgb,currentColor 14%,var(--anatomy-card))}
+.d2-shape[data-fill="solid"]{fill:currentColor}
+.d2-line[data-dashed]{stroke-dasharray:4 4}
+.d2-line[data-dotted]{stroke-dasharray:.01 4;stroke-width:1.8px}

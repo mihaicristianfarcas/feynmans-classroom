@@ -1,0 +1,46 @@
+{
+  "name": "feynmans-classroom",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Upload a book, read it, and watch Codex-generated animated visualizations of its ideas side by side.",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:server": "tsx watch --clear-screen=false server/index.ts",
+    "dev:web": "vite",
+    "build": "vite build",
+    "start": "NODE_ENV=production tsx server/index.ts",
+    "sync:kit": "node scripts/sync-kit.mjs",
+    "seed": "tsx scripts/seed.ts",
+    "test": "vitest run",
+    "test:e2e": "tsx tests/e2e.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "postinstall": "node scripts/sync-kit.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anaralabs/lector": "^3.15.5",
+    "@firecrawl/pdf-inspector": "^1.25.2",
+    "@hono/node-server": "^2.1.4",
+    "esbuild": "^0.28.2",
+    "hono": "^4.13.13",
+    "jszip": "^3.10.2",
+    "linkedom": "^0.18.13",
+    "pdfjs-dist": "^5.7.284",
+    "puppeteer-core": "^25.13.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.4"
+  }
+}
