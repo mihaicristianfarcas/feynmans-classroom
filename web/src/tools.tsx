@@ -1,6 +1,7 @@
 /* Study tools that open from a passage, a concept or a note: make cards, explain it back, connect
  * it to the world, draw a figure. Each one saves into the vault. */
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { learn, type Connection, type DraftCard, type ExplainFeedback, type SavedFigure, type SourceRef } from "./api";
 import { Markdown } from "./Markdown";
 import { SceneView } from "./scene/SceneView";
@@ -11,10 +12,11 @@ export function Modal({ title, eyebrow, onClose, children, wide }: { title: stri
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
-    box.current?.querySelector<HTMLElement>("textarea, input, button")?.focus();
+    (box.current?.querySelector<HTMLElement>(".modal-body textarea, .modal-body input:not([type=checkbox])") || box.current?.querySelector<HTMLElement>("button"))?.focus();
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-  return (
+  // in a portal: a page's own transforms (its entrance animation) must not become the backdrop's frame
+  return createPortal(
     <div className="modal-back" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={`modal ${wide ? "wide" : ""}`} role="dialog" aria-label={title} ref={box}>
         <header className="modal-head">
@@ -28,7 +30,8 @@ export function Modal({ title, eyebrow, onClose, children, wide }: { title: stri
         </header>
         <div className="modal-body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
