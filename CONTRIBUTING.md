@@ -87,3 +87,8 @@ Agents follow the same process; [AGENTS.md](AGENTS.md) has the short version.
 Use the issue templates: bug, idea, or accessibility problem. Security problems go privately, as
 described in [SECURITY.md](SECURITY.md). By taking part you agree to the
 [code of conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+The project is licensed under the [GPL, version 3 or later](LICENSE). By contributing, you agree
+that your contributions are licensed the same way.

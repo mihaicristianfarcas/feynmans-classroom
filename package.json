@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "A local-first learning platform: read hard books beside interactive figures, spaced repetition, quizzes, the Feynman technique and a Markdown second brain, on your own Codex or Claude Code subscription.",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "engines": {
     "node": ">=22"
