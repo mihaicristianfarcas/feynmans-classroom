@@ -2,15 +2,21 @@
  *
  *   structured()  JSON that matches a schema (figures, cards, quizzes, grading): one quick turn
  *   text()        a plain answer (tutor replies, explanations)
- *   agent()       a read-only agent that may read and search files in a folder (asking the vault)
+ *   agent()       an agent with a real shell (rg, sed, ls, jq…) in a folder: read-only, or allowed to
+ *                 write there and nowhere else
+ *
+ * Agents run inside the CLI's own OS sandbox (Seatbelt on macOS, bubblewrap/Landlock on Linux): they
+ * can read only their folder (plus system tools), write only their folder when allowed, never touch
+ * .git, and have no network. Codex gets a custom permission profile; Claude Code runs restricted with
+ * its sandbox settings. (Both verified: tests/agent-sandbox.test.ts.)
  *
  * Codex runs as `codex exec` (ChatGPT login); Claude Code as `claude -p` (Claude subscription).
  * Neither needs an API key. Calls share a small concurrency limit so a burst of requests never
  * hammers the user's plan. */
-import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { spawn, spawnSync } from "node:child_process";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { basename, dirname, join } from "node:path";
 import { runCodex } from "./codex.ts";
 import { activeProvider, getSettings, type Provider } from "./settings.ts";
 
@@ -26,6 +32,10 @@ export interface CallOptions {
   timeoutMs?: number;
   /** Append the raw event stream here (Codex). */
   log?: string;
+  /** Let the model search the web (live). */
+  search?: boolean;
+  /** Pictures to look at (absolute paths). */
+  images?: string[];
 }
 
 export interface CallResult<T = string> {
@@ -57,6 +67,21 @@ function modelFor(provider: Provider, tier: Tier) {
   return tier === "fast" ? { model: conf.fastModel, effort: conf.fastEffort } : { model: conf.smartModel, effort: conf.smartEffort };
 }
 
+/** The model a call ran on, by name: an empty setting means the CLI's own default (Codex: ~/.codex/config.toml). */
+let codexDefault: string | null = null;
+function shownModel(provider: Provider, model: string) {
+  if (model) return model;
+  if (provider === "claude") return "claude (default)";
+  if (codexDefault === null) {
+    try {
+      codexDefault = /^\s*model\s*=\s*"([^"]+)"/m.exec(readFileSync(join(homedir(), ".codex", "config.toml"), "utf8"))?.[1] || "codex (default)";
+    } catch {
+      codexDefault = "codex (default)";
+    }
+  }
+  return codexDefault;
+}
+
 export function parseJsonLoose(text: string): unknown {
   try {
     return JSON.parse(text);
@@ -76,15 +101,15 @@ export function structured<T>(options: CallOptions & { schema: object }): Promis
     const started = Date.now();
     if (provider === "claude") {
       const out = await runClaude({ ...options, model, effort: options.effort || effort, schema: options.schema });
-      return { data: out.structured as T, ms: Date.now() - started, provider, model: model || "default" };
+      return { data: out.structured as T, ms: Date.now() - started, provider, model: shownModel(provider, model) };
     }
     const dir = mkdtempSync(join(tmpdir(), "classroom-llm-"));
     try {
       const schemaFile = join(dir, "schema.json");
       writeFileSync(schemaFile, JSON.stringify(options.schema));
-      const result = await runCodex({ cwd: dir, prompt: options.prompt, sandbox: "read-only", schema: schemaFile, ephemeral: true, model: model || undefined, effort: options.effort || effort, signal: options.signal, onActivity: options.onActivity, timeoutMs: options.timeoutMs ?? 5 * 60 * 1000, log: options.log });
+      const result = await runCodex({ cwd: dir, prompt: options.prompt, sandbox: "read-only", config: codexExtras(options), images: safeImages(options.images, dir), schema: schemaFile, ephemeral: true, model: model || undefined, effort: options.effort || effort, signal: options.signal, onActivity: options.onActivity, timeoutMs: options.timeoutMs ?? 5 * 60 * 1000, log: options.log });
       if (!result.ok) throw new Error(result.error || "no answer from Codex");
-      return { data: parseJsonLoose(result.lastMessage) as T, ms: Date.now() - started, provider, model: model || "default" };
+      return { data: parseJsonLoose(result.lastMessage) as T, ms: Date.now() - started, provider, model: shownModel(provider, model) };
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -99,28 +124,39 @@ export function text(options: CallOptions): Promise<CallResult<string>> {
     const started = Date.now();
     if (provider === "claude") {
       const out = await runClaude({ ...options, model, effort: options.effort || effort });
-      return { data: out.text, ms: Date.now() - started, provider, model: model || "default" };
+      return { data: out.text, ms: Date.now() - started, provider, model: shownModel(provider, model) };
     }
     const dir = mkdtempSync(join(tmpdir(), "classroom-llm-"));
     try {
-      const result = await runCodex({ cwd: dir, prompt: options.prompt, sandbox: "read-only", ephemeral: true, model: model || undefined, effort: options.effort || effort, signal: options.signal, onActivity: options.onActivity, timeoutMs: options.timeoutMs ?? 5 * 60 * 1000, log: options.log });
+      const result = await runCodex({ cwd: dir, prompt: options.prompt, sandbox: "read-only", config: codexExtras(options), images: safeImages(options.images, dir), ephemeral: true, model: model || undefined, effort: options.effort || effort, signal: options.signal, onActivity: options.onActivity, timeoutMs: options.timeoutMs ?? 5 * 60 * 1000, log: options.log });
       if (!result.ok) throw new Error(result.error || "no answer from Codex");
-      return { data: result.lastMessage, ms: Date.now() - started, provider, model: model || "default" };
+      return { data: result.lastMessage, ms: Date.now() - started, provider, model: shownModel(provider, model) };
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 }
 
-/** A read-only agent working in `cwd`: it may list, read and search files there, never write. */
-export function agent(options: CallOptions & { cwd: string; schema?: object }): Promise<CallResult<string | unknown>> {
+export interface AgentOptions extends CallOptions {
+  /** The agent's folder: its working directory, the only place it may write (when `write`). */
+  cwd: string;
+  schema?: object;
+  /** Allow writing inside `cwd` (never .git). Default: read-only. */
+  write?: boolean;
+  /** More folders it may read (never write), e.g. the live vault next to a working copy. */
+  readRoots?: string[];
+}
+
+/** An agent with a shell, confined to `cwd` by the CLI's OS sandbox: it reads there (and `readRoots`), writes there only if `write`, no network. */
+export function agent(options: AgentOptions): Promise<CallResult<string | unknown>> {
   return slot(async () => {
     const provider = activeProvider();
     const { model, effort } = modelFor(provider, options.tier || "smart");
     const started = Date.now();
     if (provider === "claude") {
-      const out = await runClaude({ ...options, model, effort: options.effort || effort, cwd: options.cwd, tools: ["Read", "Grep", "Glob"], schema: options.schema });
-      return { data: options.schema ? out.structured : out.text, ms: Date.now() - started, provider, model: model || "default" };
+      const tools = options.write ? ["Bash", "Read", "Grep", "Glob", "Edit", "Write"] : ["Bash", "Read", "Grep", "Glob"];
+      const out = await runClaude({ ...options, model, effort: options.effort || effort, cwd: options.cwd, tools, sandbox: claudeSandbox(options), restricted: true, addDirs: options.readRoots, schema: options.schema });
+      return { data: options.schema ? out.structured : out.text, ms: Date.now() - started, provider, model: shownModel(provider, model) };
     }
     let schemaDir: string | null = null;
     try {
@@ -130,13 +166,76 @@ export function agent(options: CallOptions & { cwd: string; schema?: object }): 
         schemaFile = join(schemaDir, "schema.json");
         writeFileSync(schemaFile, JSON.stringify(options.schema));
       }
-      const result = await runCodex({ cwd: options.cwd, prompt: options.prompt, sandbox: "read-only", schema: schemaFile, ephemeral: true, model: model || undefined, effort: options.effort || effort, signal: options.signal, onActivity: options.onActivity, timeoutMs: options.timeoutMs ?? 8 * 60 * 1000, log: options.log });
+      const result = await runCodex({ cwd: options.cwd, prompt: options.prompt, sandbox: "profile", config: [...codexProfile(options), ...codexExtras(options)], schema: schemaFile, ephemeral: true, model: model || undefined, effort: options.effort || effort, signal: options.signal, onActivity: options.onActivity, timeoutMs: options.timeoutMs ?? 8 * 60 * 1000, log: options.log });
       if (!result.ok) throw new Error(result.error || "no answer from Codex");
-      return { data: options.schema ? parseJsonLoose(result.lastMessage) : result.lastMessage, ms: Date.now() - started, provider, model: model || "default" };
+      return { data: options.schema ? parseJsonLoose(result.lastMessage) : result.lastMessage, ms: Date.now() - started, provider, model: shownModel(provider, model) };
     } finally {
       if (schemaDir) rmSync(schemaDir, { recursive: true, force: true });
     }
   });
+}
+
+/* ---------------- sandboxes ---------------- */
+
+const toml = (s: string) => JSON.stringify(s);
+
+/** Where the Codex binary and its tools live: the sandbox must let it run itself (and rg). */
+export function codexToolRoots(): string[] {
+  const roots = new Set<string>();
+  const bin = process.env.CODEX_BIN || "codex";
+  const which = bin.includes("/") ? bin : spawnSync("which", [bin], { encoding: "utf8" }).stdout.trim();
+  for (const path of [which, which && existsSync(which) ? realpathSync(which) : ""]) {
+    if (!path) continue;
+    const brew = /^(\/opt\/homebrew|\/usr\/local|\/home\/linuxbrew\/\.linuxbrew)\//.exec(path);
+    roots.add(brew ? brew[1] : dirname(dirname(path)));
+  }
+  return [...roots].filter((r) => r && r !== "/");
+}
+
+/** A Codex permission profile: system files and tools readable, `cwd` readable (or writable), nothing else. */
+export function codexProfile(options: { cwd: string; write?: boolean; readRoots?: string[] }): string[] {
+  const fs: Record<string, string> = { ":minimal": "read" };
+  for (const root of codexToolRoots()) fs[root] = "read";
+  for (const root of options.readRoots || []) fs[root] = "read";
+  fs[":project_roots"] = options.write ? "write" : "read";
+  fs[":tmpdir"] = "write";
+  const table = Object.entries(fs)
+    .map(([k, v]) => `${toml(k)}=${toml(v)}`)
+    .join(", ");
+  return ['default_permissions="classroom"', `permissions.classroom.filesystem={${table}}`, 'shell_environment_policy.inherit="core"'];
+}
+
+/** Codex splits -i values on commas: give it copies with plain names, in the call's own temp folder. */
+function safeImages(images: string[] | undefined, dir: string): string[] | undefined {
+  return images?.map((image, i) => {
+    const copy = join(dir, `image-${i + 1}${image.match(/\.[a-z0-9]+$/i)?.[0] || ".png"}`);
+    copyFileSync(image, copy);
+    return copy;
+  });
+}
+
+function codexExtras(options: CallOptions): string[] {
+  return options.search ? ['web_search="live"'] : [];
+}
+
+/** Claude Code sandbox settings: reads confined to `cwd` (and `readRoots`), writes to `cwd` only if allowed, .git locked, no network. */
+export function claudeSandbox(options: { cwd: string; write?: boolean; readRoots?: string[] }) {
+  const read = [options.cwd, ...(options.readRoots || [])];
+  return {
+    sandbox: {
+      enabled: true,
+      autoAllowBashIfSandboxed: true,
+      allowUnsandboxedCommands: false,
+      failIfUnavailable: true,
+      filesystem: { denyRead: ["~/"], allowRead: read, allowWrite: options.write ? [options.cwd] : [], denyWrite: [join(options.cwd, ".git"), ...(options.readRoots || [])] },
+      network: { allowedDomains: [] },
+    },
+    permissions: {
+      blockReadsOutsideWorkingDirectories: true,
+      // the file tools follow the same rule as the shell: only the agent's own folder is writable
+      deny: [...(options.readRoots || []).flatMap((r) => [`Edit(/${r}/**)`, `Write(/${r}/**)`]), `Edit(/${join(options.cwd, ".git")}/**)`, `Write(/${join(options.cwd, ".git")}/**)`],
+    },
+  };
 }
 
 /* ---------------- Claude Code ---------------- */
@@ -149,6 +248,10 @@ interface ClaudeRun extends CallOptions {
   schema?: object;
   cwd?: string;
   tools?: string[];
+  /** Settings for Claude Code's sandbox (see claudeSandbox). */
+  sandbox?: object;
+  restricted?: boolean;
+  addDirs?: string[];
 }
 
 function runClaude(options: ClaudeRun): Promise<{ text: string; structured?: unknown }> {
@@ -156,10 +259,26 @@ function runClaude(options: ClaudeRun): Promise<{ text: string; structured?: unk
   if (options.model) args.push("--model", options.model);
   if (options.effort) args.push("--effort", options.effort);
   if (options.schema) args.push("--json-schema", JSON.stringify(options.schema));
-  if (options.tools?.length) args.push("--tools", options.tools.join(","), "--allowedTools", options.tools.join(","), "--permission-mode", "dontAsk");
-  else args.push("--tools", "");
   const cwd = options.cwd || mkdtempSync(join(tmpdir(), "classroom-claude-"));
   const cleanup = options.cwd ? null : cwd;
+  const tools = [...(options.tools || [])];
+  let prompt = options.prompt;
+  if (options.search) tools.push("WebSearch", "WebFetch");
+  if (options.images?.length) {
+    // Claude Code looks at a picture by reading it: copy each into its folder and let it read
+    if (!tools.includes("Read")) tools.push("Read");
+    const names = options.images.map((image, i) => {
+      const name = `image-${i + 1}-${basename(image)}`;
+      copyFileSync(image, join(cwd, name));
+      return name;
+    });
+    prompt = `Look at ${names.map((n) => `./${n}`).join(", ")} (read ${names.length === 1 ? "it" : "them"} first).\n\n${prompt}`;
+  }
+  if (options.restricted) args.push("--restricted");
+  for (const dir of options.addDirs || []) args.push("--add-dir", dir);
+  if (options.sandbox) args.push("--settings", JSON.stringify(options.sandbox));
+  if (tools.length) args.push("--tools", tools.join(","), "--allowedTools", tools.join(","), "--permission-mode", "dontAsk");
+  else args.push("--tools", "");
   return new Promise((resolve, reject) => {
     const child = spawn(process.env.CLAUDE_BIN || "claude", args, { cwd, env: { ...process.env, NO_COLOR: "1" }, stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
@@ -186,6 +305,6 @@ function runClaude(options: ClaudeRun): Promise<{ text: string; structured?: unk
         reject(new Error(code === 0 ? "claude returned something unreadable" : `claude exited with ${code}: ${(stderr || stdout).trim().slice(-300)}`));
       }
     });
-    child.stdin.end(options.prompt);
+    child.stdin.end(prompt);
   });
 }

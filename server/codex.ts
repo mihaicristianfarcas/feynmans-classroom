@@ -1,13 +1,16 @@
 import { spawn, spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { appendFileSync, existsSync, readFileSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { CODEX } from "./config.ts";
 
 export interface CodexOptions {
   cwd: string;
   prompt: string;
-  sandbox: "read-only" | "workspace-write";
+  /** "profile": no sandbox_mode; the caller passes a permission profile in `config` instead. */
+  sandbox: "read-only" | "workspace-write" | "profile";
+  /** Extra `-c key=value` overrides (permission profiles, web search). */
+  config?: string[];
   /** JSON Schema file for the final message (structured output). */
   schema?: string;
   /** Resume this thread instead of starting a new one. */
@@ -66,7 +69,9 @@ function describe(event: Record<string, any>): string | null {
 }
 
 export function codexArgs(options: CodexOptions, lastFile: string): string[] {
-  const args = ["exec", "--json", "--skip-git-repo-check", "-c", `sandbox_mode="${options.sandbox}"`];
+  const args = ["exec", "--json", "--skip-git-repo-check"];
+  if (options.sandbox !== "profile") args.push("-c", `sandbox_mode="${options.sandbox}"`);
+  for (const entry of options.config || []) args.push("-c", entry);
   // The agent never needs the network: it writes one file and runs a local check.
   if (options.sandbox === "workspace-write") args.push("-c", "sandbox_workspace_write.network_access=false");
   const model = options.model || CODEX.model;
@@ -79,6 +84,7 @@ export function codexArgs(options: CodexOptions, lastFile: string): string[] {
     for (const image of options.images || []) args.push("-i", image);
     args.push("-o", lastFile, "-");
   } else {
+    for (const image of options.images || []) args.push("-i", image);
     args.push("-C", options.cwd, "-o", lastFile);
   }
   return args;
@@ -147,7 +153,8 @@ function configuredModel(): string {
 }
 
 function runCodexOnce(options: CodexOptions): Promise<CodexResult> {
-  const lastFile = join(options.cwd, `.codex-last-${Date.now()}.txt`);
+  // outside the working folder: an agent's folder is committed, and this file is ours
+  const lastFile = join(tmpdir(), `classroom-codex-last-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`);
   const args = codexArgs(options, lastFile);
   return new Promise((resolve) => {
     hookShutdown();
@@ -166,7 +173,10 @@ function runCodexOnce(options: CodexOptions): Promise<CodexResult> {
       settled = true;
       clearTimeout(timer);
       Object.assign(result, patch);
-      if (existsSync(lastFile)) result.lastMessage = readFileSync(lastFile, "utf8").trim() || result.lastMessage;
+      if (existsSync(lastFile)) {
+        result.lastMessage = readFileSync(lastFile, "utf8").trim() || result.lastMessage;
+        rmSync(lastFile, { force: true });
+      }
       result.ok = result.exitCode === 0 && !result.error;
       resolve(result);
     };
