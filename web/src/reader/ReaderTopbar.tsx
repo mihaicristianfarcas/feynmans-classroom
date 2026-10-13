@@ -1,7 +1,8 @@
 /* The reader's top bar: back to the library, the book's title, chapter and section pickers, "Find
  * chapters" for a PDF without bookmarks, Capture, the page, Review, Hold (on the Figures pane), the
- * theme and Help. */
+ * agent, the theme and Help. */
 import { ArrowLeft, CircleHelp, Crop, Layers, Pin, PinOff } from "lucide-react";
+import { AgentButton } from "../agent/AgentButton";
 import { api, type Book, type Job, type Loc, posOf, type TocEntry } from "../api";
 import { ThemeButton, useDueCount } from "../app/Shell";
 
@@ -130,6 +131,7 @@ export function ReaderTopbar({
         </button>
       )}
       <span className="topbar-sep" />
+      <AgentButton />
       <ThemeButton theme={theme} setTheme={setTheme} />
       <button
         type="button"

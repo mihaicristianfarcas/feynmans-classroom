@@ -12,7 +12,16 @@ export interface SourceRef {
   quote?: string;
 }
 
-export type NoteType = "note" | "highlight" | "explanation" | "connection" | "answer" | "summary";
+export type NoteType =
+  | "note"
+  | "highlight"
+  | "explanation"
+  | "connection"
+  | "answer"
+  | "summary"
+  | "quiz"
+  | "exercises"
+  | "session";
 
 export interface Note {
   /** From the frontmatter, or derived from the path for notes written elsewhere (Obsidian, an agent). */
@@ -27,6 +36,9 @@ export interface Note {
   aliases: string[];
   /** Links kept in the frontmatter (Obsidian properties), e.g. connections the learner accepted. */
   related: string[];
+  /** What the note is about: links to books, concepts, notes ("[[DDIA]]", "[[Replication]]"). Their
+   * pages list it. */
+  about: string[];
   concepts: string[];
   source?: SourceRef;
   /** Feynman explanations: the grade the tutor gave (0–100). */
@@ -204,10 +216,31 @@ export interface Connection {
 
 /* ---------------- agent runs ---------------- */
 
+/** Where the learner was when they asked (sent by the page; the server looks the rest up). */
+export interface AgentContext {
+  /** The page's route ("#/notes/n1a2b3c4", "#/review"). */
+  route?: string;
+  noteId?: string;
+  conceptId?: string;
+  bookId?: string;
+  /** In a book: the page (PDF, with the fraction down it) or the block (other formats). */
+  at?: number;
+  /** Text selected on the page. */
+  selection?: string;
+}
+
+/** One request to the agent: a command it carries out in the vault, or a question it answers. */
 export interface AgentRun {
   id: string;
   task: string;
-  mode: "read" | "write";
+  /** The conversation it belongs to (the first request's id); a follow-up sees the earlier turns. */
+  thread?: string;
+  /** Where the learner was, in a few words ("DDIA · ch. 5 Replication"). */
+  where?: string;
+  /** "fast": the quick model (Enter); "smart": the careful one (⌘Enter). */
+  tier?: "fast" | "smart";
+  /** "read": it could only look (no jj on this machine); "write": it worked on its own copy. */
+  mode?: "read" | "write";
   status: "running" | "review" | "merged" | "discarded" | "failed" | "undone" | "done";
   started: string;
   ms?: number;
@@ -215,10 +248,18 @@ export interface AgentRun {
   model?: string;
   /** Files the run changed: A(dded), M(odified), D(eleted). */
   files?: { path: string; change: "A" | "M" | "D" }[];
-  /** Why it waits for the learner's OK (it deletes or rewrites their notes). */
+  /** Why it waits for the learner's OK (a file it wrote can't be read). */
   review?: string[];
+  /** The jj change it made: what Undo takes out again. */
+  change?: string;
+  /** That change's commit: its diff stays readable after an undo. */
   commit?: string;
+  /** Its reply: what it did, or the answer. */
   answer?: string;
+  /** The vault path of the main thing it made or changed, to open from the reply. */
+  open?: string;
+  /** The note an answer was kept in. */
+  kept?: string;
   error?: string;
   activity?: string;
 }

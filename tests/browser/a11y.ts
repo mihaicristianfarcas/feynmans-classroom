@@ -78,6 +78,28 @@ async function serve() {
     concepts: ["Derivative"],
   });
   await json("api/cards", "POST", { front: "What is dx?", back: "A little bit of x.", deck: "Calculus" });
+  await json("api/notes", "POST", {
+    title: "Smallness, check yourself",
+    type: "quiz",
+    folder: "Calculus/Quizzes",
+    about: ["[[Calculus Made Easy]]"],
+    body: [
+      "```quiz",
+      "title: Degrees of smallness",
+      "questions:",
+      "  - q: What is dx?",
+      "    choices: [A large step, A little bit of x]",
+      "    answer: 2",
+      "    why: The d means a little bit of.",
+      "```",
+      "",
+      "> [!exercise] Compare",
+      "> Which is smaller, dx or dx²?",
+      "",
+      "> [!solution]-",
+      "> dx², a small quantity of the second order.",
+    ].join("\n"),
+  });
 }
 
 /* ---------- pages ---------- */
@@ -94,14 +116,14 @@ async function routes(): Promise<string[]> {
     "#/review",
     "#/library/figures",
     "#/brain",
-    "#/ask",
-    "#/ask?do=1",
     "#/journey",
     "#/settings",
     "#/welcome",
     "#/gallery",
   ];
   if (notes[0]) list.push(`#/notes/${notes[0].id}`);
+  const quiz = (notes as { id: string; type?: string }[]).find((n) => n.type === "quiz");
+  if (quiz && quiz.id !== notes[0]?.id) list.push(`#/notes/${quiz.id}`);
   if (concepts[0]) list.push(`#/brain/concept/${concepts[0].id}`);
   if (books[0]) list.push(`#/book/${books[0].id}`);
   const only = arg("only");
@@ -222,6 +244,20 @@ async function keyboard(page: Page, bookRoute: string | undefined) {
   await wait(200);
   check("Escape closes the palette", !(await page.$("[role=dialog]")));
 
+  // ⌘J opens the agent with focus in its field, from any page; Escape closes it and gives focus back
+  await open(page, "#/library", "light");
+  await page.keyboard.down(mod);
+  await page.keyboard.press("j");
+  await page.keyboard.up(mod);
+  await wait(200);
+  const inAgent = await page.evaluate(
+    () => !!document.activeElement?.closest("[role=dialog]") && document.activeElement?.tagName === "TEXTAREA",
+  );
+  check("⌘J opens the agent with focus in its field", inAgent, await focused(page));
+  await page.keyboard.press("Escape");
+  await wait(200);
+  check("Escape closes the agent", !(await page.$("[role=dialog]")));
+
   // a dialog keeps focus inside while open, and Escape returns focus to what opened it
   const concept = (await routes()).find((r) => r.startsWith("#/brain/concept/"));
   if (concept) await open(page, concept, "light");
@@ -330,6 +366,30 @@ try {
       await open(page, route, theme);
       const violations = await axe(page);
       check(`axe: ${route} (${theme})`, violations.length === 0, describe(violations));
+    }
+  }
+  // the agent's panel and a note's versions, open, in both themes
+  const quizNote = ((await fetch(`${BASE}api/notes?type=quiz`).then((r) => r.json())) as { id: string }[])[0];
+  const note = quizNote ? `#/notes/${quizNote.id}` : list.find((r) => r.startsWith("#/notes/"));
+  for (const theme of ["light", "dark"] as const) {
+    if (arg("only") && !"agent".includes(arg("only")!)) break;
+    await open(page, "#/", theme);
+    await page.click(".topnav-tools .agent-button");
+    await wait(300);
+    check(
+      `axe: the agent's panel (${theme})`,
+      !!(await page.$(".agent-panel")) && (await axe(page)).length === 0,
+      describe(await axe(page)),
+    );
+    if (note) {
+      await open(page, note, theme);
+      await page.click('.note-tools [aria-label="Versions"]');
+      await wait(600);
+      check(
+        `axe: a note's versions (${theme})`,
+        !!(await page.$(".modal")) && (await axe(page)).length === 0,
+        describe(await axe(page)),
+      );
     }
   }
   if (!arg("only"))

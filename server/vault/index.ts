@@ -18,10 +18,10 @@
  *
  * Markdown with YAML frontmatter is what agents read best and what people can open in any editor
  * (it is a valid Obsidian vault). The server keeps an index in memory, writes through, notices
- * edits made outside the app, and commits the vault to git a few seconds after changes.
+ * edits made outside the app, and keeps the vault's history with Jujutsu (jj).
  *
  * This module is the vault's public face; the work happens in the files it re-exports from. */
-export { onVaultChange, touched, wroteItself } from "./changes.ts";
+export { onVaultChange, takeSelfWrite, touched, wroteItself } from "./changes.ts";
 export { Collection, GENERATED, trash } from "./collection.ts";
 export { annotations, cards, concepts, figures, notes } from "./collections.ts";
 export {
@@ -36,7 +36,20 @@ export {
   vaultRel,
 } from "./files.ts";
 export { annotationBookInfo, setAnnotationBookInfo } from "./formats.ts";
-export { changed, commitNow, git, gitIdentity, hasGit, vaultHistory, vaultIsRepo } from "./git.ts";
+export {
+  changed,
+  checkpoint,
+  diffOf,
+  type FileChange,
+  fileAt,
+  fileHistory,
+  filesOf,
+  hasJj,
+  jj,
+  type Version,
+  vaultHistory,
+  vaultIsRepo,
+} from "./jj.ts";
 export { activity, appendLog, logActivity, logReview, readLog, reviews } from "./logs.ts";
 export { DEFAULT_PROFILE, getProfile, saveProfile } from "./profile.ts";
 export { initVault, vaultStats } from "./setup.ts";

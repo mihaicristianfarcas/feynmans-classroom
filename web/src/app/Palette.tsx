@@ -1,8 +1,9 @@
 /* ⌘K (Ctrl K): search everything (concepts, notes, annotations, cards, the books' text) and jump to
- * it; with no match, Enter asks the library instead. A combobox: type to search, arrow keys move
+ * it; with no match, Enter hands the words to the agent instead. A combobox: type to search, arrow keys move
  * through the results, Enter opens one, Escape closes and gives focus back. */
 import { CornerDownLeft, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { openAgent } from "../agent/store";
 import { learn, type SearchHit } from "../api";
 import { announce, useFocusTrap } from "../lib/a11y";
 import { bookLink, go } from "./navigation";
@@ -54,7 +55,7 @@ export function Palette() {
   if (!open) return null;
   const pick = (h: SearchHit | undefined) => {
     if (!h) {
-      if (q.trim()) go(`#/ask?q=${encodeURIComponent(q.trim())}`);
+      if (q.trim()) openAgent({ text: q.trim(), send: true });
     } else if (h.kind === "concept") go(`#/brain/concept/${h.id}`);
     else if (h.kind === "note") go(`#/notes/${h.id}`);
     else if (h.kind === "card") go("#/brain/concepts");
@@ -127,7 +128,7 @@ export function Palette() {
                 aria-selected="true"
                 onClick={() => pick(undefined)}
               >
-                No matches. Press <kbd>↵</kbd> to ask your library instead.
+                No matches. Press <kbd>↵</kbd> to ask the agent instead.
               </div>
             )}
           </div>

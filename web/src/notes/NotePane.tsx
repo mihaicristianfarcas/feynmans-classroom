@@ -1,15 +1,19 @@
-/* One note on the notes page: its title, properties and body (edit with a live preview, or read),
- * with what links to it in the sidebar. */
-import { ArrowUpRight, Trash2 } from "lucide-react";
+/* One note on the notes page: its title, properties (tags, aliases, what it's about) and body (edit
+ * with a live preview, or read: quizzes play there), its saved versions, and what links to it in the
+ * sidebar. It follows changes made elsewhere (the agent, another editor) as they land, and if they land
+ * while you're typing in it, asks which text to keep. */
+import { ArrowUpRight, History, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { learn, type NoteDetail } from "../api";
 import { go } from "../app/navigation";
 import { Markdown } from "../components/Markdown";
+import { NoteContext } from "../components/QuizBlock";
 import { useIndicator } from "../components/ui";
 import { timeAgo } from "../lib/time";
+import { useVaultEvents } from "../lib/useVaultEvents";
 import { NoteEditor } from "./NoteEditor";
 import { NoteSidebar } from "./NoteSidebar";
-import { useVaultEvents } from "./useVaultEvents";
+import { Versions } from "./Versions";
 
 export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" | "dark"; onChanged: () => void }) {
   const [note, setNote] = useState<NoteDetail | null>(null);
@@ -24,6 +28,11 @@ export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" 
     }
   });
   const [saving, setSaving] = useState<"idle" | "saving" | "saved">("idle");
+  const [versions, setVersions] = useState(false);
+  /** The note changed on disk while there were unsaved edits here. */
+  const [clash, setClash] = useState(false);
+  /** Whether the mode was picked for this note yet (a note with a quiz opens to be read: that's where it plays). */
+  const modeSet = useRef(false);
   const modes = useIndicator<HTMLFieldSetElement>(mode);
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -34,6 +43,10 @@ export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" 
       learn.note(id).then(
         (n) => {
           setNote(n);
+          if (!modeSet.current) {
+            modeSet.current = true;
+            if (/^(`{3,}|~{3,})quiz\b/m.test(n.body)) setMode("read");
+          }
           if (!dirty.current) setBody(n.body);
           setTitle((t) => (document.activeElement === titleRef.current ? t : n.title));
         },
@@ -51,12 +64,15 @@ export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" 
     });
   }, [load, id]);
   useVaultEvents((path) => {
-    if (note && path === note.path && !dirty.current) load();
-    else if (note) load();
+    if (!note) return;
+    // changed elsewhere while you were typing here: don't overwrite either text without asking
+    if (path === note.path && dirty.current) setClash(true);
+    load();
   });
 
   const save = useCallback(
     async (patch: { body?: string; title?: string }) => {
+      if (clashRef.current && patch.body !== undefined) return;
       setSaving("saving");
       try {
         const updated = await learn.updateNote(id, patch);
@@ -74,6 +90,8 @@ export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" 
     },
     [id, load, onChanged],
   );
+  const clashRef = useRef(clash);
+  clashRef.current = clash;
   const onBody = (text: string) => {
     setBody(text);
     dirty.current = true;
@@ -120,6 +138,33 @@ export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" 
             aria-label="Title (renames the file and updates links to it)"
             title="The title is the file name: renaming updates every link to this note"
           />
+          {clash && (
+            <div className="notice note-clash" role="alert">
+              <span>This note was changed elsewhere (by the agent, or in another editor) while you were typing.</span>
+              <button
+                type="button"
+                className="button small"
+                onClick={() => {
+                  dirty.current = false;
+                  setClash(false);
+                  load();
+                }}
+              >
+                Show the new text
+              </button>
+              <button
+                type="button"
+                className="button small"
+                onClick={() => {
+                  setClash(false);
+                  clashRef.current = false;
+                  save({ body: bodyRef.current });
+                }}
+              >
+                Keep mine
+              </button>
+            </div>
+          )}
           <div className="row gap note-tools">
             <fieldset className="segmented" ref={modes}>
               <legend className="visually-hidden">Mode</legend>
@@ -149,6 +194,16 @@ export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" 
                     : `Edited ${timeAgo(note.updated)}`}
             </span>
             <span className="spacer" />
+            <button
+              type="button"
+              className="icon-button"
+              title="Versions: read or bring back an earlier one"
+              aria-label="Versions"
+              aria-haspopup="dialog"
+              onClick={() => setVersions(true)}
+            >
+              <History aria-hidden="true" />
+            </button>
             <button
               type="button"
               className="icon-button danger"
@@ -181,28 +236,46 @@ export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" 
               autoFocus={!location.hash.includes("new=1") && !body}
             />
           ) : (
-            <Markdown text={body} theme={theme} className="note-read" base={note.path} />
+            <NoteContext.Provider value={{ id: note.id }}>
+              <Markdown text={body} theme={theme} className="note-read" base={note.path} />
+            </NoteContext.Provider>
           )}
         </div>
       </div>
       <NoteSidebar note={note} reload={load} />
+      {versions && (
+        <Versions
+          note={note}
+          theme={theme}
+          onClose={() => setVersions(false)}
+          onRestored={() => {
+            dirty.current = false;
+            load();
+          }}
+        />
+      )}
     </div>
   );
 }
+
+/** A note's `about` links as the field shows them: names, separated by commas. */
+const aboutText = (list: string[]) => list.map((a) => a.replace(/^\[\[|\]\]$/g, "")).join(", ");
 
 function Properties({
   note,
   onSave,
 }: {
   note: NoteDetail;
-  onSave: (patch: { tags?: string[]; aliases?: string[] }) => Promise<void>;
+  onSave: (patch: { tags?: string[]; aliases?: string[]; about?: string[] }) => Promise<void>;
 }) {
   const [tags, setTags] = useState(note.tags.join(", "));
   const [aliases, setAliases] = useState(note.aliases.join(", "));
+  const [about, setAbout] = useState(aboutText(note.about || []));
   useEffect(() => {
     setTags(note.tags.join(", "));
     setAliases(note.aliases.join(", "));
-  }, [note.tags, note.aliases]);
+    setAbout(aboutText(note.about || []));
+  }, [note.tags, note.aliases, note.about]);
   const list = (s: string) =>
     s
       .split(",")
@@ -227,6 +300,28 @@ function Properties({
           onBlur={() => aliases !== note.aliases.join(", ") && onSave({ aliases: list(aliases) })}
           placeholder="other names links can use"
         />
+      </label>
+      <label className="wide">
+        <span>about</span>
+        <input
+          value={about}
+          onChange={(e) => setAbout(e.target.value)}
+          onBlur={() =>
+            about !== aboutText(note.about || []) &&
+            onSave({
+              about: about
+                .split(",")
+                .map((x) => x.trim().replace(/^\[\[|\]\]$/g, ""))
+                .filter(Boolean)
+                .map((x) => `[[${x}]]`),
+            })
+          }
+          placeholder="books, concepts or notes it's about"
+          aria-describedby="about-hint"
+        />
+        <span id="about-hint" className="visually-hidden">
+          Names separated by commas; their pages list this note
+        </span>
       </label>
       {note.source?.bookId && (
         <a

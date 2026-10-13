@@ -48,7 +48,8 @@ export function Modal({
         aria-labelledby={titleId}
         ref={box}
       >
-        <header className="modal-head">
+        {/* a div, not a header: portalled into the body, a header would be a second banner for the page */}
+        <div className="modal-head">
           <div>
             {eyebrow && <div className="eyebrow">{eyebrow}</div>}
             <h2 className="modal-title" id={titleId}>
@@ -58,7 +59,7 @@ export function Modal({
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
             <X aria-hidden="true" />
           </button>
-        </header>
+        </div>
         <div className="modal-body">{children}</div>
       </div>
     </div>,

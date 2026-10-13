@@ -2,6 +2,7 @@
  * cards and review, the study tools, figures, links, search, the journey, and agents. */
 import { call, del, post, put } from "./client";
 import type {
+  AgentContext,
   AgentRun,
   Anchor,
   Annotation,
@@ -27,6 +28,14 @@ import type {
   Today,
 } from "./types";
 
+/** A saved version of the vault, or of one file in it (jj's change and commit ids). */
+export interface Version {
+  change: string;
+  commit: string;
+  when: string;
+  subject: string;
+}
+
 export const learn = {
   profile: () => call<Profile>("/api/profile"),
   saveProfile: (p: Partial<Profile>) => put<Profile>("/api/profile", p),
@@ -41,9 +50,10 @@ export const learn = {
       cards: number;
       figures: number;
       reviews: number;
-      git: boolean;
+      versioned: boolean;
+      jj: boolean;
       path: string;
-      history: { hash: string; when: string; subject: string }[];
+      history: Version[];
     }>("/api/vault"),
   today: () => call<Today>("/api/today"),
   journey: () => call<Journey>("/api/journey"),
@@ -58,6 +68,13 @@ export const learn = {
   updateNote: (id: string, n: Partial<Note> & { folder?: string }) => put<Note>(`/api/notes/${id}`, n),
   appendToNote: (id: string, markdown: string) => post<Note>(`/api/notes/${id}/append`, { markdown }),
   deleteNote: (id: string) => del(`/api/notes/${id}`),
+  noteVersions: (id: string) => call<Version[]>(`/api/notes/${id}/versions`),
+  noteVersion: (id: string, commit: string) =>
+    call<{ body: string; diff: string }>(`/api/notes/${id}/versions/${commit}`),
+  restoreNote: (id: string, commit: string) => post<Note>(`/api/notes/${id}/restore`, { commit }),
+  createFolder: (path: string) => post<{ folder: string }>("/api/folders", { path }),
+  moveFolder: (from: string, to: string) => post<{ folder: string }>("/api/folders/move", { from, to }),
+  deleteFolder: (path: string) => post<{ notes: number }>("/api/folders/delete", { path }),
   bookNote: (bookId: string) => post<Note>(`/api/books/${bookId}/note`),
   tree: () =>
     call<{ notes: { id: string; path: string; title: string; type: string; updated: string }[]; folders: string[] }>(
@@ -115,8 +132,10 @@ export const learn = {
   decideConnection: (id: string, decision: "accept" | "reject" | "remove") =>
     post<SuggestedLink>(`/api/connections/${id}/${decision}`),
   agents: () => call<AgentRun[]>("/api/agents"),
-  runAgent: (task: string, mode: "read" | "write" = "write") => post<AgentRun>("/api/agents", { task, mode }),
-  agentAction: (id: string, action: "approve" | "discard" | "undo") => post<AgentRun>(`/api/agents/${id}/${action}`),
+  runAgent: (input: { task: string; context?: AgentContext; after?: string; tier?: "fast" | "smart" }) =>
+    post<AgentRun>("/api/agents", input),
+  agentAction: (id: string, action: "approve" | "discard" | "undo" | "keep") =>
+    post<AgentRun>(`/api/agents/${id}/${action}`),
   agentDiff: (id: string) => call<{ diff: string }>(`/api/agents/${id}/diff`),
   concepts: () => call<Concept[]>("/api/concepts"),
   concept: (id: string) => call<ConceptDetail>(`/api/concepts/${id}`),
@@ -179,10 +198,6 @@ export const learn = {
     source?: SourceRef;
     mode?: "answer" | "socratic";
   }) => post<{ reply: string }>("/api/tutor", input),
-  ask: (question: string) =>
-    post<{ answer: string; sources: { path: string; quote: string }[]; ms: number }>("/api/ask", { question }),
-  saveAnswer: (input: { question: string; answer: string; sources: { path: string; quote: string }[] }) =>
-    post<Note>("/api/ask/save", input),
   figures: () => call<SavedFigure[]>("/api/figures"),
   figure: (id: string) => call<SavedFigure>(`/api/figures/${id}`),
   makeFigure: (input: {

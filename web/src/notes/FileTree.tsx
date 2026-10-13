@@ -1,10 +1,12 @@
 /* The notes page's file tree: the vault's notes/ folder as folders you open and close and the notes
- * in them, with buttons for a new note or a new folder. */
-import { ChevronRight, FolderPlus, SquarePen } from "lucide-react";
-import { useMemo, useState } from "react";
+ * in them, with buttons for a new note or a new folder; each folder has a menu to add a note or a
+ * folder inside it, rename or move it, or delete it. */
+import { ChevronRight, Ellipsis, FolderInput, FolderPlus, SquarePen, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { learn } from "../api";
 import { go } from "../app/navigation";
 import { Spinner } from "../components/feedback";
+import { announce, useArrowKeys } from "../lib/a11y";
 
 export type Tree = Awaited<ReturnType<typeof learn.tree>>;
 
@@ -81,16 +83,19 @@ export function FileTree({ tree, current, reload }: { tree: Tree | null; current
     <>
       {f.folders.map((sub) => (
         <li key={`d:${sub.path}`}>
-          <button
-            type="button"
-            className="tree-row folder"
-            style={{ paddingLeft: 6 + depth * 14 }}
-            onClick={() => toggle(sub.path)}
-            aria-expanded={!closed.has(sub.path)}
-          >
-            <ChevronRight className="tree-caret" aria-hidden="true" />
-            {sub.name}
-          </button>
+          <div className="tree-folder-row">
+            <button
+              type="button"
+              className="tree-row folder"
+              style={{ paddingLeft: 6 + depth * 14 }}
+              onClick={() => toggle(sub.path)}
+              aria-expanded={!closed.has(sub.path)}
+            >
+              <ChevronRight className="tree-caret" aria-hidden="true" />
+              {sub.name}
+            </button>
+            <FolderMenu folder={sub.path} reload={reload} />
+          </div>
           {!closed.has(sub.path) && <ul className="tree">{renderFolder(sub, depth + 1)}</ul>}
         </li>
       ))}
@@ -133,13 +138,7 @@ export function FileTree({ tree, current, reload }: { tree: Tree | null; current
           className="icon-button"
           title="New folder"
           aria-label="New folder"
-          onClick={async () => {
-            const name = prompt("New folder (inside notes/):", currentFolder ? `${currentFolder}/` : "");
-            if (name?.trim()) {
-              await newNote(name.trim().replace(/\/+$/, ""));
-              reload();
-            }
-          }}
+          onClick={() => newFolder(currentFolder ? `${currentFolder}/` : "", reload)}
         >
           <FolderPlus aria-hidden="true" />
         </button>
@@ -166,5 +165,108 @@ export function FileTree({ tree, current, reload }: { tree: Tree | null; current
         </p>
       )}
     </aside>
+  );
+}
+
+/** Asks for a folder's name (a path under notes/ makes the folders in between too) and makes it. */
+async function newFolder(start: string, reload: () => void) {
+  const name = prompt("New folder (inside notes/; use / for folders inside folders):", start);
+  if (!name?.trim() || name.trim() === start) return;
+  const { folder } = await learn.createFolder(name.trim().replace(/\/+$/, ""));
+  announce(`Made the folder ${folder}`);
+  reload();
+}
+
+/** A folder's menu: a note or a folder inside it, rename or move it, delete it. */
+function FolderMenu({ folder, reload }: { folder: string; reload: () => void }) {
+  const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  useArrowKeys(box, { selector: "[role=menuitem]", orientation: "vertical" });
+  useEffect(() => {
+    if (open) box.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
+  }, [open]);
+  const name = folder.split("/").pop() || folder;
+  const act = (fn: () => Promise<void>) => async () => {
+    setOpen(false);
+    try {
+      await fn();
+    } catch (e) {
+      alert((e as Error).message);
+    }
+  };
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: it only closes the menu when focus leaves it; the buttons inside are the controls
+    <div
+      className="menu-host tree-folder-menu"
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false);
+      }}
+    >
+      <button
+        type="button"
+        className="icon-button small"
+        ref={button}
+        aria-label={`Folder ${name}: more`}
+        title="More"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Ellipsis aria-hidden="true" />
+      </button>
+      {open && (
+        <div
+          className="menu"
+          role="menu"
+          aria-label={`Folder ${name}`}
+          ref={box}
+          onKeyDown={(e) => {
+            if (e.key !== "Escape") return;
+            e.stopPropagation();
+            setOpen(false);
+            button.current?.focus();
+          }}
+        >
+          <button type="button" role="menuitem" onClick={act(() => newNote(folder))}>
+            <SquarePen aria-hidden="true" />
+            New note here
+          </button>
+          <button type="button" role="menuitem" onClick={act(() => newFolder(`${folder}/`, reload))}>
+            <FolderPlus aria-hidden="true" />
+            New folder inside
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={act(async () => {
+              const to = prompt("Rename or move the folder (its path inside notes/):", folder);
+              if (!to?.trim() || to.trim() === folder) return;
+              const moved = await learn.moveFolder(folder, to.trim());
+              announce(`Moved to ${moved.folder}`);
+              reload();
+            })}
+          >
+            <FolderInput aria-hidden="true" />
+            Rename or move…
+          </button>
+          <div className="menu-sep" />
+          <button
+            type="button"
+            role="menuitem"
+            className="danger"
+            onClick={act(async () => {
+              if (!confirm(`Move the folder “${name}” and every note in it to the vault's trash?`)) return;
+              const r = await learn.deleteFolder(folder);
+              announce(`Deleted the folder and ${r.notes} note${r.notes === 1 ? "" : "s"}`);
+              reload();
+            })}
+          >
+            <Trash2 aria-hidden="true" />
+            Delete folder…
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

@@ -10,7 +10,7 @@ browser (React, web/)  ──HTTP + server-sent events──▶  server/ (Hono o
                      ┌────────────────────────────────────┼─────────────────────────┐
                      ▼                                    ▼                         ▼
           DATA_DIR/vault (Markdown, JSONL, books)    codex exec / claude -p      Chrome (optional:
-          the only source of truth, versioned by git  (server/llm/)              hand-built demo checks)
+          the only source of truth, versioned by jj   (server/llm/)              hand-built demo checks)
 ```
 
 ## The repository
@@ -22,7 +22,7 @@ server/            the API and everything behind it (Node, TypeScript, run with 
   http.ts fs.ts    HTTP and file helpers; errors.ts, events.ts (live updates), jobs.ts (queue)
   config.ts        paths, ports and tuning from the environment; settings.ts: the learner's settings
   routes/          one file per API area (books, demos, annotations, notes, cards, study, brain, agents…)
-  vault/           the vault as files: collections, file formats, git, logs, watching, indexes, links
+  vault/           the vault as files: collections, file formats, history (jj), logs, watching, indexes, links
   books/           the book store, types, finding quotes (locate.ts), figure placement and numbers
   ingest/          reading uploaded books: PDF, EPUB, Markdown, text, chapter detection
   annotations/     the margin: anchors, files, model-written answers, live updates, sending to notes
@@ -30,16 +30,17 @@ server/            the API and everything behind it (Node, TypeScript, run with 
   scene/           drawing figures with a model (one structured call → a validated scene spec)
   handbuilt/       hand-built demos: Codex writes demo.js in a sandboxed workspace, checked in Chrome
   llm/             the one door to models: structured(), text(), agent(); Codex and Claude drivers, sandboxes
-  agents/          agents that change the vault: working copy, checks, merge, undo
+  agents/          the agent: where the learner is, the prompt, its jj workspace, checks, landing, undo
 shared/            code the server and the browser both run
   scene/           the figure engine: spec types, the expression language, five renderers, validation
   fsrs.ts links.ts textmatch.ts vault-types.ts
 web/src/           the React app (Vite)
   app/             the shell (a slim bar along the top): routing, navigation, theme, the ⌘K palette
-  pages/           Today, Library (and Figures), Review, Journey, Ask, Settings, Welcome, Gallery;
+  agent/           the agent's panel (⌘J), its button, the runs it shows, where the learner is
+  pages/           Today, Library (and Figures), Review, Journey, Settings, Welcome, Gallery;
                    brain/: the graph that fills the page, the card beside it, a concept's page
   reader/          the reader: book views, margin, selection menu, figures pane, note, tutor, capture, gutter
-  notes/           notes: the file tree, the note pane and its links sidebar, the CodeMirror editor
+  notes/           notes: the file tree (with folders), the note pane, its versions and links sidebar, the editor
   components/      shared pieces: Markdown, dialogs and study tools, quiz, graph, profile form
   scene/           the figure player (the universal frame around every figure)
   api/             typed calls to the server, and the live book hook
@@ -61,8 +62,11 @@ A route in `server/routes/` reads the request and calls a service (`learn/`, `an
 `scene/`…). Services read and write the vault through `server/vault/` (collections keep an index in
 memory and write through to disk atomically) and call models through `server/llm/`. Changes are
 announced on `events.ts`, and open pages follow them over server-sent events (`web/src/api/live.ts`
-for a book, `/api/events` for everything else). The vault commits itself to git a few seconds after
-changes.
+for a book, `/api/events` for everything else). The vault's history is kept by Jujutsu: the change in
+progress is named as you work and closed when a sitting ends (see [vault.md](vault.md)).
+
+The agent (⌘J) can work on several requests at once: each works in a jj workspace of the vault and
+lands as one change after whatever happened meanwhile (see [agents.md](agents.md)).
 
 Slow work (planning a chapter, drawing figures, building demos) runs in `jobs.ts`, reporting progress
 on the book's event stream, and resumes after a restart.

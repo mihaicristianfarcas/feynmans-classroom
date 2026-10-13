@@ -6,10 +6,12 @@ import { learn } from "../api";
 import { Spinner } from "../components/feedback";
 import { FigureMaker } from "../components/tools";
 import { useLoad } from "../lib/useLoad";
+import { under, useVaultEvents } from "../lib/useVaultEvents";
 import { SceneView } from "../scene/SceneView";
 
 export function Figures({ theme }: { theme: "light" | "dark" }) {
   const { data, reload } = useLoad(() => learn.figures());
+  useVaultEvents(reload, under("figures/"));
   const [making, setMaking] = useState(false);
   const [topic, setTopic] = useState("");
   return (

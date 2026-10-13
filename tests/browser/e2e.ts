@@ -246,9 +246,11 @@ try {
     await page.waitForSelector(".node-card", { timeout: 5000 }).catch(() => null);
     check("clicking an item in the graph opens its card", !!(await page.$(".node-card h2")));
   }
-  await page.goto(`${BASE}#/ask?do=1`, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".agent-form", { timeout: 10000 });
-  check("agents can be given work on the vault", !!(await page.$(".agent-form textarea")));
+  await page.goto(`${BASE}#/`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".topnav-tools .agent-button", { timeout: 10000 });
+  await page.click(".topnav-tools .agent-button");
+  await page.waitForSelector(".agent-panel textarea", { timeout: 5000 }).catch(() => null);
+  check("the agent opens from the top bar, ready for a request", !!(await page.$(".agent-panel textarea")));
 
   check("no page errors", pageErrors.length === 0, pageErrors.join(" | "));
 } finally {

@@ -7,6 +7,7 @@ import { learn } from "../../api";
 import { Spinner } from "../../components/feedback";
 import { GraphView } from "../../components/GraphView";
 import { useLoad } from "../../lib/useLoad";
+import { under, useVaultEvents } from "../../lib/useVaultEvents";
 import { NodeCard, SuggestionsCard } from "./NodeCard";
 
 /** The card's width and its gap from the edge, as in .node-card: the graph keeps clear of both. */
@@ -30,6 +31,8 @@ function useNarrow() {
 
 export function BrainGraph({ theme }: { theme: "light" | "dark" }) {
   const { data, reload } = useLoad(() => learn.graph());
+  // notes and concepts made or linked elsewhere (the agent, another editor) join the graph as they land
+  useVaultEvents(reload, under("notes/", "concepts/", "brain/connections"));
   const narrow = useNarrow();
   // #/brain?focus=<node id> opens with that item picked (a concept's page links back this way)
   const [card, setCard] = useState<Card | null>(() => {

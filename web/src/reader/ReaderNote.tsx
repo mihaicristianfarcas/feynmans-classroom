@@ -6,8 +6,8 @@ import { type Book, type Loc, learn, type Note } from "../api";
 import { Markdown } from "../components/Markdown";
 import { useIndicator } from "../components/ui";
 import { timeAgo } from "../lib/time";
+import { useVaultEvents } from "../lib/useVaultEvents";
 import { NoteEditor } from "../notes/NoteEditor";
-import { useVaultEvents } from "../notes/useVaultEvents";
 
 export function ReaderNote({
   book,

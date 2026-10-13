@@ -1,10 +1,12 @@
 /* The app: picks the page from the URL's hash (#/library, #/book/<id>, #/notes/<id>…), sends a new
  * learner to the welcome page first, and puts every page except the reader inside the Shell (Notes
- * and the Brain's graph fill the window below its bar; the rest scroll). */
+ * and the Brain's graph fill the window below its bar; the rest scroll). The ⌘K palette and the agent
+ * (⌘J) sit over every page; old #/ask links open the agent. */
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { AgentPanel } from "../agent/AgentPanel";
+import { openAgent } from "../agent/store";
 import { learn } from "../api";
 import { Notes } from "../notes/Notes";
-import { Ask } from "../pages/Ask";
 import { Brain } from "../pages/brain/Brain";
 import { Gallery } from "../pages/Gallery";
 import { Journey } from "../pages/Journey";
@@ -29,7 +31,6 @@ type Route =
         | "notes"
         | "review"
         | "brain"
-        | "ask"
         | "journey"
         | "settings"
         | "gallery"
@@ -43,7 +44,6 @@ const TITLES: Record<Exclude<Route["name"], "book">, string> = {
   notes: "Notes",
   review: "Review",
   brain: "Brain",
-  ask: "Ask",
   journey: "Journey",
   settings: "Settings",
   gallery: "Figure gallery",
@@ -59,11 +59,17 @@ function route(): Route {
   const name = hash.replace(/^#\/?/, "").split("/")[0];
   // pages that fill the window: Notes, and the Brain's graph (not a concept's own page)
   const full = name === "notes" || (name === "brain" && !hash.startsWith("#/brain/concept/"));
-  if (
-    ["library", "notes", "review", "brain", "ask", "journey", "settings", "gallery", "welcome", "open"].includes(name)
-  )
+  if (["library", "notes", "review", "brain", "journey", "settings", "gallery", "welcome", "open"].includes(name))
     return { name: name as Route["name"], full } as Route;
   return { name: "today" };
+}
+
+/** #/ask?q=… (the page the agent replaced): open the agent with the question instead. */
+function redirectAsk() {
+  if (!/^#\/ask\b/.test(location.hash)) return;
+  const q = new URLSearchParams(location.hash.split("?")[1] || "").get("q")?.trim();
+  history.replaceState(null, "", "#/");
+  setTimeout(() => openAgent(q ? { text: q, send: true } : {}));
 }
 
 export function App() {
@@ -71,7 +77,9 @@ export function App() {
   const [theme, setTheme] = useTheme();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   useEffect(() => {
+    redirectAsk();
     const onHash = () => {
+      redirectAsk();
       const next = route();
       setCurrent((old) =>
         old.name === next.name &&
@@ -111,6 +119,7 @@ export function App() {
       <>
         <Reader key={current.id} bookId={current.id} theme={theme} setTheme={setTheme} />
         <Palette />
+        <AgentPanel theme={theme} />
       </>
     );
   if (current.name === "welcome") page = <Welcome />;
@@ -119,7 +128,6 @@ export function App() {
   else if (current.name === "open") page = <OpenLink />;
   else if (current.name === "review") page = <Review theme={theme} />;
   else if (current.name === "brain") page = <Brain theme={theme} />;
-  else if (current.name === "ask") page = <Ask theme={theme} />;
   else if (current.name === "journey") page = <Journey />;
   else if (current.name === "settings") page = <Settings />;
   else if (current.name === "gallery") page = <Gallery theme={theme} />;
@@ -130,6 +138,7 @@ export function App() {
         {page}
       </Shell>
       <Palette />
+      <AgentPanel theme={theme} />
     </>
   );
 }

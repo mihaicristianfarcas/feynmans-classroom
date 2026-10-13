@@ -5,9 +5,11 @@ open a pull request. For how the code is organised, read [docs/architecture.md](
 
 ## Setting up
 
-You need Node 22 or newer (`.nvmrc` has the version CI uses), git, and, to use the model features,
-the Codex CLI (`codex login`) or Claude Code (run `claude` once). Chrome or Chromium is only needed
-for hand-built demos and the browser tests.
+You need Node 22 or newer (`.nvmrc` has the version CI uses), git, [Jujutsu](https://www.jj-vcs.dev/)
+(`brew install jj`: it keeps the vault's history, and the agent's changes go through it; tests that
+need it are skipped without it), and, to use the model features, the Codex CLI (`codex login`) or
+Claude Code (run `claude` once). Chrome or Chromium is only needed for hand-built demos and the
+browser tests.
 
 ```bash
 git clone <your fork> && cd feynmans-classroom

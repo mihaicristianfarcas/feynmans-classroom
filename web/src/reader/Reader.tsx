@@ -22,6 +22,7 @@ import { Toast, useToast } from "../components/Toast";
 import { CardDrafter, Connector, ExplainBack } from "../components/tools";
 import { useIndicator } from "../components/ui";
 import { useArrowKeys } from "../lib/a11y";
+import { under, useVaultEvents } from "../lib/useVaultEvents";
 import { CaptureLayer } from "./Capture";
 import { DemoPanel } from "./DemoPanel";
 import { type DemoMarker, demoMarkers, Gutter, type NoteMarker, noteMarkers, sameMarkers } from "./Gutter";
@@ -98,6 +99,8 @@ export function Reader({
     if (book && book.format !== "pdf") api.blocks(bookId).then(setBlocks, (e) => setFailed(e.message));
   }, [book, bookId]);
   const loadNotes = useCallback(() => learn.notes({ book: bookId }).then(setNotes, () => {}), [bookId]);
+  // notes about this book made elsewhere (the agent, another editor) show up as they land
+  useVaultEvents(loadNotes, under("notes/"));
   useEffect(() => {
     loadNotes();
   }, [loadNotes]);

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { Activity, ReviewLog } from "../../shared/vault-types.ts";
 import { wroteItself } from "./changes.ts";
 import { VAULT } from "./files.ts";
-import { changed } from "./git.ts";
+import { changed } from "./jj.ts";
 
 let reviewCache: ReviewLog[] | null = null;
 let activityCache: Activity[] | null = null;

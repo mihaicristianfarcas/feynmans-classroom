@@ -191,6 +191,40 @@ describe("notes", () => {
   });
 });
 
+describe("notes about things, and folders", () => {
+  it("say what they are about, and the book lists them", () => {
+    const note = N.createNote({
+      title: "Why systems fail",
+      body: "Faults are not failures.",
+      about: ["[[Designing Data-Intensive Applications]]"],
+    });
+    const text = readFileSync(join(vault, note.path), "utf8");
+    expect(text).toMatch(/^about: \[.*"\[\[Designing Data-Intensive Applications\]\]"/m);
+    expect(N.listNotes({ book: "b0000legacy" }).map((n) => n.id)).toContain(note.id);
+    expect(L.backlinks("book:b0000legacy").find((b) => b.from === `note:${note.id}`)?.kind).toBe("about");
+  });
+  it("move with their folder, links following them", () => {
+    const inside = N.createNote({ title: "Partitioning", body: "Split the data.", folder: "DDIA/Part 2" });
+    const deeper = N.createNote({ title: "Rebalancing", body: "Move partitions.", folder: "DDIA/Part 2/Later" });
+    const linking = N.createNote({ title: "Index of DDIA", body: "See [[notes/DDIA/Part 2/Partitioning]]." });
+    expect(N.moveFolder("DDIA/Part 2", "Data systems/Scaling")).toBe("Data systems/Scaling");
+    expect(V.notes.get(inside.id)?.path).toBe("notes/Data systems/Scaling/Partitioning.md");
+    expect(V.notes.get(deeper.id)?.path).toBe("notes/Data systems/Scaling/Later/Rebalancing.md");
+    expect(existsSync(join(vault, "notes", "DDIA", "Part 2"))).toBe(false);
+    expect(V.notes.get(linking.id)?.body).toContain("[[notes/Data systems/Scaling/Partitioning]]");
+    expect(() => N.moveFolder("Data systems", "Data systems/Inside")).toThrow(/into itself/);
+  });
+  it("can be made empty, and deleted with their notes going to the trash", () => {
+    expect(N.createFolder("Physics/Waves")).toBe("Physics/Waves");
+    expect(N.noteTree().folders).toContain("Physics/Waves");
+    const note = N.createNote({ title: "Standing waves", body: "Nodes.", folder: "Physics/Waves" });
+    expect(N.deleteFolder("Physics")).toBe(1);
+    expect(V.notes.get(note.id)).toBeUndefined();
+    expect(existsSync(join(vault, "notes", "Physics"))).toBe(false);
+    expect(readdirSync(join(vault, ".trash")).some((f) => f.endsWith("Standing waves.md"))).toBe(true);
+  });
+});
+
 describe("indexes", () => {
   it("are written for people and agents", () => {
     I.writeIndexes();

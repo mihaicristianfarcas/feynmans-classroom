@@ -6,9 +6,9 @@ import { useEffect, useState } from "react";
 import { learn } from "../api";
 import { go } from "../app/navigation";
 import { useLoad } from "../lib/useLoad";
+import { under, useVaultEvents } from "../lib/useVaultEvents";
 import { FileTree, newNote, type Tree } from "./FileTree";
 import { NotePane } from "./NotePane";
-import { useVaultEvents } from "./useVaultEvents";
 
 export function Notes({ theme }: { theme: "light" | "dark" }) {
   const [hash, setHash] = useState(location.hash);
@@ -30,7 +30,7 @@ export function Notes({ theme }: { theme: "light" | "dark" }) {
       }
     } catch {}
   }, [id, route]);
-  useVaultEvents(reload);
+  useVaultEvents(reload, under("notes/"));
   return (
     <div className="notes-page">
       <FileTree tree={tree} current={id} reload={reload} />

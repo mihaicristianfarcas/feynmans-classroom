@@ -1,8 +1,10 @@
 // The agents' sandboxes: the settings both CLIs get, and real shell commands under Codex's sandbox
-// (reads and writes inside the folder work; the home folder, .git, the live vault and the network don't).
+// (reads and writes inside the folder work; the home folder, .jj, .git, the live vault and the
+// network don't).
 // The live part runs only where Codex is installed.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { claudeSandbox, codexProfile } from "../server/llm/sandbox.ts";
@@ -15,10 +17,23 @@ describe("the agents' sandbox settings", () => {
     expect(args[1]).toContain('":minimal"="read"');
     expect(args[1]).toContain('"/vault"="read"');
     expect(args[1]).toContain('":project_roots"="write"');
+    expect(args[1]).toContain('"/vault-copy/.jj"="read"');
+    expect(args[1]).toContain('"/vault-copy/.git"="read"');
     expect(args).toContain('shell_environment_policy.inherit="core"');
     expect(codexProfile({ cwd: "/vault" }).join(" ")).toContain('":project_roots"="read"');
   });
-  it("give Claude Code a sandbox with no network, writes only to its folder, and .git locked", () => {
+  it("lock .jj and .git where they really are, behind a symlink too (/tmp is /private/tmp on macOS)", () => {
+    const real = mkdtempSync(join(tmpdir(), "classroom-real-"));
+    const link = `${real}-link`;
+    symlinkSync(real, link);
+    const table = codexProfile({ cwd: link, write: true })[1];
+    expect(table).toContain(`"${join(link, ".jj")}"="read"`);
+    expect(table).toContain(`"${join(realpathSync(real), ".jj")}"="read"`);
+    expect(claudeSandbox({ cwd: link, write: true }).sandbox.filesystem.denyWrite).toContain(
+      join(realpathSync(real), ".jj"),
+    );
+  });
+  it("give Claude Code a sandbox with no network, writes only to its folder, and .jj and .git locked", () => {
     const s = claudeSandbox({ cwd: "/vault-copy", write: true, readRoots: ["/vault"] });
     expect(s.sandbox.enabled).toBe(true);
     expect(s.sandbox.allowUnsandboxedCommands).toBe(false);
@@ -26,8 +41,9 @@ describe("the agents' sandbox settings", () => {
     expect(s.sandbox.filesystem.denyRead).toEqual(["~/"]);
     expect(s.sandbox.filesystem.allowRead).toEqual(["/vault-copy", "/vault"]);
     expect(s.sandbox.filesystem.allowWrite).toEqual(["/vault-copy"]);
-    expect(s.sandbox.filesystem.denyWrite).toEqual(["/vault-copy/.git", "/vault"]);
+    expect(s.sandbox.filesystem.denyWrite).toEqual(["/vault-copy/.jj", "/vault-copy/.git", "/vault"]);
     expect(s.permissions.deny).toContain("Edit(//vault/**)");
+    expect(s.permissions.deny).toContain("Write(//vault-copy/.jj/**)");
     expect(claudeSandbox({ cwd: "/vault" }).sandbox.filesystem.allowWrite).toEqual([]);
   });
 });
@@ -39,7 +55,9 @@ describe.skipIf(!hasCodex)("an agent's shell under the Codex profile", () => {
   const cache = join(process.cwd(), "node_modules", ".cache");
   mkdirSync(cache, { recursive: true });
   const folder = mkdtempSync(join(cache, "classroom-sandbox-"));
-  spawnSync("git", ["init", "-q"], { cwd: folder });
+  // a jj repository colocated with git, as the vault (and its workspaces) are
+  if (spawnSync("jj", ["git", "init"], { cwd: folder }).status !== 0) spawnSync("git", ["init", "-q"], { cwd: folder });
+  mkdirSync(join(folder, ".jj"), { recursive: true });
   writeFileSync(join(folder, "note.md"), "hello\n");
   const run = (command: string, write = true) => {
     const flags = codexProfile({ cwd: folder, write }).flatMap((c) => ["-c", c]);
@@ -54,11 +72,12 @@ describe.skipIf(!hasCodex)("an agent's shell under the Codex profile", () => {
     expect(r.stdout).toContain("hello");
     expect(r.stdout).toContain("ok");
   });
-  it("cannot write outside its folder (its temp folder aside), or into .git", () => {
+  it("cannot write outside its folder (its temp folder aside), or into .jj or .git", () => {
     const outside = join(mkdtempSync(join(cache, "classroom-outside-")), "x.txt");
-    run(`echo x > "${outside}"; echo y > .git/planted`);
+    run(`echo x > "${outside}"; echo y > .git/planted; echo y > .jj/planted`);
     expect(existsSync(outside)).toBe(false);
     expect(existsSync(join(folder, ".git", "planted"))).toBe(false);
+    expect(existsSync(join(folder, ".jj", "planted"))).toBe(false);
   });
   it("cannot write at all when read-only", () => {
     run("echo z > readonly.md", false);

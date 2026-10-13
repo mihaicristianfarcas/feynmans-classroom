@@ -161,13 +161,18 @@ export function Settings() {
           <p className="fine">
             Plain Markdown in <code>{vault.path}</code>: {vault.notes} notes, {vault.concepts} concepts, {vault.cards}{" "}
             cards, {vault.figures} figures. Open it in any editor or Obsidian.{" "}
-            {vault.git ? "Every change is committed to git." : "Install git to keep a history of every change."}
+            {vault.versioned
+              ? "Jujutsu (jj) keeps every version, and each agent request can be undone."
+              : vault.jj
+                ? "Its history couldn't be started; see the server's log."
+                : "Install Jujutsu (brew install jj, or see jj-vcs.dev) to keep every version and let the agent make changes."}
           </p>
           {vault.history.length > 0 && (
             <ul className="history">
               {vault.history.slice(0, 6).map((h) => (
-                <li key={h.hash}>
-                  <code>{h.hash}</code> <span>{h.subject}</span> <span className="muted">{timeAgo(h.when)}</span>
+                <li key={h.commit}>
+                  <code>{h.change.slice(0, 8)}</code> <span>{h.subject}</span>{" "}
+                  <span className="muted">{timeAgo(h.when)}</span>
                 </li>
               ))}
             </ul>

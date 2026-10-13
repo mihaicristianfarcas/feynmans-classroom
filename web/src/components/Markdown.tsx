@@ -1,7 +1,8 @@
 /* Markdown as the vault writes it, rendered with react-markdown (remark/rehype): GitHub-flavoured
  * Markdown, KaTeX math, and Obsidian's additions: [[links]], ![[embeds]] (notes, annotations,
- * pictures, figures), > [!callouts], ==highlights==, #tags; plus the platform's own: ```figure blocks
- * become interactive figures and {{cloze}} deletions become blanks. Raw HTML is never rendered. */
+ * pictures, figures), > [!callouts] (folded with `-` or `+`, as disclosures), ==highlights==, #tags;
+ * plus the platform's own: ```figure blocks become interactive figures, ```quiz blocks quizzes to
+ * play, and {{cloze}} deletions become blanks. Raw HTML is never rendered. */
 import "katex/dist/katex.min.css";
 import type { Blockquote, Paragraph, PhrasingContent, Root, Text } from "mdast";
 import { Children, isValidElement, memo, type ReactNode, useEffect, useState } from "react";
@@ -14,6 +15,7 @@ import { codeRanges } from "../../../shared/links.ts";
 import { learn, type Resolved } from "../api";
 import { openLink } from "../app/navigation";
 import { SceneView } from "../scene/SceneView";
+import { QuizBlock } from "./QuizBlock";
 
 /* ---------------- Obsidian syntax, as a remark plugin ---------------- */
 
@@ -74,8 +76,10 @@ function remarkObsidian() {
       if (p?.type !== "paragraph") return;
       const first = p.children[0];
       if (first?.type !== "text") return;
-      const m = /^\[!(\w+)\][+-]?[ \t]*/.exec(first.value);
+      const m = /^\[!(\w+)\]([+-]?)[ \t]*/.exec(first.value);
       if (!m) return;
+      // [!type]- is folded (opens with a click), [!type]+ folds but starts open
+      const fold = m[2];
       first.value = first.value.slice(m[0].length);
       const title: PhrasingContent[] = [];
       const rest: PhrasingContent[] = [];
@@ -91,14 +95,17 @@ function remarkObsidian() {
         else title.push(child);
       }
       const kind = m[1].toLowerCase();
-      node.data = { hName: "div", hProperties: { className: ["callout"], "data-callout": kind } };
+      node.data = {
+        hName: fold ? "details" : "div",
+        hProperties: { className: ["callout"], "data-callout": kind, ...(fold === "+" ? { open: true } : {}) },
+      };
       const head: Paragraph = {
         type: "paragraph",
         children:
           title.length && title.some((t) => t.type !== "text" || t.value.trim())
             ? title
             : [{ type: "text", value: kind[0].toUpperCase() + kind.slice(1) }],
-        data: { hName: "div", hProperties: { className: ["callout-title"] } },
+        data: { hName: fold ? "summary" : "div", hProperties: { className: ["callout-title"] } },
       };
       node.children = [
         head,
@@ -204,6 +211,8 @@ function makeComponents(
       const code = node?.children?.[0] as { tagName?: string; properties?: { className?: string[] } } | undefined;
       if (code?.tagName === "code" && code.properties?.className?.includes("language-figure"))
         return <FigureBlock source={textOf(children)} theme={theme} />;
+      if (code?.tagName === "code" && code.properties?.className?.includes("language-quiz"))
+        return <QuizBlock source={textOf(children)} theme={theme} depth={depth} />;
       return <pre>{children}</pre>;
     },
     img({ src, alt, node: _node }) {

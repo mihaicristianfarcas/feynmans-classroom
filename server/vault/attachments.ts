@@ -5,7 +5,7 @@ import { extname, join } from "node:path";
 import { fileNameOf } from "../../shared/links.ts";
 import { safeJoin } from "../fs.ts";
 import { VAULT } from "./files.ts";
-import { changed } from "./git.ts";
+import { changed } from "./jj.ts";
 
 const PICTURE_TYPES: Record<string, string> = {
   png: "image/png",

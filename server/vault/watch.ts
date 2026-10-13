@@ -1,12 +1,13 @@
-/* Edits made outside the app (in an editor, in Obsidian, by an agent, by a git merge) are picked up
- * here: the changed file is re-read into its collection, committed, and announced. */
+/* Edits made outside the app (in an editor, in Obsidian, by jj bringing an agent's work in or taking
+ * it out) are picked up here: the changed file is re-read into its collection, noted in the change in
+ * progress, and announced. */
 import { existsSync, statSync, watch } from "node:fs";
 import { join } from "node:path";
 import { takeSelfWrite, touched } from "./changes.ts";
 import { isGenerated } from "./collection.ts";
 import { COLLECTIONS } from "./collections.ts";
 import { VAULT } from "./files.ts";
-import { changed } from "./git.ts";
+import { changed } from "./jj.ts";
 import { forgetLog } from "./logs.ts";
 
 /** Re-reads a file into whichever collection owns it (after an outside edit, or a merge). */
@@ -26,6 +27,7 @@ export function startWatching() {
       const rel = String(file).replace(/\\/g, "/");
       if (
         rel.startsWith(".git") ||
+        rel.startsWith(".jj") ||
         rel.startsWith(".trash") ||
         rel.endsWith(".tmp") ||
         isGenerated(rel) ||
@@ -39,11 +41,14 @@ export function startWatching() {
         setTimeout(() => {
           debounce.delete(rel);
           if (takeSelfWrite(rel)) return;
-          // a folder that moved: rescan what lives in it
+          // a folder that appeared or moved: rescan what lives in it (the files in it are the change)
           const full = join(VAULT, rel);
           if (existsSync(full) && statSync(full).isDirectory()) {
             for (const c of COLLECTIONS) if (c.dir === rel.split("/")[0]) c.load();
-          } else if (!reloadFile(rel) && !rel.startsWith("brain/") && !rel.startsWith("attachments/")) return;
+            touched(rel);
+            return;
+          }
+          if (!reloadFile(rel) && !rel.startsWith("brain/") && !rel.startsWith("attachments/")) return;
           changed(`edit ${rel}`);
           touched(rel);
         }, 300),

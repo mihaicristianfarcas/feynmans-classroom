@@ -17,9 +17,15 @@ does its thinking on **your own Codex or Claude Code subscription** (no API keys
   after, the Feynman technique (explain it, get your gaps back), a Socratic tutor, and connections
   from the idea to today's world and to your own goals.
 - **A second brain.** Books, annotations, notes, concepts, cards and figures live in one folder of
-  plain files (a valid Obsidian vault), versioned by git, with indexes kept for people and agents.
-  See it as a graph built from your links (and the connections an agent suggests, which you accept
-  or reject); ask it questions; have an agent reorganise it, on its own branch, with undo.
+  plain files (a valid Obsidian vault), versioned by Jujutsu (jj), with indexes kept for people and
+  agents. Organise it in folders by subject, book or topic, link notes to what they're about, and
+  see it as a graph built from your links (and the connections an agent suggests, which you accept
+  or reject). Every note keeps its versions.
+- **One agent, one field.** Press ⌘J anywhere (or the sparkle in the top bar) and say what you want:
+  "summarise this chapter into my folder for this book", "quiz me on my highlights", "turn this note
+  into exercises", "what have I written about consensus?". It knows where you are, does it in its
+  own copy of your vault, and the change shows up at once with Undo. Reply to refine it, as a
+  conversation, or just move on.
 
 ## Quick start
 
@@ -36,8 +42,9 @@ select a passage.
 
 Production: `npm run build && npm start` serves the app and the API from one port (8787).
 
-Requirements: Node 22+, the Codex CLI or Claude Code, git (for the vault's history), and Chrome or
-Chromium only for the optional hand-built demos and the screenshot tests.
+Requirements: Node 22+, the Codex CLI or Claude Code, [Jujutsu](https://www.jj-vcs.dev/) (`brew install
+jj`; for the vault's history and the agent's changes), and Chrome or Chromium only for the optional
+hand-built demos and the screenshot tests.
 
 ## Documentation
 

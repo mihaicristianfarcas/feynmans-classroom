@@ -1,9 +1,12 @@
 /* The frame around every page except the reader: a slim bar along the top (the pages, with the number
- * of cards due on Review; search, the theme switch and settings at the right end) and the page itself. */
+ * of cards due on Review; the agent, search, the theme switch and settings at the right end) and the
+ * page itself. */
 import { Moon, Search, Settings, Sun } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { AgentButton } from "../agent/AgentButton";
 import { learn } from "../api";
 import { openPalette, useIndicator } from "../components/ui";
+import { under, useVaultEvents } from "../lib/useVaultEvents";
 
 const NAV: { route: string; label: string; match: RegExp }[] = [
   { route: "#/", label: "Today", match: /^#\/?$/ },
@@ -11,13 +14,15 @@ const NAV: { route: string; label: string; match: RegExp }[] = [
   { route: "#/notes", label: "Notes", match: /^#\/notes/ },
   { route: "#/review", label: "Review", match: /^#\/review/ },
   { route: "#/brain", label: "Brain", match: /^#\/brain/ },
-  { route: "#/ask", label: "Ask", match: /^#\/ask/ },
   { route: "#/journey", label: "Journey", match: /^#\/journey/ },
 ];
 
 /** How many cards are waiting, for the nav badge (refreshed every minute and on focus). */
 export function useDueCount() {
   const [due, setDue] = useState<number | null>(null);
+  const reload = useRef<() => void>(() => {});
+  // cards the agent (or another editor) makes count at once
+  useVaultEvents(() => reload.current(), under("cards/"));
   useEffect(() => {
     let alive = true;
     const load = () =>
@@ -26,6 +31,7 @@ export function useDueCount() {
         () => {},
       );
     load();
+    reload.current = load;
     const timer = setInterval(load, 60000);
     window.addEventListener("focus", load);
     window.addEventListener("classroom:reviewed", load);
@@ -104,6 +110,7 @@ export function Shell({
           </ul>
         </nav>
         <div className="topnav-tools">
+          <AgentButton />
           <button
             type="button"
             className="icon-button"

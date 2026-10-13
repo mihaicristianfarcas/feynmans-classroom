@@ -1,13 +1,12 @@
 /* The checks an agent's changes pass before they reach the vault. Some files belong to the app and
- * may never change; every changed file must still parse (JSON, JSONL, Markdown frontmatter); and
- * deleting files or taking lines out of the learner's notes waits for their approval. */
+ * may never change (such a run fails outright), and every changed file must still parse (JSON, JSONL,
+ * Markdown frontmatter, ```quiz blocks): one that doesn't waits for the learner's OK. Everything else lands at once,
+ * since every run can be undone. */
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
-import type { AgentRun } from "../../shared/vault-types.ts";
-import { git } from "../vault/index.ts";
-
-type Changes = NonNullable<AgentRun["files"]>;
+import { quizBlocks, quizFromData } from "../../shared/quiz.ts";
+import type { FileChange } from "../vault/index.ts";
 
 /** Paths an agent may never change: the app's own records. */
 const FORBIDDEN = [
@@ -16,36 +15,15 @@ const FORBIDDEN = [
   /^AGENTS\.md$/,
   /^CLAUDE\.md$/,
   /^\.gitignore$/,
+  /^\.jj\//,
+  /^\.git\//,
   /^\.classroom\.json$/,
   /^library\/[^/]+\/book\.json$/,
   /^library\/[^/]+\/demos\//,
   /^\.obsidian\//,
 ];
-/** Changes that wait for the learner: deleting anything, or taking lines out of their notes and concepts. */
-const PROTECTED = /^(notes|concepts)\//;
-
-/** The files a run's commit changed (added, modified, deleted), and how many lines each lost. */
-export function changesIn(dir: string): { files: Changes; removed: Map<string, number> } {
-  const status = git(["diff", "--name-status", "--no-renames", "HEAD~1", "HEAD"], dir).stdout.trim();
-  const files = status
-    ? status.split("\n").map((line) => {
-        const [change, ...rest] = line.split("\t");
-        return { path: rest.join("\t"), change: (change[0] as "A" | "M" | "D") || "M" };
-      })
-    : [];
-  const removed = new Map<string, number>();
-  for (const line of git(["diff", "--numstat", "--no-renames", "HEAD~1", "HEAD"], dir)
-    .stdout.trim()
-    .split("\n")
-    .filter(Boolean)) {
-    const [, del, ...rest] = line.split("\t");
-    removed.set(rest.join("\t"), Number(del) || 0);
-  }
-  return { files, removed };
-}
-
 /** Every changed file must still be readable by the app (and by Obsidian), and none may be the app's own. */
-export function problemsIn(dir: string, files: Changes): string[] {
+export function problemsIn(dir: string, files: FileChange[]): string[] {
   const problems: string[] = [];
   for (const f of files) {
     if (FORBIDDEN.some((re) => re.test(f.path)))
@@ -62,6 +40,7 @@ export function problemsIn(dir: string, files: Changes): string[] {
         const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
         if (m) parseYaml(m[1]);
         else if (text.startsWith("---")) throw new Error("frontmatter is not closed");
+        for (const block of quizBlocks(text)) quizFromData(parseYaml(block));
       }
     } catch (error) {
       problems.push(`${f.path}: ${(error as Error).message.split("\n")[0]}`);
@@ -73,13 +52,5 @@ export function problemsIn(dir: string, files: Changes): string[] {
 /** True when a problem is a change to a file agents may not touch: such a run fails outright. */
 export const isForbidden = (problem: string) => problem.includes("agents may not change");
 
-/** What waits for the learner's OK: unreadable files, deletions, and lines taken out of notes and concepts. */
-export function needsReview(files: Changes, removed: Map<string, number>, problems: string[]): string[] {
-  return [
-    ...problems.map((p) => `Can't be read: ${p}`),
-    ...files.filter((f) => f.change === "D").map((f) => `Deletes ${f.path}`),
-    ...files
-      .filter((f) => f.change === "M" && PROTECTED.test(f.path) && (removed.get(f.path) || 0) > 0)
-      .map((f) => `Rewrites ${f.path} (${removed.get(f.path)} line${removed.get(f.path) === 1 ? "" : "s"} out)`),
-  ];
-}
+/** What waits for the learner's OK: files that can't be read back. */
+export const needsReview = (problems: string[]) => problems.map((p) => `Can't be read: ${p}`);
