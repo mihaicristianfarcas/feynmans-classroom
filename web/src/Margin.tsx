@@ -5,6 +5,7 @@
  *
  * Positions follow the book's scroll without React re-rendering: the reader announces each scroll
  * frame on `bus`, and the margin moves its cards directly. */
+import { ArrowUp, Copy, Ellipsis, FileText, Link2, Maximize2, Quote, SquarePlus, Trash2, X } from "lucide-react";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { learn, type Annotation, type Book, type Demo } from "./api";
 import { Markdown } from "./Markdown";
@@ -154,8 +155,8 @@ export function Margin({ book, items, reader, bus, focused, setFocused, hovered,
         </div>
       ))}
       {!items.some((i) => i.annotation && i.annotation.kind !== "highlight") && !items.some((i) => i.demo) && (
-        <div className="margin-empty">
-          <p className="eyebrow">The margin</p>
+        <div className="margin-empty rise">
+          <p className="margin-empty-title">The margin</p>
           <p className="fine">Select a passage in the book and choose Explain, Visualize, Ask or Define. The answer appears here, beside the passage, and is saved with the book in your vault.</p>
         </div>
       )}
@@ -205,20 +206,24 @@ const AnnotationCard = memo(function AnnotationCard({ a, book, open, theme, onOp
         {where && <span className="chip-where">{where}</span>}
         <span className="spacer" />
         <div className="menu-host">
-          <button className="mcard-icon" aria-label="More" title="More" onClick={() => setMenu((m) => !m)}>
-            ⋯
+          <button className="mcard-icon" aria-label="More" title="More" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
+            <Ellipsis aria-hidden="true" />
           </button>
           {menu && (
             <div className="menu" role="menu" onMouseLeave={() => setMenu(false)}>
               <button role="menuitem" onClick={() => (setMenu(false), onToNote(a, "embed"))}>
+                <SquarePlus aria-hidden="true" />
                 Add to note{a.kind === "highlight" ? "" : " (with the answer)"}
               </button>
               <button role="menuitem" onClick={() => (setMenu(false), onToNote(a, "passage"))}>
+                <Quote aria-hidden="true" />
                 Add the passage to note
               </button>
               <button role="menuitem" onClick={() => (setMenu(false), onToNote(a, "reference"))}>
+                <Link2 aria-hidden="true" />
                 Add a reference to note
               </button>
+              <div className="menu-sep" />
               <button
                 role="menuitem"
                 onClick={() => {
@@ -226,9 +231,11 @@ const AnnotationCard = memo(function AnnotationCard({ a, book, open, theme, onOp
                   void navigator.clipboard?.writeText(`${a.anchor.quote}\n\n${a.body}`.trim()).then(() => toast("Copied."));
                 }}
               >
+                <Copy aria-hidden="true" />
                 Copy
               </button>
               <a role="menuitem" href={`#/open?target=${encodeURIComponent(a.path.replace(/\.md$/, ""))}`} onClick={() => setMenu(false)} title={a.path}>
+                <FileText aria-hidden="true" />
                 Show the file
               </a>
               <button
@@ -239,13 +246,14 @@ const AnnotationCard = memo(function AnnotationCard({ a, book, open, theme, onOp
                   await learn.deleteAnnotation(a.id);
                 }}
               >
+                <Trash2 aria-hidden="true" />
                 Delete
               </button>
             </div>
           )}
         </div>
         <button className="mcard-icon" aria-label="Collapse" title="Collapse (Esc)" onClick={onClose}>
-          ×
+          <X aria-hidden="true" />
         </button>
       </header>
       <blockquote className="mcard-quote">{a.anchor.quote.length > 420 ? `${a.anchor.quote.slice(0, 420)}…` : a.anchor.quote}</blockquote>
@@ -313,7 +321,7 @@ const AnnotationCard = memo(function AnnotationCard({ a, book, open, theme, onOp
         >
           <input value={ask} onChange={(e) => setAsk(e.target.value)} placeholder={a.kind === "visualize" ? "What should change? (redraws it)" : "Ask a follow-up…"} disabled={!!asking} />
           <button className="mcard-send" type="submit" disabled={!ask.trim() || !!asking} aria-label="Send">
-            {asking ? "…" : "↑"}
+            {asking ? <span className="spinner-mark" aria-hidden="true" /> : <ArrowUp aria-hidden="true" />}
           </button>
         </form>
       )}
@@ -342,10 +350,11 @@ const DemoCard = memo(function DemoCard({ demo, open, theme, onOpen, onClose, on
         <span className="mcard-kind">{demo.fig}</span>
         <span className="spacer" />
         <button className="link" onClick={() => onOpenDemo(demo)}>
+          <Maximize2 aria-hidden="true" />
           Open large
         </button>
         <button className="mcard-icon" aria-label="Collapse" onClick={onClose}>
-          ×
+          <X aria-hidden="true" />
         </button>
       </header>
       {demo.type === "scene" && demo.scene && demo.status === "ready" ? <SceneView spec={demo.scene} theme={theme} compact predict={false} /> : <p className="fine">{demo.status === "ready" ? "A hand-built demo: open it large to play with it." : demo.activity || demo.status}</p>}

@@ -16,6 +16,7 @@ import { Today } from "./Today";
 import { Welcome } from "./Welcome";
 import "./styles.css";
 import "./app.css";
+import "./reader.css";
 import "./notes.css";
 
 type Route = { name: "book"; id: string } | { name: "today" | "library" | "notes" | "review" | "brain" | "ask" | "journey" | "settings" | "gallery" | "welcome" | "open" };

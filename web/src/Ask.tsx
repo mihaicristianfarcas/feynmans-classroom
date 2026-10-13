@@ -1,8 +1,10 @@
+import { ArrowUp, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { learn } from "./api";
 import { AgentRuns } from "./AgentRuns";
 import { Markdown } from "./Markdown";
 import { Spinner } from "./Shell";
+import { useIndicator } from "./ui";
 
 interface Answer {
   question: string;
@@ -23,13 +25,14 @@ function pathLink(path: string): string | null {
 /** An agent reads your vault (notes, concepts, cards and the full text of your books) and answers. */
 export function Ask({ theme }: { theme: "light" | "dark" }) {
   const [mode, setMode] = useState<"ask" | "do">(new URLSearchParams(location.hash.split("?")[1] || "").get("do") ? "do" : "ask");
+  const tabs = useIndicator<HTMLElement>(mode);
   return (
-    <div className="ask">
+    <div className="ask rise">
       <header className="page-head">
         <h1 className="page-title">{mode === "ask" ? "Ask your library" : "Work on your vault"}</h1>
         <p className="lede small">{mode === "ask" ? "An agent searches your notes, concepts, cards and the full text of your books with its own shell, then answers with sources." : "An agent reorganises, links and writes notes for you, on its own branch of your vault, inside a sandbox. Its changes land after checks, and every run can be undone."}</p>
       </header>
-      <nav className="tabs" aria-label="Mode">
+      <nav className="tabs" aria-label="Mode" ref={tabs}>
         <button className="tab" aria-current={mode === "ask" ? "page" : undefined} onClick={() => setMode("ask")}>
           Ask
         </button>
@@ -74,9 +77,10 @@ function AskPanel({ theme }: { theme: "light" | "dark" }) {
           ask(question);
         }}
       >
+        <Sparkles className="ask-icon" aria-hidden="true" />
         <input autoFocus value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="e.g. How do Tanenbaum and Kleppmann differ on consistency models?" disabled={!!busy} />
-        <button className="button primary" type="submit" disabled={!!busy || !question.trim()}>
-          Ask
+        <button className="icon-button ask-send" type="submit" disabled={!!busy || !question.trim()} aria-label="Ask">
+          <ArrowUp aria-hidden="true" />
         </button>
       </form>
       {busy && <Spinner label="Reading your vault" since={busy} />}

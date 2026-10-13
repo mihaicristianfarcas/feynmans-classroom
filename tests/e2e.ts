@@ -145,7 +145,7 @@ try {
   });
   await wait(300);
   const labels = await page.$$eval(".sel-menu .sel-row .sel-btn", (els) => els.map((e) => (e.textContent || "").trim()));
-  check("selecting a passage opens the menu", ["Highlight", "Explain", "◆ Visualize", "Ask", "Define", "+ Note"].every((l) => labels.includes(l)), `selected ${selected} chars: ${labels.join(" | ")}`);
+  check("selecting a passage opens the menu", ["Highlight", "Explain", "Visualize", "Ask", "Define", "Note"].every((l) => labels.includes(l)), `selected ${selected} chars: ${labels.join(" | ")}`);
   if (await page.$(".sel-menu")) {
     // a highlight needs no model: it is marked on the page and kept as a file beside the book
     const before = ((await (await fetch(`${BASE}api/books/${bookId}/annotations`)).json()) as { id: string }[]).map((a) => a.id);

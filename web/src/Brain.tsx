@@ -1,3 +1,4 @@
+import { ArrowLeft, Pause, Play, Shapes } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { bookLink, go, learn, openLink, type Concept, type Note } from "./api";
 import { GraphView } from "./GraphView";
@@ -5,6 +6,7 @@ import { Markdown } from "./Markdown";
 import { SceneView } from "./scene/SceneView";
 import { Mastery, Spinner, timeAgo, useLoad } from "./Shell";
 import { CardDrafter, Connector, ExplainBack, FigureMaker } from "./tools";
+import { useIndicator } from "./ui";
 
 type Tab = "graph" | "concepts" | "notes" | "figures";
 
@@ -35,8 +37,9 @@ function Find({ target }: { target: string }) {
 
 function BrainHome({ tab, theme }: { tab: Tab; theme: "light" | "dark" }) {
   const [filter, setFilter] = useState("");
+  const tabs = useIndicator<HTMLElement>(tab);
   return (
-    <div className="brain">
+    <div className="brain rise">
       <header className="page-head row">
         <h1 className="page-title">Your brain</h1>
         <span className="spacer" />
@@ -45,7 +48,7 @@ function BrainHome({ tab, theme }: { tab: Tab; theme: "light" | "dark" }) {
           Notes
         </a>
       </header>
-      <nav className="tabs" aria-label="Brain sections">
+      <nav className="tabs" aria-label="Brain sections" ref={tabs}>
         {(["graph", "concepts", "notes", "figures"] as Tab[]).map((t) => (
           <a key={t} href={`#/brain/${t}`} className="tab" aria-current={tab === t ? "page" : undefined}>
             {t[0].toUpperCase() + t.slice(1)}
@@ -125,7 +128,7 @@ function GraphTab({ filter }: { filter: string }) {
       {times.length > 1 && (
         <div className="growth">
           <button className="icon-button" onClick={() => (playing ? setPlaying(false) : (setUntil(first), setPlaying(true)))} aria-label={playing ? "Pause" : "Replay your graph's growth"} title="Replay how your graph grew">
-            {playing ? "❚❚" : "▶"}
+            {playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
           </button>
           <input type="range" min={first} max={last} step={Math.max(1, (last - first) / 400)} value={until ?? last} onChange={(e) => (setPlaying(false), setUntil(Number(e.target.value) >= last ? null : Number(e.target.value)))} aria-label="Your graph over time" />
           <span className="fine">
@@ -289,7 +292,8 @@ function FiguresTab({ filter, theme }: { filter: string; theme: "light" | "dark"
       >
         <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Draw a figure of any idea… (e.g. how a B-tree splits a full node)" />
         <button className="button" type="submit">
-          ◆ Draw
+          <Shapes aria-hidden="true" />
+          Draw
         </button>
       </form>
       {making && (
@@ -345,9 +349,10 @@ function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
   const text = `${c.name}: ${c.summary}\n\n${c.body}`;
   const source = c.sources[0];
   return (
-    <div className="concept-page">
-      <a className="fine" href="#/brain/concepts">
-        ← Concepts
+    <div className="concept-page rise">
+      <a className="back-link" href="#/brain/concepts">
+        <ArrowLeft aria-hidden="true" />
+        Concepts
       </a>
       <header className="page-head">
         <span className="eyebrow">Concept</span>
@@ -362,7 +367,8 @@ function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
           Make cards
         </button>
         <button className="button" onClick={() => setTool("figure")}>
-          ◆ Draw it
+          <Shapes aria-hidden="true" />
+          Draw it
         </button>
         <button className="button" onClick={() => setTool("connect")}>
           Connect

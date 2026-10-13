@@ -1,11 +1,13 @@
 /* The reader's left pane, beyond the margin: the tutor and the chapter's study tools (pretest, quiz,
  * concept map, explain it back). */
+import { ArrowUp, CircleHelp, MessageCircleQuestion, Waypoints } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { learn, type Book, type Concept, type Quiz, type SourceRef, type TocEntry } from "./api";
 import { Markdown } from "./Markdown";
 import { QuizRunner } from "./Quiz";
 import { Mastery, Spinner } from "./Shell";
 import { ExplainBack } from "./tools";
+import { useIndicator } from "./ui";
 
 /* ---------------- tutor ---------------- */
 
@@ -18,6 +20,7 @@ export function TutorTab({ book, chapter, pinned, onUnpin, theme, messages, setM
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState<number | null>(null);
   const [mode, setMode] = useState<"answer" | "socratic">("answer");
+  const modes = useIndicator<HTMLDivElement>(mode);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     // a block, not an expression: scrollIntoView returns a promise in recent browsers
@@ -90,11 +93,11 @@ export function TutorTab({ book, chapter, pinned, onUnpin, theme, messages, setM
           }}
         />
         <div className="row gap">
-          <div className="chips" role="group" aria-label="Tutor style">
-            <button type="button" className="chip" aria-pressed={mode === "answer"} onClick={() => setMode("answer")}>
+          <div className="segmented" role="group" aria-label="Tutor style" ref={modes}>
+            <button type="button" aria-pressed={mode === "answer"} onClick={() => setMode("answer")}>
               Answer me
             </button>
-            <button type="button" className="chip" aria-pressed={mode === "socratic"} onClick={() => setMode("socratic")} title="The tutor asks questions that lead you to the answer">
+            <button type="button" aria-pressed={mode === "socratic"} onClick={() => setMode("socratic")} title="The tutor asks questions that lead you to the answer">
               Socratic
             </button>
           </div>
@@ -106,6 +109,7 @@ export function TutorTab({ book, chapter, pinned, onUnpin, theme, messages, setM
           )}
           <button className="button primary" type="submit" disabled={!!busy || !input.trim()}>
             Send
+            <ArrowUp aria-hidden="true" />
           </button>
         </div>
       </form>
@@ -149,21 +153,36 @@ export function StudyTab({ book, chapter, theme, autoQuiz }: { book: Book; chapt
     <div className="study-tab">
       <div className="eyebrow">{chapter.title}</div>
       {chapter.subtitle && <h2 className="chapter-title">{chapter.subtitle}</h2>}
-      <div className="study-actions">
+      <div className="study-actions stagger">
         <button className="study-action" disabled={!!busy} onClick={() => startQuiz("pretest")}>
-          <b>Pretest</b>
-          <span>Before you read: guess at the key ideas. Getting them wrong first makes the reading stick.</span>
+          <span className="well" data-tone="sky" aria-hidden="true">
+            <CircleHelp />
+          </span>
+          <span>
+            <b>Pretest</b>
+            <span>Before you read: guess at the key ideas. Getting them wrong first makes the reading stick.</span>
+          </span>
         </button>
         <button className="study-action" disabled={!!busy} onClick={() => startQuiz("check")}>
-          <b>Quiz me</b>
-          <span>After you read: questions that make you use the ideas, with explanations.</span>
+          <span className="well" data-tone="lavender" aria-hidden="true">
+            <MessageCircleQuestion />
+          </span>
+          <span>
+            <b>Quiz me</b>
+            <span>After you read: questions that make you use the ideas, with explanations.</span>
+          </span>
         </button>
         <button className="study-action" disabled={!!busy} onClick={() => run("Mapping the chapter's concepts", async () => {
           await learn.extractConcepts(book.id, chapter.id);
           await loadConcepts();
         })}>
-          <b>Map concepts</b>
-          <span>Find the chapter's key concepts and add them to your knowledge graph, linked to where they appear.</span>
+          <span className="well" data-tone="sage" aria-hidden="true">
+            <Waypoints />
+          </span>
+          <span>
+            <b>Map concepts</b>
+            <span>Find the chapter's key concepts and add them to your knowledge graph, linked to where they appear.</span>
+          </span>
         </button>
       </div>
       {busy && <Spinner label={busy.what} since={busy.at} />}

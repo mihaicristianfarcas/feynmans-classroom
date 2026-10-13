@@ -1,3 +1,4 @@
+import { ArrowLeft, CircleHelp, Crop, Layers, Pin, PinOff, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, learn, posOf, useBookLive, withFigs, type Anchor, type Annotation, type Block, type Book, type Demo, type Loc, type Note, type SourceRef } from "./api";
 import { blockAnchor, pdfAnchor } from "./anchoring";
@@ -7,9 +8,10 @@ import { Margin, type MarginItem } from "./Margin";
 import { ReaderNote } from "./ReaderNote";
 import { HtmlReader, MarksContext, PdfReader, type ReaderHandle } from "./readers";
 import { SelectionMenu, type SelectionAction } from "./SelectionMenu";
-import { useDueCount } from "./Shell";
+import { ThemeButton, useDueCount } from "./Shell";
 import { StudyTab, TutorTab, type TutorMessage } from "./StudyPanel";
 import { CardDrafter, Connector, ExplainBack } from "./tools";
+import { useIndicator } from "./ui";
 
 type Tab = "margin" | "figures" | "note" | "tutor" | "study";
 type Tool = "cards" | "explain" | "connect";
@@ -32,8 +34,10 @@ interface NoteMarker {
 }
 interface Selection {
   text: string;
+  /** Centre of the selection, and the menu's top, in the book pane. */
   x: number;
   y: number;
+  side: "top" | "bottom";
   anchor: Anchor;
   chapterId?: string;
   /** Reading position where the selection starts (page + fraction, or block). */
@@ -327,7 +331,7 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
         const above = rect.top - box.top > 70;
         const y = above ? rect.top - box.top - 48 : Math.min(box.height - 60, rect.bottom - box.top + 10);
         const at = reader.current?.positionAt(Math.max(box.top + 1, rect.top + 2));
-        setSelection({ text, anchor, x: Math.min(box.width - 470, Math.max(40, rect.left - box.left + rect.width / 2 - 230)), y: Math.max(8, y), chapterId: at != null ? chapterOfRef.current(at)?.id : undefined, at: at ?? undefined });
+        setSelection({ text, anchor, x: rect.left - box.left + rect.width / 2, y: Math.max(8, y), side: above ? "top" : "bottom", chapterId: at != null ? chapterOfRef.current(at)?.id : undefined, at: at ?? undefined });
       }, 10);
     };
     document.addEventListener("mouseup", onUp);
@@ -416,6 +420,7 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
   );
 
   const marks = useMemo(() => ({ annotations, focused, hovered }), [annotations, focused, hovered]);
+  const tabs = useIndicator<HTMLElement>(tab);
 
   if (failed) return <div className="center-note">Could not open this book: {failed}</div>;
   if (!book) return <div className="center-note">Opening…</div>;
@@ -428,10 +433,12 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
   return (
     <div className="reader-app">
       <header className="topbar">
-        <a className="brand" href="#/" title="Library">
-          <span className="brand-mark" aria-hidden="true" />
-          <span className="brand-book">{book.title}</span>
+        <a className="icon-button" href="#/library" title="Library" aria-label="Back to the library">
+          <ArrowLeft aria-hidden="true" />
         </a>
+        <span className="book-name" title={book.title}>
+          {book.title}
+        </span>
         <select
           className="toc-select"
           value={chapter?.id || ""}
@@ -480,36 +487,41 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
         )}
         <span className="spacer" />
         {book.format === "pdf" && (
-          <button className={`button ${capturing ? "on" : ""}`} onClick={() => (setCapturing((v) => !v), setSelection(null))} aria-pressed={capturing} title="Capture a figure, formula or table from the page into your note (C)">
-            ⬚ Capture
+          <button className={`button subtle ${capturing ? "on" : ""}`} onClick={() => (setCapturing((v) => !v), setSelection(null))} aria-pressed={capturing} title="Capture a figure, formula or table from the page into your note (C)">
+            <Crop aria-hidden="true" />
+            Capture
           </button>
         )}
         <span className="page-label">{pageLabel}</span>
-        <a className="button" href="#/review" title="Review your cards">
+        <a className="button subtle" href="#/review" title="Review your cards">
+          <Layers aria-hidden="true" />
           Review{due ? <span className="badge">{due}</span> : null}
         </a>
         {tab === "figures" && (
-          <button className={`button ${heldId ? "on" : ""}`} onClick={() => setHeldId(heldId ? null : active?.id || null)} disabled={!active && !heldId} aria-pressed={!!heldId} title="Keep this figure while you scroll (h)">
+          <button className={`button subtle ${heldId ? "on" : ""}`} onClick={() => setHeldId(heldId ? null : active?.id || null)} disabled={!active && !heldId} aria-pressed={!!heldId} title="Keep this figure while you scroll (h)">
+            {heldId ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
             {heldId ? "Release" : "Hold"}
           </button>
         )}
-        <button className="icon-button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label="Switch theme" title="Switch theme">
-          {theme === "light" ? "◐" : "◑"}
-        </button>
-        <button className="icon-button" onClick={() => setHelp(!help)} aria-label="Help" title="Help (?)">
-          ?
+        <span className="topbar-sep" />
+        <ThemeButton theme={theme} setTheme={setTheme} />
+        <button className="icon-button" onClick={() => setHelp(!help)} aria-label="Help" aria-expanded={help} title="Help (?)">
+          <CircleHelp aria-hidden="true" />
         </button>
       </header>
 
       <main className="split" ref={split}>
         <section className="demo-pane" aria-label="Study panel">
-          <nav className="pane-tabs" aria-label="Study panel">
-            {(["margin", "figures", "note", "tutor", "study"] as Tab[]).map((t) => (
-              <button key={t} className="pane-tab" aria-pressed={tab === t} onClick={() => setTab(t)}>
-                {t === "margin" ? `Margin${counted ? ` ${counted}` : ""}` : t === "figures" ? "Figures" : t === "note" ? "Note" : t === "tutor" ? "Tutor" : "Study"}
-              </button>
-            ))}
-          </nav>
+          <div className="pane-head">
+            <nav className="pane-tabs segmented" aria-label="Study panel" ref={tabs}>
+              {(["margin", "figures", "note", "tutor", "study"] as Tab[]).map((t) => (
+                <button key={t} className="pane-tab" aria-pressed={tab === t} onClick={() => setTab(t)}>
+                  {t === "margin" ? "Margin" : t === "figures" ? "Figures" : t === "note" ? "Note" : t === "tutor" ? "Tutor" : "Study"}
+                  {t === "margin" && counted > 0 && <span className="tab-count">{counted}</span>}
+                </button>
+              ))}
+            </nav>
+          </div>
           <div className="pane-body">
             {tab === "margin" && (
               <Margin
@@ -584,7 +596,7 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
               )}
             </MarksContext.Provider>
           </div>
-          {selection && !capturing && <SelectionMenu x={selection.x} y={selection.y} onAction={onAction} noteTitle={workingNote?.title} />}
+          {selection && !capturing && <SelectionMenu x={selection.x} y={selection.y} side={selection.side} onAction={onAction} noteTitle={workingNote?.title} />}
           {capturing && <CaptureLayer book={book} root={pane.current} theme={theme} note={workingNote} ensureNote={ensureNote} onNote={chooseNote} onDone={() => setCapturing(false)} say={say} />}
         </section>
         <svg className="leader" aria-hidden="true">
@@ -606,6 +618,9 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
       {tool?.kind === "connect" && <Connector passage={tool.text} source={tool.source} theme={theme} onClose={() => (setTool(null), loadNotes())} />}
       {help && (
         <div className="help-pop" role="dialog" aria-label="Help">
+          <button className="icon-button help-close" onClick={() => setHelp(false)} aria-label="Close help">
+            <X aria-hidden="true" />
+          </button>
           <h3>How this works</h3>
           <p>Read on the right. Select any passage for the menu: an explanation, a definition, an answer or a figure appears in the margin on the left, beside the passage, and is saved with the book in your vault.</p>
           <ul>
@@ -623,9 +638,6 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
               <kbd>[</kbd> <kbd>]</kbd> previous / next figure · <kbd>⌘K</kbd> searches everything you’ve read and written
             </li>
           </ul>
-          <button className="button" onClick={() => setHelp(false)}>
-            Close
-          </button>
         </div>
       )}
     </div>

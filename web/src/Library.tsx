@@ -1,5 +1,8 @@
+import { Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api, type Book, type Status } from "./api";
+import { Spinner } from "./Shell";
+import { toneOf } from "./ui";
 
 export function Library() {
   const [books, setBooks] = useState<Book[] | null>(null);
@@ -31,11 +34,11 @@ export function Library() {
   };
 
   return (
-    <div className="library">
+    <div className="library rise">
       <header className="page-head">
         <h1 className="page-title">Library</h1>
+        <p className="lede small">Bring in a hard book and read it with a margin that explains, draws and quizzes. Select any passage to ask about it.</p>
       </header>
-      <p className="lede small">Bring in a hard book: a PDF with selectable text, an EPUB, Markdown or plain text. Read it beside figures you can play with; select any passage to draw a figure, make flashcards, ask the tutor or explain it back.</p>
 
       <div
         className={`dropzone ${drag ? "drag" : ""}`}
@@ -55,27 +58,33 @@ export function Library() {
         onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
       >
         <input ref={input} type="file" accept=".pdf,.epub,.md,.markdown,.txt" hidden onChange={(e) => upload(e.target.files?.[0])} />
+        <span className="well drop-icon" data-tone={drag ? "lavender" : undefined} aria-hidden="true">
+          <Upload />
+        </span>
         {uploading ? (
-          <span>Reading “{uploading}”…</span>
+          <Spinner label={`Reading “${uploading}”`} />
         ) : (
-          <>
-            <span className="drop-title">Drop a book here, or click to choose one</span>
-            <span className="fine">PDF (with selectable text), EPUB, Markdown or plain text</span>
-          </>
+          <span className="drop-text">
+            <span className="drop-title">Drop a book here, or choose one</span>
+            <span className="fine">PDF with selectable text, EPUB, Markdown or plain text</span>
+          </span>
         )}
       </div>
       {error && <p className="form-error">{error}</p>}
 
-      <section className="shelf">
+      <section className="shelf stagger">
         {books === null ? (
-          <p className="fine">Loading…</p>
+          <Spinner label="Loading your shelf" />
         ) : books.length === 0 ? (
           <p className="fine">Your shelf is empty.</p>
         ) : (
           books.map((book) => (
             <article key={book.id} className="book-card">
               <a href={`#/book/${book.id}`} className="book-link">
-                <span className="book-format">{book.format}</span>
+                <span className="book-cover" data-tone={toneOf(book.id)} aria-hidden="true">
+                  <span className="book-cover-letter">{book.title.replace(/^(the|a|an)\s+/i, "")[0]}</span>
+                  <span className="book-format">{book.format}</span>
+                </span>
                 <span className="book-title">{book.title}</span>
                 {book.author && <span className="book-author">{book.author}</span>}
                 <span className="book-meta">
@@ -85,15 +94,16 @@ export function Library() {
                 {book.status === "error" && <span className="form-error">{book.error}</span>}
               </a>
               <button
-                className="book-delete"
+                className="icon-button book-delete"
                 aria-label={`Remove ${book.title}`}
+                title="Remove from the library"
                 onClick={async () => {
                   if (!confirm(`Remove "${book.title}" and its demos?`)) return;
                   await api.deleteBook(book.id);
                   refresh();
                 }}
               >
-                ×
+                <Trash2 aria-hidden="true" />
               </button>
             </article>
           ))

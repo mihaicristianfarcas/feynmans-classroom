@@ -1,4 +1,5 @@
 import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type Simulation, type SimulationLinkDatum, type SimulationNodeDatum } from "d3-force";
+import { Maximize2, Minus, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { go, openLink, type GraphData } from "./api";
 
@@ -180,9 +181,9 @@ export function GraphView({ data, showNotes, showAnnotations = false, showSugges
       </svg>
       {hover && <GraphTip node={nodes.find((n) => n.id === hover)!} />}
       <div className="graph-tools">
-        <button className="icon-button" onClick={() => setView((v) => ({ ...v, k: Math.min(4, v.k * 1.3) }))} aria-label="Zoom in">+</button>
-        <button className="icon-button" onClick={() => setView((v) => ({ ...v, k: Math.max(0.3, v.k / 1.3) }))} aria-label="Zoom out">−</button>
-        <button className="icon-button" onClick={() => setView({ k: 1, x: 0, y: 0 })} aria-label="Reset view">⤢</button>
+        <button className="icon-button" onClick={() => setView((v) => ({ ...v, k: Math.min(4, v.k * 1.3) }))} aria-label="Zoom in" title="Zoom in"><Plus aria-hidden="true" /></button>
+        <button className="icon-button" onClick={() => setView((v) => ({ ...v, k: Math.max(0.3, v.k / 1.3) }))} aria-label="Zoom out" title="Zoom out"><Minus aria-hidden="true" /></button>
+        <button className="icon-button" onClick={() => setView({ k: 1, x: 0, y: 0 })} aria-label="Reset view" title="Reset view"><Maximize2 aria-hidden="true" /></button>
       </div>
     </div>
   );

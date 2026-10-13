@@ -1,11 +1,13 @@
 /* Notes, like Obsidian: a file tree of the vault's notes/ folder, the note as Markdown (edit with a
  * live preview, or read), and beside it what links here, what it links to, where it's mentioned
  * without a link, and the connections the agent suggests (accept, reject, or remove later). */
+import { ArrowUpRight, ChevronRight, FolderPlus, SquarePen, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { go, learn, openLink, type NoteDetail, type SuggestedLink } from "./api";
 import { Markdown } from "./Markdown";
 import { NoteEditor } from "./NoteEditor";
 import { Spinner, timeAgo, useLoad } from "./Shell";
+import { useIndicator } from "./ui";
 
 type Tree = Awaited<ReturnType<typeof learn.tree>>;
 
@@ -60,10 +62,11 @@ export function useVaultEvents(onChange: (path: string) => void) {
 function EmptyNotes({ tree }: { tree: Tree | null }) {
   return (
     <div className="note-pane empty-pane">
-      <div className="empty">
+      <div className="empty rise">
         <h1 className="page-title">Notes</h1>
         <p className="lede small">Write what you think as you learn. Link ideas with <code>[[double brackets]]</code>, embed passages, figures and pictures with <code>![[…]]</code>. Every note is a Markdown file in your vault, named by its title, so Obsidian and AI agents can work with it too.</p>
         <button className="button primary" onClick={() => newNote("")}>
+          <SquarePen aria-hidden="true" />
           New note
         </button>
         {tree && tree.notes.length > 0 && <p className="fine">Or pick one on the left.</p>}
@@ -137,8 +140,8 @@ function FileTree({ tree, current, reload }: { tree: Tree | null; current: strin
     <>
       {f.folders.map((sub) => (
         <li key={`d:${sub.path}`}>
-          <button className="tree-row folder" style={{ paddingLeft: 8 + depth * 14 }} onClick={() => toggle(sub.path)} aria-expanded={!closed.has(sub.path)}>
-            <span className="tree-caret">{closed.has(sub.path) ? "▸" : "▾"}</span>
+          <button className="tree-row folder" style={{ paddingLeft: 6 + depth * 14 }} onClick={() => toggle(sub.path)} aria-expanded={!closed.has(sub.path)}>
+            <ChevronRight className="tree-caret" aria-hidden="true" />
             {sub.name}
           </button>
           {!closed.has(sub.path) && <ul className="tree">{renderFolder(sub, depth + 1)}</ul>}
@@ -146,7 +149,7 @@ function FileTree({ tree, current, reload }: { tree: Tree | null; current: strin
       ))}
       {f.notes.map((n) => (
         <li key={n.id}>
-          <a className="tree-row" href={`#/notes/${n.id}`} aria-current={n.id === current ? "page" : undefined} style={{ paddingLeft: 22 + depth * 14 }} title={n.path}>
+          <a className="tree-row" href={`#/notes/${n.id}`} aria-current={n.id === current ? "page" : undefined} style={{ paddingLeft: 26 + depth * 14 }} title={n.path}>
             {n.title}
           </a>
         </li>
@@ -158,7 +161,7 @@ function FileTree({ tree, current, reload }: { tree: Tree | null; current: strin
       <div className="tree-head">
         <input className="search" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find a note…" aria-label="Find a note" />
         <button className="icon-button" title="New note" aria-label="New note" onClick={() => newNote(currentFolder)}>
-          +
+          <SquarePen aria-hidden="true" />
         </button>
         <button
           className="icon-button"
@@ -172,7 +175,7 @@ function FileTree({ tree, current, reload }: { tree: Tree | null; current: strin
             }
           }}
         >
-          ⊞
+          <FolderPlus aria-hidden="true" />
         </button>
       </div>
       {!root ? (
@@ -182,7 +185,7 @@ function FileTree({ tree, current, reload }: { tree: Tree | null; current: strin
           {matches.map((n) => (
             <li key={n.id}>
               <a className="tree-row" href={`#/notes/${n.id}`} aria-current={n.id === current ? "page" : undefined}>
-                {n.title} <span className="fine">{n.path.split("/").slice(1, -1).join("/")}</span>
+                <span className="tree-title">{n.title}</span> <span className="tree-folder">{n.path.split("/").slice(1, -1).join("/")}</span>
               </a>
             </li>
           ))}
@@ -210,6 +213,7 @@ function NotePane({ id, theme, onChanged }: { id: string; theme: "light" | "dark
     }
   });
   const [saving, setSaving] = useState<"idle" | "saving" | "saved">("idle");
+  const modes = useIndicator<HTMLDivElement>(mode);
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -301,11 +305,10 @@ function NotePane({ id, theme, onChanged }: { id: string; theme: "light" | "dark
             title="The title is the file name: renaming updates every link to this note"
           />
           <div className="row gap note-tools">
-            <div className="chips" role="group" aria-label="Mode">
+            <div className="segmented" role="group" aria-label="Mode" ref={modes}>
               {(["edit", "read"] as const).map((m) => (
                 <button
                   key={m}
-                  className="chip"
                   aria-pressed={mode === m}
                   onClick={() => {
                     setMode(m);
@@ -324,7 +327,9 @@ function NotePane({ id, theme, onChanged }: { id: string; theme: "light" | "dark
               {note.path}
             </code>
             <button
-              className="link danger"
+              className="icon-button danger"
+              title="Move to the vault’s trash"
+              aria-label="Delete note"
               onClick={async () => {
                 if (!confirm(`Move “${note.title}” to the vault's trash?`)) return;
                 await learn.deleteNote(note.id);
@@ -332,7 +337,7 @@ function NotePane({ id, theme, onChanged }: { id: string; theme: "light" | "dark
                 go("#/notes");
               }}
             >
-              Delete
+              <Trash2 aria-hidden="true" />
             </button>
           </div>
           <Properties note={note} onSave={async (patch) => (await learn.updateNote(note.id, patch), load())} />
@@ -363,8 +368,9 @@ function Properties({ note, onSave }: { note: NoteDetail; onSave: (patch: { tags
         <input value={aliases} onChange={(e) => setAliases(e.target.value)} onBlur={() => aliases !== note.aliases.join(", ") && onSave({ aliases: list(aliases) })} placeholder="other names links can use" />
       </label>
       {note.source?.bookId && (
-        <a className="fine" href={`#/book/${note.source.bookId}${note.source.page !== undefined ? `?at=${(note.source.page + (note.source.y ?? 0)).toFixed(3)}` : ""}`}>
-          from a book ↗
+        <a className="link" href={`#/book/${note.source.bookId}${note.source.page !== undefined ? `?at=${(note.source.page + (note.source.y ?? 0)).toFixed(3)}` : ""}`}>
+          from a book
+          <ArrowUpRight aria-hidden="true" />
         </a>
       )}
     </div>
@@ -472,8 +478,8 @@ function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => void })
                 <span className="ai-badge" title={c.why}>
                   AI
                 </span>
-                <button className="link danger" title="Remove this link" onClick={() => decide(c, "remove")}>
-                  ×
+                <button className="link danger" title="Remove this link" aria-label="Remove this link" onClick={() => decide(c, "remove")}>
+                  <X aria-hidden="true" />
                 </button>
               </li>
             ))}

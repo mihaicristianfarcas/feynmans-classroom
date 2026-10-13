@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronUp, Shapes } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, learn, type Book, type Demo, type Job, type TocEntry } from "./api";
 import { SceneView } from "./scene/SceneView";
@@ -51,10 +52,10 @@ export function DemoPanel({ book, demo, chapter, chapterDemos, allDemos, jobs, t
       <footer className="demo-foot">
         <div className="demo-steps">
           <button className="icon-button" onClick={() => onStep(-1)} disabled={!canStep.prev} aria-label="Previous figure" title="Previous figure ( [ )">
-            ↑
+            <ChevronUp aria-hidden="true" />
           </button>
           <button className="icon-button" onClick={() => onStep(1)} disabled={!canStep.next} aria-label="Next figure" title="Next figure ( ] )">
-            ↓
+            <ChevronDown aria-hidden="true" />
           </button>
         </div>
         <span className="demo-count">
@@ -124,7 +125,7 @@ function DemoView({ book, demo, theme, held }: { book: Book; demo: Demo; theme: 
       ) : (
         <div className="demo-pending" data-status={demo.status}>
           <div className="pending-figure" aria-hidden="true">
-            <span className="pending-diamond" />
+            <Shapes />
           </div>
           <div className="pending-text">
             <div className="pending-title">
@@ -186,7 +187,7 @@ function SceneDemo({ book, demo, theme, held }: { book: Book; demo: Demo; theme:
       ) : (
         <div className="demo-pending" data-status={demo.status}>
           <div className="pending-figure" aria-hidden="true">
-            <span className="pending-diamond" />
+            <Shapes />
           </div>
           <div className="pending-text">
             <div className="pending-title">
@@ -224,7 +225,8 @@ function DemoMenu({ book, demo }: { book: Book; demo: Demo }) {
   return (
     <div className="demo-menu" ref={box}>
       <button className="button" onClick={() => setOpen(!open)} aria-expanded={open}>
-        Improve ▾
+        Improve
+        <ChevronDown aria-hidden="true" />
       </button>
       {open && (
         <div className="menu-pop" role="dialog" aria-label="Improve this demo">
@@ -352,7 +354,7 @@ function ChapterCard({ book, chapter, demos, planning, onJump, total }: { book: 
       {chapter.subtitle && <h2 className="chapter-title">{chapter.subtitle}</h2>}
       {demos.length > 0 ? (
         <>
-          <p className="caption">Scroll on: each diamond in the margin is a figure. Or jump straight to one.</p>
+          <p className="caption">Scroll on: each diamond beside the page is a figure. Or jump straight to one.</p>
           <ol className="demo-list">
             {demos.map((demo) => (
               <li key={demo.id}>
@@ -378,7 +380,7 @@ function ChapterCard({ book, chapter, demos, planning, onJump, total }: { book: 
       ) : (
         <>
           <p className="caption">
-            No figures for this chapter yet. The tutor will read it, pick the ideas worth seeing move, and draw an interactive figure for each, anchored to the passage it explains. Or select any passage and choose ◆ Visualize.
+            No figures for this chapter yet. The tutor will read it, pick the ideas worth seeing move, and draw an interactive figure for each, anchored to the passage it explains. Or select any passage and choose Visualize.
           </p>
           <div className="generate-row">
             <label className="count-select">
@@ -399,7 +401,7 @@ function ChapterCard({ book, chapter, demos, planning, onJump, total }: { book: 
         </>
       )}
       {message && <p className="form-error">{message}</p>}
-      {total === 0 && <p className="fine">Tip: select any passage in the book and choose ◆ Visualize, with your own request if you like.</p>}
+      {total === 0 && <p className="fine">Tip: select any passage in the book and choose Visualize, with your own request if you like.</p>}
     </div>
   );
 }

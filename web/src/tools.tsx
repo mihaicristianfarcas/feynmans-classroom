@@ -1,5 +1,6 @@
 /* Study tools that open from a passage, a concept or a note: make cards, explain it back, connect
  * it to the world, draw a figure. Each one saves into the vault. */
+import { Shapes, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { learn, type Connection, type DraftCard, type ExplainFeedback, type SavedFigure, type SourceRef } from "./api";
@@ -25,7 +26,7 @@ export function Modal({ title, eyebrow, onClose, children, wide }: { title: stri
             <h2 className="modal-title">{title}</h2>
           </div>
           <button className="icon-button" onClick={onClose} aria-label="Close">
-            ×
+            <X aria-hidden="true" />
           </button>
         </header>
         <div className="modal-body">{children}</div>
@@ -301,7 +302,8 @@ export function FigureRequest({ onSubmit, busy, autoFocus = true, compact }: { o
           Careful
         </label>
         <button className="button primary" type="submit" disabled={busy}>
-          ◆ Draw it
+          <Shapes aria-hidden="true" />
+          Draw it
         </button>
       </div>
     </form>

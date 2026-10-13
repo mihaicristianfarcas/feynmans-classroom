@@ -1,4 +1,4 @@
-// Drives the reader like a person: select a passage, open ◆ Visualize, ask for a figure, wait for it.
+// Drives the reader like a person: select a passage, open Visualize, ask for a figure, wait for it.
 //   npx tsx tests/reader-flow.ts <bookId> <block> <out-dir> ["request"]   (npm run dev must be running; uses the model)
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";

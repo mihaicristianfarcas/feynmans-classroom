@@ -120,30 +120,31 @@ const livePreview = ViewPlugin.fromClass(
 );
 
 const style = HighlightStyle.define([
-  { tag: t.heading, fontWeight: "600", color: "var(--strong)" },
-  { tag: t.strong, fontWeight: "650", color: "var(--strong)" },
+  { tag: t.heading, fontWeight: "600", color: "var(--ink)" },
+  { tag: t.strong, fontWeight: "650", color: "var(--ink)" },
   { tag: t.emphasis, fontStyle: "italic" },
   { tag: t.strikethrough, textDecoration: "line-through" },
-  { tag: t.link, color: "var(--strong)", textDecoration: "underline" },
-  { tag: t.url, color: "var(--muted)" },
-  { tag: t.monospace, fontFamily: "var(--mono)", fontSize: "0.92em", color: "var(--strong)" },
-  { tag: t.quote, color: "var(--text)", fontStyle: "italic" },
-  { tag: t.processingInstruction, color: "var(--muted)" },
-  { tag: t.meta, color: "var(--muted)" },
+  { tag: t.link, color: "var(--sky-ink)", textDecoration: "underline" },
+  { tag: t.url, color: "var(--ink-3)" },
+  { tag: t.monospace, fontFamily: "var(--mono)", fontSize: "0.88em", color: "var(--ink)" },
+  { tag: t.quote, color: "var(--ink-2)", fontStyle: "italic" },
+  { tag: t.processingInstruction, color: "var(--ink-4)" },
+  { tag: t.meta, color: "var(--ink-4)" },
 ]);
 
 const theme = EditorView.theme({
-  "&": { height: "100%", fontSize: "15px", background: "transparent" },
-  ".cm-scroller": { fontFamily: "var(--serif)", lineHeight: "1.6", overflow: "auto" },
-  ".cm-content": { padding: "14px 0 40vh", caretColor: "var(--strong)", maxWidth: "720px" },
-  ".cm-line": { padding: "0 18px" },
+  "&": { height: "100%", fontSize: "16px", background: "transparent", color: "var(--ink)" },
+  ".cm-scroller": { fontFamily: "var(--serif)", lineHeight: "1.65", overflow: "auto" },
+  ".cm-content": { padding: "14px 0 40vh", caretColor: "var(--ink)", maxWidth: "760px" },
+  ".cm-line": { padding: "0 32px" },
   "&.cm-focused": { outline: "none" },
-  ".cm-cursor": { borderLeftColor: "var(--strong)" },
-  ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection": { background: "color-mix(in srgb, var(--hi) 18%, transparent) !important" },
-  ".cm-placeholder": { color: "var(--muted)", fontStyle: "italic" },
-  ".cm-tooltip.cm-tooltip-autocomplete": { background: "var(--card)", border: "0", boxShadow: "var(--lift)", borderRadius: "4px", fontFamily: "var(--sans)", fontSize: "13px" },
-  ".cm-tooltip-autocomplete ul li[aria-selected]": { background: "var(--faint)", color: "var(--strong)" },
-  ".cm-completionDetail": { fontFamily: "var(--mono)", fontSize: "10px", textTransform: "uppercase", color: "var(--muted)", marginLeft: "8px", fontStyle: "normal" },
+  ".cm-cursor": { borderLeftColor: "var(--ink)", borderLeftWidth: "1.5px" },
+  ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection": { background: "color-mix(in srgb, var(--lavender) 50%, transparent) !important" },
+  ".cm-placeholder": { color: "var(--ink-4)", fontStyle: "italic" },
+  ".cm-tooltip.cm-tooltip-autocomplete": { background: "var(--raised)", border: "0", boxShadow: "var(--shadow-lg)", borderRadius: "10px", padding: "4px", fontFamily: "var(--sans)", fontSize: "13px" },
+  ".cm-tooltip-autocomplete ul li": { borderRadius: "6px", padding: "4px 8px !important" },
+  ".cm-tooltip-autocomplete ul li[aria-selected]": { background: "var(--hover)", color: "var(--ink)" },
+  ".cm-completionDetail": { fontFamily: "var(--sans)", fontSize: "11px", color: "var(--ink-3)", marginLeft: "10px", fontStyle: "normal" },
 });
 
 /* ---------------- pictures ---------------- */
