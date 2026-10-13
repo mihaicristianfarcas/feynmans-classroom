@@ -1,0 +1,97 @@
+/* The strip between the panes and the book: the reading line, a mark beside each passage your notes
+ * come from, and a mark beside each figure's anchor (lit for the active one). */
+import type { Demo, Loc, Note } from "../api";
+import { LINE } from "./position";
+import type { ReaderHandle } from "./readers";
+
+export interface DemoMarker {
+  id: string;
+  top: number;
+  status: Demo["status"];
+  fig: string;
+  title: string;
+}
+export interface NoteMarker {
+  id: string;
+  top: number;
+  type: Note["type"];
+  title: string;
+}
+
+/** Where on screen (px from the pane's top) a location is, or null when it is out of view. */
+function topOf(reader: ReaderHandle, box: DOMRect, loc: Loc): number | null {
+  const y = reader.clientYOf(loc);
+  return y === null || y < box.top + 6 || y > box.bottom - 6 ? null : y - box.top;
+}
+
+export function demoMarkers(reader: ReaderHandle, box: DOMRect, demos: Demo[]): DemoMarker[] {
+  return demos.flatMap((demo) => {
+    const top = topOf(reader, box, demo.anchor);
+    return top === null
+      ? []
+      : [{ id: demo.id, top, status: demo.status, fig: demo.fig, title: demo.brief.eyebrow || demo.brief.title }];
+  });
+}
+
+export function noteMarkers(reader: ReaderHandle, box: DOMRect, notes: Note[]): NoteMarker[] {
+  return notes.flatMap((note) => {
+    const src = note.source;
+    const loc: Loc | null =
+      src?.page !== undefined ? { page: src.page, y: src.y } : src?.block !== undefined ? { block: src.block } : null;
+    const top = loc && topOf(reader, box, loc);
+    return top == null ? [] : [{ id: note.id, top, type: note.type, title: note.title }];
+  });
+}
+
+/** Keeps the old list when nothing visibly moved, so scrolling doesn't re-render for nothing. */
+export function sameMarkers<T extends { id: string; top: number; status?: string }>(old: T[], next: T[]): T[] {
+  return old.length === next.length &&
+    old.every((m, i) => m.id === next[i].id && Math.abs(m.top - next[i].top) < 0.5 && m.status === next[i].status)
+    ? old
+    : next;
+}
+
+export function Gutter({
+  demos,
+  notes,
+  activeId,
+  onNote,
+  onDemo,
+}: {
+  demos: DemoMarker[];
+  notes: NoteMarker[];
+  activeId: string | undefined;
+  onNote: () => void;
+  onDemo: (id: string) => void;
+}) {
+  return (
+    <div className="gutter">
+      <span className="reading-line" style={{ top: `${LINE * 100}%` }} title="Reading line" />
+      {notes.map((m) => (
+        <button
+          type="button"
+          key={m.id}
+          className="note-mark"
+          data-type={m.type}
+          style={{ top: m.top }}
+          title={`${m.type}: ${m.title}`}
+          aria-label={`${m.type}: ${m.title}`}
+          onClick={onNote}
+        />
+      ))}
+      {demos.map((m) => (
+        <button
+          type="button"
+          key={m.id}
+          className="anchor"
+          data-active={activeId === m.id || undefined}
+          data-status={m.status}
+          style={{ top: m.top }}
+          title={`${m.fig} · ${m.title}`}
+          aria-label={`${m.fig}: ${m.title}`}
+          onClick={() => onDemo(m.id)}
+        />
+      ))}
+    </div>
+  );
+}

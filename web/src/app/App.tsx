@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { learn } from "../api";
 import { Notes } from "../notes/Notes";
 import { Ask } from "../pages/Ask";
-import { Brain } from "../pages/Brain";
+import { Brain } from "../pages/brain/Brain";
 import { Gallery } from "../pages/Gallery";
 import { Journey } from "../pages/Journey";
 import { Library } from "../pages/Library";

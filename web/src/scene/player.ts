@@ -11,7 +11,6 @@
  * Framework-free, so the same figure lives in the reader, a note, a flashcard or a bare page.
  * Buttons that don't apply to a figure are shown disabled, never hidden: the frame is always the same. */
 
-import { compile } from "../../../shared/scene/expr.ts";
 import {
   buildScope,
   defaults,
@@ -31,6 +30,9 @@ import {
   zoomsByTransform,
 } from "../../../shared/scene/index.ts";
 import { HEIGHT, WIDTH } from "../../../shared/scene/types.ts";
+import { h, ICONS, swatch } from "./dom";
+import { infoMap, movableParts, usesClock, usesTime } from "./inspect";
+import { predictBox } from "./predict";
 
 export interface PlayerOptions {
   theme: "light" | "dark";
@@ -44,32 +46,6 @@ export interface PlayerOptions {
   ) => void;
 }
 
-const ICONS = {
-  play: '<svg viewBox="0 0 12 12"><path class="fill" d="M3 1.8v8.4L10 6z"/></svg>',
-  pause: '<svg viewBox="0 0 12 12"><path class="fill" d="M2.6 1.8h2.4v8.4H2.6zM7 1.8h2.4v8.4H7z"/></svg>',
-  restart: '<svg viewBox="0 0 12 12"><path d="M2.2 6.2a3.8 3.8 0 1 0 1.2-2.8"/><path d="M2.2 1.8v2.4h2.4"/></svg>',
-  prev: '<svg viewBox="0 0 12 12"><path d="M7.6 2.4 4 6l3.6 3.6"/></svg>',
-  next: '<svg viewBox="0 0 12 12"><path d="M4.4 2.4 8 6 4.4 9.6"/></svg>',
-  minus: '<svg viewBox="0 0 12 12"><path d="M2.5 6h7"/></svg>',
-  plus: '<svg viewBox="0 0 12 12"><path d="M2.5 6h7M6 2.5v7"/></svg>',
-  fit: '<svg viewBox="0 0 12 12"><path d="M1.8 4.4V1.8h2.6M10.2 4.4V1.8H7.6M1.8 7.6v2.6h2.6M10.2 7.6v2.6H7.6"/></svg>',
-};
-
-const h = <K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  attrs: Record<string, string | boolean | undefined> = {},
-  children: (Node | string | null | undefined)[] = [],
-) => {
-  const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (v === undefined || v === false) continue;
-    if (k === "html") node.innerHTML = String(v);
-    else if (k === "text") node.textContent = String(v);
-    else node.setAttribute(k, v === true ? "" : v);
-  }
-  for (const c of children) if (c !== null && c !== undefined) node.append(c);
-  return node;
-};
 const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
 const ease = (x: number) => {
   const t = clamp(x, 0, 1);
@@ -77,65 +53,6 @@ const ease = (x: number) => {
 };
 const reduced = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 let counter = 0;
-
-/** Does any expression in the spec read the clock? (Decides whether Play means anything.) */
-function usesTime(spec: Scene): boolean {
-  const json = JSON.stringify(spec);
-  const strings = json.match(/"(?:[^"\\]|\\.)*"/g) || [];
-  for (const s of strings) {
-    const v = s.slice(1, -1);
-    if (!/[a-z]/i.test(v) || v.length > 600) continue;
-    for (const src of v.includes("{") ? [...v.matchAll(/\{([^{}]+)\}/g)].map((m) => m[1]) : [v]) {
-      try {
-        const names = compile(src.replace(/:\d$/, "")).names;
-        if (names.some((n) => n === "t" || n === "clock" || n === "p" || n === "now")) return true;
-      } catch {}
-    }
-  }
-  return spec.kind === "graph" && spec.tokens.length > 0;
-}
-
-function infoMap(spec: Scene): Map<string, { label: string; info: string }> {
-  const out = new Map<string, { label: string; info: string }>();
-  const add = (id: string, label: string, info: string) => (label || info) && out.set(id, { label, info });
-  switch (spec.kind) {
-    case "plot":
-      for (const l of spec.layers) add(l.id, "label" in l ? l.label.replace(/\{[^}]*\}/g, "").trim() : "", l.info);
-      break;
-    case "sequence":
-      for (const a of spec.actors) add(a.id, a.label, a.info);
-      break;
-    case "graph":
-      for (const n of spec.nodes) add(n.id, n.label, n.info);
-      for (const e of spec.edges) add(e.id, e.label, e.info);
-      break;
-    case "object3d":
-      for (const p of spec.parts) add(p.id, p.label, p.info);
-      break;
-    case "diagram":
-      for (const sh of spec.shapes) add(sh.id, sh.label.replace(/\{[^}]*\}/g, "").trim(), sh.info);
-      break;
-  }
-  return out;
-}
-
-/** The parts the reader can drag: plot points and diagram shapes move their sliders (x, y), graph nodes
- * move themselves (null). */
-function movableParts(spec: Scene): Map<string, { x: string; y: string } | null> {
-  const out = new Map<string, { x: string; y: string } | null>();
-  if (spec.kind === "plot") for (const l of spec.layers) if ("drag" in l && l.drag) out.set(l.id, l.drag);
-  if (spec.kind === "diagram") for (const sh of spec.shapes) if ("drag" in sh && sh.drag) out.set(sh.id, sh.drag);
-  if (spec.kind === "graph") for (const n of spec.nodes) out.set(n.id, null);
-  return out;
-}
-
-function swatch(tone: string, style: string) {
-  const color = `var(--sc-${tone === "lit" ? "lit" : tone})`;
-  if (style === "dot") return `<svg viewBox="0 0 18 10"><circle cx="9" cy="5" r="3.4" fill="${color}"/></svg>`;
-  if (style === "fill")
-    return `<svg viewBox="0 0 18 10"><rect x="2" y="1.5" width="14" height="7" rx="1" fill="color-mix(in srgb, ${color} 18%, var(--sc-card))" stroke="${color}" stroke-width="1"/></svg>`;
-  return `<svg viewBox="0 0 18 10"><path d="M1 5h16" stroke="${color}" stroke-width="${tone === "lit" ? 2 : 1.5}" ${style === "dashed" ? 'stroke-dasharray="3 3"' : ""} fill="none"/></svg>`;
-}
 
 /** Arrow keys as [dx, dy] with y up. */
 const ARROWS: Record<string, [number, number]> = {
@@ -563,46 +480,16 @@ export class ScenePlayer {
   /* ---------------- predict first ---------------- */
 
   private showPredict() {
-    const p = this.spec.predict!;
     this.predicting = true;
-    const skip = h("button", { class: "sc-link", type: "button", text: "Skip" });
-    const choices = p.choices.map((c, i) => {
-      const b = h("button", { class: "sc-btn", type: "button", text: c }) as HTMLButtonElement;
-      b.addEventListener("click", () => reveal(i));
-      return b;
+    const box = predictBox(this.spec.predict!, {
+      onAnswer: (correct) => this.opts.onEvent?.({ type: "predict", correct }),
+      onClose: (hadFocus) => {
+        this.predicting = false;
+        this.restart();
+        if (hadFocus) this.el.stage.focus({ preventScroll: true });
+      },
     });
-    // a question inside the figure, not a dialog: it doesn't take focus when the figure scrolls into view
-    const box = h("div", { class: "sc-predict", role: "group", "aria-label": "Predict first" }, [
-      h("div", { class: "sc-predict-head" }, [h("span", { text: "Predict first" }), skip]),
-      h("p", { text: p.question }),
-      h("div", { class: "sc-predict-choices" }, choices),
-    ]);
     this.el.plate.append(box);
-    const close = () => {
-      const hadFocus = box.contains(document.activeElement);
-      box.remove();
-      this.predicting = false;
-      this.restart();
-      if (hadFocus) this.el.stage.focus({ preventScroll: true });
-    };
-    skip.addEventListener("click", close);
-    const reveal = (i: number) => {
-      const right = i === p.answer;
-      choices.forEach((b, k) => {
-        b.disabled = true;
-        if (k === p.answer) b.dataset.right = "";
-        if (k === i && !right) b.dataset.wrong = "";
-      });
-      const watch = h("button", { class: "sc-btn", type: "button", text: "Watch it" });
-      watch.addEventListener("click", close);
-      box.append(
-        h("p", { class: "sc-answer", role: "status", text: `${right ? "Right." : "Not quite."} ${p.explain}` }),
-        h("div", {}, [watch]),
-      );
-      // the choices are disabled now: focus moves on to what comes next
-      if (box.contains(document.activeElement) || document.activeElement === document.body) watch.focus();
-      this.opts.onEvent?.({ type: "predict", correct: right });
-    };
   }
 
   /* ---------------- pointer ---------------- */
@@ -963,9 +850,4 @@ export class ScenePlayer {
       );
     this.opts.onEvent?.({ type: "error", message });
   }
-}
-
-/** Figures whose motion is driven by the free-running clock keep moving after their timeline ends. */
-function usesClock(spec: Scene): boolean {
-  return /\bclock\b/.test(JSON.stringify(spec));
 }
