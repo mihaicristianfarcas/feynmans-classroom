@@ -9,13 +9,15 @@ import { Spinner } from "../components/feedback";
 import { Markdown } from "../components/Markdown";
 import { QuizRunner } from "../components/Quiz";
 import { useLoad } from "../lib/useLoad";
+import { under, useVaultEvents } from "../lib/useVaultEvents";
 
 const LABELS: Record<1 | 2 | 3 | 4, string> = { 1: "Again", 2: "Hard", 3: "Good", 4: "Easy" };
 
 export function Review({ theme }: { theme: "light" | "dark" }) {
   const query = new URLSearchParams(location.hash.split("?")[1] || "");
   const [deck, setDeck] = useState(query.get("deck") || "");
-  const { data: decks } = useLoad(() => learn.decks());
+  const { data: decks, reload: reloadDecks } = useLoad(() => learn.decks());
+  useVaultEvents(reloadDecks, under("cards/"));
   const [queue, setQueue] = useState<CardView[] | null>(null);
   const [stats, setStats] = useState({ done: 0, again: 0 });
   const [revealed, setRevealed] = useState(false);

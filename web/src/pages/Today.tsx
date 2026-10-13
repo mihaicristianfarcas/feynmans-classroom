@@ -6,6 +6,7 @@ import { learn } from "../api";
 import { go } from "../app/navigation";
 import { Spinner } from "../components/feedback";
 import { useLoad } from "../lib/useLoad";
+import { under, useVaultEvents } from "../lib/useVaultEvents";
 
 /** Each kind of suggestion keeps its pastel: butter for what's due, peach for reading, and so on. */
 const TONE: Record<string, string> = {
@@ -17,7 +18,8 @@ const TONE: Record<string, string> = {
 };
 
 export function Today() {
-  const { data, error } = useLoad(() => learn.today());
+  const { data, error, reload } = useLoad(() => learn.today());
+  useVaultEvents(reload, under("cards/", "notes/", "concepts/"));
   const [question, setQuestion] = useState("");
   if (error) return <div className="center-note">Could not load today: {error}</div>;
   if (!data)

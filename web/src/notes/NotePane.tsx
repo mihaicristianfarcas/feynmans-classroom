@@ -1,6 +1,7 @@
 /* One note on the notes page: its title, properties (tags, aliases, what it's about) and body (edit
  * with a live preview, or read: quizzes play there), its saved versions, and what links to it in the
- * sidebar. */
+ * sidebar. It follows changes made elsewhere (the agent, another editor) as they land, and if they land
+ * while you're typing in it, asks which text to keep. */
 import { ArrowUpRight, History, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { learn, type NoteDetail } from "../api";
@@ -9,9 +10,9 @@ import { Markdown } from "../components/Markdown";
 import { NoteContext } from "../components/QuizBlock";
 import { useIndicator } from "../components/ui";
 import { timeAgo } from "../lib/time";
+import { useVaultEvents } from "../lib/useVaultEvents";
 import { NoteEditor } from "./NoteEditor";
 import { NoteSidebar } from "./NoteSidebar";
-import { useVaultEvents } from "./useVaultEvents";
 import { Versions } from "./Versions";
 
 export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" | "dark"; onChanged: () => void }) {
@@ -28,6 +29,8 @@ export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" 
   });
   const [saving, setSaving] = useState<"idle" | "saving" | "saved">("idle");
   const [versions, setVersions] = useState(false);
+  /** The note changed on disk while there were unsaved edits here. */
+  const [clash, setClash] = useState(false);
   /** Whether the mode was picked for this note yet (a note with a quiz opens to be read: that's where it plays). */
   const modeSet = useRef(false);
   const modes = useIndicator<HTMLFieldSetElement>(mode);
@@ -61,12 +64,15 @@ export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" 
     });
   }, [load, id]);
   useVaultEvents((path) => {
-    if (note && path === note.path && !dirty.current) load();
-    else if (note) load();
+    if (!note) return;
+    // changed elsewhere while you were typing here: don't overwrite either text without asking
+    if (path === note.path && dirty.current) setClash(true);
+    load();
   });
 
   const save = useCallback(
     async (patch: { body?: string; title?: string }) => {
+      if (clashRef.current && patch.body !== undefined) return;
       setSaving("saving");
       try {
         const updated = await learn.updateNote(id, patch);
@@ -84,6 +90,8 @@ export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" 
     },
     [id, load, onChanged],
   );
+  const clashRef = useRef(clash);
+  clashRef.current = clash;
   const onBody = (text: string) => {
     setBody(text);
     dirty.current = true;
@@ -130,6 +138,33 @@ export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" 
             aria-label="Title (renames the file and updates links to it)"
             title="The title is the file name: renaming updates every link to this note"
           />
+          {clash && (
+            <div className="notice note-clash" role="alert">
+              <span>This note was changed elsewhere (by the agent, or in another editor) while you were typing.</span>
+              <button
+                type="button"
+                className="button small"
+                onClick={() => {
+                  dirty.current = false;
+                  setClash(false);
+                  load();
+                }}
+              >
+                Show the new text
+              </button>
+              <button
+                type="button"
+                className="button small"
+                onClick={() => {
+                  setClash(false);
+                  clashRef.current = false;
+                  save({ body: bodyRef.current });
+                }}
+              >
+                Keep mine
+              </button>
+            </div>
+          )}
           <div className="row gap note-tools">
             <fieldset className="segmented" ref={modes}>
               <legend className="visually-hidden">Mode</legend>

@@ -43,7 +43,8 @@ commands under the Codex sandbox):
 - **Landing.** The change is moved onto everything you did meanwhile without touching your files,
   checked for conflicts, and only then do the files follow. If it clashes with something you
   changed meanwhile, it doesn't land at all ("ask again and it starts from your latest version"), so
-  conflict markers never reach a note. Several agents can work at once (up to four).
+  conflict markers never reach a note. Several agents can work at once (up to four). If you're
+  typing in a note when an agent's change to it lands, the note asks which text to keep.
 - **Undo** takes the change out of the history (jj's `abandon`, with what came after it moved onto
   its parent). It's tried first without touching your files and refused, untouched, if you've since
   changed the same lines. A change already pushed somewhere gets its reverse added instead.

@@ -9,6 +9,7 @@ import { Mastery, Spinner } from "../../components/feedback";
 import { Markdown } from "../../components/Markdown";
 import { CardDrafter, Connector, ExplainBack, FigureMaker } from "../../components/tools";
 import { useLoad } from "../../lib/useLoad";
+import { under, useVaultEvents } from "../../lib/useVaultEvents";
 
 const TYPE_LABEL: Record<string, string> = {
   note: "Note",
@@ -21,6 +22,7 @@ const TYPE_LABEL: Record<string, string> = {
 
 export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
   const { data: c, error, reload } = useLoad(() => learn.concept(id), [id]);
+  useVaultEvents(reload, under("notes/", "concepts/", "cards/"));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ summary: "", body: "" });
   const [tool, setTool] = useState<"explain" | "cards" | "connect" | "figure" | null>(
