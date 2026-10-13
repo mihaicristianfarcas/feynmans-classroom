@@ -1,5 +1,5 @@
-// End-to-end check of the reader against a running app (npm run dev) with at least one book that has
-// two or more ready demos. It never starts a Codex job unless --generate is passed.
+// End-to-end check of the app (npm run dev) with at least one book that has two or more ready demos.
+// It never calls a model unless --generate is passed. It makes one highlight (and deletes it again).
 //   npx tsx tests/e2e.ts [--book <id>] [--generate]
 import puppeteer, { type Frame, type Page } from "puppeteer-core";
 import { chromePath } from "../server/config.ts";
@@ -50,20 +50,45 @@ const demoFrame = async (p: Page): Promise<Frame | null> => {
   return null;
 };
 
+async function clickTab(p: Page, name: string) {
+  for (const b of await p.$$(".pane-tab")) if ((await b.evaluate((el) => el.textContent || "")).startsWith(name)) await b.click();
+}
+async function selectAll(p: Page) {
+  await p.evaluate(() => {
+    const host = document.querySelector(".textLayer, .html-book")!;
+    const range = document.createRange();
+    range.selectNodeContents(host);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  });
+  await wait(300);
+}
+
 try {
   // library
   await page.goto(`${BASE}#/library`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".book-card", { timeout: 10000 });
   check("library lists books", (await page.$$(".book-card")).length >= 1);
 
-  // open the reader just past the first demo's anchor
+  // open the reader just past the first demo's anchor: the margin first, then the chapter's figures
   await page.goto(`${BASE}#/book/${bookId}?at=${(pos(first.anchor) + 0.03).toFixed(3)}`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".margin", { timeout: 20000 });
+  check("the reader opens on the margin", !!(await page.$(".pane-tab[aria-pressed=true]")) && (await page.$eval(".pane-tab[aria-pressed=true]", (e) => e.textContent || "")).startsWith("Margin"));
+  await clickTab(page, "Figures");
   await page.waitForSelector(".demo-frame", { timeout: 20000 });
   await wait(2500);
   check("first demo is active when the reading line passes its anchor", (await active(page)).includes(first.fig), await active(page));
   const frame = await demoFrame(page);
   check("the demo loads in its iframe", !!frame);
   if (frame) {
+    // a predict-first question pauses the demo until it's answered or skipped
+    const skipped = await frame.evaluate(() => {
+      const skip = [...document.querySelectorAll<HTMLElement>("button, a")].find((el) => /^skip$/i.test((el.textContent || "").trim()));
+      skip?.click();
+      return !!skip;
+    });
+    if (skipped) await wait(1500);
     const state = await frame.evaluate(() => {
       const S = (window as unknown as { __classroom?: { frames: number; errors: unknown[] } }).__classroom;
       return { frames: S?.frames ?? 0, errors: S?.errors?.length ?? -1, origin: String(window.origin) };
@@ -118,26 +143,53 @@ try {
     document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
   });
   await wait(300);
-  check("selecting a passage offers the study actions", (await page.$$(".select-pop .select-action")).length === 6, `selected ${selected} chars`);
-  if (await page.$(".select-pop")) {
-    await page.click(".select-action.primary");
+  const labels = await page.$$eval(".sel-menu .sel-row .sel-btn", (els) => els.map((e) => (e.textContent || "").trim()));
+  check("selecting a passage opens the menu", ["Highlight", "Explain", "◆ Visualize", "Ask", "Define", "+ Note"].every((l) => labels.includes(l)), `selected ${selected} chars: ${labels.join(" | ")}`);
+  if (await page.$(".sel-menu")) {
+    // a highlight needs no model: it is marked on the page and kept as a file beside the book
+    const before = ((await (await fetch(`${BASE}api/books/${bookId}/annotations`)).json()) as { id: string }[]).map((a) => a.id);
+    await page.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>(".sel-btn")].find((b) => b.textContent?.trim() === "Highlight")!.click());
+    await wait(1200);
+    const after = (await (await fetch(`${BASE}api/books/${bookId}/annotations`)).json()) as { id: string; kind: string; path: string }[];
+    const made = after.find((a) => !before.includes(a.id));
+    check("Highlight saves an annotation file beside the book", !!made && made.kind === "highlight" && /^library\/[^/]+\/annotations\//.test(made.path), made?.path);
+    check("the highlight is marked in the book", (await page.$$(".page-marks .mark[data-style=fill], .html-reader")).length > 0);
+    if (made) await fetch(`${BASE}api/annotations/${made.id}`, { method: "DELETE" });
+    await selectAll(page);
+    await page.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>(".sel-btn")].find((b) => b.textContent?.includes("Visualize"))!.click());
     await wait(200);
-    check("Visualize opens the request composer", !!(await page.$(".select-pop .figure-request input")));
+    check("Visualize opens the request composer", !!(await page.$(".sel-menu .figure-request input")));
     if (process.argv.includes("--generate")) {
-      await page.type(".select-pop .figure-request input", "the simplest picture of this idea");
-      await page.click(".select-pop .figure-request button[type=submit]");
-      await page.waitForSelector(".scene-demo", { timeout: 15000 });
+      await page.type(".sel-menu .figure-request input", "the simplest picture of this idea");
+      await page.click(".sel-menu .figure-request button[type=submit]");
+      await page.waitForSelector(".mcard.open", { timeout: 15000 });
       const started = Date.now();
-      await page.waitForSelector(".scene-demo .scene .sc-svg", { timeout: 180000 });
-      check("the figure is drawn", true, `${((Date.now() - started) / 1000).toFixed(1)} s`);
+      await page.waitForSelector(".mcard.open .sc-svg", { timeout: 180000 });
+      check("the figure is drawn in the margin", true, `${((Date.now() - started) / 1000).toFixed(1)} s`);
     }
   }
-  for (const tab of ["Tutor", "Notes", "Study"]) {
-    const buttons = await page.$$(".pane-tab");
-    for (const b of buttons) if ((await b.evaluate((el) => el.textContent || "")).startsWith(tab)) await b.click();
+  for (const [tab, selector] of [["Margin", ".margin"], ["Note", ".reader-note"], ["Tutor", ".tutor"], ["Study", ".study-tab"]]) {
+    await clickTab(page, tab);
     await wait(300);
-    check(`the ${tab} tab opens`, !!(await page.$(tab === "Tutor" ? ".tutor" : tab === "Notes" ? ".notes-tab" : ".study-tab")));
+    check(`the ${tab} tab opens`, !!(await page.$(selector)));
   }
+
+  // notes, the graph, agents
+  await page.goto(`${BASE}#/notes`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".file-tree .tree", { timeout: 10000 }).catch(() => null);
+  check("the Notes page shows the vault's notes", !!(await page.$(".file-tree .tree")));
+  const tree = (await (await fetch(`${BASE}api/vault/tree`)).json()) as { notes: { id: string }[] };
+  if (tree.notes[0]) {
+    await page.goto(`${BASE}#/notes/${tree.notes[0].id}`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".note-editor .cm-content", { timeout: 10000 });
+    check("a note opens in the editor with its links beside it", !!(await page.$(".note-side")));
+  }
+  await page.goto(`${BASE}#/brain/graph`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".graph, .empty", { timeout: 10000 });
+  check("the brain's graph loads", !!(await page.$(".graph, .empty")));
+  await page.goto(`${BASE}#/ask?do=1`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".agent-form", { timeout: 10000 });
+  check("agents can be given work on the vault", !!(await page.$(".agent-form textarea")));
 
   check("no page errors", pageErrors.length === 0, pageErrors.join(" | "));
 } finally {

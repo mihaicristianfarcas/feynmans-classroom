@@ -5,16 +5,21 @@ can play with, test yourself at the right moments, explain ideas back in your ow
 what you know grow as a graph. It runs on your machine, keeps everything in plain files you own, and
 does its thinking on **your own Codex or Claude Code subscription** (no API keys).
 
-- **Read with figures.** Upload a PDF, EPUB, Markdown or text book. Select any passage, say what you
-  want to see ("what happens if a message is lost?"), and an interactive figure appears beside the
-  text in about **10–20 seconds**: a graph you can drag, a protocol you can scrub, a network with
-  packets flowing, a 2D physics sketch, a 3D object you can turn and take apart.
+- **Read with a living margin.** Upload a PDF, EPUB, Markdown or text book. Select any passage and
+  choose Explain, Define, Ask or Visualize: the answer appears in the margin **beside the passage**
+  (an explanation in about 8 seconds, a figure in 15–30), with a line to it, and you can ask
+  follow-ups there. Figures are interactive: a graph you can drag, a protocol you can scrub, a
+  network with packets flowing, a 2D physics sketch, a 3D object you can turn and take apart.
+- **Notes like Obsidian.** Write while you read; send passages, answers, figures and captured
+  formulas or pictures to a note in one keystroke. Notes are Markdown files named by their title,
+  with `[[links]]`, embeds, backlinks and unlinked mentions, edited in CodeMirror with a live preview.
 - **Learn it for good.** Flashcards scheduled with FSRS-6, pretests before a chapter and quizzes
   after, the Feynman technique (explain it, get your gaps back), a Socratic tutor, and connections
   from the idea to today's world and to your own goals.
-- **A second brain.** Highlights, notes, concepts, cards and figures live in a Markdown vault with
-  `[[links]]`, versioned by git, readable by you, Obsidian and AI agents alike. See it as a
-  knowledge graph coloured by how well you know each concept; ask it questions.
+- **A second brain.** Books, annotations, notes, concepts, cards and figures live in one folder of
+  plain files (a valid Obsidian vault), versioned by git, with indexes kept for people and agents.
+  See it as a graph built from your links (and the connections an agent suggests, which you accept
+  or reject); ask it questions; have an agent reorganise it, on its own branch, with undo.
 
 ## Quick start
 
@@ -46,14 +51,17 @@ one of them where it's easiest to use.
 
 | Where | Tool | Technique |
 |---|---|---|
-| Reader → select → **Visualize** | an interactive figure of the passage, drawn to your request | dual coding; doing beats watching (drag, scrub, predict) |
+| Reader → select → **Explain / Define / Ask** | the answer in the margin beside the passage, linked to your own notes where they fit; follow-ups in place | elaboration, elaborative interrogation |
+| Reader → select → **Visualize** | an interactive figure of the passage, drawn to your request, in the margin | dual coding; doing beats watching (drag, scrub, predict) |
 | every figure | **predict first**: a question before it plays, when intuition is likely wrong | pretesting, generation |
-| Reader → select → **Cards** | 3–6 flashcards drafted from the passage (minimum information, cloze, "why" cards), edited by you | retrieval practice |
+| Reader → select → ⋯ **Make flashcards** | 3–6 flashcards drafted from the passage (minimum information, cloze, "why" cards), edited by you | retrieval practice |
 | **Review** | FSRS-6 scheduling (the algorithm Anki uses), decks interleaved, optional "type it first" | spaced and interleaved retrieval |
 | Reader → **Study** | **pretest** before a chapter, **quiz** after (misconception-based distractors, explanations, misses become cards in one click) | practice testing, pretesting, feedback |
-| Reader → select → **Explain**, or a concept → **Explain it back** | the Feynman technique: write it plainly, get a score, gaps, unexplained jargon, misconceptions, a "why" follow-up and a 12-year-old's version | self-explanation, elaborative interrogation |
-| Reader → select → **Connect** | the idea in today's world, in your own work (from your goals), and across fields | elaboration, concrete examples |
+| Reader → select → ⋯ **Teach it back**, or a concept → **Explain it back** | the Feynman technique: write it plainly, get a score, gaps, unexplained jargon, misconceptions, a "why" follow-up and a 12-year-old's version | self-explanation, elaborative interrogation |
+| Reader → select → ⋯ **Connect it to today** | the idea in today's world, in your own work (from your goals), and across fields | elaboration, concrete examples |
+| Reader → select → ⋯ **Find resources** | 3–6 videos, explainers, lectures and papers, found with live web search | concrete examples, multiple representations |
 | Reader → **Tutor** | ask about the passage or chapter; "Socratic" mode leads you there with questions | tutoring |
+| Reader → **Note**, **Notes** | write as you read; passages arrive as quotes linked back to the page | generation, organisation |
 | **Review → Mixed quiz** | a quiz across everything you've studied, weakest first | interleaving |
 | **Today** | what's due, what's fading (explain it back), what to quiz a few days after reading | spacing |
 | **Brain**, **Journey** | the knowledge graph (mastery rings), concepts, notes, figures; study days, recall, the vault's history | metacognition |
@@ -110,39 +118,146 @@ about a minute). "Improve → Redraw" applies your notes to the current figure, 
 For the rare figure the kinds can't express, **Hand-build** has Codex write a custom `demo.js` in
 its sandbox (the original pipeline, minutes), checked in real Chrome.
 
-## Your vault: agent-native, plain files, versioned
+## Reading with a margin
+
+The reader puts the book on the right and a **margin** on the left, as in the nutlope reading demo:
+select text and a dark menu offers **Highlight · Explain · Visualize · Ask · Define · + Note** (and,
+under ⋯, the passage or a reference to your note, resources, flashcards, teach it back, connect it to
+today, the tutor). Keys work too: <kbd>H</kbd> <kbd>E</kbd> <kbd>V</kbd> <kbd>A</kbd> <kbd>D</kbd>
+<kbd>N</kbd>. Each answer becomes a card at the height of its passage, which is underlined in the
+page; cards never overlap (the open one sits by its passage and the rest make room, as comments do
+in a shared document), and a thin line joins the open card to its passage. Click a marked passage to
+open its card. <kbd>C</kbd> captures a region of the page (a figure, a formula, a table) as a
+picture for your note, with a transcription if you want one (LaTeX for formulas).
+
+Every card is a Markdown file beside the book, `library/<book>/annotations/p152-explain-….md`:
+
+```markdown
+---
+id: a8c1f0e2
+kind: explain                     # highlight · comment · explain · define · ask · resources · visualize
+book: designing-data-intensive-applications
+book_id: b15c347ba44
+pdf: { file: source.pdf, sha256: 9c1e…, pages: 613 }
+chapter: c5
+page: 152
+anchor:
+  quote: Replication means keeping a copy of the same data on multiple machines
+  prefix: "…in this chapter we discuss "
+  suffix: " that are connected via a network"
+  start: 1834                     # character offsets in the page's text
+  end: 1906
+  rects:                          # the selection's boxes, as fractions of the page
+    - [0.118, 0.431, 0.762, 0.018]
+  md: { file: library/designing-data-intensive-applications/text/05-replication.md, line: 41 }
+request: what does "copy" mean here, physically?
+model: { provider: codex, name: gpt-6-luna, ms: 8421 }
+created: 2026-10-13T07:42:10.000Z
+---
+
+> [!quote] p. 152
+> Replication means keeping a copy of the same data on multiple machines
+
+…the explanation…
+
+## Follow-up: why not just back up?
+
+…
+```
+
+**Finding a passage again.** Anchors follow the W3C Web Annotation model (as Hypothesis does): the
+boxes make it instant to draw, the quote with its context makes it robust, and `md` gives agents the
+same passage in the book's Markdown. `shared/textmatch.ts` folds both texts (whitespace, hyphenation
+at line ends, ligatures, curly quotes, Markdown marks) and matches exactly, then approximately
+(Myers' algorithm); pdf-inspector's positioned lines give the height of a quote on its page, which
+is how an annotation an agent wrote with only a page and a quote still lands beside its passage.
+
+## Notes
+
+Notes are files in `notes/` (folders allowed), **named by their title** as in Obsidian, with
+optional frontmatter. The editor is CodeMirror 6 (what Obsidian is built on): it edits the Markdown
+itself, byte for byte, with a live preview (marks hidden away from the cursor, `[[target|text]]`
+shown as its text), `[[` completion over notes, concepts and books, and pictures pasted or dropped
+into `attachments/`. ⌘-click follows a link. Rendering is react-markdown (remark/rehype) with GFM,
+KaTeX, and Obsidian's syntax: `[[links]]`, `![[embeds]]` (notes, annotations, pictures,
+`figure:<id>`), `> [!callouts]`, `==highlights==`, `#tags`; a ```` ```figure ```` block is a live
+figure. Beside each note: what links here (with the line), unlinked mentions (one click links them),
+links out, and **connections**: an agent reads your vault and suggests notes and concepts this one
+should link to, each with a reason. Accepting writes `related: ["[[…]]"]` into the note's
+frontmatter (so Obsidian and agents see it too); rejected and removed ones are remembered in
+`brain/connections.jsonl` and never suggested again (Settings can make it add them directly).
+Renaming a note moves the file and rewrites every link to it; deleting moves it to `.trash/`.
+
+## Your vault: plain files, indexed for agents, versioned
 
 ```
 data/vault/
-  AGENTS.md            the layout, for AI agents (and you)
-  profile.md           who you are and how you learn; the tutor reads it
-  notes/*.md           notes, highlights, explanations, connections, saved answers
-  concepts/*.md        one page per concept: summary, related concepts, source passages
-  cards/*.md           flashcards (## Front / ## Back) with their source
-  figures/*.json       figures you kept (embed one in any note with ![[figure:id]])
-  sources/*.md         one page per book: chapters, its concepts and notes
-  library/<book>/*.md  each book's text by chapter (derived, not versioned)
-  log/reviews.jsonl    every review; card memory is replayed from it with FSRS
-  log/activity.jsonl   your learning journey
+  AGENTS.md                 the layout and rules, for AI agents (CLAUDE.md imports it)
+  INDEX.md                  generated: counts, recent changes, where to look
+  profile.md                who you are and how you learn
+  notes/**.md               your notes (notes/INDEX.md: generated table of them)
+  concepts/<Name>.md        one page per concept (concepts/INDEX.md: with mastery)
+  cards/*.md                flashcards (## Front / ## Back)
+  figures/*.json            saved figures
+  attachments/              pictures
+  library/INDEX.md          generated: every book
+  library/<book>/           book.json · the file · text/NN-chapter.md (with [[page N]] markers)
+                            annotations/*.md · demos/ · README.md (generated: chapters, annotations)
+  brain/links.tsv           generated: every link (backlinks are one rg away)
+  brain/connections.jsonl   suggested connections and your decisions
+  log/*.jsonl               reviews, the journey, agent runs
 ```
 
-Markdown with YAML frontmatter is what language models read best and what people can open
-anywhere (it's a valid Obsidian vault). The server keeps an index in memory, writes through, picks
-up edits you make in another editor, and commits to git a few seconds after changes, so the vault's
-history is your learning history. **Ask** runs a read-only agent inside the vault: it reads
-`AGENTS.md`, searches notes, concepts, cards and the full text of your books, and answers with
-sources. A database would be faster to query, but nothing at this scale needs it, and plain files
-are what both people and agents can work with directly.
+**Files, not a database.** Markdown with frontmatter (and JSONL for logs) is the only source of truth:
+you, Obsidian, git and any agent with `rg`, `sed` or `cat` can read and change it, and there's no
+second copy to keep in sync. The bookkeeping a database would do is kept as **generated files**,
+rewritten a moment after any change: the vault map, the library, each book's chapters and
+annotations, the note and concept tables, every link. An agent reads a 2 KB index instead of opening
+a hundred files, which is where the savings in tokens and calls come from. At this scale an index in
+memory builds in a second and ripgrep searches a library in milliseconds; if search ever gets slow,
+a SQLite full-text index can sit in `.cache/` as a disposable copy rebuilt from the files. Books,
+annotations, notes and logs are versioned; the PDFs, the extracted text and the generated indexes
+are not (`.gitignore` keeps a managed block). Vaults and books from earlier versions are migrated at
+startup.
+
+## Agents with a real shell, and the guardrails
+
+Agents get no custom tools and no MCP: they work on the files with the shell they already have
+(`rg`, `sed`, `ls`, `jq`, `sqlite3`…), confined by the CLI's own OS sandbox (Seatbelt on macOS,
+bubblewrap/Landlock on Linux). Codex runs with a custom permission profile, Claude Code with
+`--restricted` and its sandbox settings; both verified (`tests/agent-sandbox.test.ts` runs real shell
+commands under the Codex sandbox):
+
+| the agent tries to | allowed? |
+|---|---|
+| read and search the vault (or its working copy) | yes |
+| write its working copy (agents that change things) | yes |
+| write the live vault, anything else, or `.git` | no |
+| look around your home folder | no |
+| reach the network | no |
+
+- **Ask** (and connection suggestions) run read-only, directly in the vault.
+- **Do** (Ask → Do) gives an agent work: "turn my chapter 5 highlights into a summary note". It works in
+  a **git worktree of the vault** (its own branch, outside the vault), with the books' text and the
+  indexes linked in read-only, so it never edits a note you have open. When it's done the server
+  checks the diff: every file must still parse, app-owned files (logs, profile, `book.json`,
+  `AGENTS.md`…) must be untouched, and **deleting files or taking lines out of your notes waits for
+  your OK** (you see the diff). Then it merges, as one commit with an **Undo** button. Every run is
+  recorded in `log/agents.jsonl` (task, model, files, commit).
+- Book text is material, never instructions, in every prompt; a passage that tries to give orders
+  can't get past the sandbox and the checks anyway.
 
 ## Your subscription
 
 Everything model-driven goes through one door (`server/llm.ts`): `structured()` for JSON matching a
-schema, `text()` for prose, `agent()` for read-only work in a folder. Behind it:
+schema, `text()` for prose (both can look at pictures and search the web), `agent()` for an agent
+with a shell in a folder, read-only or writing. Behind it:
 
-- **Codex**: `codex exec` with your ChatGPT login (`--output-schema` for structure, a read-only
-  sandbox, ephemeral sessions).
-- **Claude Code**: `claude -p` with your Claude login (`--json-schema`, no tools except Read/Grep/Glob
-  for the vault agent, no MCP servers, no session files).
+- **Codex**: `codex exec` with your ChatGPT login (`--output-schema` for structure, `-i` for pictures,
+  live web search for resources, a permission profile for agents, ephemeral sessions).
+- **Claude Code**: `claude -p` with your Claude login (`--json-schema`; agents get Bash, Read, Grep,
+  Glob (and Edit, Write when they may write) under `--restricted` and the sandbox; no MCP servers, no
+  session files).
 
 **Settings** picks the provider (automatic: Codex when it's logged in, else Claude Code), the quick
 and careful model and effort for each, and how many calls may run at once (3 by default, so a burst
@@ -168,14 +283,20 @@ never hammers your plan).
 ```
 shared/scene/      the figure engine: spec types, expressions, five renderers, validation, schemas,
                    reference figures (runs in the browser and in Node)
+shared/links.ts    Obsidian links: parse, rewrite, file names
+shared/textmatch.ts finding a quote again across differently extracted texts
 shared/fsrs.ts     FSRS-6
-server/            Hono API: ingest, anchors, jobs, SSE, settings, the provider layer
+server/            Hono API: ingest, jobs, SSE, settings, the provider layer (llm.ts), agents (agents.ts)
+  annotations/     the margin: anchors (anchor.ts), annotation files and their answers, routes
   scene/           figure generation (guide, kinds, generate.ts) and figures in books (figures.ts)
-  learn/           cards, concepts, study tools (quiz, explain, connect, tutor), brain (graph, search, ask, journey, today)
-  vault/           the Markdown vault, git, the books' text export
+  learn/           notes, connections, cards, concepts, study tools, brain (graph, search, ask, journey, today)
+  vault/           the vault (collections, git, watching), links, indexes, connections, the books' text
   generate/        chapter planning and the hand-built demo pipeline (Codex)
 runtime/           the hand-built demo runtime (iframe pages)
-web/src/           React: Today, Library, Reader (figures, tutor, notes, study), Review, Brain, Ask, Journey, Settings
+web/src/           React: Today, Library, Reader (margin, figures, note, tutor, study), Notes, Review,
+                   Brain, Ask (and Do), Journey, Settings
+  Margin.tsx, SelectionMenu.tsx, anchoring.ts, Capture.tsx     the reader's margin and menu
+  Notes.tsx, NoteEditor.tsx, Markdown.tsx                      notes, the editor, rendering
   scene/           the player: the universal frame, loop, controls, dragging, zoom
 tests/             vitest units; screenshot and browser-flow scripts
 vendor/anatomy/    the anatomy skill (MIT)
@@ -184,10 +305,12 @@ vendor/anatomy/    the anatomy skill (MIT)
 ## Tests
 
 ```bash
-npm test                    # 74 unit tests: expressions, every reference figure (validate + render + schema),
-                            # validation catching model mistakes, FSRS, the vault, ingest, anchors, Codex args
+npm test                    # 100 unit tests: expressions, every reference figure, FSRS, the vault and its
+                            # migration, links and renames, indexes, annotations and anchoring, ingest,
+                            # Codex args, and the agents' sandbox (real shell commands under Codex's sandbox)
 npm run typecheck
 npm run test:e2e            # browser checks of the running app (add --generate to draw a figure with the model)
+npx tsx tests/margin-flow.ts <bookId> <page> out/                            # select → Explain → follow-up → note
 npx tsx tests/scene-shots.ts out/ [--theme dark] [--only tangent,engine]   # screenshot the gallery
 npx tsx tests/reader-flow.ts <bookId> <block> out/ "a request"               # select → Visualize → figure
 npx tsx scripts/try-scene.ts lag lamport wick                                # generate sample figures, timed
@@ -199,4 +322,6 @@ npx tsx scripts/try-scene.ts lag lamport wick                                # g
 - Figures are as true as the model's reading of the passage; every number they show comes from
   their own expressions, so check the readout against the text when it matters.
 - Hand-built demos need Codex (they run in its sandbox).
+- Agents that write need git (their changes are checked, merged and undone through the vault's history).
+- Capture works on PDF pages; in EPUBs, pictures are already in the text.
 - Speed and how much you can generate follow your plan's limits.
