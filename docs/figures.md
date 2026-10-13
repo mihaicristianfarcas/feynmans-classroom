@@ -35,7 +35,9 @@ Every figure gets the same frame: Fig number and title, the stage, a hint and a 
 legend and narration, then play/pause, restart, step back and forward, a progress slider, zoom and
 reset (disabled when they don't apply, never hidden), the parameters, "back to text values" and the
 live stats. Doers drag points, nodes and pistons, scrub protocols and orbit 3D objects; tap any part
-to read what it is. Numbers that move are expressions in a small safe language
+to read what it is. All of it works from the keyboard on the focused stage: Space plays, ← → step,
+↑ ↓ pick and read the parts, Shift + arrows drag the picked part (or pan, or turn a 3D object), + −
+zoom and 0 resets. Numbers that move are expressions in a small safe language
 (`shared/scene/expr.ts`: no property access, no globals), so a spec can only compute values.
 
 Figures share the app's palette ([design.md](design.md)): coal lines on white, the one lit element in the lavender

@@ -119,6 +119,16 @@ function infoMap(spec: Scene): Map<string, { label: string; info: string }> {
   return out;
 }
 
+/** The parts the reader can drag: plot points and diagram shapes move their sliders (x, y), graph nodes
+ * move themselves (null). */
+function movableParts(spec: Scene): Map<string, { x: string; y: string } | null> {
+  const out = new Map<string, { x: string; y: string } | null>();
+  if (spec.kind === "plot") for (const l of spec.layers) if ("drag" in l && l.drag) out.set(l.id, l.drag);
+  if (spec.kind === "diagram") for (const sh of spec.shapes) if ("drag" in sh && sh.drag) out.set(sh.id, sh.drag);
+  if (spec.kind === "graph") for (const n of spec.nodes) out.set(n.id, null);
+  return out;
+}
+
 function swatch(tone: string, style: string) {
   const color = `var(--sc-${tone === "lit" ? "lit" : tone})`;
   if (style === "dot") return `<svg viewBox="0 0 18 10"><circle cx="9" cy="5" r="3.4" fill="${color}"/></svg>`;
@@ -126,6 +136,14 @@ function swatch(tone: string, style: string) {
     return `<svg viewBox="0 0 18 10"><rect x="2" y="1.5" width="14" height="7" rx="1" fill="color-mix(in srgb, ${color} 18%, var(--sc-card))" stroke="${color}" stroke-width="1"/></svg>`;
   return `<svg viewBox="0 0 18 10"><path d="M1 5h16" stroke="${color}" stroke-width="${tone === "lit" ? 2 : 1.5}" ${style === "dashed" ? 'stroke-dasharray="3 3"' : ""} fill="none"/></svg>`;
 }
+
+/** Arrow keys as [dx, dy] with y up. */
+const ARROWS: Record<string, [number, number]> = {
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+  ArrowUp: [0, 1],
+  ArrowDown: [0, -1],
+};
 
 export class ScenePlayer {
   readonly root: HTMLElement;
@@ -156,6 +174,8 @@ export class ScenePlayer {
   private tourPhase = 0;
   private hover: string | null = null;
   private picked: string | null = null;
+  /** The part was picked with the arrow keys, so the info box says how to move it. */
+  private pickedByKey = false;
   private lastSvg = "";
   private lastOut: RenderOut | null = null;
   private drag: {
@@ -167,6 +187,7 @@ export class ScenePlayer {
     view: View;
   } | null = null;
   private infos: Map<string, { label: string; info: string }>;
+  private movable: Map<string, { x: string; y: string } | null>;
   private observer: IntersectionObserver | null = null;
   private dead = false;
   private stats: HTMLElement[] = [];
@@ -183,6 +204,7 @@ export class ScenePlayer {
     this.shown = { ...this.params };
     this.playing = opts.autoplay !== false && !reduced();
     this.infos = infoMap(spec);
+    this.movable = movableParts(spec);
     this.build();
     this.recompute();
     if (opts.predict !== false && spec.predict) this.showPredict();
@@ -199,14 +221,15 @@ export class ScenePlayer {
     this.root.dataset.theme = this.opts.theme;
     if (this.opts.compact) this.root.dataset.compact = "";
     const corner = (name: string, text: string) => h("span", { class: "sc-corner", "data-corner": name, text });
-    const parts = [...this.infos.values()].filter((p) => p.info).length;
+    const parts = this.readableParts().length;
+    const moves = spec.kind === "object3d" ? "turn it" : this.movable.size ? "move the chosen part" : "pan";
     const stage = h("div", {
       class: "sc-stage",
       tabindex: "0",
       role: "img",
       "aria-label": `${spec.title}. ${spec.caption}`,
       "aria-roledescription": "interactive figure",
-      "aria-description": `Space plays and pauses, the left and right arrows step${parts ? ", the up and down arrows read its parts" : ""}, plus and minus zoom.`,
+      "aria-description": `Space plays and pauses, the left and right arrows step${parts ? ", the up and down arrows read its parts" : ""}, Shift and the arrows ${moves}, plus and minus zoom.`,
     });
     stage.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="sc-svg" viewBox="0 0 ${WIDTH} ${HEIGHT}" aria-hidden="true"></svg>`;
     const info = h("div", { class: "sc-info", "aria-live": "polite" });
@@ -650,25 +673,7 @@ export class ScenePlayer {
           ...this.view,
           moved: { ...this.view.moved, [d.id!]: this.lastOut?.invert ? this.lastOut.invert(base[0], base[1]) : base },
         };
-      } else if (d.kind === "orbit") {
-        this.view = {
-          ...this.view,
-          azimuth: d.view.azimuth - dx * 0.45,
-          elevation: clamp(d.view.elevation + dy * 0.35, -85, 85),
-        };
-      } else if (d.kind === "pan" && d.moved) {
-        const z = d.view.zoom || 1;
-        if (this.spec.kind === "plot")
-          this.view = {
-            ...this.view,
-            panX: d.view.panX - dx / (WIDTH * 0.87) / z,
-            panY: d.view.panY + dy / (HEIGHT * 0.81) / z,
-          };
-        else if (this.spec.kind === "diagram")
-          this.view = { ...this.view, panX: d.view.panX + dx / WIDTH, panY: d.view.panY + dy / HEIGHT };
-        else if ((this.view.zoom || 1) > 1.01)
-          this.view = { ...this.view, panX: d.view.panX + dx / WIDTH, panY: d.view.panY + dy / HEIGHT };
-      }
+      } else if (d.kind === "orbit" || (d.kind === "pan" && d.moved)) this.view = this.draggedView(d.view, dx, dy);
       this.updateTransport();
       this.wake();
     });
@@ -680,6 +685,7 @@ export class ScenePlayer {
       if (!d.moved) {
         const id = (event.target as Element).closest("[data-id]")?.getAttribute("data-id") || null;
         this.picked = this.picked === id ? null : id;
+        this.pickedByKey = false;
         this.showInfo();
       }
       this.wake();
@@ -704,19 +710,24 @@ export class ScenePlayer {
       { passive: false },
     );
     stage.addEventListener("keydown", (event) => {
-      if (event.key === " ") {
+      const arrow = ARROWS[event.key];
+      if (arrow && event.shiftKey) {
+        event.preventDefault();
+        this.nudge(arrow[0], arrow[1]);
+      } else if (event.key === " ") {
         event.preventDefault();
         this.setPlaying(!this.playing);
       } else if (event.key === "ArrowRight") this.stepBy(1);
       else if (event.key === "ArrowLeft") this.stepBy(-1);
       else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         // read the figure's parts one by one: what tapping a part does, for the keyboard (the info box is announced)
-        const ids = [...this.infos.entries()].filter(([, p]) => p.info).map(([id]) => id);
+        const ids = this.readableParts();
         if (!ids.length) return;
         event.preventDefault();
         const at = this.picked ? ids.indexOf(this.picked) : -1;
         const to = event.key === "ArrowDown" ? at + 1 : at < 0 ? ids.length - 1 : at - 1;
         this.picked = ids[(to + ids.length) % ids.length];
+        this.pickedByKey = true;
         this.showInfo();
         this.wake();
       } else if (event.key === "+" || event.key === "=") this.setZoom((this.view.zoom || 1) * 1.25);
@@ -725,14 +736,67 @@ export class ScenePlayer {
     });
   }
 
+  /** The parts the up and down arrows step through: those with something to say, and those that move. */
+  private readableParts(): string[] {
+    const said = [...this.infos.entries()].filter(([, p]) => p.info).map(([id]) => id);
+    return [...said, ...[...this.movable.keys()].filter((id) => !said.includes(id))];
+  }
+
+  /** The view after dragging the stage by (dx, dy) px from `from`: pans, or turns a 3D object. */
+  private draggedView(from: View, dx: number, dy: number): View {
+    if (this.spec.kind === "object3d")
+      return { ...this.view, azimuth: from.azimuth - dx * 0.45, elevation: clamp(from.elevation + dy * 0.35, -85, 85) };
+    const z = from.zoom || 1;
+    if (this.spec.kind === "plot")
+      return { ...this.view, panX: from.panX - dx / (WIDTH * 0.87) / z, panY: from.panY + dy / (HEIGHT * 0.81) / z };
+    // sequences and graphs pan only once zoomed in
+    if (this.spec.kind === "diagram" || (this.view.zoom || 1) > 1.01)
+      return { ...this.view, panX: from.panX + dx / WIDTH, panY: from.panY + dy / HEIGHT };
+    return this.view;
+  }
+
+  /** Shift + an arrow drags one notch that way: the picked part if it moves, else the view.
+   * `dy` is +1 for up. A point moves its sliders by a fortieth of their range (or one step). */
+  private nudge(dx: number, dy: number) {
+    this.touch();
+    const id = this.picked;
+    const drag = id ? this.movable.get(id) : undefined;
+    if (id && drag) {
+      for (const [param, by] of [
+        [drag.x, dx],
+        [drag.y, dy],
+      ] as const) {
+        const p = param && by ? this.spec.params.find((x) => x.id === param) : null;
+        if (p) this.setParam(p.id, this.params[p.id] + by * Math.max(p.step || 0, (p.max - p.min) / 40), true);
+      }
+      this.showInfo();
+    } else if (id && drag === null) {
+      const at = this.view.moved?.[id] ?? (this.memo.layout as Map<string, [number, number]> | undefined)?.get(id);
+      if (at) this.view = { ...this.view, moved: { ...this.view.moved, [id]: [at[0] + dx * 16, at[1] - dy * 16] } };
+    } else this.view = this.draggedView(this.view, dx * 40, -dy * 40);
+    this.updateTransport();
+    this.wake();
+  }
+
   private showInfo() {
     const id = this.hover || this.picked;
     const entry = id ? this.infos.get(id) : null;
     const box = this.el.info;
-    if (entry?.info) {
+    // a part picked from the keyboard that moves says how, and what its sliders read now
+    const drag = id && id === this.picked && this.pickedByKey ? this.movable.get(id) : undefined;
+    const keys = drag !== undefined;
+    if (entry?.info || keys) {
       box.innerHTML = "";
-      if (entry.label) box.append(h("b", { text: entry.label }));
-      box.append(h("span", { text: entry.info }));
+      if (entry?.label) box.append(h("b", { text: entry.label }));
+      if (entry?.info) box.append(h("span", { text: entry.info }));
+      if (keys) {
+        const values = [drag?.x, drag?.y].flatMap((param) => {
+          const p = param ? this.spec.params.find((x) => x.id === param) : null;
+          const out = p && this.controls.get(p.id)?.out;
+          return p && out ? [`${p.label} ${out.textContent}`] : [];
+        });
+        box.append(h("span", { class: "sc-info-keys", text: [...values, "Shift + arrows move it"].join(" · ") }));
+      }
       box.dataset.on = "";
     } else delete box.dataset.on;
   }
