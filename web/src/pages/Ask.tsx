@@ -1,5 +1,5 @@
 /* Ask: put a question to your whole vault (an agent reads it and answers with sources), or, under Do,
- * give an agent work to do on it. */
+ * give an agent work to do on it. A small switch picks which; the field is the page. */
 import { ArrowUp, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { learn } from "../api";
@@ -30,35 +30,19 @@ export function Ask({ theme }: { theme: "light" | "dark" }) {
   const [mode, setMode] = useState<"ask" | "do">(
     new URLSearchParams(location.hash.split("?")[1] || "").get("do") ? "do" : "ask",
   );
-  const tabs = useIndicator<HTMLElement>(mode);
+  const modes = useIndicator<HTMLFieldSetElement>(mode);
   return (
     <div className="ask rise">
-      <header className="page-head">
-        <h1 className="page-title">{mode === "ask" ? "Ask your library" : "Work on your vault"}</h1>
-        <p className="lede small">
-          {mode === "ask"
-            ? "An agent searches your notes, concepts, cards and the full text of your books with its own shell, then answers with sources."
-            : "An agent reorganises, links and writes notes for you, on its own branch of your vault, inside a sandbox. Its changes land after checks, and every run can be undone."}
-        </p>
-      </header>
-      <nav className="tabs" aria-label="Mode" ref={tabs}>
-        <button
-          type="button"
-          className="tab"
-          aria-current={mode === "ask" ? "page" : undefined}
-          onClick={() => setMode("ask")}
-        >
+      <h1 className="visually-hidden">{mode === "ask" ? "Ask your library" : "Work on your vault"}</h1>
+      <fieldset className="segmented ask-mode" ref={modes}>
+        <legend className="visually-hidden">Mode</legend>
+        <button type="button" aria-pressed={mode === "ask"} onClick={() => setMode("ask")}>
           Ask
         </button>
-        <button
-          type="button"
-          className="tab"
-          aria-current={mode === "do" ? "page" : undefined}
-          onClick={() => setMode("do")}
-        >
+        <button type="button" aria-pressed={mode === "do"} onClick={() => setMode("do")}>
           Do
         </button>
-      </nav>
+      </fieldset>
       {mode === "ask" ? <AskPanel theme={theme} /> : <AgentRuns theme={theme} />}
     </div>
   );
@@ -103,13 +87,17 @@ function AskPanel({ theme }: { theme: "light" | "dark" }) {
           autoFocus
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="e.g. How do Tanenbaum and Kleppmann differ on consistency models?"
+          placeholder="Ask anything about your books and notes…"
+          aria-label="Your question"
           disabled={!!busy}
         />
         <button className="icon-button ask-send" type="submit" disabled={!!busy || !question.trim()} aria-label="Ask">
           <ArrowUp aria-hidden="true" />
         </button>
       </form>
+      {!busy && !answers.length && !error && (
+        <p className="fine ask-hint">An agent reads your notes, cards and books, then answers with its sources.</p>
+      )}
       {busy && <Spinner label="Reading your vault" since={busy} />}
       {error && <p className="form-error">{error}</p>}
       {answers.map((a, i) => (

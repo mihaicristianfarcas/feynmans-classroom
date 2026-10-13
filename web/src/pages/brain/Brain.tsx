@@ -1,13 +1,12 @@
+/* The Brain (#/brain): your vault as one graph that fills the page (BrainGraph), and each concept's own
+ * page (#/brain/concept/<id>). Older routes still land somewhere: the lists that were tabs here open
+ * the graph, figures moved to the library, notes to #/notes, and #/brain/find/<target> opens a link. */
 import { useEffect, useState } from "react";
 import { openLink } from "../../app/navigation";
-import { useIndicator } from "../../components/ui";
+import { BrainGraph } from "./BrainGraph";
 import { ConceptPage } from "./ConceptPage";
-import { GraphTab } from "./GraphTab";
-import { ConceptsTab, FiguresTab, NotesTab } from "./lists";
 
-type Tab = "graph" | "concepts" | "notes" | "figures";
-
-/** #/brain[/tab] · #/brain/concept/:id · #/brain/note/:id · #/brain/new · #/brain/find/:target */
+/** #/brain · #/brain/concept/:id · #/brain/note/:id · #/brain/new · #/brain/figures · #/brain/find/:target */
 export function Brain({ theme }: { theme: "light" | "dark" }) {
   const [hash, setHash] = useState(location.hash);
   useEffect(() => {
@@ -20,13 +19,9 @@ export function Brain({ theme }: { theme: "light" | "dark" }) {
   if (section === "concept" && id) return <ConceptPage key={id} id={id} theme={theme} />;
   if (section === "note" && id) return <Redirect to={`#/notes/${id}`} />;
   if (section === "new") return <Redirect to="#/notes" />;
+  if (section === "figures") return <Redirect to="#/library/figures" />;
   if (section === "find" && id) return <Find target={id} />;
-  return (
-    <BrainHome
-      tab={(["graph", "concepts", "notes", "figures"].includes(section) ? section : "graph") as Tab}
-      theme={theme}
-    />
-  );
+  return <BrainGraph theme={theme} />;
 }
 
 /** Old [[link]] routes: resolve the link the same way notes do. */
@@ -37,41 +32,7 @@ function Find({ target }: { target: string }) {
   return <div className="center-note">Opening “{target}”…</div>;
 }
 
-function BrainHome({ tab, theme }: { tab: Tab; theme: "light" | "dark" }) {
-  const [filter, setFilter] = useState("");
-  const tabs = useIndicator<HTMLElement>(tab);
-  return (
-    <div className="brain rise">
-      <header className="page-head row">
-        <h1 className="page-title">Your brain</h1>
-        <span className="spacer" />
-        <input
-          className="search"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter…"
-          aria-label="Filter"
-        />
-        <a className="button primary" href="#/notes">
-          Notes
-        </a>
-      </header>
-      <nav className="tabs" aria-label="Brain sections" ref={tabs}>
-        {(["graph", "concepts", "notes", "figures"] as Tab[]).map((t) => (
-          <a key={t} href={`#/brain/${t}`} className="tab" aria-current={tab === t ? "page" : undefined}>
-            {t[0].toUpperCase() + t.slice(1)}
-          </a>
-        ))}
-      </nav>
-      {tab === "graph" && <GraphTab filter={filter} />}
-      {tab === "concepts" && <ConceptsTab filter={filter} />}
-      {tab === "notes" && <NotesTab filter={filter} theme={theme} />}
-      {tab === "figures" && <FiguresTab filter={filter} theme={theme} />}
-    </div>
-  );
-}
-
-/** Notes moved to #/notes: old links go there. */
+/** Routes that moved: old links go to the new place. */
 function Redirect({ to }: { to: string }) {
   useEffect(() => {
     location.replace(to);

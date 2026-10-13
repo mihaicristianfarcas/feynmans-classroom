@@ -9,7 +9,15 @@ import { Markdown } from "../../components/Markdown";
 import { CardDrafter, Connector, ExplainBack, FigureMaker } from "../../components/tools";
 import { timeAgo } from "../../lib/time";
 import { useLoad } from "../../lib/useLoad";
-import { TYPE_LABEL } from "./lists";
+
+const TYPE_LABEL: Record<string, string> = {
+  note: "Note",
+  highlight: "Highlight",
+  explanation: "Explanation",
+  connection: "Connection",
+  answer: "Answer",
+  summary: "Summary",
+};
 
 export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
   const { data: c, error, reload } = useLoad(() => learn.concept(id), [id]);
@@ -29,9 +37,9 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
   const source = c.sources[0];
   return (
     <div className="concept-page rise">
-      <a className="back-link" href="#/brain/concepts">
+      <a className="back-link" href={`#/brain?focus=concept:${encodeURIComponent(c.id)}`}>
         <ArrowLeft aria-hidden="true" />
-        Concepts
+        Brain
       </a>
       <header className="page-head">
         <span className="eyebrow">Concept</span>
@@ -42,18 +50,18 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
         <button type="button" className="button primary" aria-haspopup="dialog" onClick={() => setTool("explain")}>
           Explain it back
         </button>
-        <button type="button" className="button" aria-haspopup="dialog" onClick={() => setTool("cards")}>
+        <button type="button" className="button subtle" aria-haspopup="dialog" onClick={() => setTool("cards")}>
           Make cards
         </button>
-        <button type="button" className="button" aria-haspopup="dialog" onClick={() => setTool("figure")}>
+        <button type="button" className="button subtle" aria-haspopup="dialog" onClick={() => setTool("figure")}>
           <Shapes aria-hidden="true" />
           Draw it
         </button>
-        <button type="button" className="button" aria-haspopup="dialog" onClick={() => setTool("connect")}>
+        <button type="button" className="button subtle" aria-haspopup="dialog" onClick={() => setTool("connect")}>
           Connect
         </button>
         <a
-          className="button"
+          className="button subtle"
           href={`#/ask?q=${encodeURIComponent(`Explain ${c.name} using everything in my library`)}`}
         >
           Ask the library
@@ -178,7 +186,7 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
         onClick={async () => {
           if (!confirm(`Delete the concept "${c.name}"? Cards and notes stay.`)) return;
           await learn.deleteConcept(c.id);
-          go("#/brain/concepts");
+          go("#/brain");
         }}
       >
         Delete concept

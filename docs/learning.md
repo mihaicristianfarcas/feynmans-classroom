@@ -23,7 +23,7 @@ one of them where it's easiest to use.
 | Reader → **Note**, **Notes** | write as you read; passages arrive as quotes linked back to the page | generation, organisation |
 | **Review → Mixed quiz** | a quiz across everything you've studied, weakest first | interleaving |
 | **Today** | what's due, what's fading (explain it back), what to quiz a few days after reading | spacing |
-| **Brain**, **Journey** | the knowledge graph (mastery rings), concepts, notes, figures; study days, recall, the vault's history | metacognition |
+| **Brain**, **Journey** | the knowledge graph (mastery rings; click an item to read it in a card beside the graph); study days, recall, concepts from solid to fading | metacognition |
 
 Concept mastery is the FSRS-predicted recall of a concept's cards right now (or your best
 explanation score when it has no cards), so the graph shows what is actually fading.

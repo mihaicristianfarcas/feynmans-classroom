@@ -1,24 +1,37 @@
-/* The library: the shelf of books, uploading a new one (a button you can also drop a file on), and
- * whether Codex and the browser check are ready. */
-import { Trash2, Upload } from "lucide-react";
+/* The library: your books as a shelf of covers (add one with the button, or drop a file anywhere on the
+ * page) and, under Figures (#/library/figures), the figures you drew. It mentions the model tool only
+ * when the one in use isn't ready. */
+import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { api, type Book, type Status } from "../api";
+import { api, type Book, learn, type SettingsInfo } from "../api";
 import { Spinner } from "../components/feedback";
-import { toneOf } from "../components/ui";
+import { toneOf, useIndicator } from "../components/ui";
+import { Figures } from "./Figures";
 
-export function Library() {
+const FORMATS = "PDF with selectable text, EPUB, Markdown or plain text";
+
+export function Library({ theme }: { theme: "light" | "dark" }) {
+  const [hash, setHash] = useState(location.hash);
+  useEffect(() => {
+    const on = () => setHash(location.hash);
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
+  }, []);
+  const view = hash.split("?")[0].startsWith("#/library/figures") ? "figures" : "books";
+  const views = useIndicator<HTMLElement>(view);
   const [books, setBooks] = useState<Book[] | null>(null);
-  const [status, setStatus] = useState<Status | null>(null);
+  const [info, setInfo] = useState<SettingsInfo | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [drag, setDrag] = useState(false);
+  // a file dragged over the page: counted, so moving across children doesn't flicker the overlay
+  const [drag, setDrag] = useState(0);
   const input = useRef<HTMLInputElement>(null);
 
   const refresh = () => api.books().then(setBooks, (e) => setError(e.message));
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs once, when the page opens
   useEffect(() => {
     refresh();
-    api.status().then(setStatus, () => setStatus(null));
+    learn.settings().then(setInfo, () => setInfo(null));
   }, []);
 
   const upload = async (file: File | undefined) => {
@@ -35,17 +48,38 @@ export function Library() {
       refresh();
     }
   };
+  const files = (e: React.DragEvent) => e.dataTransfer.types.includes("Files");
+  const ready =
+    !info || (info.active === "codex" ? info.codex.installed && info.codex.loggedIn : info.claude.installed);
 
   return (
-    <div className="library rise">
-      <header className="page-head">
+    // biome-ignore lint/a11y/noStaticElementInteractions: dropping a file is a shortcut; "Add a book" does the same
+    <div
+      className="library rise"
+      onDragEnter={(e) => files(e) && setDrag((n) => n + 1)}
+      onDragLeave={(e) => files(e) && setDrag((n) => Math.max(0, n - 1))}
+      onDragOver={(e) => files(e) && e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDrag(0);
+        if (view === "books") upload(e.dataTransfer.files[0]);
+      }}
+    >
+      <header className="page-head row">
         <h1 className="page-title">Library</h1>
-        <p className="lede small">
-          Bring in a hard book and read it with a margin that explains, draws and quizzes. Select any passage to ask
-          about it.
-        </p>
+        <nav className="segmented" aria-label="Library" ref={views}>
+          <a href="#/library" aria-current={view === "books" ? "page" : undefined}>
+            Books
+          </a>
+          <a href="#/library/figures" aria-current={view === "figures" ? "page" : undefined}>
+            Figures
+          </a>
+        </nav>
+        <span className="spacer" />
+        {view === "books" && books?.length ? (
+          <AddBook uploading={uploading} onClick={() => input.current?.click()} />
+        ) : null}
       </header>
-
       <input
         ref={input}
         type="file"
@@ -53,63 +87,50 @@ export function Library() {
         hidden
         onChange={(e) => upload(e.target.files?.[0])}
       />
-      <button
-        type="button"
-        className={`dropzone ${drag ? "drag" : ""}`}
-        aria-describedby="upload-formats"
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDrag(true);
-        }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDrag(false);
-          upload(e.dataTransfer.files[0]);
-        }}
-        onClick={() => input.current?.click()}
-        disabled={!!uploading}
-      >
-        <span className="well drop-icon" data-tone={drag ? "lavender" : undefined} aria-hidden="true">
-          <Upload />
-        </span>
-        {uploading ? (
-          <Spinner label={`Reading “${uploading}”`} />
-        ) : (
-          <span className="drop-text">
-            <span className="drop-title">Drop a book here, or choose one</span>
-            <span className="fine" id="upload-formats">
-              PDF with selectable text, EPUB, Markdown or plain text
-            </span>
-          </span>
-        )}
-      </button>
       {error && (
         <p className="form-error" role="alert">
           {error}
         </p>
       )}
+      {!ready && info && (
+        <p className="fine notice">
+          {info.active === "codex"
+            ? info.codex.installed
+              ? "Codex isn’t logged in (run codex login), so nothing can be explained or drawn yet."
+              : "Codex isn’t installed (npm i -g @openai/codex), so nothing can be explained or drawn yet."
+            : "Claude Code isn’t installed (npm i -g @anthropic-ai/claude-code), so nothing can be explained or drawn yet."}{" "}
+          <a href="#/settings">Settings</a>
+        </p>
+      )}
 
-      <section className="shelf stagger" aria-label="Your books">
-        {books === null ? (
-          <Spinner label="Loading your shelf" />
-        ) : books.length === 0 ? (
-          <p className="fine">Your shelf is empty.</p>
-        ) : (
-          books.map((book) => (
-            <article key={book.id} className="book-card">
+      {view === "figures" ? (
+        <Figures theme={theme} />
+      ) : books === null ? (
+        <Spinner label="Loading your shelf" />
+      ) : books.length === 0 ? (
+        <div className="empty-state">
+          <h2 className="empty-title">Bring in a hard book</h2>
+          <p className="fine">
+            Read it beside a margin that explains, draws and quizzes. {FORMATS}; or drop a file on this page.
+          </p>
+          <AddBook uploading={uploading} onClick={() => input.current?.click()} primary />
+        </div>
+      ) : (
+        <ul className="shelf stagger" aria-label="Your books">
+          {books.map((book) => (
+            <li key={book.id} className="book-card">
               <a href={`#/book/${book.id}`} className="book-link">
                 <span className="book-cover" data-tone={toneOf(book.id)} aria-hidden="true">
                   <span className="book-cover-letter">{book.title.replace(/^(the|a|an)\s+/i, "")[0]}</span>
-                  <span className="book-format">{book.format}</span>
                 </span>
                 <span className="book-title">{book.title}</span>
-                {book.author && <span className="book-author">{book.author}</span>}
-                <span className="book-meta">
-                  {book.format === "pdf" ? `${book.pageCount} pages` : `${book.toc.length} chapters`} ·{" "}
-                  {book.demoCount || 0} figure{book.demoCount === 1 ? "" : "s"}
-                  {book.building ? ` · ${book.building} building` : ""}
+                <span className="book-author">
+                  {book.author ||
+                    (book.format === "pdf"
+                      ? `${book.pageCount} pages`
+                      : `${book.toc.length} chapter${book.toc.length === 1 ? "" : "s"}`)}
                 </span>
+                {book.building ? <span className="fine">Drawing {book.building} figures…</span> : null}
                 {book.status === "error" && <span className="form-error">{book.error}</span>}
               </a>
               <button
@@ -118,41 +139,51 @@ export function Library() {
                 aria-label={`Remove ${book.title}`}
                 title="Remove from the library"
                 onClick={async () => {
-                  if (!confirm(`Remove "${book.title}" and its demos?`)) return;
+                  if (!confirm(`Remove "${book.title}" and its figures?`)) return;
                   await api.deleteBook(book.id);
                   refresh();
                 }}
               >
                 <Trash2 aria-hidden="true" />
               </button>
-            </article>
-          ))
-        )}
-      </section>
-
-      <footer className="status-line">
-        {status ? (
-          <>
-            <span data-ok={status.codex.installed && status.codex.loggedIn}>
-              Codex{" "}
-              {status.codex.installed
-                ? status.codex.loggedIn
-                  ? `ready · ${status.codex.detail || "logged in"}`
-                  : "installed but not logged in: run codex login"
-                : "not installed"}{" "}
-              · <a href="#/settings">settings</a>
-            </span>
-            <span data-ok={status.chrome}>
-              Browser check {status.chrome ? "ready" : "unavailable (set CHROME_PATH)"}
-            </span>
-            <span>
-              {status.queue.running} building · {status.queue.waiting} waiting
-            </span>
-          </>
-        ) : (
-          <span>API not reachable</span>
-        )}
-      </footer>
+            </li>
+          ))}
+        </ul>
+      )}
+      {drag > 0 && view === "books" && (
+        <div className="drop-overlay" aria-hidden="true">
+          <span>Drop to add it to your library</span>
+        </div>
+      )}
     </div>
+  );
+}
+
+function AddBook({
+  uploading,
+  onClick,
+  primary,
+}: {
+  uploading: string | null;
+  onClick: () => void;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={`button ${primary ? "primary" : ""}`}
+      onClick={onClick}
+      disabled={!!uploading}
+      title={FORMATS}
+    >
+      {uploading ? (
+        <Spinner label={`Reading “${uploading}”`} />
+      ) : (
+        <>
+          <Plus aria-hidden="true" />
+          Add a book
+        </>
+      )}
+    </button>
   );
 }

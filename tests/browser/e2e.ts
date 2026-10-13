@@ -237,9 +237,15 @@ try {
     await page.waitForSelector(".note-editor .cm-content", { timeout: 10000 });
     check("a note opens in the editor with its links beside it", !!(await page.$(".note-side")));
   }
-  await page.goto(`${BASE}#/brain/graph`, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".graph, .empty", { timeout: 10000 });
-  check("the brain's graph loads", !!(await page.$(".graph, .empty")));
+  await page.goto(`${BASE}#/brain`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".graph, .empty-state", { timeout: 10000 });
+  check("the brain's graph loads", !!(await page.$(".graph, .empty-state")));
+  const item = await page.$("[data-node] .g-shape");
+  if (item) {
+    await item.click();
+    await page.waitForSelector(".node-card", { timeout: 5000 }).catch(() => null);
+    check("clicking an item in the graph opens its card", !!(await page.$(".node-card h2")));
+  }
   await page.goto(`${BASE}#/ask?do=1`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".agent-form", { timeout: 10000 });
   check("agents can be given work on the vault", !!(await page.$(".agent-form textarea")));

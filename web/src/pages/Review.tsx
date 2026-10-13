@@ -1,5 +1,6 @@
-/* Review: flashcards due today, interleaved across decks and scheduled with FSRS-6. Space reveals the
- * answer, 1–4 rate it; a card can be typed first, edited, or skipped. Also the mixed quiz. */
+/* Review: flashcards due today, one at a time, interleaved across decks and scheduled with FSRS-6.
+ * Space reveals the answer, 1–4 rate it; a quiet bar above picks the deck, asks you to type answers
+ * first, or starts the mixed quiz. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { humanInterval } from "../../../shared/fsrs.ts";
 import { type CardView, learn, type Quiz } from "../api";
@@ -102,10 +103,9 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
 
   return (
     <div className="review">
-      <header className="page-head row">
-        <h1 className="page-title">Review</h1>
-        <span className="spacer" />
-        <select value={deck} onChange={(e) => setDeck(e.target.value)} aria-label="Deck">
+      <h1 className="visually-hidden">Review</h1>
+      <div className="review-bar">
+        <select className="quiet-select" value={deck} onChange={(e) => setDeck(e.target.value)} aria-label="Deck">
           <option value="">All decks, interleaved</option>
           {decks?.map((d) => (
             <option key={d.name} value={d.name}>
@@ -124,10 +124,10 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
           />
           Type answers first
         </label>
-        <button type="button" className="button" onClick={startMixed} disabled={quizLoading}>
+        <button type="button" className="button subtle" onClick={startMixed} disabled={quizLoading}>
           {quizLoading ? <Spinner label="Writing a quiz" /> : "Mixed quiz"}
         </button>
-      </header>
+      </div>
       <div className="quiz-progress">
         <span style={{ width: `${progress * 100}%` }} />
       </div>
@@ -137,15 +137,15 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
         </div>
       ) : !card ? (
         <div className="review-done">
-          <h2 className="section-title">{stats.done ? `Done: ${stats.done} reviews` : "Nothing due right now."}</h2>
-          <p className="lede small">
+          <h2 className="empty-title">{stats.done ? `Done: ${stats.done} reviews` : "Nothing due right now"}</h2>
+          <p className="fine">
             {stats.done
-              ? `You recalled ${Math.round(((stats.done - stats.again) / stats.done) * 100)}% on the first try. The scheduler will bring each card back just before you'd forget it.`
+              ? `You recalled ${Math.round(((stats.done - stats.again) / stats.done) * 100)}% on the first try. Each card comes back just before you'd forget it.`
               : "Cards come back when you're about to forget them. Make new ones while you read: select a passage and choose Cards."}
           </p>
           <div className="row gap">
             <button type="button" className="button primary" onClick={startMixed} disabled={quizLoading}>
-              Mixed quiz across your topics
+              Mixed quiz
             </button>
             <a className="button" href="#/library">
               Read
@@ -155,11 +155,15 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
       ) : (
         <article className="flash" data-revealed={revealed || undefined}>
           <div className="flash-meta">
-            <span className="eyebrow">{card.deck}</span>
-            <span className="fine">
-              {card.state
-                ? `${card.state.phase} · seen ${card.state.reps}×${card.state.lapses ? ` · forgot ${card.state.lapses}×` : ""}`
-                : "new"}
+            <span
+              className="eyebrow"
+              title={
+                card.state
+                  ? `${card.state.phase} · seen ${card.state.reps}×${card.state.lapses ? ` · forgot ${card.state.lapses}×` : ""}`
+                  : "new"
+              }
+            >
+              {card.deck}
             </span>
           </div>
           <Markdown text={card.front} theme={theme} className="flash-front" hideCloze={!revealed} />
@@ -210,11 +214,7 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
           )}
         </article>
       )}
-      {queue && card && (
-        <p className="fine center">
-          {queue.length} left in this session · {stats.done} done
-        </p>
-      )}
+      {queue && card && <p className="fine center">{queue.length} left</p>}
     </div>
   );
 }

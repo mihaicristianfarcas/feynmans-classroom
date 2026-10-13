@@ -18,7 +18,7 @@ export async function openLink(target: string, sub?: string) {
       const at = r.anchor.page !== undefined ? r.anchor.page + (r.anchor.y ?? 0) : (r.anchor.block ?? 0);
       return go(`#/book/${r.bookId}?at=${at.toFixed(3)}&focus=${r.id}`);
     }
-    if (r.kind === "figure") return go("#/brain/figures");
+    if (r.kind === "figure") return go("#/library/figures");
     if (r.kind === "attachment" && r.path)
       return window.open(`/api/vault/attachment?path=${encodeURIComponent(r.path)}`, "_blank", "noopener");
   } catch {

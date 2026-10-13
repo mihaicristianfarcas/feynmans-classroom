@@ -73,16 +73,13 @@ export function AgentRuns({ theme }: { theme: "light" | "dark" }) {
           disabled={busy}
         />
         <div className="row gap">
-          <span className="fine">
-            It works on a copy of your vault with its own shell (rg, sed, …), can't reach the network or anything
-            outside the vault, and you can undo every run.
-          </span>
+          <span className="fine">Works on its own copy of your vault, offline. Every run can be undone.</span>
           <span className="spacer" />
           <button className="button primary" type="submit" disabled={busy || task.trim().length < 8}>
             {busy ? "Working…" : "Start"}
           </button>
         </div>
-        {!task && (
+        {!task && runs?.length === 0 && (
           <div className="starters">
             {EXAMPLES.map((x) => (
               <button key={x} type="button" className="chip" onClick={() => setTask(x)}>

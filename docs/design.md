@@ -16,6 +16,12 @@ default highlighter, **peach** for figures, **sky** for links and notes, **rose*
 and delete. The app is set in the system sans; what you read and write (books, notes, answers) is in
 a serif.
 
+Every page shows only what it is for. A slim bar along the top holds the pages (with the cards due
+on Review), search, the theme and settings; the reader keeps its own bar of the same height. The
+Brain is the graph alone, filling the window, with the item you pick in a card at its side; Today is
+a greeting, the ask field and what's next; Review is the card. Secondary controls stay quiet
+(subtle buttons, a disclosure for advanced settings) and explanations are one line.
+
 Motion is quick and quiet: popovers and menus grow from where they open, presses scale slightly,
 tab and nav indicators slide, new content rises a few pixels, and the theme switch crossfades.
 What you do from the keyboard (the ⌘K palette, revealing a card, the reader's shortcuts) doesn't
@@ -46,6 +52,7 @@ page in both themes, plus keyboard checks) on every pull request.
   (`announce()`, or `role="status"` / `role="alert"`).
 - **Mouse-only gestures have a keyboard way.** In the reader, `S` selects the passage at the
   reading line and opens the selection menu with focus in it; capture places its box with the arrow
-  keys; the knowledge graph is navigated with the arrow keys; a figure's parts are picked and read
+  keys; the knowledge graph is navigated with the arrow keys, Enter reads an item in the card beside
+  it and Escape gives focus back to the item; a figure's parts are picked and read
   with the up and down arrows, and Shift + arrows drag the picked one (or pan, or turn the view).
 - **Motion.** Keyboard actions don't animate; `prefers-reduced-motion` keeps only fades.

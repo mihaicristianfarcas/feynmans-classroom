@@ -92,10 +92,8 @@ async function routes(): Promise<string[]> {
     "#/library",
     "#/notes",
     "#/review",
+    "#/library/figures",
     "#/brain",
-    "#/brain/concepts",
-    "#/brain/notes",
-    "#/brain/figures",
     "#/ask",
     "#/ask?do=1",
     "#/journey",
@@ -227,7 +225,7 @@ async function keyboard(page: Page, bookRoute: string | undefined) {
   // a dialog keeps focus inside while open, and Escape returns focus to what opened it
   const concept = (await routes()).find((r) => r.startsWith("#/brain/concept/"));
   if (concept) await open(page, concept, "light");
-  const opener = concept ? await page.$('[aria-haspopup="dialog"]') : null;
+  const opener = concept ? await page.$('main [aria-haspopup="dialog"]') : null;
   if (opener) {
     await opener.focus();
     await page.keyboard.press("Enter");
@@ -244,6 +242,31 @@ async function keyboard(page: Page, bookRoute: string | undefined) {
     check("Escape closes the dialog and focus returns to its opener", back, await focused(page));
   } else
     check("a dialog can be opened from the keyboard", false, "no [aria-haspopup=dialog] button on a concept's page");
+
+  // the Brain's graph: arrow keys reach its items, Enter reads one in the card beside it (focus goes into the
+  // card), and Escape closes the card and gives focus back to the item
+  await open(page, "#/brain", "light");
+  // an SVG item: focused from the page (puppeteer's focus() takes only HTML elements)
+  const node = await page.evaluate(() => {
+    const item = document.querySelector<SVGElement>("[data-node][tabindex='0']");
+    item?.focus();
+    return !!item;
+  });
+  if (node) {
+    await page.keyboard.press("ArrowRight");
+    const item = await page.evaluate(() => document.activeElement?.getAttribute("data-node"));
+    await page.keyboard.press("Enter");
+    await wait(400);
+    const inCard = await page.evaluate(() => !!document.activeElement?.closest(".node-card"));
+    check("Enter on a graph item opens its card with focus in it", inCard, await focused(page));
+    await page.keyboard.press("Escape");
+    await wait(400);
+    const back = await page.evaluate(
+      (id) => !document.querySelector(".node-card") && document.activeElement?.getAttribute("data-node") === id,
+      item,
+    );
+    check("Escape closes the card and focus returns to the item", back, await focused(page));
+  } else check("the graph's items can be reached with the keyboard", false, "no graph item in the Tab order");
 
   // the reader: its panes are tabs you can move between with the arrow keys
   if (bookRoute) {
