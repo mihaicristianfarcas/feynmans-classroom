@@ -1,11 +1,12 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { learn, useTheme } from "./api";
+import { learn, openLink, useTheme } from "./api";
 import { Ask } from "./Ask";
 import { Brain } from "./Brain";
 import { Gallery } from "./Gallery";
 import { Journey } from "./Journey";
 import { Library } from "./Library";
+import { Notes } from "./Notes";
 import { Palette } from "./Palette";
 import { Reader } from "./Reader";
 import { Review } from "./Review";
@@ -15,15 +16,16 @@ import { Today } from "./Today";
 import { Welcome } from "./Welcome";
 import "./styles.css";
 import "./app.css";
+import "./notes.css";
 
-type Route = { name: "book"; id: string } | { name: "today" | "library" | "review" | "brain" | "ask" | "journey" | "settings" | "gallery" | "welcome" };
+type Route = { name: "book"; id: string } | { name: "today" | "library" | "notes" | "review" | "brain" | "ask" | "journey" | "settings" | "gallery" | "welcome" | "open" };
 
 function route(): Route {
   const hash = location.hash.split("?")[0];
   const book = hash.match(/^#\/book\/([a-z0-9]+)/i);
   if (book) return { name: "book", id: book[1] };
   const name = hash.replace(/^#\/?/, "").split("/")[0];
-  if (["library", "review", "brain", "ask", "journey", "settings", "gallery", "welcome"].includes(name)) return { name: name as Route["name"] } as Route;
+  if (["library", "notes", "review", "brain", "ask", "journey", "settings", "gallery", "welcome", "open"].includes(name)) return { name: name as Route["name"] } as Route;
   return { name: "today" };
 }
 
@@ -56,6 +58,8 @@ function App() {
   );
   if (current.name === "welcome") page = <Welcome />;
   else if (current.name === "library") page = <Library />;
+  else if (current.name === "notes") page = <Notes theme={theme} />;
+  else if (current.name === "open") page = <OpenLink />;
   else if (current.name === "review") page = <Review theme={theme} />;
   else if (current.name === "brain") page = <Brain theme={theme} />;
   else if (current.name === "ask") page = <Ask theme={theme} />;
@@ -65,12 +69,21 @@ function App() {
   else page = <Today />;
   return (
     <>
-      <Shell theme={theme} setTheme={setTheme}>
+      <Shell theme={theme} setTheme={setTheme} full={current.name === "notes"}>
         {page}
       </Shell>
       <Palette />
     </>
   );
+}
+
+/** #/open?target=…&sub=…: where a [[link]] goes when opened directly (a new tab, a pasted URL). */
+function OpenLink() {
+  useEffect(() => {
+    const q = new URLSearchParams(location.hash.split("?")[1] || "");
+    openLink(q.get("target") || "", q.get("sub") || undefined);
+  }, []);
+  return <div className="center-note">Opening…</div>;
 }
 
 createRoot(document.getElementById("root")!).render(

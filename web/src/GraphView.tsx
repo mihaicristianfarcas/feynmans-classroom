@@ -1,6 +1,6 @@
 import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type Simulation, type SimulationLinkDatum, type SimulationNodeDatum } from "d3-force";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { go, type GraphData } from "./api";
+import { go, openLink, type GraphData } from "./api";
 
 type N = SimulationNodeDatum & GraphData["nodes"][number];
 type L = SimulationLinkDatum<N> & { kind: string };
@@ -8,11 +8,14 @@ type L = SimulationLinkDatum<N> & { kind: string };
 const W = 1000;
 const H = 640;
 
-const radius = (n: N) => (n.kind === "book" ? 0 : n.kind === "concept" ? 5 + n.size * 3 : 3.2);
+const radius = (n: N) => (n.kind === "book" ? 0 : n.kind === "concept" ? 5 + n.size * 3 : n.kind === "annotation" ? 2.6 : 3.2);
 
-/** The knowledge graph: books, concepts and notes; each concept's ring shows how well it's known. */
-export function GraphView({ data, showNotes, highlight, until }: { data: GraphData; showNotes: boolean; highlight: string; until?: number }) {
-  const nodes = useMemo<N[]>(() => data.nodes.filter((n) => showNotes || n.kind !== "note").map((n) => ({ ...n })), [data, showNotes]);
+/**
+ * The knowledge graph: books, concepts, notes (and, if shown, annotations), joined by their links.
+ * Each concept's ring shows how well it's known.
+ */
+export function GraphView({ data, showNotes, showAnnotations = false, highlight, until }: { data: GraphData; showNotes: boolean; showAnnotations?: boolean; highlight: string; until?: number }) {
+  const nodes = useMemo<N[]>(() => data.nodes.filter((n) => (showNotes || n.kind !== "note") && (showAnnotations || n.kind !== "annotation")).map((n) => ({ ...n })), [data, showNotes, showAnnotations]);
   const links = useMemo<L[]>(() => {
     const ids = new Set(nodes.map((n) => n.id));
     return data.edges.filter((e) => ids.has(e.from) && ids.has(e.to)).map((e) => ({ source: e.from, target: e.to, kind: e.kind }));
@@ -71,12 +74,14 @@ export function GraphView({ data, showNotes, highlight, until }: { data: GraphDa
   const focus = hover ? new Set([hover, ...(neighbors.get(hover) || [])]) : null;
   const born = (n: N) => until === undefined || n.created <= until;
   const fewConcepts = nodes.filter((n) => n.kind === "concept").length <= 40;
+  const fewNotes = nodes.filter((n) => n.kind === "note").length <= 30;
   const matches = (n: N) => !!q && n.label.toLowerCase().includes(q);
 
   const open = (n: N) => {
     if (n.kind === "book") go(`#/book/${n.bookId}`);
     else if (n.kind === "concept") go(`#/brain/concept/${n.id.slice(8)}`);
-    else go(`#/brain/note/${n.id.slice(5)}`);
+    else if (n.kind === "annotation" && n.path) openLink(n.path.replace(/\.md$/, ""));
+    else go(`#/notes/${n.id.slice(5)}`);
   };
 
   return (
@@ -157,10 +162,10 @@ export function GraphView({ data, showNotes, highlight, until }: { data: GraphDa
             const r = radius(n);
             const m = n.mastery;
             const arc = m === null ? "" : describeArc(r + 3.2, Math.max(0.001, Math.min(0.9999, m)));
-            const showLabel = n.kind === "concept" && (fewConcepts || n.size > 1.3 || hover === n.id || hit || (focus && focus.has(n.id)) || view.k > 1.6);
+            const showLabel = (n.kind === "concept" && (fewConcepts || n.size > 1.3)) || (n.kind === "note" && fewNotes) || hover === n.id || hit || (focus && focus.has(n.id)) || view.k > 1.6;
             return (
               <g key={n.id} data-node={n.id} className={`g-node g-${n.kind}`} transform={`translate(${n.x} ${n.y})`} data-dim={dim || undefined} data-hit={hit || undefined} data-level={m === null ? "none" : m >= 0.8 ? "strong" : m >= 0.55 ? "ok" : "weak"} onPointerEnter={() => setHover(n.id)} onPointerLeave={() => setHover(null)}>
-                {n.kind === "note" ? <rect x={-r} y={-r} width={r * 2} height={r * 2} /> : <circle r={r} />}
+                {n.kind === "note" ? <rect x={-r} y={-r} width={r * 2} height={r * 2} /> : n.kind === "annotation" ? <rect x={-r} y={-r} width={r * 2} height={r * 2} transform="rotate(45)" /> : <circle r={r} />}
                 {n.kind === "concept" && m !== null && <path d={arc} className="g-ring" />}
                 {showLabel && (
                   <text x={r + 7} y={4}>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { bookLink, go, learn, type Concept, type Note } from "./api";
+import { bookLink, go, learn, openLink, type Concept, type Note } from "./api";
 import { GraphView } from "./GraphView";
 import { Markdown } from "./Markdown";
 import { SceneView } from "./scene/SceneView";
@@ -19,23 +19,16 @@ export function Brain({ theme }: { theme: "light" | "dark" }) {
   const path = hash.split("?")[0].replace(/^#\/brain\/?/, "");
   const [section, id] = [path.split("/")[0], decodeURIComponent(path.split("/").slice(1).join("/"))];
   if (section === "concept" && id) return <ConceptPage key={id} id={id} theme={theme} />;
-  if (section === "note" && id) return <NotePage key={id} id={id} theme={theme} />;
-  if (section === "new") return <NotePage key="new" id={null} theme={theme} />;
+  if (section === "note" && id) return <Redirect to={`#/notes/${id}`} />;
+  if (section === "new") return <Redirect to="#/notes" />;
   if (section === "find" && id) return <Find target={id} />;
   return <BrainHome tab={(["graph", "concepts", "notes", "figures"].includes(section) ? section : "graph") as Tab} theme={theme} />;
 }
 
+/** Old [[link]] routes: resolve the link the same way notes do. */
 function Find({ target }: { target: string }) {
   useEffect(() => {
-    Promise.all([learn.concepts(), learn.notes()]).then(([concepts, notes]) => {
-      const t = target.toLowerCase();
-      const c = concepts.find((x) => x.id === t || x.name.toLowerCase() === t || x.aliases.some((a) => a.toLowerCase() === t));
-      if (c) return go(`#/brain/concept/${c.id}`);
-      const n = notes.find((x) => x.title.toLowerCase() === t || x.id === target);
-      if (n) return go(`#/brain/note/${n.id}`);
-      // a link to nothing yet: offer to create the concept
-      learn.createConcept({ name: target }).then((created) => go(`#/brain/concept/${created.id}`));
-    });
+    openLink(target);
   }, [target]);
   return <div className="center-note">Opening “{target}”…</div>;
 }
@@ -48,8 +41,8 @@ function BrainHome({ tab, theme }: { tab: Tab; theme: "light" | "dark" }) {
         <h1 className="page-title">Your brain</h1>
         <span className="spacer" />
         <input className="search" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter…" aria-label="Filter" />
-        <a className="button primary" href="#/brain/new">
-          New note
+        <a className="button primary" href="#/notes">
+          Notes
         </a>
       </header>
       <nav className="tabs" aria-label="Brain sections">
@@ -70,6 +63,7 @@ function BrainHome({ tab, theme }: { tab: Tab; theme: "light" | "dark" }) {
 function GraphTab({ filter }: { filter: string }) {
   const { data } = useLoad(() => learn.graph());
   const [notes, setNotes] = useState(true);
+  const [annotationsShown, setAnnotationsShown] = useState(false);
   // the learning journey: replay how the graph grew
   const [until, setUntil] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -105,13 +99,17 @@ function GraphTab({ filter }: { filter: string }) {
           <input type="checkbox" checked={notes} onChange={(e) => setNotes(e.target.checked)} />
           Notes
         </label>
+        <label className="check" title="Highlights, explanations and figures from books">
+          <input type="checkbox" checked={annotationsShown} onChange={(e) => setAnnotationsShown(e.target.checked)} />
+          Annotations
+        </label>
         <span className="legend-item"><span className="legend-ring" data-level="strong" /> well known</span>
         <span className="legend-item"><span className="legend-ring" data-level="ok" /> getting there</span>
         <span className="legend-item"><span className="legend-ring" data-level="weak" /> fading</span>
         <span className="legend-item"><span className="legend-ring" data-level="none" /> not studied</span>
         <span className="fine">Drag to move · ⌘-scroll to zoom · click to open</span>
       </div>
-      <GraphView data={data} showNotes={notes} highlight={filter} until={until ?? undefined} />
+      <GraphView data={data} showNotes={notes} showAnnotations={annotationsShown} highlight={filter} until={until ?? undefined} />
       {times.length > 1 && (
         <div className="growth">
           <button className="icon-button" onClick={() => (playing ? setPlaying(false) : (setUntil(first), setPlaying(true)))} aria-label={playing ? "Pause" : "Replay your graph's growth"} title="Replay how your graph grew">
@@ -198,7 +196,7 @@ function NotesTab({ filter, theme }: { filter: string; theme: "light" | "dark" }
       ) : (
         <div className="note-grid">
           {list.map((n) => (
-            <a key={n.id} className="note-card" href={`#/brain/note/${n.id}`}>
+            <a key={n.id} className="note-card" href={`#/notes/${n.id}`}>
               <span className="eyebrow">
                 {TYPE_LABEL[n.type]}
                 {typeof n.score === "number" ? ` · ${n.score}/100` : ""}
@@ -387,7 +385,7 @@ function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
           <ul className="plain">
             {c.notes.map((n: Note) => (
               <li key={n.id}>
-                <a href={`#/brain/note/${n.id}`}>{n.title}</a> <span className="fine">{TYPE_LABEL[n.type]}</span>
+                <a href={`#/notes/${n.id}`}>{n.title}</a> <span className="fine">{TYPE_LABEL[n.type]}</span>
               </li>
             ))}
           </ul>
@@ -442,142 +440,11 @@ function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
   );
 }
 
-/* ---------------- a note ---------------- */
+/* ---------------- notes moved to #/notes ---------------- */
 
-function NotePage({ id, theme }: { id: string | null; theme: "light" | "dark" }) {
-  const [note, setNote] = useState<Note | null>(null);
-  const [editing, setEditing] = useState(!id);
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [tool, setTool] = useState<"cards" | "figure" | null>(null);
+function Redirect({ to }: { to: string }) {
   useEffect(() => {
-    if (!id) return;
-    learn.note(id).then((n) => {
-      setNote(n);
-      setTitle(n.title);
-      setBody(n.body);
-    });
-  }, [id]);
-  if (id && !note) return <div className="center-note"><Spinner label="Opening" /></div>;
-  const save = async () => {
-    if (!title.trim()) return;
-    if (note) setNote(await learn.updateNote(note.id, { title, body }));
-    else {
-      const created = await learn.createNote({ title, body, type: "note" });
-      go(`#/brain/note/${created.id}`);
-      return;
-    }
-    setEditing(false);
-  };
-  return (
-    <div className="note-page">
-      <a className="fine" href="#/brain/notes">
-        ← Notes
-      </a>
-      {editing ? (
-        <div className="note-editor">
-          <input className="note-title-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" autoFocus={!id} />
-          <div className="editor-split">
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder={"Write in Markdown. Link ideas with [[concept or note]], math with $…$, embed a figure with ![[figure:id]]."}
-              onKeyDown={(e) => {
-                if (e.key === "s" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  save();
-                }
-              }}
-            />
-            <Markdown text={body} theme={theme} className="preview" />
-          </div>
-          <div className="form-actions">
-            <button className="button primary" onClick={save}>
-              Save <kbd>⌘S</kbd>
-            </button>
-            {note && (
-              <button className="button" onClick={() => setEditing(false)}>
-                Cancel
-              </button>
-            )}
-          </div>
-        </div>
-      ) : (
-        note && (
-          <article>
-            <header className="page-head">
-              <span className="eyebrow">
-                {TYPE_LABEL[note.type]}
-                {typeof note.score === "number" ? ` · ${note.score}/100` : ""} · {timeAgo(note.updated)}
-              </span>
-              <h1 className="page-title">{note.title}</h1>
-            </header>
-            <div className="concept-actions">
-              <button className="button" onClick={() => setEditing(true)}>
-                Edit
-              </button>
-              <button className="button" onClick={() => setTool("cards")}>
-                Make cards
-              </button>
-              <button className="button" onClick={() => setTool("figure")}>
-                ◆ Draw it
-              </button>
-              {note.source?.bookId && (
-                <a className="button" href={bookLink(note.source)}>
-                  Open in the book
-                </a>
-              )}
-              <span className="spacer" />
-              <button
-                className="button danger subtle"
-                onClick={async () => {
-                  if (!confirm("Delete this note?")) return;
-                  await learn.deleteNote(note.id);
-                  go("#/brain/notes");
-                }}
-              >
-                Delete
-              </button>
-            </div>
-            <Markdown text={note.body} theme={theme} className="note-body" />
-            {note.concepts.length > 0 && (
-              <div className="chips">
-                {note.concepts.map((c) => (
-                  <a key={c} className="chip" href={`#/brain/concept/${c}`}>
-                    {c}
-                  </a>
-                ))}
-              </div>
-            )}
-            {note.backlinks && note.backlinks.length > 0 && (
-              <section>
-                <h2 className="section-title">Linked from</h2>
-                <ul className="plain">
-                  {note.backlinks.map((b) => (
-                    <li key={b.id}>
-                      <a href={`#/brain/note/${b.id}`}>{b.title}</a>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-          </article>
-        )
-      )}
-      {tool === "cards" && note && <CardDrafter passage={`${note.title}\n\n${note.body}`} source={note.source} onClose={() => setTool(null)} />}
-      {tool === "figure" && note && (
-        <FigureMaker
-          passage={`${note.title}\n\n${note.body}`}
-          source={note.source}
-          theme={theme}
-          onClose={() => setTool(null)}
-          onSaved={async (f) => {
-            const updated = await learn.updateNote(note.id, { body: `${note.body}\n\n![[figure:${f.id}]]` });
-            setNote(updated);
-            setBody(updated.body);
-          }}
-        />
-      )}
-    </div>
-  );
+    location.replace(to);
+  }, [to]);
+  return <div className="center-note">Opening…</div>;
 }

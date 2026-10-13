@@ -296,11 +296,6 @@ a.tile:hover { box-shadow: 0 0 0 1px var(--hi), var(--lift); }
 .concept-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
 .cards-list li { padding: 8px 0; border-bottom: 1px solid var(--faint); }
 .cards-list .md { font-size: 14px; }
-.note-editor { display: grid; gap: 12px; margin-top: 10px; }
-.note-title-input { font: 600 24px/1.3 var(--serif) !important; padding: 8px 10px !important; }
-.editor-split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; min-height: 380px; }
-.editor-split textarea { font: 13.5px/1.6 var(--mono); min-height: 380px; }
-.editor-split .preview { padding: 10px 14px; border-radius: 3px; background: var(--card); box-shadow: 0 0 0 1px var(--rule); overflow: auto; }
 .note-body { margin: 6px 0 20px; font-size: 16.5px; }
 
 /* ---------- ask ---------- */

@@ -31,8 +31,9 @@ export function Palette() {
     if (!h) {
       if (q.trim()) go(`#/ask?q=${encodeURIComponent(q.trim())}`);
     } else if (h.kind === "concept") go(`#/brain/concept/${h.id}`);
-    else if (h.kind === "note") go(`#/brain/note/${h.id}`);
+    else if (h.kind === "note") go(`#/notes/${h.id}`);
     else if (h.kind === "card") go("#/brain/concepts");
+    else if (h.kind === "annotation") go(`${bookLink({ bookId: h.bookId, ...(h.loc || {}) })}&focus=${h.id}`);
     else go(bookLink({ bookId: h.bookId, ...(h.loc || {}) }));
     setOpen(false);
     setQ("");
@@ -44,7 +45,7 @@ export function Palette() {
           ref={input}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search concepts, notes, cards and your books… (↵ on nothing asks the library)"
+          placeholder="Search notes, concepts, annotations, cards and your books… (↵ on nothing asks the library)"
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") setIndex((i) => Math.min(hits.length - 1, i + 1));
             else if (e.key === "ArrowUp") setIndex((i) => Math.max(0, i - 1));

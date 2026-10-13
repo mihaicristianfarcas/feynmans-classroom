@@ -1,0 +1,113 @@
+/* Notes and the Markdown they're written in. Same finish as the rest: paper,
+ * thin rules, mono labels; one warm accent for what was made from a passage (as in the margin of a
+ * well-annotated book), and translucent highlighter colours. */
+:root {
+  --mark: #b8432f;
+  --mark-soft: #b8432f1f;
+  --hl-yellow: #ffd60066;
+  --hl-green: #7ee0815c;
+  --hl-blue: #7cc4ff5c;
+  --hl-pink: #ff8fc15c;
+  --hl-purple: #b9a2ff5c;
+  --menu: #1b1b1d;
+  --menu-text: #ededed;
+}
+:root[data-theme="dark"] {
+  --mark: #ff8a6b;
+  --mark-soft: #ff8a6b24;
+  --hl-yellow: #ffd60040;
+  --hl-green: #7ee08138;
+  --hl-blue: #7cc4ff38;
+  --hl-pink: #ff8fc138;
+  --hl-purple: #b9a2ff38;
+  --menu: #f0f0ee;
+  --menu-text: #161616;
+}
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- Markdown: Obsidian syntax ---------- */
+.md .callout { margin: 0 0 0.85em; padding: 8px 12px; border-left: 2px solid var(--hi); background: var(--card); border-radius: 0 3px 3px 0; color: var(--strong); }
+.md .callout[data-callout="quote"] { border-left-color: var(--mark); font-style: italic; color: var(--text); }
+.md .callout[data-callout="warning"], .md .callout[data-callout="caution"] { border-left-color: var(--danger); }
+.md .callout-title { font: 500 10.5px/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; font-style: normal; color: var(--strong); margin-bottom: 4px; }
+.md .callout-title a { color: var(--mark); }
+.md .callout > p:last-child { margin-bottom: 0; }
+.md .tag { font: 12px var(--mono); color: var(--mark); background: var(--mark-soft); padding: 0 5px; border-radius: 3px; }
+.md img, .md .md-image { max-width: 100%; height: auto; border-radius: 3px; display: block; margin: 8px 0; }
+.md-embed-box { display: block; margin: 8px 0 12px; padding: 8px 12px; border-left: 2px solid var(--rule); background: var(--card); border-radius: 0 3px 3px 0; }
+.md-embed-box[data-kind="annotation"] { border-left-color: var(--mark); }
+.md-embed-box.missing { color: var(--muted); }
+.md-embed-head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 4px; font: 11px var(--mono); }
+.md-embed-head a { color: var(--strong); }
+.md .contains-task-list { list-style: none; padding-left: 0.4em; }
+.md input[type="checkbox"] { margin-right: 6px; }
+.md hr { border: 0; border-top: 1px solid var(--rule); margin: 1.2em 0; }
+
+/* ---------- the notes page ---------- */
+.page-full { padding: 0; height: 100vh; overflow: hidden; }
+.page-full > * { max-width: none; }
+.notes-page { display: grid; grid-template-columns: 250px 1fr; height: 100%; min-height: 0; }
+.file-tree { border-right: 1px solid var(--rule); background: var(--card); display: flex; flex-direction: column; min-height: 0; }
+.tree-head { display: flex; gap: 6px; padding: 12px 10px 8px; }
+.tree-head .search { width: auto; flex: 1; }
+.tree { list-style: none; margin: 0; padding: 0; }
+.file-tree > .tree { overflow: auto; flex: 1; padding-bottom: 12px; }
+.tree-row { display: flex; align-items: center; gap: 4px; width: 100%; padding: 4px 10px; font: 13px/1.35 var(--sans); color: var(--text); text-decoration: none; border: 0; background: none; text-align: left; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tree-row:hover { background: var(--faint); color: var(--strong); }
+.tree-row[aria-current="page"] { background: var(--faint); color: var(--strong); font-weight: 600; box-shadow: inset 2px 0 0 var(--hi); }
+.tree-row.folder { font-weight: 500; color: var(--strong); }
+.tree-caret { width: 12px; color: var(--muted); font-size: 10px; }
+.tree-foot { padding: 8px 12px; border-top: 1px solid var(--rule); margin: 0; }
+.note-pane { display: grid; grid-template-columns: 1fr 290px; min-height: 0; min-width: 0; }
+.note-pane.empty-pane, .note-pane.center-note { display: grid; grid-template-columns: 1fr; place-items: center; }
+.note-main { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.note-head { padding: 16px 22px 8px; border-bottom: 1px solid var(--faint); }
+.crumbs { margin: 0; font: 11px var(--mono); display: flex; gap: 8px; align-items: center; }
+.badge-type { font: 10px var(--mono); text-transform: uppercase; letter-spacing: 0.06em; padding: 1px 6px; border-radius: 8px; box-shadow: 0 0 0 1px var(--rule); }
+.note-title-input { width: 100%; border: 0 !important; box-shadow: none !important; background: transparent !important; font: 600 26px/1.25 var(--serif) !important; color: var(--strong); padding: 4px 0 !important; }
+.note-title-input:focus { outline: none; box-shadow: inset 0 -1px 0 var(--rule) !important; }
+.note-tools { margin-top: 4px; }
+.note-tools .fine { margin: 0; }
+.note-tools .path { font-size: 10.5px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.properties { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; margin-top: 8px; }
+.properties label { display: inline-flex; gap: 8px; align-items: center; font: 11px var(--mono); color: var(--muted); }
+.properties input { font: 12.5px var(--sans) !important; padding: 3px 6px !important; box-shadow: none !important; background: transparent !important; border-bottom: 1px dashed var(--rule) !important; border-radius: 0 !important; width: 200px; }
+.properties .fine { margin: 0; }
+.note-body { flex: 1; min-height: 0; overflow: auto; }
+.note-body > .note-editor { height: 100%; }
+.note-read { padding: 16px 22px 40vh; max-width: 760px; }
+.note-side { border-left: 1px solid var(--rule); background: var(--card); overflow: auto; padding: 14px 14px 30px; display: grid; align-content: start; gap: 18px; }
+.side-title { font: 500 10.5px/1.3 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--strong); margin: 0 0 8px; display: flex; gap: 6px; }
+.side-title .count { color: var(--muted); }
+.link-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 13px; }
+.link-list.compact { gap: 3px; }
+.link-list a { color: var(--strong); text-decoration: none; border-bottom: 1px solid var(--rule); }
+.link-list a:hover { border-color: var(--hi); }
+.link-list li[data-missing] a { color: var(--muted); border-bottom-style: dashed; }
+.link-list .context { color: var(--muted); font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ai-badge { margin-left: 6px; font: 600 9px var(--mono); letter-spacing: 0.06em; color: var(--mark); box-shadow: 0 0 0 1px var(--mark); padding: 0 4px; border-radius: 6px; vertical-align: 1px; }
+
+/* the editor */
+.note-editor { height: 100%; min-height: 200px; }
+.note-editor .cm-editor { height: 100%; }
+.cm-h { font-family: var(--serif); color: var(--strong); }
+.cm-h1 { font-size: 1.55em; font-weight: 600; line-height: 1.35; padding-top: 0.4em !important; }
+.cm-h2 { font-size: 1.3em; font-weight: 600; padding-top: 0.3em !important; }
+.cm-h3 { font-size: 1.12em; font-weight: 600; }
+.cm-wikilink { color: var(--strong); background: color-mix(in srgb, var(--mark) 8%, transparent); border-radius: 2px; text-decoration: underline dashed var(--mid); text-underline-offset: 3px; }
+.cm-mark { background: var(--mark-soft); border-radius: 2px; }
+.cm-tag { color: var(--mark); font-family: var(--mono); font-size: 0.85em; }
+.cm-callout { font: 500 0.7em var(--mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--mark); }
+
+/* ---------- the graph ---------- */
+.g-edge[data-kind="link"], .g-edge[data-kind="embed"] { stroke: var(--mid); }
+.g-annotation rect { fill: var(--mark); stroke: none; }
+@media (max-width: 1100px) {
+  .note-pane { grid-template-columns: 1fr; }
+  .note-side { border-left: 0; border-top: 1px solid var(--rule); }
+}
+@media (max-width: 760px) {
+  .page-full { height: auto; overflow: visible; }
+  .notes-page { grid-template-columns: 1fr; height: auto; }
+  .file-tree { max-height: 40vh; }
+}

@@ -4,6 +4,7 @@ import { learn } from "./api";
 const NAV = [
   { route: "#/", label: "Today", match: /^#\/?$/ },
   { route: "#/library", label: "Library", match: /^#\/library/ },
+  { route: "#/notes", label: "Notes", match: /^#\/notes/ },
   { route: "#/review", label: "Review", match: /^#\/review/ },
   { route: "#/brain", label: "Brain", match: /^#\/brain/ },
   { route: "#/ask", label: "Ask", match: /^#\/ask/ },
@@ -35,7 +36,7 @@ export function useDueCount() {
   return due;
 }
 
-export function Shell({ children, theme, setTheme }: { children: ReactNode; theme: "light" | "dark"; setTheme: (t: "light" | "dark") => void }) {
+export function Shell({ children, theme, setTheme, full = false }: { children: ReactNode; theme: "light" | "dark"; setTheme: (t: "light" | "dark") => void; full?: boolean }) {
   const due = useDueCount();
   const [hash, setHash] = useState(location.hash || "#/");
   useEffect(() => {
@@ -67,7 +68,7 @@ export function Shell({ children, theme, setTheme }: { children: ReactNode; them
           <kbd title="Search">⌘K</kbd>
         </div>
       </nav>
-      <main className="page">{children}</main>
+      <main className={full ? "page page-full" : "page"}>{children}</main>
     </div>
   );
 }

@@ -243,16 +243,74 @@ export interface SourceRef {
 export type NoteType = "note" | "highlight" | "explanation" | "connection" | "answer" | "summary";
 export interface Note {
   id: string;
+  /** Vault-relative path: the file name is the title. */
+  path: string;
   type: NoteType;
   title: string;
   body: string;
   tags: string[];
+  aliases: string[];
+  related: string[];
   concepts: string[];
   source?: SourceRef;
   score?: number;
+  props?: Record<string, unknown>;
   created: string;
   updated: string;
-  backlinks?: { id: string; title: string; type: string }[];
+}
+export interface NoteDetail extends Note {
+  backlinks: { from: string; path: string; title: string; kind: string; line: number; context: string }[];
+  mentions: { path: string; title: string; context: string }[];
+  outgoing: { target: string; kind: string; to: string | null; path?: string; title: string }[];
+}
+export type AnnotationKind = "highlight" | "explain" | "define" | "ask" | "visualize" | "resources" | "comment";
+export interface Rect {
+  p?: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+export interface Anchor {
+  page?: number;
+  block?: number;
+  blockEnd?: number;
+  quote: string;
+  prefix?: string;
+  suffix?: string;
+  start?: number;
+  end?: number;
+  rects?: Rect[];
+  y?: number;
+  md?: { file: string; line: number; score?: number };
+}
+export interface Annotation {
+  id: string;
+  kind: AnnotationKind;
+  bookId: string;
+  path: string;
+  chapterId?: string;
+  anchor: Anchor;
+  color?: string;
+  request?: string;
+  status: "pending" | "ready" | "failed";
+  error?: string;
+  model?: { provider: string; name: string; effort?: string; ms?: number };
+  body: string;
+  title?: string;
+  tags: string[];
+  created: string;
+  updated: string;
+}
+export interface Resolved {
+  node: string;
+  kind: "note" | "concept" | "book" | "annotation" | "figure" | "attachment";
+  id: string;
+  path?: string;
+  title: string;
+  page?: number;
+  bookId?: string;
+  anchor?: Anchor;
 }
 export interface Concept {
   id: string;
@@ -359,11 +417,11 @@ export interface SavedFigure {
   created: string;
 }
 export interface GraphData {
-  nodes: { id: string; kind: "book" | "concept" | "note"; label: string; mastery: number | null; size: number; detail?: string; bookId?: string; created: number }[];
+  nodes: { id: string; kind: "book" | "concept" | "note" | "annotation"; label: string; mastery: number | null; size: number; detail?: string; bookId?: string; path?: string; created: number }[];
   edges: { from: string; to: string; kind: string }[];
 }
 export interface SearchHit {
-  kind: "note" | "concept" | "card" | "book";
+  kind: "note" | "concept" | "card" | "book" | "annotation";
   id: string;
   title: string;
   snippet: string;
@@ -422,11 +480,16 @@ export const learn = {
   graph: () => call<GraphData>("/api/graph"),
   search: (q: string) => call<SearchHit[]>(`/api/search?q=${encodeURIComponent(q)}`),
   readPing: (body: { bookId: string; chapter?: string; chapterId?: string; position?: number; page?: number }) => post("/api/activity", { type: "read", ...body }),
-  notes: (filter: { type?: string; book?: string; concept?: string } = {}) => call<Note[]>(`/api/notes?${new URLSearchParams(filter as Record<string, string>)}`),
-  note: (id: string) => call<Note>(`/api/notes/${id}`),
-  createNote: (n: Partial<Note>) => post<Note>("/api/notes", n),
-  updateNote: (id: string, n: Partial<Note>) => put<Note>(`/api/notes/${id}`, n),
+  notes: (filter: { type?: string; book?: string; concept?: string; folder?: string } = {}) => call<Note[]>(`/api/notes?${new URLSearchParams(filter as Record<string, string>)}`),
+  note: (id: string) => call<NoteDetail>(`/api/notes/${id}`),
+  createNote: (n: Partial<Note> & { folder?: string }) => post<Note>("/api/notes", n),
+  updateNote: (id: string, n: Partial<Note> & { folder?: string }) => put<Note>(`/api/notes/${id}`, n),
   deleteNote: (id: string) => del(`/api/notes/${id}`),
+  tree: () => call<{ notes: { id: string; path: string; title: string; type: string; updated: string }[]; folders: string[] }>("/api/vault/tree"),
+  linkTargets: () => call<{ title: string; kind: string; path?: string; detail?: string }[]>("/api/links/targets"),
+  resolve: (target: string, sub?: string) => call<Resolved>(`/api/links/resolve?target=${encodeURIComponent(target)}${sub ? `&sub=${encodeURIComponent(sub)}` : ""}`),
+  attach: (data: string, name?: string) => post<{ path: string; name: string }>("/api/attachments", { data, name }),
+  annotation: (id: string) => call<Annotation>(`/api/annotations/${id}`),
   concepts: () => call<Concept[]>("/api/concepts"),
   concept: (id: string) => call<ConceptDetail>(`/api/concepts/${id}`),
   createConcept: (c: { name: string; summary?: string }) => post<Concept>("/api/concepts", c),
@@ -463,6 +526,26 @@ export const learn = {
 export const go = (route: string) => {
   location.hash = route.startsWith("#") ? route : `#${route}`;
 };
+
+/** Opens what a [[link]] points at; a link to nothing yet creates that note (as Obsidian does). */
+export async function openLink(target: string, sub?: string) {
+  try {
+    const r = await learn.resolve(target, sub);
+    if (r.kind === "note") return go(`#/notes/${r.id}`);
+    if (r.kind === "concept") return go(`#/brain/concept/${r.id}`);
+    if (r.kind === "book") return go(`#/book/${r.id}${r.page ? `?at=${r.page}` : ""}`);
+    if (r.kind === "annotation" && r.bookId && r.anchor) {
+      const at = r.anchor.page !== undefined ? r.anchor.page + (r.anchor.y ?? 0) : (r.anchor.block ?? 0);
+      return go(`#/book/${r.bookId}?at=${at.toFixed(3)}&focus=${r.id}`);
+    }
+    if (r.kind === "figure") return go("#/brain/figures");
+    if (r.kind === "attachment" && r.path) return window.open(`/api/vault/attachment?path=${encodeURIComponent(r.path)}`, "_blank", "noopener");
+  } catch {
+    if (!target.trim() || target.includes("/")) return;
+    const note = await learn.createNote({ title: target.trim(), body: "" });
+    go(`#/notes/${note.id}`);
+  }
+}
 
 /** A book location as a reader link. */
 export const bookLink = (ref: Partial<SourceRef> & { bookId?: string }) => (ref.bookId ? `#/book/${ref.bookId}${ref.page !== undefined ? `?at=${(ref.page + (ref.y ?? 0)).toFixed(3)}` : ref.block !== undefined ? `?at=${ref.block}` : ""}` : "#/library");
