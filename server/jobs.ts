@@ -20,7 +20,7 @@ class Queue {
   add(partial: Omit<Job, "id" | "status">, work: Work): Job {
     const job: Job = { ...partial, id: newId("j"), status: "queued" };
     const entry = { job, work, controller: new AbortController() };
-    if (job.kind === "plan") this.start(entry);
+    if (job.kind !== "build") this.start(entry);
     else {
       this.waiting.push(entry);
       this.pump();

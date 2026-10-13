@@ -10,10 +10,15 @@ import { chromePath, CODEX, DATA_DIR, PORT, PROD, RUNTIME_DIR, WEB_DIST } from "
 import { codexStatus } from "./codex.ts";
 import { publish, subscribe } from "./events.ts";
 import { detectChapters } from "./generate/chapters.ts";
-import { figOf, generateChapter, regenerate, resumeInterrupted, visualizeSelection, withFigs } from "./generate/index.ts";
+import { enqueueBuild, figOf, generateChapter, regenerate, resumeInterrupted, withFigs } from "./generate/index.ts";
+import { registerRoutes } from "./routes.ts";
+import { figureFromSelection, figuresForChapter, regenerateFigure, resumeFigures } from "./scene/figures.ts";
+import { activeProvider } from "./settings.ts";
+import { initVault, logActivity } from "./vault/index.ts";
+import { exportBook, exportMissingBooks, removeBookExport } from "./vault/library.ts";
 import { formatOf, ingestBook } from "./ingest/index.ts";
 import { queue } from "./jobs.ts";
-import { bookDir, deleteBook, deleteDemo, demoDir, demoSource, getBlocks, getBook, getDemo, listBooks, listDemos } from "./store.ts";
+import { bookDir, deleteBook, deleteDemo, demoDir, demoSource, getBlocks, getBook, getDemo, listBooks, listDemos, newId, saveDemo } from "./store.ts";
 
 const app = new Hono();
 const MAX_UPLOAD = 200 * 1024 * 1024;
@@ -73,6 +78,12 @@ app.post("/api/books", bodyLimit({ maxSize: MAX_UPLOAD + 1024 * 1024, onError: (
   if (!formatOf(file.name)) return c.json({ error: "Upload a PDF, EPUB, Markdown or plain-text book." }, 415);
   const book = await ingestBook({ name: file.name, data: Buffer.from(await file.arrayBuffer()) });
   if (book.status === "error") return c.json({ error: book.error, book }, 422);
+  try {
+    exportBook(book);
+  } catch (error) {
+    console.warn("[vault] export failed:", (error as Error).message);
+  }
+  logActivity({ type: "book", bookId: book.id, text: `Added ${book.title}` });
   return c.json(book);
 });
 
@@ -84,6 +95,8 @@ app.get("/api/books/:id", (c) => {
 app.delete("/api/books/:id", (c) => {
   const id = c.req.param("id");
   queue.cancelBook(id);
+  const book = getBook(id);
+  if (book) removeBookExport(book);
   deleteBook(id);
   return c.json({ ok: true });
 });
@@ -113,22 +126,45 @@ app.get("/api/books/:id/demos", (c) => {
 app.get("/api/books/:id/jobs", (c) => c.json(queue.list(c.req.param("id"))));
 
 app.post("/api/books/:id/chapters/:chapterId/generate", async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as { count?: number };
-  const job = generateChapter(c.req.param("id"), c.req.param("chapterId"), { count: body.count });
+  const body = (await c.req.json().catch(() => ({}))) as { count?: number; mode?: "scene" | "code" };
+  // scene figures by default (seconds each); hand-built demos on request (minutes each, Codex only)
+  const job = body.mode === "code" ? generateChapter(c.req.param("id"), c.req.param("chapterId"), { count: body.count }) : figuresForChapter(c.req.param("id"), c.req.param("chapterId"), { count: body.count });
   return c.json(job);
 });
 
 app.post("/api/books/:id/detect-chapters", (c) => c.json(detectChapters(c.req.param("id"))));
 
 app.post("/api/books/:id/visualize", async (c) => {
-  const body = (await c.req.json()) as { chapterId: string; text: string };
+  const body = (await c.req.json()) as { chapterId: string; text: string; request?: string; kind?: string; quality?: "quick" | "careful"; page?: number; block?: number };
   if (!body.text || body.text.trim().length < 20) return c.json({ error: "select a longer passage" }, 400);
-  return c.json(visualizeSelection(c.req.param("id"), body.chapterId, body.text));
+  return c.json(figureFromSelection(c.req.param("id"), body));
 });
 
 app.post("/api/books/:id/demos/:demoId/regenerate", async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as { feedback?: string };
+  const body = (await c.req.json().catch(() => ({}))) as { feedback?: string; quality?: "quick" | "careful"; fresh?: boolean };
+  const demo = getDemo(c.req.param("id"), c.req.param("demoId"));
+  if (!demo) return c.json({ error: "not found" }, 404);
+  if (demo.type === "scene") return c.json(regenerateFigure(demo.bookId, demo.id, body.feedback, { quality: body.quality, fresh: body.fresh }));
   return c.json(regenerate(c.req.param("id"), c.req.param("demoId"), body.feedback));
+});
+
+/** Hand-builds a demo.js version of a scene figure with Codex (minutes; for what the scene kinds can't express). */
+app.post("/api/books/:id/demos/:demoId/craft", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { feedback?: string };
+  const demo = getDemo(c.req.param("id"), c.req.param("demoId"));
+  if (!demo) return c.json({ error: "not found" }, 404);
+  if (activeProvider() !== "codex") return c.json({ error: "Hand-built demos need Codex (they run in its sandbox). Switch the provider in Settings." }, 400);
+  const scene = demo.scene as { title?: string; caption?: string; hint?: string } | undefined;
+  const brief = { ...demo.brief, picture: demo.brief.picture || `As in this figure spec, but hand-crafted: ${JSON.stringify(demo.scene || {}).slice(0, 4000)}`, motion: demo.brief.motion || scene?.hint || "", controls: demo.brief.controls || "", readouts: demo.brief.readouts || "", truth: demo.brief.truth || "" };
+  const copy = { ...demo, id: newId("d"), type: "code" as const, scene: undefined, status: "queued" as const, brief, attempts: 0, threadId: undefined, checks: undefined, feedback: body.feedback, createdAt: new Date().toISOString(), activity: "waiting for a Codex slot" };
+  saveDemo(copy, { create: true });
+  publish(copy.bookId, { type: "demo", data: copy });
+  return c.json(enqueueBuild(copy));
+});
+
+app.get("/api/books/:id/demos/:demoId/scene", (c) => {
+  const demo = getDemo(c.req.param("id"), c.req.param("demoId"));
+  return demo?.scene ? c.json(demo.scene) : c.json({ error: "not found" }, 404);
 });
 
 app.delete("/api/books/:id/demos/:demoId", (c) => {
@@ -197,6 +233,8 @@ app.get("/api/books/:id/events", (c) =>
   }),
 );
 
+registerRoutes(app);
+
 /* ---------- the web app (production build) ---------- */
 if (PROD && existsSync(WEB_DIST)) {
   app.get("*", (c) => {
@@ -206,7 +244,10 @@ if (PROD && existsSync(WEB_DIST)) {
   });
 }
 
+initVault();
+exportMissingBooks();
 resumeInterrupted();
+resumeFigures();
 serve({ fetch: app.fetch, port: PORT, hostname: process.env.HOST || "127.0.0.1" }, (info) => {
   const status = codexStatus();
   console.log(`Feynman's Classroom API on http://${info.address}:${info.port}`);

@@ -79,6 +79,8 @@ export interface Brief {
   readouts: string;
   truth: string;
   predict: Predict | null;
+  /** The figure kind that fits: plot, sequence, graph, object3d, diagram. */
+  kind?: string;
 }
 
 export type DemoStatus = "queued" | "planning" | "building" | "checking" | "ready" | "failed";
@@ -101,6 +103,18 @@ export interface Demo {
   checks?: { node?: CheckReport; browser?: BrowserReport };
   feedback?: string;
   source?: "chapter" | "selection";
+  /** "scene": a declarative figure drawn by the platform (fast); "code": a hand-built demo.js. */
+  type?: "scene" | "code";
+  scene?: unknown;
+  /** The reader's request, in their words. */
+  request?: string;
+  /** The kind asked for (or "auto"). */
+  kind?: string;
+  quality?: "quick" | "careful";
+  /** Generation time in ms (scene figures). */
+  ms?: number;
+  /** When the current drawing started (ISO), for the progress clock. */
+  startedAt?: string;
 }
 
 export interface CheckReport {
@@ -121,7 +135,7 @@ export interface BrowserReport {
 export interface Job {
   id: string;
   bookId: string;
-  kind: "plan" | "build";
+  kind: "plan" | "build" | "figure";
   chapterId?: string;
   demoId?: string;
   status: "queued" | "running" | "done" | "failed";

@@ -110,26 +110,6 @@ export function generateChapter(bookId: string, chapterId: string, options: { co
   });
 }
 
-/** One demo for a passage the reader selected. */
-export function visualizeSelection(bookId: string, chapterId: string, text: string) {
-  const book = getBook(bookId);
-  if (!book) throw new Error("book not found");
-  const chapter = findChapter(book, chapterId);
-  if (!chapter) throw new Error("chapter not found");
-  return queue.add({ bookId, kind: "plan", chapterId, message: "Codex is reading your selection" }, async (job, signal) => {
-    const say = (message: string) => {
-      job.message = message;
-      publish(bookId, { type: "job", data: job });
-    };
-    const context = chapterText(book, chapter, Math.min(GENERATION.maxChapterChars, 30000));
-    const [brief] = await planChapter(book, chapter, context, { focus: text.slice(0, 4000), onActivity: say, signal });
-    if (!brief) throw new Error("no demo planned for the selection");
-    if (signal.aborted || !getBook(bookId)) return;
-    const demo = createDemo(book, chapter, brief, "selection");
-    enqueueBuild(demo);
-  });
-}
-
 export function regenerate(bookId: string, demoId: string, feedback?: string) {
   const demo = getDemo(bookId, demoId);
   if (!demo) throw new Error("demo not found");
@@ -145,7 +125,7 @@ export function regenerate(bookId: string, demoId: string, feedback?: string) {
 export function resumeInterrupted() {
   for (const book of listBooks()) {
     for (const demo of listDemos(book.id)) {
-      if (["queued", "building", "checking", "planning"].includes(demo.status)) {
+      if (demo.type !== "scene" && ["queued", "building", "checking", "planning"].includes(demo.status)) {
         resetWorkspace(demo);
         demo.status = "queued";
         demo.activity = "resuming after a restart";

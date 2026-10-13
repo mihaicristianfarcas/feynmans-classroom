@@ -1,8 +1,5 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { CODEX, GENERATION } from "../config.ts";
-import { runCodex } from "../codex.ts";
+import { structured } from "../llm.ts";
 import type { Book, Brief, TocEntry } from "../types.ts";
 
 const predictSchema = {
@@ -27,9 +24,10 @@ export const PLAN_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["slug", "eyebrow", "title", "caption", "anchorQuote", "page", "idea", "picture", "motion", "controls", "readouts", "truth", "predict"],
+        required: ["slug", "kind", "eyebrow", "title", "caption", "anchorQuote", "page", "idea", "picture", "motion", "controls", "readouts", "truth", "predict"],
         properties: {
           slug: { type: "string", description: "kebab-case id, e.g. work-done-by-gravity" },
+          kind: { type: "string", enum: ["plot", "sequence", "graph", "object3d", "diagram"], description: "plot: quantities and curves · sequence: actors exchanging messages over time · graph: things and connections, states, flows with moving tokens · object3d: a physical object and its parts in 3D · diagram: a 2D sketch of a physical setup that moves (a pendulum, a wick, rays, molecules)" },
           eyebrow: { type: "string", description: "2–5 word topic label shown above the demo, e.g. 'Work done by gravity'" },
           title: { type: "string", description: "card title, at most 32 characters" },
           caption: { type: "string", description: "one or two plain sentences (max ~30 words) saying what the reader sees and why it matters" },
@@ -61,10 +59,11 @@ Chapter: ${chapter.title}${chapter.subtitle ? ` — ${chapter.subtitle}` : ""}
 ${want}
 
 What makes a good demo here:
-- SIMPLE and INTUITIVE: one idea per demo, shown by one clear 2D picture that moves (a ball on a track, a curve with a point sliding along it, a square that grows, vectors adding, a pendulum, energy bars). A reader should get it in five seconds.
+- SIMPLE and INTUITIVE: one idea per demo, shown by one clear picture that moves (a curve with a point sliding along it, messages travelling between servers, tokens flowing through a pipeline, an engine turning). A reader should get it in five seconds.
+- Each demo is one of five kinds: plot (quantities and curves), sequence (actors exchanging messages over time: protocols), graph (things and connections: networks, state machines, flows with moving tokens, arrays, rings), diagram (a 2D sketch of a physical setup that moves: a pendulum, a wick drawing up fuel, light rays, molecules in a box), object3d (a physical object and how its parts work, in 3D). Show the mechanism, not just a chart of its result.
 - It plays on its own (an idle animation that shows the point), and the reader can change 1–3 controls to see the effect. Live numbers (readout and stats) come from the same model.
 - TRUE to the text: use the book's own equations, constants and example values as defaults. Pick ideas where seeing something move or change genuinely helps; skip pure definitions, history and asides.
-- No elaborate machines or 3D scenes: plain side views, plots and diagrams in a calm monochrome style with one highlighted ("lit") element.
+- A calm monochrome style with one highlighted ("lit") element; 3D only for genuinely physical objects.
 - Numbers only where the book has them: for a qualitative idea the readout is a state in words, never percentages of the drawing or animation progress.
 - Add a "predict" question only when there is a tempting wrong intuition the demo settles; otherwise null.
 - anchorQuote must be copied EXACTLY from the text (8–16 consecutive words, no ellipses), from the spot where the idea is introduced, and "page" must be the [[${unit} N]] marker it appears under.
@@ -79,44 +78,10 @@ Return JSON matching the schema.`;
 }
 
 export async function planChapter(book: Book, chapter: TocEntry, text: string, options: { count?: number; focus?: string; existing?: string[]; onActivity?: (t: string) => void; signal?: AbortSignal; log?: string }): Promise<Brief[]> {
-  const dir = mkdtempSync(join(tmpdir(), "classroom-plan-"));
-  try {
-    const schema = join(dir, "schema.json");
-    writeFileSync(schema, JSON.stringify(PLAN_SCHEMA));
-    const result = await runCodex({
-      cwd: dir,
-      prompt: planPrompt(book, chapter, text, options),
-      sandbox: "read-only",
-      schema,
-      ephemeral: true,
-      effort: CODEX.planEffort,
-      onActivity: options.onActivity,
-      signal: options.signal,
-      log: options.log,
-      timeoutMs: Math.min(CODEX.timeoutMs, 10 * 60 * 1000),
-    });
-    if (!result.ok) throw new Error(`planning failed: ${result.error || "no answer from codex"}`);
-    const parsed = parseJson(result.lastMessage);
-    const demos = (parsed?.demos || []) as Brief[];
-    if (!demos.length) throw new Error("the planner returned no demos");
-    return demos.slice(0, options.focus ? 1 : GENERATION.maxDemos + 1).map(normalizeBrief);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
-
-function parseJson(text: string): { demos?: unknown[] } | null {
-  try {
-    return JSON.parse(text);
-  } catch {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    try {
-      return JSON.parse(match[0]);
-    } catch {
-      return null;
-    }
-  }
+  const result = await structured<{ demos?: Brief[] }>({ prompt: planPrompt(book, chapter, text, options), schema: PLAN_SCHEMA, tier: "fast", effort: "medium", onActivity: options.onActivity, signal: options.signal, log: options.log, timeoutMs: Math.min(CODEX.timeoutMs, 10 * 60 * 1000) });
+  const demos = (result.data?.demos || []) as Brief[];
+  if (!demos.length) throw new Error("the planner returned no figures");
+  return demos.slice(0, options.focus ? 1 : GENERATION.maxDemos + 1).map(normalizeBrief);
 }
 
 function normalizeBrief(raw: Brief): Brief {
@@ -136,6 +101,7 @@ function normalizeBrief(raw: Brief): Brief {
     readouts: s(raw.readouts),
     truth: s(raw.truth, 1200),
     predict,
+    kind: ["plot", "sequence", "graph", "object3d", "diagram"].includes(String(raw.kind)) ? String(raw.kind) : undefined,
   };
 }
 
