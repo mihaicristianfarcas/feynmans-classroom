@@ -1,32 +1,18 @@
-/* The frame around every page except the reader: the side navigation (with the number of cards due),
- * search, the theme switch, and the page itself. */
-import {
-  BookOpen,
-  ChartNoAxesColumn,
-  House,
-  Layers,
-  type LucideIcon,
-  Moon,
-  NotebookPen,
-  Search,
-  Settings,
-  Sparkles,
-  Sun,
-  Waypoints,
-} from "lucide-react";
+/* The frame around every page except the reader: a slim bar along the top (the pages, with the number
+ * of cards due on Review; search, the theme switch and settings at the right end) and the page itself. */
+import { Moon, Search, Settings, Sun } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { learn } from "../api";
 import { openPalette, useIndicator } from "../components/ui";
 
-const NAV: { route: string; label: string; match: RegExp; icon: LucideIcon }[] = [
-  { route: "#/", label: "Today", match: /^#\/?$/, icon: House },
-  { route: "#/library", label: "Library", match: /^#\/library/, icon: BookOpen },
-  { route: "#/notes", label: "Notes", match: /^#\/notes/, icon: NotebookPen },
-  { route: "#/review", label: "Review", match: /^#\/review/, icon: Layers },
-  { route: "#/brain", label: "Brain", match: /^#\/brain/, icon: Waypoints },
-  { route: "#/ask", label: "Ask", match: /^#\/ask/, icon: Sparkles },
-  { route: "#/journey", label: "Journey", match: /^#\/journey/, icon: ChartNoAxesColumn },
-  { route: "#/settings", label: "Settings", match: /^#\/settings/, icon: Settings },
+const NAV: { route: string; label: string; match: RegExp }[] = [
+  { route: "#/", label: "Today", match: /^#\/?$/ },
+  { route: "#/library", label: "Library", match: /^#\/library/ },
+  { route: "#/notes", label: "Notes", match: /^#\/notes/ },
+  { route: "#/review", label: "Review", match: /^#\/review/ },
+  { route: "#/brain", label: "Brain", match: /^#\/brain/ },
+  { route: "#/ask", label: "Ask", match: /^#\/ask/ },
+  { route: "#/journey", label: "Journey", match: /^#\/journey/ },
 ];
 
 /** How many cards are waiting, for the nav badge (refreshed every minute and on focus). */
@@ -66,47 +52,81 @@ export function Shell({
 }) {
   const due = useDueCount();
   const [hash, setHash] = useState(location.hash || "#/");
+  // the bar draws its hairline only once the page scrolls under it
+  const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
-    const on = () => setHash(location.hash || "#/");
-    window.addEventListener("hashchange", on);
-    return () => window.removeEventListener("hashchange", on);
+    const onHash = () => setHash(location.hash || "#/");
+    const onScroll = () => setScrolled(window.scrollY > 2);
+    onScroll();
+    window.addEventListener("hashchange", onHash);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      window.removeEventListener("scroll", onScroll);
+    };
   }, []);
-  const current = NAV.findIndex((item) => item.match.test(hash));
-  const nav = useIndicator<HTMLUListElement>(current, "y");
+  const path = hash.split("?")[0];
+  const current = NAV.findIndex((item) => item.match.test(path));
+  const nav = useIndicator<HTMLUListElement>(current);
+  // on a narrow screen the pages scroll sideways: keep the current one in view
+  // biome-ignore lint/correctness/useExhaustiveDependencies: again when the page changes, or the badge widens the row
+  useEffect(() => {
+    const link = nav.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    const strip = nav.current?.parentElement;
+    if (!link || !strip || strip.scrollWidth <= strip.clientWidth) return;
+    strip.scrollTo({ left: link.offsetLeft - (strip.clientWidth - link.offsetWidth) / 2 });
+  }, [current, nav, due]);
   const mac = /Mac|iPhone|iPad/.test(navigator.platform);
   return (
     <div className="shell">
       <SkipLink />
-      <nav className="side" aria-label="Main">
+      <header className="topnav" data-line={scrolled || full || undefined}>
         <a className="brand" href="#/" title="Today">
           <span className="brand-mark" aria-hidden="true" />
           <span className="brand-name">Feynman’s Classroom</span>
         </a>
-        <button type="button" className="side-search" onClick={openPalette} title="Search everything">
-          <Search aria-hidden="true" />
-          <span>Search</span>
-          <kbd>{mac ? "⌘K" : "Ctrl K"}</kbd>
-        </button>
-        <ul className="side-nav" ref={nav}>
-          {NAV.map((item, i) => (
-            <li key={item.route}>
-              <a
-                href={item.route}
-                className="side-link"
-                aria-current={i === current ? "page" : undefined}
-                title={item.label}
-              >
-                <item.icon aria-hidden="true" />
-                <span>{item.label}</span>
-                {item.label === "Review" && due ? <span className="badge">{due}</span> : null}
-              </a>
-            </li>
-          ))}
-        </ul>
-        <div className="side-foot">
+        <nav className="topnav-nav" aria-label="Main">
+          <ul className="topnav-links" ref={nav}>
+            {NAV.map((item, i) => (
+              <li key={item.route}>
+                <a href={item.route} className="topnav-link" aria-current={i === current ? "page" : undefined}>
+                  {item.label}
+                  {item.label === "Review" && due ? (
+                    <span className="badge">
+                      <span className="visually-hidden">, </span>
+                      {due}
+                      <span className="visually-hidden"> due</span>
+                    </span>
+                  ) : null}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <div className="topnav-tools">
+          <button
+            type="button"
+            className="icon-button"
+            onClick={openPalette}
+            aria-label="Search"
+            aria-haspopup="dialog"
+            aria-keyshortcuts={mac ? "Meta+K" : "Control+K"}
+            title={`Search (${mac ? "⌘K" : "Ctrl K"})`}
+          >
+            <Search aria-hidden="true" />
+          </button>
           <ThemeButton theme={theme} setTheme={setTheme} />
+          <a
+            className="icon-button"
+            href="#/settings"
+            aria-label="Settings"
+            title="Settings"
+            aria-current={path.startsWith("#/settings") ? "page" : undefined}
+          >
+            <Settings aria-hidden="true" />
+          </a>
         </div>
-      </nav>
+      </header>
       <main id="main" tabIndex={-1} className={full ? "page page-full" : "page"}>
         {children}
       </main>

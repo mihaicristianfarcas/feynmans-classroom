@@ -160,7 +160,11 @@ export function FileTree({ tree, current, reload }: { tree: Tree | null; current
       ) : (
         <ul className="tree">{renderFolder(root, 0)}</ul>
       )}
-      {tree && <p className="fine tree-foot">{tree.notes.length} notes · files in your vault’s notes/ folder</p>}
+      {tree && (
+        <p className="fine tree-foot">
+          {tree.notes.length} note{tree.notes.length === 1 ? "" : "s"}
+        </p>
+      )}
     </aside>
   );
 }

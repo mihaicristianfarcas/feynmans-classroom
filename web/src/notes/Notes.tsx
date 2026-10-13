@@ -42,12 +42,11 @@ export function Notes({ theme }: { theme: "light" | "dark" }) {
 function EmptyNotes({ tree }: { tree: Tree | null }) {
   return (
     <div className="note-pane empty-pane">
-      <div className="empty rise">
-        <h1 className="page-title">Notes</h1>
-        <p className="lede small">
-          Write what you think as you learn. Link ideas with <code>[[double brackets]]</code>, embed passages, figures
-          and pictures with <code>![[…]]</code>. Every note is a Markdown file in your vault, named by its title, so
-          Obsidian and AI agents can work with it too.
+      <div className="empty-state rise">
+        <h1 className="empty-title">Notes</h1>
+        <p className="fine">
+          Write what you think as you learn. <code>[[Brackets]]</code> link ideas; every note is a Markdown file in your
+          vault.
         </p>
         <button type="button" className="button primary" onClick={() => newNote("")}>
           <SquarePen aria-hidden="true" />

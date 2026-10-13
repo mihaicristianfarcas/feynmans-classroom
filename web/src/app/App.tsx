@@ -1,5 +1,6 @@
 /* The app: picks the page from the URL's hash (#/library, #/book/<id>, #/notes/<id>…), sends a new
- * learner to the welcome page first, and puts every page except the reader inside the Shell. */
+ * learner to the welcome page first, and puts every page except the reader inside the Shell (Notes
+ * and the Brain's graph fill the window below its bar; the rest scroll). */
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { learn } from "../api";
 import { Notes } from "../notes/Notes";
@@ -21,6 +22,7 @@ import { useTheme } from "./theme";
 type Route =
   | { name: "book"; id: string }
   | {
+      full?: boolean;
       name:
         | "today"
         | "library"
@@ -55,10 +57,12 @@ function route(): Route {
   const book = hash.match(/^#\/book\/([a-z0-9]+)/i);
   if (book) return { name: "book", id: book[1] };
   const name = hash.replace(/^#\/?/, "").split("/")[0];
+  // pages that fill the window: Notes, and the Brain's graph (not a concept's own page)
+  const full = name === "notes" || (name === "brain" && !hash.startsWith("#/brain/concept/"));
   if (
     ["library", "notes", "review", "brain", "ask", "journey", "settings", "gallery", "welcome", "open"].includes(name)
   )
-    return { name: name as Route["name"] } as Route;
+    return { name: name as Route["name"], full } as Route;
   return { name: "today" };
 }
 
@@ -70,7 +74,11 @@ export function App() {
     const onHash = () => {
       const next = route();
       setCurrent((old) =>
-        old.name === next.name && (old as { id?: string }).id === (next as { id?: string }).id ? old : next,
+        old.name === next.name &&
+        (old as { id?: string }).id === (next as { id?: string }).id &&
+        (old as { full?: boolean }).full === (next as { full?: boolean }).full
+          ? old
+          : next,
       );
     };
     window.addEventListener("hashchange", onHash);
@@ -106,7 +114,7 @@ export function App() {
       </>
     );
   if (current.name === "welcome") page = <Welcome />;
-  else if (current.name === "library") page = <Library />;
+  else if (current.name === "library") page = <Library theme={theme} />;
   else if (current.name === "notes") page = <Notes theme={theme} />;
   else if (current.name === "open") page = <OpenLink />;
   else if (current.name === "review") page = <Review theme={theme} />;
@@ -118,7 +126,7 @@ export function App() {
   else page = <Today />;
   return (
     <>
-      <Shell theme={theme} setTheme={setTheme} full={current.name === "notes"}>
+      <Shell theme={theme} setTheme={setTheme} full={current.full}>
         {page}
       </Shell>
       <Palette />

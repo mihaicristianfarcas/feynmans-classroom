@@ -35,8 +35,9 @@ shared/            code the server and the browser both run
   scene/           the figure engine: spec types, the expression language, five renderers, validation
   fsrs.ts links.ts textmatch.ts vault-types.ts
 web/src/           the React app (Vite)
-  app/             the shell: routing, navigation, theme, the ⌘K palette
-  pages/           Today, Library, Review, Journey, Ask, Settings, Welcome, Gallery; brain/: graph, lists, concept
+  app/             the shell (a slim bar along the top): routing, navigation, theme, the ⌘K palette
+  pages/           Today, Library (and Figures), Review, Journey, Ask, Settings, Welcome, Gallery;
+                   brain/: the graph that fills the page, the card beside it, a concept's page
   reader/          the reader: book views, margin, selection menu, figures pane, note, tutor, capture, gutter
   notes/           notes: the file tree, the note pane and its links sidebar, the CodeMirror editor
   components/      shared pieces: Markdown, dialogs and study tools, quiz, graph, profile form

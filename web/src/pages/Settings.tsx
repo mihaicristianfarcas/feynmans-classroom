@@ -1,5 +1,5 @@
 /* Settings: who you are, which subscription does the thinking (Codex or Claude Code), the models and
- * effort for quick and careful work, and the vault's folder and history. */
+ * effort for quick and careful work (folded away until wanted), and the vault's folder and history. */
 import { useState } from "react";
 import { learn, type SettingsInfo } from "../api";
 import { Spinner } from "../components/feedback";
@@ -51,17 +51,19 @@ export function Settings() {
     );
   };
   return (
-    <div className="settings">
-      <header className="page-head">
+    <div className="settings rise">
+      <header className="page-head row">
         <h1 className="page-title">Settings</h1>
-        {saved && <span className="saved">{saved}</span>}
+        {saved && (
+          <span className="saved" role="status">
+            {saved}
+          </span>
+        )}
       </header>
 
-      <section className="panel">
+      <section className="settings-section">
         <h2 className="section-title">Who does the thinking</h2>
-        <p className="fine">
-          Feynman’s Classroom runs on your own subscription through its command-line tool. No API keys.
-        </p>
+        <p className="fine">Your own subscription, through its command-line tool. No API keys.</p>
         <div className="providers">
           {(["auto", "codex", "claude"] as const).map((p) => (
             <label key={p} className="provider" data-on={s.provider === p || undefined}>
@@ -85,34 +87,36 @@ export function Settings() {
             </label>
           ))}
         </div>
-        <h3 className="sub-title">Codex models</h3>
-        {tier("codex")}
-        <h3 className="sub-title">Claude Code models</h3>
-        {tier("claude")}
-        <div className="form-row two">
-          <label className="field">
-            <span>Model calls at once</span>
-            <input
-              type="number"
-              min={1}
-              max={8}
-              defaultValue={s.concurrency}
-              onBlur={(e) => save({ concurrency: Number(e.target.value) })}
-            />
-          </label>
-          <p className="fine">
-            Quick: figures, cards, quizzes, grading (seconds). Careful: chapter planning, asking the vault, “careful”
-            figures. Now running {info.load.running}, waiting {info.load.waiting}.
-          </p>
-        </div>
+        <details className="disclosure">
+          <summary>Models and speed</summary>
+          <h3 className="sub-title">Codex models</h3>
+          {tier("codex")}
+          <h3 className="sub-title">Claude Code models</h3>
+          {tier("claude")}
+          <div className="form-row two">
+            <label className="field">
+              <span>Model calls at once</span>
+              <input
+                type="number"
+                min={1}
+                max={8}
+                defaultValue={s.concurrency}
+                onBlur={(e) => save({ concurrency: Number(e.target.value) })}
+              />
+            </label>
+            <p className="fine">
+              Quick: figures, cards, quizzes, grading (seconds). Careful: chapter planning, asking the vault, “careful”
+              figures. Now running {info.load.running}, waiting {info.load.waiting}.
+            </p>
+          </div>
+        </details>
       </section>
 
-      <section className="panel">
+      <section className="settings-section">
         <h2 className="section-title">Agents in your vault</h2>
         <p className="fine">
-          Agents work with your files using their own shell, inside the CLI's sandbox: they can read only your vault,
-          write only where they're allowed (agents that change things work on their own git branch and land as one
-          commit you can undo), never touch .git, and have no network.
+          Agents read only your vault, have no network, and make their changes on their own branch, as one commit you
+          can undo.
         </p>
         <div className="radio-row" role="radiogroup" aria-label="Connections between notes">
           <label className="check">
@@ -136,7 +140,7 @@ export function Settings() {
         </div>
       </section>
 
-      <section className="panel">
+      <section className="settings-section">
         <h2 className="section-title">You</h2>
         <ProfileForm
           initial={profile}
@@ -152,18 +156,16 @@ export function Settings() {
       </section>
 
       {vault && (
-        <section className="panel">
+        <section className="settings-section">
           <h2 className="section-title">Your vault</h2>
-          <p>
-            Everything you make lives as plain Markdown in <code>{vault.path}</code>: {vault.notes} notes,{" "}
-            {vault.concepts} concepts, {vault.annotations} annotations, {vault.cards} cards, {vault.figures} figures,{" "}
-            {vault.reviews} reviews. Open it in any editor or Obsidian; point an AI agent at it (it has an{" "}
-            <code>AGENTS.md</code>).{" "}
+          <p className="fine">
+            Plain Markdown in <code>{vault.path}</code>: {vault.notes} notes, {vault.concepts} concepts, {vault.cards}{" "}
+            cards, {vault.figures} figures. Open it in any editor or Obsidian.{" "}
             {vault.git ? "Every change is committed to git." : "Install git to keep a history of every change."}
           </p>
           {vault.history.length > 0 && (
             <ul className="history">
-              {vault.history.map((h) => (
+              {vault.history.slice(0, 6).map((h) => (
                 <li key={h.hash}>
                   <code>{h.hash}</code> <span>{h.subject}</span> <span className="muted">{timeAgo(h.when)}</span>
                 </li>

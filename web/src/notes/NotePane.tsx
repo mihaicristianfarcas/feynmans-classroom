@@ -149,9 +149,6 @@ export function NotePane({ id, theme, onChanged }: { id: string; theme: "light" 
                     : `Edited ${timeAgo(note.updated)}`}
             </span>
             <span className="spacer" />
-            <code className="fine path" title="The file in your vault">
-              {note.path}
-            </code>
             <button
               type="button"
               className="icon-button danger"
