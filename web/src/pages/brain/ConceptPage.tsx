@@ -2,12 +2,12 @@
  * sources, and tools to explain it back, draft cards, connect it or draw a figure of it. */
 import { ArrowLeft, Shapes } from "lucide-react";
 import { useState } from "react";
+import { humanInterval } from "../../../../shared/fsrs.ts";
 import { learn, type Note } from "../../api";
 import { bookLink, go } from "../../app/navigation";
 import { Mastery, Spinner } from "../../components/feedback";
 import { Markdown } from "../../components/Markdown";
 import { CardDrafter, Connector, ExplainBack, FigureMaker } from "../../components/tools";
-import { timeAgo } from "../../lib/time";
 import { useLoad } from "../../lib/useLoad";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -163,9 +163,11 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
               <li key={k.id}>
                 <Markdown text={k.front} theme={theme} />
                 <span className="fine">
-                  {k.state
-                    ? `due ${timeAgo(k.state.due).replace(" ago", "")}${k.state.due > Date.now() ? " from now" : ""}`
-                    : "new"}
+                  {!k.state
+                    ? "new"
+                    : k.state.due <= Date.now()
+                      ? "due now"
+                      : `due in ${humanInterval(k.state.due - Date.now())}`}
                 </span>
               </li>
             ))}
