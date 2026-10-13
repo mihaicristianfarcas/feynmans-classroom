@@ -97,12 +97,13 @@ try {
     check("the demo runs in an opaque (sandboxed) origin", state.origin === "null", state.origin);
   }
 
-  // theme reaches the iframe
+  // theme reaches the iframe (the app starts in the system's theme, so switch to the other one)
+  const before = await page.evaluate(() => document.documentElement.dataset.theme);
   await page.click('button[aria-label="Switch theme"]');
   await wait(1200);
   const frame2 = await demoFrame(page);
   const theme = frame2 ? await frame2.evaluate(() => document.body.getAttribute("data-theme")) : null;
-  check("the theme switch reaches the demo", theme === "dark", String(theme));
+  check("the theme switch reaches the demo", !!theme && theme !== before, `${before} → ${theme}`);
   await page.click('button[aria-label="Switch theme"]');
 
   // ] steps to the next demo
