@@ -8,7 +8,7 @@ you need, instead of listing everything.
 |---|---|
 | `INDEX.md` | generated map: counts, recent changes, the other indexes |
 | `profile.md` | who the learner is: goals, background, level, how they like to learn |
-| `notes/**.md` | the learner's notes, in folders. **The file name is the title.** Optional frontmatter: `type` (note, explanation, connection, answer, summary), `tags`, `aliases`, `related` (links), `concepts`, `source` (`bookId`, `page`/`block`, `quote`) |
+| `notes/**.md` | the learner's notes, in folders (by subject, book, topic: however they like). **The file name is the title.** Optional frontmatter: `type` (note, explanation, summary, quiz, exercises, session, connection, answer), `about` (links to the books, concepts or notes it is about: `["[[Book title]]", "[[Concept]]"]`), `tags`, `aliases`, `related` (links), `concepts`, `source` (`bookId`, `page`/`block`, `quote`) |
 | `notes/INDEX.md` | generated: every note with its tags, links out and backlinks |
 | `concepts/<Name>.md` | one page per concept: `name`, `aliases`, `summary`, `related` concept ids, `sources`; the body explains it. `concepts/INDEX.md` lists them with mastery |
 | `cards/*.md` | flashcards: frontmatter (`deck`, `concepts`, `source`) and a body with `## Front` and `## Back` |
@@ -27,6 +27,44 @@ you need, instead of listing everything.
 Links are Obsidian links: `[[Note title]]`, `[[Note title|shown text]]`, `[[Concept name]]`, a book page
 `[[library/<book>/source.pdf#page=12]]`, an annotation `[[library/<book>/annotations/<file>]]`.
 `![[…]]` embeds a note, a picture or `figure:<id>`.
+
+## Making things for the learner
+
+Everything is a note in `notes/`, so it can go in any folder and link to anything. Make folders
+freely (`notes/Physics/Waves/`, `notes/DDIA/Chapter 5/`); follow the folders the learner already has.
+Give every note you make an `about` property linking the books, concepts or notes it is about: their
+pages then list it. Cite book pages as below.
+
+- **Summaries and explanations**: `type: summary` or `type: explanation`, in the learner's level and
+  style (see `profile.md`).
+- **Quizzes**: `type: quiz`, with one or more fenced `quiz` blocks of YAML that the app plays one
+  question at a time. A question with `choices` is multiple choice (`answer` is the right choice's
+  number, from 1); one without is answered in the learner's words and graded against `answer`.
+  `why` explains the answer; `concept` and `quote` are optional.
+
+  ````markdown
+  ```quiz
+  title: Replication, check yourself
+  questions:
+    - q: Which setup lets any replica accept writes?
+      choices: [Single-leader, Multi-leader, Leaderless]
+      answer: 3
+      why: Leaderless stores send each write to several replicas directly.
+    - q: In a sentence or two, what is replication lag?
+      answer: The delay before a write on the leader shows up on a follower.
+  ```
+  ````
+
+  After each try the app adds a folded `> [!attempt]-` callout below it: the score, and for each
+  miss what they answered and the correction. Read those to see what they still get wrong.
+- **Exercises**: `type: exercises`, each one a `> [!exercise] Title` callout followed by a folded
+  `> [!solution]-` callout (folded callouts open with a click, so the answer stays hidden).
+- **Study sessions**: `type: session`, e.g. `notes/<subject>/Sessions/2026-10-13.md`: what was
+  studied, what went well, what to revisit.
+- **Flashcards**: files in `cards/` (see above), with `concepts` and `source` where they apply.
+
+When asked to change a note, keep the learner's own words unless they asked for a rewrite. Don't
+delete or rename notes they didn't mention.
 
 Rules for agents:
 - Read the indexes first; search with `rg`; open only the files you need.

@@ -78,6 +78,28 @@ async function serve() {
     concepts: ["Derivative"],
   });
   await json("api/cards", "POST", { front: "What is dx?", back: "A little bit of x.", deck: "Calculus" });
+  await json("api/notes", "POST", {
+    title: "Smallness, check yourself",
+    type: "quiz",
+    folder: "Calculus/Quizzes",
+    about: ["[[Calculus Made Easy]]"],
+    body: [
+      "```quiz",
+      "title: Degrees of smallness",
+      "questions:",
+      "  - q: What is dx?",
+      "    choices: [A large step, A little bit of x]",
+      "    answer: 2",
+      "    why: The d means a little bit of.",
+      "```",
+      "",
+      "> [!exercise] Compare",
+      "> Which is smaller, dx or dx²?",
+      "",
+      "> [!solution]-",
+      "> dx², a small quantity of the second order.",
+    ].join("\n"),
+  });
 }
 
 /* ---------- pages ---------- */
@@ -102,6 +124,8 @@ async function routes(): Promise<string[]> {
     "#/gallery",
   ];
   if (notes[0]) list.push(`#/notes/${notes[0].id}`);
+  const quiz = (notes as { id: string; type?: string }[]).find((n) => n.type === "quiz");
+  if (quiz && quiz.id !== notes[0]?.id) list.push(`#/notes/${quiz.id}`);
   if (concepts[0]) list.push(`#/brain/concept/${concepts[0].id}`);
   if (books[0]) list.push(`#/book/${books[0].id}`);
   const only = arg("only");
@@ -331,6 +355,20 @@ try {
       const violations = await axe(page);
       check(`axe: ${route} (${theme})`, violations.length === 0, describe(violations));
     }
+  }
+  // a note's versions, open, in both themes
+  const quizNote = ((await fetch(`${BASE}api/notes?type=quiz`).then((r) => r.json())) as { id: string }[])[0];
+  const note = quizNote ? `#/notes/${quizNote.id}` : list.find((r) => r.startsWith("#/notes/"));
+  for (const theme of ["light", "dark"] as const) {
+    if (!note || (arg("only") && !"versions".includes(arg("only")!))) break;
+    await open(page, note, theme);
+    await page.click('.note-tools [aria-label="Versions"]');
+    await wait(600);
+    check(
+      `axe: a note's versions (${theme})`,
+      !!(await page.$(".modal")) && (await axe(page)).length === 0,
+      describe(await axe(page)),
+    );
   }
   if (!arg("only"))
     await keyboard(

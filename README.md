@@ -18,8 +18,10 @@ does its thinking on **your own Codex or Claude Code subscription** (no API keys
   from the idea to today's world and to your own goals.
 - **A second brain.** Books, annotations, notes, concepts, cards and figures live in one folder of
   plain files (a valid Obsidian vault), versioned by Jujutsu (jj), with indexes kept for people and
-  agents. See it as a graph built from your links (and the connections an agent suggests, which you
-  accept or reject); ask it questions; have an agent reorganise it, in its own copy, with undo.
+  agents. Organise it in folders by subject, book or topic, link notes to what they're about, and
+  see it as a graph built from your links (and the connections an agent suggests, which you accept
+  or reject). Every note keeps its versions. Ask it questions; have an agent reorganise it, in its
+  own copy, with undo.
 
 ## Quick start
 

@@ -67,6 +67,13 @@ export const learn = {
   updateNote: (id: string, n: Partial<Note> & { folder?: string }) => put<Note>(`/api/notes/${id}`, n),
   appendToNote: (id: string, markdown: string) => post<Note>(`/api/notes/${id}/append`, { markdown }),
   deleteNote: (id: string) => del(`/api/notes/${id}`),
+  noteVersions: (id: string) => call<Version[]>(`/api/notes/${id}/versions`),
+  noteVersion: (id: string, commit: string) =>
+    call<{ body: string; diff: string }>(`/api/notes/${id}/versions/${commit}`),
+  restoreNote: (id: string, commit: string) => post<Note>(`/api/notes/${id}/restore`, { commit }),
+  createFolder: (path: string) => post<{ folder: string }>("/api/folders", { path }),
+  moveFolder: (from: string, to: string) => post<{ folder: string }>("/api/folders/move", { from, to }),
+  deleteFolder: (path: string) => post<{ notes: number }>("/api/folders/delete", { path }),
   bookNote: (bookId: string) => post<Note>(`/api/books/${bookId}/note`),
   tree: () =>
     call<{ notes: { id: string; path: string; title: string; type: string; updated: string }[]; folders: string[] }>(

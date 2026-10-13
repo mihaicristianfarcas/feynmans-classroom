@@ -221,6 +221,90 @@
 .md .callout > p:last-child {
   margin-bottom: 0;
 }
+/* exercises, solutions and quiz attempts */
+.md .callout[data-callout="exercise"] {
+  background: var(--lavender-soft);
+}
+.md .callout:is([data-callout="solution"], [data-callout="answer"]) {
+  background: var(--sage-soft);
+}
+.md .callout[data-callout="attempt"] {
+  background: var(--sunken);
+}
+.md .callout[data-callout="attempt"] ol {
+  margin: 4px 0 0;
+  padding-left: 1.4em;
+  font-family: var(--sans);
+  font-size: 13.5px;
+}
+/* a folded callout ([!type]-) opens with a click, like any disclosure */
+.md details.callout > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  margin-bottom: 0;
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--r-sm);
+}
+.md details.callout > summary::-webkit-details-marker {
+  display: none;
+}
+.md details.callout > summary::before {
+  content: "";
+  flex: none;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 4.5px 0 4.5px 6px;
+  border-color: transparent transparent transparent currentColor;
+  opacity: 0.6;
+  transition: transform 160ms var(--ease-out);
+}
+.md details.callout[open] > summary {
+  margin-bottom: 6px;
+}
+.md details.callout[open] > summary::before {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .md details.callout > summary::before {
+    transition: none;
+  }
+}
+/* a quiz kept in a note: a card to start it, then the quiz itself */
+.md .md-quiz {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  margin: 0 0 1em;
+  padding: 16px 18px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--line),
+    var(--shadow-xs);
+  font-family: var(--sans);
+}
+.md .md-quiz.playing {
+  display: block;
+}
+.md .md-quiz .eyebrow {
+  color: var(--sky-ink);
+}
+.md .md-quiz-title {
+  margin: 0;
+  font: 600 16px / 1.35 var(--sans);
+  color: var(--ink);
+}
+.md .md-quiz .fine {
+  margin: 0 0 6px;
+}
+.md .md-quiz[data-error] pre {
+  max-width: 100%;
+  overflow: auto;
+}
 .md-embed-box {
   display: block;
   margin: 8px 0 14px;
@@ -317,6 +401,33 @@
 .tree-row.folder {
   color: var(--ink);
   font-weight: 500;
+}
+/* a folder's row: the folder, and its menu at the right end (shown on hover or focus) */
+.tree-folder-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.tree-folder-row .tree-row {
+  padding-right: 30px;
+}
+.tree-folder-menu {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+}
+.tree-folder-menu > .icon-button {
+  opacity: 0;
+}
+.tree-folder-row:hover .tree-folder-menu > .icon-button,
+.tree-folder-menu:focus-within > .icon-button,
+.tree-folder-menu > .icon-button[aria-expanded="true"] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .tree-folder-menu > .icon-button {
+    opacity: 1;
+  }
 }
 .tree-caret {
   width: 14px;
@@ -469,12 +580,88 @@
   box-shadow: none !important;
   border-radius: 6px !important;
 }
+.properties .wide {
+  flex: 1 1 320px;
+}
+.properties .wide input {
+  width: auto;
+  flex: 1;
+  min-width: 0;
+}
 .properties input:hover {
   background: var(--hover) !important;
 }
 .properties input:focus {
   background: var(--bg) !important;
   box-shadow: inset 0 0 0 1px var(--line-strong) !important;
+}
+/* a note's versions: the list beside the version picked */
+.versions {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 18px;
+  min-height: 320px;
+}
+.versions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 6px 0 0;
+  max-height: 60vh;
+  overflow: auto;
+  border-right: 1px solid var(--line);
+}
+.versions-list button {
+  appearance: none;
+  border: 0;
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: 7px 9px;
+  border-radius: var(--r);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.versions-list button[aria-pressed="true"] {
+  background: var(--accent-soft);
+}
+@media (hover: hover) and (pointer: fine) {
+  .versions-list button:hover:not([aria-pressed="true"]) {
+    background: var(--hover);
+  }
+}
+.versions-when {
+  font: 500 13px var(--sans);
+  color: var(--ink);
+}
+.versions-what {
+  font-size: 12px;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.versions-view {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+}
+.versions-text {
+  max-height: 52vh;
+  overflow: auto;
+  padding: 4px 4px 12px !important;
+}
+@media (max-width: 700px) {
+  .versions {
+    grid-template-columns: 1fr;
+  }
+  .versions-list {
+    max-height: 30vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
 }
 .note-body {
   flex: 1;

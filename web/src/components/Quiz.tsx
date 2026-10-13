@@ -1,12 +1,13 @@
 /* Quizzes and pretests: one question at a time, multiple choice or short answer, with feedback right
- * after each answer; misses can become flashcards in one click. */
+ * after each answer; misses can become flashcards in one click, and a quiz kept in a note can have the
+ * attempt added to it. */
 import { useEffect, useState } from "react";
 import { learn, type Question, type Quiz } from "../api";
 import { announce } from "../lib/a11y";
 import { Spinner } from "./feedback";
 import { Markdown } from "./Markdown";
 
-interface Answer {
+export interface Answer {
   choice?: number;
   text?: string;
   score: number;
@@ -19,11 +20,14 @@ export function QuizRunner({
   theme,
   onDone,
   deck,
+  saveAttempt,
 }: {
   quiz: Quiz;
   theme: "light" | "dark";
   onDone?: () => void;
   deck?: string;
+  /** Keeps the attempt (a quiz in a note: added under it, with the corrections). */
+  saveAttempt?: (answers: (Answer | null)[]) => Promise<void>;
 }) {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<(Answer | null)[]>(quiz.questions.map(() => null));
@@ -31,6 +35,7 @@ export function QuizRunner({
   const [grading, setGrading] = useState(false);
   const [carded, setCarded] = useState<Set<number>>(new Set());
   const [recorded, setRecorded] = useState(false);
+  const [kept, setKept] = useState<"no" | "saving" | "yes">("no");
   const q = quiz.questions[index];
   const answer = answers[index];
   const done = index >= quiz.questions.length;
@@ -107,6 +112,25 @@ export function QuizRunner({
               Make cards from all misses
             </button>
           </>
+        )}
+        {saveAttempt && (
+          <button
+            type="button"
+            className="button"
+            disabled={kept !== "no"}
+            onClick={async () => {
+              setKept("saving");
+              try {
+                await saveAttempt(answers);
+                setKept("yes");
+                announce("Added to the note");
+              } catch {
+                setKept("no");
+              }
+            }}
+          >
+            {kept === "yes" ? "Added to the note" : "Add this attempt to the note, with corrections"}
+          </button>
         )}
         {onDone && (
           <button type="button" className="button" onClick={onDone}>

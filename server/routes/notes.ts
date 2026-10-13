@@ -1,6 +1,6 @@
-/* Routes for notes: listing and the file tree, one note with its links, writing, appending,
- * renaming and deleting, linking an unlinked mention, resolving [[links]], and the connections an
- * agent suggests between notes. */
+/* Routes for notes: listing and the file tree, folders, one note with its links, writing, appending,
+ * renaming and deleting, its saved versions, linking an unlinked mention, resolving [[links]], and
+ * the connections an agent suggests between notes. */
 import type { Hono } from "hono";
 import type { Note } from "../../shared/vault-types.ts";
 import { readBody } from "../http.ts";
@@ -8,12 +8,18 @@ import { upsertConcept } from "../learn/concepts.ts";
 import { decideConnection, suggestConnections } from "../learn/connections.ts";
 import {
   appendToNote,
+  createFolder,
   createNote,
+  deleteFolder,
   deleteNote,
   linkMention,
   listNotes,
+  moveFolder,
   noteDetail,
   noteTree,
+  noteVersion,
+  noteVersions,
+  restoreNote,
   updateNote,
 } from "../learn/notes.ts";
 import { listConnections } from "../vault/connections.ts";
@@ -23,6 +29,14 @@ import { linkTargets, resolveLink } from "../vault/links.ts";
 export function noteRoutes(app: Hono) {
   app.get("/api/notes", (c) => c.json(listNotes(c.req.query())));
   app.get("/api/vault/tree", (c) => c.json(noteTree()));
+  app.post("/api/folders", async (c) => c.json({ folder: createFolder((await readBody<{ path: string }>(c)).path) }));
+  app.post("/api/folders/move", async (c) => {
+    const b = await readBody<{ from: string; to: string }>(c);
+    return c.json({ folder: moveFolder(b.from, b.to) });
+  });
+  app.post("/api/folders/delete", async (c) =>
+    c.json({ notes: deleteFolder((await readBody<{ path: string }>(c)).path) }),
+  );
 
   app.get("/api/notes/:id", (c) => {
     const note = notes.get(c.req.param("id")) || notes.byPath(c.req.query("path") || "");
@@ -45,6 +59,11 @@ export function noteRoutes(app: Hono) {
     return c.json(appendToNote(c.req.param("id"), b.markdown));
   });
   app.delete("/api/notes/:id", (c) => c.json({ ok: deleteNote(c.req.param("id")) }));
+  app.get("/api/notes/:id/versions", (c) => c.json(noteVersions(c.req.param("id"))));
+  app.get("/api/notes/:id/versions/:commit", (c) => c.json(noteVersion(c.req.param("id"), c.req.param("commit"))));
+  app.post("/api/notes/:id/restore", async (c) =>
+    c.json(restoreNote(c.req.param("id"), (await readBody<{ commit: string }>(c)).commit)),
+  );
   app.post("/api/notes/:id/link-mention", async (c) =>
     c.json(linkMention(c.req.param("id"), (await readBody<{ path: string }>(c)).path)),
   );

@@ -33,7 +33,7 @@ export interface Edge {
   to: string | null;
   toPath?: string;
   target: string;
-  kind: "link" | "embed" | "related" | "ai" | "mentions" | "source" | "concept";
+  kind: "link" | "embed" | "related" | "about" | "ai" | "mentions" | "source" | "concept";
   line: number;
 }
 
@@ -230,6 +230,10 @@ export function allEdges(): Edge[] {
         line: 1,
       });
     }
+    for (const target of linksInValue(n.about)) {
+      const r = resolveLink(target);
+      edges.push({ from, fromPath: n.path, to: r?.node ?? null, toPath: r?.path, target, kind: "about", line: 1 });
+    }
     for (const c of n.concepts) {
       const concept = concepts.get(c);
       if (concept)
@@ -307,13 +311,15 @@ export function backlinks(
       }
     }
     const lines = files.get(e.fromPath)!;
+    // a link kept in the frontmatter has no line of text around it worth showing
+    const inProperties = ["about", "related", "ai", "mentions", "source"].includes(e.kind);
     out.push({
       from: e.from,
       path: e.fromPath,
       title: titleOf(e.from, e.fromPath),
       kind: e.kind,
       line: e.line,
-      context: (lines[e.line - 1] || "").trim().slice(0, 240),
+      context: e.kind === "about" ? "About this" : inProperties ? "" : (lines[e.line - 1] || "").trim().slice(0, 240),
     });
   }
   return out;
@@ -368,8 +374,9 @@ export function carryLinks(oldKeys: string[], next: { name: string; path: string
   for (const n of notes.list()) {
     const body = rewriteLinks(n.body, rename);
     const related = n.related.map((r) => rewriteLinks(r, rename));
-    if (body !== n.body || related.some((r, i) => r !== n.related[i])) {
-      notes.save({ ...n, body, related });
+    const about = n.about.map((r) => rewriteLinks(r, rename));
+    if (body !== n.body || related.some((r, i) => r !== n.related[i]) || about.some((r, i) => r !== n.about[i])) {
+      notes.save({ ...n, body, related, about });
       count++;
     }
   }

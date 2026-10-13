@@ -5,7 +5,7 @@ data/vault/
   AGENTS.md                 the layout and rules, for AI agents (CLAUDE.md imports it)
   INDEX.md                  generated: counts, recent changes, where to look
   profile.md                who you are and how you learn
-  notes/**.md               your notes (notes/INDEX.md: generated table of them)
+  notes/**.md               your notes, in any folders (notes/INDEX.md: generated table of them)
   concepts/<Name>.md        one page per concept (concepts/INDEX.md: with mastery)
   cards/*.md                flashcards (## Front / ## Back)
   figures/*.json            saved figures
@@ -30,6 +30,22 @@ annotations, notes and logs are versioned; the PDFs, the extracted text and the 
 are not (`.gitignore` keeps a managed block). Vaults and books from earlier versions are migrated at
 startup.
 
+## Notes, folders, and what they're about
+
+Notes go in any folders you like under `notes/` (by subject, by book, by topic) and folders can be
+made, renamed, moved (links to the notes in them follow) and deleted (to `.trash/`) from the file
+tree, by you or by the agent. A note says what it's **about** in its properties: links to books,
+concepts or other notes (`about: ["[[Calculus Made Easy]]", "[[Derivative]]"]`). A book's notes
+(in the reader) and a concept's page list the notes about them.
+
+Notes can hold more than prose:
+
+- a fenced `quiz` block (YAML: questions with `choices` and the right `answer`, or open questions
+  with a model answer; `shared/quiz.ts` has the format) is played right in the note, and each
+  attempt can be added under it as a folded `> [!attempt]-` callout with the corrections;
+- a folded callout, `> [!solution]-`, opens with a click: exercises keep their answers hidden;
+- `type` says what a note is (summary, explanation, quiz, exercises, session…).
+
 ## History, with Jujutsu
 
 The vault is a [Jujutsu](https://www.jj-vcs.dev/) (jj) repository, colocated with git: `.jj/` and
@@ -42,7 +58,10 @@ The app runs jj with its own config (`DATA_DIR/jj.toml`), so yours doesn't matte
   when you stop for a few minutes (`VAULT_SITTING_MS`), or before the agent's work comes in, it
   closes it and begins the next. The history reads one entry per sitting, and every snapshot in
   between stays in jj's operation log (`jj op log`, `jj evolog`).
-- **An agent's work** is one change per run, made in a workspace of its own and brought in after
-  your edits (see [agents.md](agents.md)); Undo takes it out again.
+- **Versions of a note.** The clock button on a note lists its saved versions (`jj log` on the
+  file): read one as it was, see what it changed, and bring it back (as a new change, so nothing is
+  lost).
+- **The agent's work** is one change per request, made in a workspace of its own and brought in
+  after your edits (see [agents.md](agents.md)); Undo takes it out again.
 - **From the command line**: `jj log`, `jj diff -r <change>`, `jj undo` and `jj op log` all work in
   the vault (stop the app first if you rewrite history yourself).

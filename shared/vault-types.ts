@@ -12,7 +12,16 @@ export interface SourceRef {
   quote?: string;
 }
 
-export type NoteType = "note" | "highlight" | "explanation" | "connection" | "answer" | "summary";
+export type NoteType =
+  | "note"
+  | "highlight"
+  | "explanation"
+  | "connection"
+  | "answer"
+  | "summary"
+  | "quiz"
+  | "exercises"
+  | "session";
 
 export interface Note {
   /** From the frontmatter, or derived from the path for notes written elsewhere (Obsidian, an agent). */
@@ -27,6 +36,9 @@ export interface Note {
   aliases: string[];
   /** Links kept in the frontmatter (Obsidian properties), e.g. connections the learner accepted. */
   related: string[];
+  /** What the note is about: links to books, concepts, notes ("[[DDIA]]", "[[Replication]]"). Their
+   * pages list it. */
+  about: string[];
   concepts: string[];
   source?: SourceRef;
   /** Feynman explanations: the grade the tutor gave (0–100). */

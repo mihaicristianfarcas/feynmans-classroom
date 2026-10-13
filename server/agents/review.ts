@@ -1,10 +1,11 @@
 /* The checks an agent's changes pass before they reach the vault. Some files belong to the app and
  * may never change (such a run fails outright), and every changed file must still parse (JSON, JSONL,
- * Markdown frontmatter): one that doesn't waits for the learner's OK. Everything else lands at once,
+ * Markdown frontmatter, ```quiz blocks): one that doesn't waits for the learner's OK. Everything else lands at once,
  * since every run can be undone. */
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
+import { quizBlocks, quizFromData } from "../../shared/quiz.ts";
 import type { FileChange } from "../vault/index.ts";
 
 /** Paths an agent may never change: the app's own records. */
@@ -39,6 +40,7 @@ export function problemsIn(dir: string, files: FileChange[]): string[] {
         const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
         if (m) parseYaml(m[1]);
         else if (text.startsWith("---")) throw new Error("frontmatter is not closed");
+        for (const block of quizBlocks(text)) quizFromData(parseYaml(block));
       }
     } catch (error) {
       problems.push(`${f.path}: ${(error as Error).message.split("\n")[0]}`);
