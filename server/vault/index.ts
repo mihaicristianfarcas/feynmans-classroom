@@ -21,12 +21,32 @@
  * edits made outside the app, and commits the vault to git a few seconds after changes. */
 import { execFile, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  watch,
+  writeFileSync,
+} from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import { Document, isScalar, parse as parseYaml, visit } from "yaml";
-import { VAULT_DIR } from "../config.ts";
 import { fileNameOf } from "../../shared/links.ts";
-import type { Activity, Annotation, Card, Concept, Note, Profile, ReviewLog, SavedFigure } from "../../shared/vault-types.ts";
+import type {
+  Activity,
+  Annotation,
+  Card,
+  Concept,
+  Note,
+  Profile,
+  ReviewLog,
+  SavedFigure,
+} from "../../shared/vault-types.ts";
+import { VAULT_DIR } from "../config.ts";
 
 export const VAULT = VAULT_DIR;
 const DIRS = ["notes", "concepts", "cards", "figures", "attachments", "library", "brain", "log"];
@@ -59,14 +79,19 @@ export function parseFrontmatter(text: string): { data: Record<string, unknown>;
   if (!m) return { data: {}, body: text };
   try {
     const data = parseYaml(m[1]);
-    return { data: data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : {}, body: m[2] };
+    return {
+      data: data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : {},
+      body: m[2],
+    };
   } catch {
     return { data: {}, body: text };
   }
 }
 
 export function stringifyFrontmatter(data: Record<string, unknown>, body: string): string {
-  const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined && v !== null && !(Array.isArray(v) && !v.length)));
+  const clean = Object.fromEntries(
+    Object.entries(data).filter(([, v]) => v !== undefined && v !== null && !(Array.isArray(v) && !v.length)),
+  );
   const doc = new Document(clean);
   // short lists of plain values on one line: tags: [a, b], rects: [0.1, 0.4, 0.7, 0.02]
   visit(doc, {
@@ -78,9 +103,11 @@ export function stringifyFrontmatter(data: Record<string, unknown>, body: string
   return `---\n${yaml === "{}" ? "" : yaml}\n---\n\n${body.trim()}\n`;
 }
 
-const asArray = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x) => x !== null && x !== undefined).map(String) : typeof v === "string" && v ? [v] : []);
+const asArray = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x) => x !== null && x !== undefined).map(String) : typeof v === "string" && v ? [v] : [];
 const asString = (v: unknown, d = "") => (v === undefined || v === null ? d : String(v));
-const iso = (v: unknown, fallback?: string) => (v instanceof Date ? v.toISOString() : v ? String(v) : fallback || new Date().toISOString());
+const iso = (v: unknown, fallback?: string) =>
+  v instanceof Date ? v.toISOString() : v ? String(v) : fallback || new Date().toISOString();
 const pick = (data: Record<string, unknown>, known: string[]) => {
   const extra = Object.fromEntries(Object.entries(data).filter(([k]) => !known.includes(k)));
   return Object.keys(extra).length ? extra : undefined;
@@ -90,7 +117,19 @@ export const pathId = (rel: string) => `p${createHash("sha1").update(rel).digest
 
 /* ---------------- serializers ---------------- */
 
-const NOTE_KEYS = ["id", "type", "title", "tags", "aliases", "related", "concepts", "source", "score", "created", "updated"];
+const NOTE_KEYS = [
+  "id",
+  "type",
+  "title",
+  "tags",
+  "aliases",
+  "related",
+  "concepts",
+  "source",
+  "score",
+  "created",
+  "updated",
+];
 function noteFromFile(rel: string, text: string, mtime: string): Note {
   const { data, body } = parseFrontmatter(text);
   return {
@@ -112,10 +151,29 @@ function noteFromFile(rel: string, text: string, mtime: string): Note {
   };
 }
 const noteToFile = (n: Note) =>
-  stringifyFrontmatter({ id: n.id, type: n.type === "note" ? undefined : n.type, tags: n.tags, aliases: n.aliases, related: n.related, concepts: n.concepts, source: n.source, score: n.score, ...(n.props || {}), created: n.created, updated: n.updated }, n.body);
+  stringifyFrontmatter(
+    {
+      id: n.id,
+      type: n.type === "note" ? undefined : n.type,
+      tags: n.tags,
+      aliases: n.aliases,
+      related: n.related,
+      concepts: n.concepts,
+      source: n.source,
+      score: n.score,
+      ...(n.props || {}),
+      created: n.created,
+      updated: n.updated,
+    },
+    n.body,
+  );
 
 const CONCEPT_KEYS = ["id", "name", "aliases", "summary", "related", "sources", "created", "updated"];
-function conceptFromFile(rel: string, text: string, mtime: string): Concept & { path: string; props?: Record<string, unknown> } {
+function conceptFromFile(
+  rel: string,
+  text: string,
+  mtime: string,
+): Concept & { path: string; props?: Record<string, unknown> } {
   const { data, body } = parseFrontmatter(text);
   const name = asString(data.name) || basename(rel, ".md");
   return {
@@ -133,7 +191,20 @@ function conceptFromFile(rel: string, text: string, mtime: string): Concept & { 
   };
 }
 const conceptToFile = (c: Concept & { props?: Record<string, unknown> }) =>
-  stringifyFrontmatter({ id: c.id, name: c.name, aliases: c.aliases, summary: c.summary, related: c.related, sources: c.sources, ...(c.props || {}), created: c.created, updated: c.updated }, c.body);
+  stringifyFrontmatter(
+    {
+      id: c.id,
+      name: c.name,
+      aliases: c.aliases,
+      summary: c.summary,
+      related: c.related,
+      sources: c.sources,
+      ...(c.props || {}),
+      created: c.created,
+      updated: c.updated,
+    },
+    c.body,
+  );
 
 function cardFromFile(rel: string, text: string, mtime: string): Card {
   const { data, body } = parseFrontmatter(text);
@@ -154,10 +225,44 @@ function cardFromFile(rel: string, text: string, mtime: string): Card {
     updated: iso(data.updated || data.created, mtime),
   };
 }
-const cardToFile = (c: Card) => stringifyFrontmatter({ id: c.id, kind: c.kind, deck: c.deck, concepts: c.concepts, tags: c.tags, source: c.source, figure: c.figure, suspended: c.suspended || undefined, created: c.created, updated: c.updated }, `## Front\n\n${c.front}\n\n## Back\n\n${c.back}`);
+const cardToFile = (c: Card) =>
+  stringifyFrontmatter(
+    {
+      id: c.id,
+      kind: c.kind,
+      deck: c.deck,
+      concepts: c.concepts,
+      tags: c.tags,
+      source: c.source,
+      figure: c.figure,
+      suspended: c.suspended || undefined,
+      created: c.created,
+      updated: c.updated,
+    },
+    `## Front\n\n${c.front}\n\n## Back\n\n${c.back}`,
+  );
 
 /* annotations: library/<book>/annotations/*.md */
-const ANNOTATION_KEYS = ["id", "kind", "book", "book_id", "pdf", "chapter", "page", "block", "anchor", "color", "request", "status", "error", "model", "title", "tags", "created", "updated"];
+const ANNOTATION_KEYS = [
+  "id",
+  "kind",
+  "book",
+  "book_id",
+  "pdf",
+  "chapter",
+  "page",
+  "block",
+  "anchor",
+  "color",
+  "request",
+  "status",
+  "error",
+  "model",
+  "title",
+  "tags",
+  "created",
+  "updated",
+];
 const QUOTE_CALLOUT = /^\s*> \[!quote\][^\n]*\n(?:>[^\n]*(?:\n|$))*/;
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 
@@ -166,7 +271,17 @@ function annotationFromFile(rel: string, text: string, mtime: string): Annotatio
   const a = (data.anchor || {}) as Record<string, unknown>;
   const rects = Array.isArray(a.rects)
     ? (a.rects as unknown[])
-        .map((r) => (Array.isArray(r) && r.length >= 4 ? { x: Number(r[0]), y: Number(r[1]), w: Number(r[2]), h: Number(r[3]), ...(r[4] !== undefined ? { p: Number(r[4]) } : {}) } : null))
+        .map((r) =>
+          Array.isArray(r) && r.length >= 4
+            ? {
+                x: Number(r[0]),
+                y: Number(r[1]),
+                w: Number(r[2]),
+                h: Number(r[3]),
+                ...(r[4] !== undefined ? { p: Number(r[4]) } : {}),
+              }
+            : null,
+        )
         .filter((r): r is NonNullable<typeof r> => !!r && [r.x, r.y, r.w, r.h].every(Number.isFinite))
     : undefined;
   const md = a.md as Annotation["anchor"]["md"] | undefined;
@@ -187,11 +302,16 @@ function annotationFromFile(rel: string, text: string, mtime: string): Annotatio
       end: num(a.end),
       rects: rects?.length ? rects : undefined,
       y: num(a.y),
-      md: md && typeof md === "object" && md.file ? { file: String(md.file), line: Number(md.line) || 1, score: num(md.score) } : undefined,
+      md:
+        md && typeof md === "object" && md.file
+          ? { file: String(md.file), line: Number(md.line) || 1, score: num(md.score) }
+          : undefined,
     },
     color: data.color ? asString(data.color) : undefined,
     request: data.request ? asString(data.request) : undefined,
-    status: (["pending", "ready", "failed"].includes(asString(data.status)) ? data.status : "ready") as Annotation["status"],
+    status: (["pending", "ready", "failed"].includes(asString(data.status))
+      ? data.status
+      : "ready") as Annotation["status"],
     error: data.error ? asString(data.error) : undefined,
     model: (data.model as Annotation["model"]) || undefined,
     title: data.title ? asString(data.title) : undefined,
@@ -221,11 +341,20 @@ function annotationToFile(x: Annotation): string {
     end: a.end,
     blockEnd: a.blockEnd,
     y: a.y !== undefined ? r4(a.y) : undefined,
-    rects: a.rects?.map((r) => (r.p !== undefined && r.p !== a.page ? [r4(r.x), r4(r.y), r4(r.w), r4(r.h), r.p] : [r4(r.x), r4(r.y), r4(r.w), r4(r.h)])),
+    rects: a.rects?.map((r) =>
+      r.p !== undefined && r.p !== a.page
+        ? [r4(r.x), r4(r.y), r4(r.w), r4(r.h), r.p]
+        : [r4(r.x), r4(r.y), r4(r.w), r4(r.h)],
+    ),
     md: a.md,
   };
   const where = a.page !== undefined ? `p. ${a.page}` : a.block !== undefined ? `block ${a.block}` : "";
-  const quote = a.quote ? `> [!quote] ${where}\n${a.quote.split("\n").map((l) => `> ${l}`).join("\n")}\n\n` : "";
+  const quote = a.quote
+    ? `> [!quote] ${where}\n${a.quote
+        .split("\n")
+        .map((l) => `> ${l}`)
+        .join("\n")}\n\n`
+    : "";
   return stringifyFrontmatter(
     {
       id: x.id,
@@ -368,7 +497,8 @@ export class Collection<T extends { id: string }> {
     this.files.set(id, to);
     const item = this.items.get(id);
     if (item && "path" in (item as object)) (item as unknown as { path: string }).path = to;
-    if (item && "title" in (item as object) && this.spec.root === "notes") (item as unknown as { title: string }).title = basename(to, this.spec.ext);
+    if (item && "title" in (item as object) && this.spec.root === "notes")
+      (item as unknown as { title: string }).title = basename(to, this.spec.ext);
     emit(from);
     emit(to);
     return to;
@@ -443,7 +573,8 @@ export const annotations = new Collection<Annotation>({
   write: annotationToFile,
   place: (x) => {
     const folder = annotationBookInfo(x.bookId).folder || "unsorted";
-    const where = x.anchor.page !== undefined ? `p${x.anchor.page}` : x.anchor.block !== undefined ? `b${x.anchor.block}` : "x";
+    const where =
+      x.anchor.page !== undefined ? `p${x.anchor.page}` : x.anchor.block !== undefined ? `b${x.anchor.block}` : "x";
     const words = slugify(x.anchor.quote.split(/\s+/).slice(0, 5).join(" "), 40);
     return `library/${folder}/annotations/${where}-${x.kind}-${words}-${x.id.slice(-4)}`;
   },
@@ -473,10 +604,12 @@ export function appendLog(name: string, entry: unknown) {
   appendFileSync(join(VAULT, "log", name), `${JSON.stringify(entry)}\n`);
 }
 export function reviews(): ReviewLog[] {
-  return (reviewCache ||= readLog<ReviewLog>("reviews.jsonl"));
+  reviewCache ??= readLog<ReviewLog>("reviews.jsonl");
+  return reviewCache;
 }
 export function activity(): Activity[] {
-  return (activityCache ||= readLog<Activity>("activity.jsonl"));
+  activityCache ??= readLog<Activity>("activity.jsonl");
+  return activityCache;
 }
 export function logReview(entry: ReviewLog) {
   const log = reviews(); // load first: loading after the append would read the new line and then add it twice
@@ -530,7 +663,13 @@ export function saveProfile(patch: Partial<Profile>): Profile {
   next.dailyNew = Math.max(0, Math.min(200, Math.round(Number(next.dailyNew) || 20)));
   const { notes: body, ...data } = next;
   selfWrites.add("profile.md");
-  atomicWrite(join(VAULT, "profile.md"), stringifyFrontmatter(data as unknown as Record<string, unknown>, body || "_Anything about how you learn best: write it here, and the tutor will read it._"));
+  atomicWrite(
+    join(VAULT, "profile.md"),
+    stringifyFrontmatter(
+      data as unknown as Record<string, unknown>,
+      body || "_Anything about how you learn best: write it here, and the tutor will read it._",
+    ),
+  );
   changed("profile");
   return next;
 }
@@ -558,7 +697,7 @@ function emit(rel: string) {
 /* ---------------- git ---------------- */
 
 export const hasGit = spawnSync("git", ["--version"], { encoding: "utf8" }).status === 0;
-let pending: string[] = [];
+const pending: string[] = [];
 let timer: ReturnType<typeof setTimeout> | null = null;
 let committing = false;
 const GIT_ID = ["-c", "user.name=Feynman's Classroom", "-c", "user.email=classroom@localhost"];
@@ -579,7 +718,9 @@ function subjectOf(items: string[]) {
     const kind = item.split(" ")[0];
     counts.set(kind, (counts.get(kind) || 0) + 1);
   }
-  return (items.length === 1 ? items[0] : [...counts].map(([k, n]) => (n > 1 ? `${n}× ${k}` : k)).join(", ") || "update").slice(0, 120);
+  return (
+    items.length === 1 ? items[0] : [...counts].map(([k, n]) => (n > 1 ? `${n}× ${k}` : k)).join(", ") || "update"
+  ).slice(0, 120);
 }
 
 function commit() {
@@ -607,7 +748,8 @@ export function commitNow(subject?: string): string | null {
   const items = pending.splice(0).filter(Boolean);
   git(["add", "-A"]);
   const status = git(["status", "--porcelain"]);
-  if (status.stdout.trim()) git([...GIT_ID, "commit", "-q", "-m", subject || subjectOf(items.length ? items : ["update"])]);
+  if (status.stdout.trim())
+    git([...GIT_ID, "commit", "-q", "-m", subject || subjectOf(items.length ? items : ["update"])]);
   return git(["rev-parse", "HEAD"]).stdout.trim() || null;
 }
 
@@ -620,7 +762,10 @@ export const gitIdentity = GIT_ID;
 
 export function vaultHistory(limit = 30): { hash: string; when: string; subject: string }[] {
   if (!hasGit || !existsSync(join(VAULT, ".git"))) return [];
-  const run = spawnSync("git", ["log", `-${limit}`, "--pretty=format:%h%x09%cI%x09%s"], { cwd: VAULT, encoding: "utf8" });
+  const run = spawnSync("git", ["log", `-${limit}`, "--pretty=format:%h%x09%cI%x09%s"], {
+    cwd: VAULT,
+    encoding: "utf8",
+  });
   return (run.stdout || "")
     .split("\n")
     .filter(Boolean)
@@ -652,7 +797,15 @@ function startWatching() {
     watch(VAULT, { recursive: true }, (_event, file) => {
       if (!file) return;
       const rel = String(file).replace(/\\/g, "/");
-      if (rel.startsWith(".git") || rel.startsWith(".trash") || rel.endsWith(".tmp") || generated(rel) || rel.startsWith("brain/links") || rel.startsWith("brain/unresolved")) return;
+      if (
+        rel.startsWith(".git") ||
+        rel.startsWith(".trash") ||
+        rel.endsWith(".tmp") ||
+        generated(rel) ||
+        rel.startsWith("brain/links") ||
+        rel.startsWith("brain/unresolved")
+      )
+        return;
       clearTimeout(debounce.get(rel));
       debounce.set(
         rel,
@@ -770,7 +923,8 @@ function migrateV1() {
   if (existsSync(join(VAULT, "library")))
     for (const name of readdirSync(join(VAULT, "library"))) {
       const dir = join(VAULT, "library", name);
-      if (statSync(dir).isDirectory() && !existsSync(join(dir, "book.json"))) rmSync(dir, { recursive: true, force: true });
+      if (statSync(dir).isDirectory() && !existsSync(join(dir, "book.json")))
+        rmSync(dir, { recursive: true, force: true });
     }
   // notes and concepts were named by slug; name them by title, as Obsidian does
   for (const dir of ["notes", "concepts"]) {
@@ -809,7 +963,16 @@ export function initVault() {
 }
 
 export function vaultStats() {
-  return { notes: notes.items.size, concepts: concepts.items.size, cards: cards.items.size, figures: figures.items.size, annotations: annotations.items.size, reviews: reviews().length, git: hasGit && existsSync(join(VAULT, ".git")), path: VAULT };
+  return {
+    notes: notes.items.size,
+    concepts: concepts.items.size,
+    cards: cards.items.size,
+    figures: figures.items.size,
+    annotations: annotations.items.size,
+    reviews: reviews().length,
+    git: hasGit && existsSync(join(VAULT, ".git")),
+    path: VAULT,
+  };
 }
 
 export function now() {

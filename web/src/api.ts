@@ -94,7 +94,8 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) throw new Error(data?.error || `${response.status} ${response.statusText}`);
   return data as T;
 }
-const post = <T,>(path: string, body?: unknown) => call<T>(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body ?? {}) });
+const post = <T>(path: string, body?: unknown) =>
+  call<T>(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body ?? {}) });
 
 export const api = {
   status: () => call<Status>("/api/status"),
@@ -109,18 +110,34 @@ export const api = {
     return call<Book>("/api/books", { method: "POST", body: form });
   },
   deleteBook: (id: string) => call(`/api/books/${id}`, { method: "DELETE" }),
-  generate: (id: string, chapterId: string, count?: number, mode: "scene" | "code" = "scene") => post<Job>(`/api/books/${id}/chapters/${chapterId}/generate`, { count, mode }),
+  generate: (id: string, chapterId: string, count?: number, mode: "scene" | "code" = "scene") =>
+    post<Job>(`/api/books/${id}/chapters/${chapterId}/generate`, { count, mode }),
   detectChapters: (id: string) => post<Job>(`/api/books/${id}/detect-chapters`),
-  visualize: (id: string, input: { chapterId: string; text: string; request?: string; kind?: string; quality?: "quick" | "careful"; page?: number; block?: number }) => post<Demo>(`/api/books/${id}/visualize`, input),
-  regenerate: (id: string, demoId: string, feedback?: string, quality?: "quick" | "careful") => post<Job>(`/api/books/${id}/demos/${demoId}/regenerate`, { feedback, quality }),
-  craft: (id: string, demoId: string, feedback?: string) => post<Job>(`/api/books/${id}/demos/${demoId}/craft`, { feedback }),
+  visualize: (
+    id: string,
+    input: {
+      chapterId: string;
+      text: string;
+      request?: string;
+      kind?: string;
+      quality?: "quick" | "careful";
+      page?: number;
+      block?: number;
+    },
+  ) => post<Demo>(`/api/books/${id}/visualize`, input),
+  regenerate: (id: string, demoId: string, feedback?: string, quality?: "quick" | "careful") =>
+    post<Job>(`/api/books/${id}/demos/${demoId}/regenerate`, { feedback, quality }),
+  craft: (id: string, demoId: string, feedback?: string) =>
+    post<Job>(`/api/books/${id}/demos/${demoId}/craft`, { feedback }),
   deleteDemo: (id: string, demoId: string) => call(`/api/books/${id}/demos/${demoId}`, { method: "DELETE" }),
   fileUrl: (id: string) => `/api/books/${id}/file`,
-  pageUrl: (id: string, demoId: string, theme: string, version: string, predict = true) => `/api/books/${id}/demos/${demoId}/page?theme=${theme}&v=${encodeURIComponent(version)}${predict ? "" : "&predict=0"}`,
+  pageUrl: (id: string, demoId: string, theme: string, version: string, predict = true) =>
+    `/api/books/${id}/demos/${demoId}/page?theme=${theme}&v=${encodeURIComponent(version)}${predict ? "" : "&predict=0"}`,
 };
 
 /** Position of a location in reading order (page + fraction, or block + fraction). */
-export const posOf = (loc: Loc | undefined) => (!loc ? 0 : loc.page !== undefined ? loc.page + (loc.y ?? 0) : (loc.block ?? 0) + (loc.y ?? 0));
+export const posOf = (loc: Loc | undefined) =>
+  !loc ? 0 : loc.page !== undefined ? loc.page + (loc.y ?? 0) : (loc.block ?? 0) + (loc.y ?? 0);
 
 /** Fig numbers in reading order inside each chapter, same rule as the server. */
 export function withFigs(book: Book, demos: Demo[]): Demo[] {
@@ -138,7 +155,7 @@ export function withFigs(book: Book, demos: Demo[]): Demo[] {
   for (const [chapterId, list] of groups) {
     const index = book.toc.findIndex((entry) => entry.id === chapterId);
     list.sort((a, b) => posOf(a.anchor) - posOf(b.anchor) || a.createdAt.localeCompare(b.createdAt));
-    list.forEach((demo, i) => (demo.fig = `Fig ${index + 1}.${i + 1}`));
+    for (const [i, demo] of list.entries()) demo.fig = `Fig ${index + 1}.${i + 1}`;
   }
   return out.sort((a, b) => posOf(a.anchor) - posOf(b.anchor) || a.createdAt.localeCompare(b.createdAt));
 }
@@ -180,7 +197,11 @@ export function useBookLive(bookId: string) {
       clearTimeout(retry);
       inflight++;
       try {
-        const [demoList, jobList, annotationList] = await Promise.all([api.demos(bookId), api.jobs(bookId), learn.annotations(bookId)]);
+        const [demoList, jobList, annotationList] = await Promise.all([
+          api.demos(bookId),
+          api.jobs(bookId),
+          learn.annotations(bookId),
+        ]);
         if (!alive) return;
         setDemos(demoList);
         setJobs(jobList);
@@ -240,7 +261,8 @@ const savedTheme = (): "light" | "dark" | null => {
   } catch {}
   return null;
 };
-const systemTheme = (): "light" | "dark" => (typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+const systemTheme = (): "light" | "dark" =>
+  typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 
 /** The theme: the one you chose, else the system's (followed as it changes). Switching crossfades. */
 export function useTheme(): ["light" | "dark", (t: "light" | "dark") => void] {
@@ -263,7 +285,8 @@ export function useTheme(): ["light" | "dark", (t: "light" | "dark") => void] {
       flushSync(() => setTheme(next));
     };
     const doc = document as Document & { startViewTransition?: (update: () => void) => unknown };
-    if (doc.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches) doc.startViewTransition(apply);
+    if (doc.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches)
+      doc.startViewTransition(apply);
     else apply();
   }, []);
   return [theme, choose];
@@ -484,7 +507,17 @@ export interface SavedFigure {
   created: string;
 }
 export interface GraphData {
-  nodes: { id: string; kind: "book" | "concept" | "note" | "annotation"; label: string; mastery: number | null; size: number; detail?: string; bookId?: string; path?: string; created: number }[];
+  nodes: {
+    id: string;
+    kind: "book" | "concept" | "note" | "annotation";
+    label: string;
+    mastery: number | null;
+    size: number;
+    detail?: string;
+    bookId?: string;
+    path?: string;
+    created: number;
+  }[];
   edges: { from: string; to: string; kind: string; id?: string; why?: string }[];
 }
 export interface SearchHit {
@@ -514,13 +547,27 @@ export interface Journey {
 }
 export interface Today {
   queue: { due: number; learning: number; fresh: number; total: number };
-  books: { id: string; title: string; author?: string; format: string; lastTs: number; position: number | null; chapter: string | null }[];
+  books: {
+    id: string;
+    title: string;
+    author?: string;
+    format: string;
+    lastTs: number;
+    position: number | null;
+    chapter: string | null;
+  }[];
   suggestions: { kind: string; title: string; detail: string; action: Record<string, string> }[];
   profile: Profile;
   summary: string;
 }
 export interface SettingsInfo {
-  settings: { provider: "auto" | "codex" | "claude"; codex: Tier; claude: Tier; concurrency: number; connections?: "suggest" | "auto" };
+  settings: {
+    provider: "auto" | "codex" | "claude";
+    codex: Tier;
+    claude: Tier;
+    concurrency: number;
+    connections?: "suggest" | "auto";
+  };
   active: "codex" | "claude";
   codex: { installed: boolean; version?: string; loggedIn: boolean; detail?: string };
   claude: { installed: boolean; version?: string };
@@ -533,44 +580,97 @@ interface Tier {
   smartEffort: string;
 }
 
-const put = <T,>(path: string, body?: unknown) => call<T>(path, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body ?? {}) });
+const put = <T>(path: string, body?: unknown) =>
+  call<T>(path, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body ?? {}) });
 const del = (path: string) => call(path, { method: "DELETE" });
 
 export const learn = {
   profile: () => call<Profile>("/api/profile"),
   saveProfile: (p: Partial<Profile>) => put<Profile>("/api/profile", p),
   settings: () => call<SettingsInfo>("/api/settings"),
-  saveSettings: (s: Partial<SettingsInfo["settings"]>) => put<{ settings: SettingsInfo["settings"]; active: string }>("/api/settings", s),
-  vault: () => call<{ notes: number; concepts: number; annotations: number; cards: number; figures: number; reviews: number; git: boolean; path: string; history: { hash: string; when: string; subject: string }[] }>("/api/vault"),
+  saveSettings: (s: Partial<SettingsInfo["settings"]>) =>
+    put<{ settings: SettingsInfo["settings"]; active: string }>("/api/settings", s),
+  vault: () =>
+    call<{
+      notes: number;
+      concepts: number;
+      annotations: number;
+      cards: number;
+      figures: number;
+      reviews: number;
+      git: boolean;
+      path: string;
+      history: { hash: string; when: string; subject: string }[];
+    }>("/api/vault"),
   today: () => call<Today>("/api/today"),
   journey: () => call<Journey>("/api/journey"),
   graph: () => call<GraphData>("/api/graph"),
   search: (q: string) => call<SearchHit[]>(`/api/search?q=${encodeURIComponent(q)}`),
-  readPing: (body: { bookId: string; chapter?: string; chapterId?: string; position?: number; page?: number }) => post("/api/activity", { type: "read", ...body }),
-  notes: (filter: { type?: string; book?: string; concept?: string; folder?: string } = {}) => call<Note[]>(`/api/notes?${new URLSearchParams(filter as Record<string, string>)}`),
+  readPing: (body: { bookId: string; chapter?: string; chapterId?: string; position?: number; page?: number }) =>
+    post("/api/activity", { type: "read", ...body }),
+  notes: (filter: { type?: string; book?: string; concept?: string; folder?: string } = {}) =>
+    call<Note[]>(`/api/notes?${new URLSearchParams(filter as Record<string, string>)}`),
   note: (id: string) => call<NoteDetail>(`/api/notes/${id}`),
   createNote: (n: Partial<Note> & { folder?: string }) => post<Note>("/api/notes", n),
   updateNote: (id: string, n: Partial<Note> & { folder?: string }) => put<Note>(`/api/notes/${id}`, n),
   appendToNote: (id: string, markdown: string) => post<Note>(`/api/notes/${id}/append`, { markdown }),
   deleteNote: (id: string) => del(`/api/notes/${id}`),
   bookNote: (bookId: string) => post<Note>(`/api/books/${bookId}/note`),
-  tree: () => call<{ notes: { id: string; path: string; title: string; type: string; updated: string }[]; folders: string[] }>("/api/vault/tree"),
+  tree: () =>
+    call<{ notes: { id: string; path: string; title: string; type: string; updated: string }[]; folders: string[] }>(
+      "/api/vault/tree",
+    ),
   linkTargets: () => call<{ title: string; kind: string; path?: string; detail?: string }[]>("/api/links/targets"),
-  resolve: (target: string, sub?: string) => call<Resolved>(`/api/links/resolve?target=${encodeURIComponent(target)}${sub ? `&sub=${encodeURIComponent(sub)}` : ""}`),
+  resolve: (target: string, sub?: string) =>
+    call<Resolved>(
+      `/api/links/resolve?target=${encodeURIComponent(target)}${sub ? `&sub=${encodeURIComponent(sub)}` : ""}`,
+    ),
   attach: (data: string, name?: string) => post<{ path: string; name: string }>("/api/attachments", { data, name }),
   transcribe: (path: string) => post<{ markdown: string; ms: number }>("/api/transcribe", { path }),
   annotations: (bookId: string) => call<Annotation[]>(`/api/books/${bookId}/annotations`),
   annotation: (id: string) => call<Annotation>(`/api/annotations/${id}`),
-  annotate: (bookId: string, input: { kind: AnnotationKind; anchor: Anchor; request?: string; color?: string; body?: string; quality?: "quick" | "careful"; sceneKind?: string }) => post<Annotation>(`/api/books/${bookId}/annotations`, input),
+  annotate: (
+    bookId: string,
+    input: {
+      kind: AnnotationKind;
+      anchor: Anchor;
+      request?: string;
+      color?: string;
+      body?: string;
+      quality?: "quick" | "careful";
+      sceneKind?: string;
+    },
+  ) => post<Annotation>(`/api/books/${bookId}/annotations`, input),
   retryAnnotation: (id: string) => post<Annotation>(`/api/annotations/${id}/retry`),
-  updateAnnotation: (id: string, patch: Partial<Pick<Annotation, "color" | "body" | "request" | "tags" | "title" | "kind">>) => call<Annotation>(`/api/annotations/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) }),
+  updateAnnotation: (
+    id: string,
+    patch: Partial<Pick<Annotation, "color" | "body" | "request" | "tags" | "title" | "kind">>,
+  ) =>
+    call<Annotation>(`/api/annotations/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
   deleteAnnotation: (id: string) => del(`/api/annotations/${id}`),
   followUp: (id: string, question: string) => post<Annotation>(`/api/annotations/${id}/followup`, { question }),
-  redraw: (id: string, notes?: string, quality?: "quick" | "careful") => post<Annotation>(`/api/annotations/${id}/redraw`, { notes, quality }),
-  toNote: (bookId: string, input: { annotationId?: string; anchor?: Anchor; noteId?: string; mode?: "reference" | "passage" | "embed"; comment?: string }) => post<{ note: Note; annotation: Annotation; markdown: string }>(`/api/books/${bookId}/to-note`, input),
-  connections: (path?: string) => call<SuggestedLink[]>(`/api/connections${path ? `?path=${encodeURIComponent(path)}` : ""}`),
-  suggestConnections: (path?: string) => post<{ suggested: SuggestedLink[]; ms: number }>("/api/connections/suggest", { path }),
-  decideConnection: (id: string, decision: "accept" | "reject" | "remove") => post<SuggestedLink>(`/api/connections/${id}/${decision}`),
+  redraw: (id: string, notes?: string, quality?: "quick" | "careful") =>
+    post<Annotation>(`/api/annotations/${id}/redraw`, { notes, quality }),
+  toNote: (
+    bookId: string,
+    input: {
+      annotationId?: string;
+      anchor?: Anchor;
+      noteId?: string;
+      mode?: "reference" | "passage" | "embed";
+      comment?: string;
+    },
+  ) => post<{ note: Note; annotation: Annotation; markdown: string }>(`/api/books/${bookId}/to-note`, input),
+  connections: (path?: string) =>
+    call<SuggestedLink[]>(`/api/connections${path ? `?path=${encodeURIComponent(path)}` : ""}`),
+  suggestConnections: (path?: string) =>
+    post<{ suggested: SuggestedLink[]; ms: number }>("/api/connections/suggest", { path }),
+  decideConnection: (id: string, decision: "accept" | "reject" | "remove") =>
+    post<SuggestedLink>(`/api/connections/${id}/${decision}`),
   agents: () => call<AgentRun[]>("/api/agents"),
   runAgent: (task: string, mode: "read" | "write" = "write") => post<AgentRun>("/api/agents", { task, mode }),
   agentAction: (id: string, action: "approve" | "discard" | "undo") => post<AgentRun>(`/api/agents/${id}/${action}`),
@@ -580,31 +680,81 @@ export const learn = {
   createConcept: (c: { name: string; summary?: string }) => post<Concept>("/api/concepts", c),
   updateConcept: (id: string, c: Partial<Concept>) => put<Concept>(`/api/concepts/${id}`, c),
   deleteConcept: (id: string) => del(`/api/concepts/${id}`),
-  extractConcepts: (bookId: string, chapterId: string) => post<Concept[]>(`/api/books/${bookId}/chapters/${chapterId}/concepts`),
-  cards: (filter: { deck?: string; concept?: string } = {}) => call<CardView[]>(`/api/cards?${new URLSearchParams(filter as Record<string, string>)}`),
+  extractConcepts: (bookId: string, chapterId: string) =>
+    post<Concept[]>(`/api/books/${bookId}/chapters/${chapterId}/concepts`),
+  cards: (filter: { deck?: string; concept?: string } = {}) =>
+    call<CardView[]>(`/api/cards?${new URLSearchParams(filter as Record<string, string>)}`),
   saveCards: (cards: Partial<CardView>[]) => post<CardView[]>("/api/cards", { cards }),
   updateCard: (id: string, c: Partial<CardView>) => put<CardView>(`/api/cards/${id}`, c),
   deleteCard: (id: string) => del(`/api/cards/${id}`),
-  draftCards: (input: { passage: string; source?: SourceRef; focus?: string; count?: number }) => post<{ cards: DraftCard[]; concepts: { name: string; summary: string }[] }>("/api/cards/draft", input),
-  saveDrafts: (input: { drafts: DraftCard[]; deck?: string; source?: SourceRef; concepts?: { name: string; summary: string }[] }) => post<CardView[]>("/api/cards/save-drafts", input),
+  draftCards: (input: { passage: string; source?: SourceRef; focus?: string; count?: number }) =>
+    post<{ cards: DraftCard[]; concepts: { name: string; summary: string }[] }>("/api/cards/draft", input),
+  saveDrafts: (input: {
+    drafts: DraftCard[];
+    deck?: string;
+    source?: SourceRef;
+    concepts?: { name: string; summary: string }[];
+  }) => post<CardView[]>("/api/cards/save-drafts", input),
   decks: () => call<{ name: string; count: number }[]>("/api/decks"),
-  queue: (deck?: string) => call<{ cards: CardView[]; due: number; fresh: number; learning: number; total: number }>(`/api/review${deck ? `?deck=${encodeURIComponent(deck)}` : ""}`),
+  queue: (deck?: string) =>
+    call<{ cards: CardView[]; due: number; fresh: number; learning: number; total: number }>(
+      `/api/review${deck ? `?deck=${encodeURIComponent(deck)}` : ""}`,
+    ),
   rate: (id: string, rating: 1 | 2 | 3 | 4, took?: number) => post<CardView>(`/api/review/${id}`, { rating, took }),
-  quiz: (input: { bookId?: string; chapterId?: string; passage?: string; source?: SourceRef; mode: "check" | "pretest" | "review"; count?: number }) => post<Quiz>("/api/quiz", input),
-  gradeShort: (items: { question: string; ideal: string; answer: string }[]) => post<{ score: number; feedback: string }[]>("/api/quiz/grade", { items }),
-  recordQuiz: (input: { title: string; mode: string; bookId?: string; score: number; total: number; concepts: string[] }) => post("/api/quiz/record", input),
-  explain: (input: { concept: string; explanation: string; passage?: string; source?: SourceRef }) => post<ExplainFeedback>("/api/explain", input),
-  saveExplanation: (input: { concept: string; explanation: string; score: number; feedback: string; source?: SourceRef }) => post<Note>("/api/explain/save", input),
-  connect: (input: { passage: string; source?: SourceRef; question?: string }) => post<Connection[]>("/api/connect", input),
-  tutor: (input: { messages: { role: "user" | "tutor"; text: string }[]; passage?: string; source?: SourceRef; mode?: "answer" | "socratic" }) => post<{ reply: string }>("/api/tutor", input),
-  ask: (question: string) => post<{ answer: string; sources: { path: string; quote: string }[]; ms: number }>("/api/ask", { question }),
-  saveAnswer: (input: { question: string; answer: string; sources: { path: string; quote: string }[] }) => post<Note>("/api/ask/save", input),
+  quiz: (input: {
+    bookId?: string;
+    chapterId?: string;
+    passage?: string;
+    source?: SourceRef;
+    mode: "check" | "pretest" | "review";
+    count?: number;
+  }) => post<Quiz>("/api/quiz", input),
+  gradeShort: (items: { question: string; ideal: string; answer: string }[]) =>
+    post<{ score: number; feedback: string }[]>("/api/quiz/grade", { items }),
+  recordQuiz: (input: {
+    title: string;
+    mode: string;
+    bookId?: string;
+    score: number;
+    total: number;
+    concepts: string[];
+  }) => post("/api/quiz/record", input),
+  explain: (input: { concept: string; explanation: string; passage?: string; source?: SourceRef }) =>
+    post<ExplainFeedback>("/api/explain", input),
+  saveExplanation: (input: {
+    concept: string;
+    explanation: string;
+    score: number;
+    feedback: string;
+    source?: SourceRef;
+  }) => post<Note>("/api/explain/save", input),
+  connect: (input: { passage: string; source?: SourceRef; question?: string }) =>
+    post<Connection[]>("/api/connect", input),
+  tutor: (input: {
+    messages: { role: "user" | "tutor"; text: string }[];
+    passage?: string;
+    source?: SourceRef;
+    mode?: "answer" | "socratic";
+  }) => post<{ reply: string }>("/api/tutor", input),
+  ask: (question: string) =>
+    post<{ answer: string; sources: { path: string; quote: string }[]; ms: number }>("/api/ask", { question }),
+  saveAnswer: (input: { question: string; answer: string; sources: { path: string; quote: string }[] }) =>
+    post<Note>("/api/ask/save", input),
   figures: () => call<SavedFigure[]>("/api/figures"),
   figure: (id: string) => call<SavedFigure>(`/api/figures/${id}`),
-  makeFigure: (input: { passage: string; request?: string; kind?: string; quality?: "quick" | "careful"; source?: SourceRef; save?: boolean }) => post<SavedFigure>("/api/figures", input),
+  makeFigure: (input: {
+    passage: string;
+    request?: string;
+    kind?: string;
+    quality?: "quick" | "careful";
+    source?: SourceRef;
+    save?: boolean;
+  }) => post<SavedFigure>("/api/figures", input),
   deleteFigure: (id: string) => del(`/api/figures/${id}`),
-  keepFigure: (input: { scene: unknown; title?: string; source?: SourceRef }) => post<SavedFigure>("/api/figures", input),
-  booksLite: () => call<{ id: string; title: string; author?: string; toc: { id: string; title: string }[] }[]>("/api/books-lite"),
+  keepFigure: (input: { scene: unknown; title?: string; source?: SourceRef }) =>
+    post<SavedFigure>("/api/figures", input),
+  booksLite: () =>
+    call<{ id: string; title: string; author?: string; toc: { id: string; title: string }[] }[]>("/api/books-lite"),
 };
 
 /** Navigates to a hash route. */
@@ -624,7 +774,8 @@ export async function openLink(target: string, sub?: string) {
       return go(`#/book/${r.bookId}?at=${at.toFixed(3)}&focus=${r.id}`);
     }
     if (r.kind === "figure") return go("#/brain/figures");
-    if (r.kind === "attachment" && r.path) return window.open(`/api/vault/attachment?path=${encodeURIComponent(r.path)}`, "_blank", "noopener");
+    if (r.kind === "attachment" && r.path)
+      return window.open(`/api/vault/attachment?path=${encodeURIComponent(r.path)}`, "_blank", "noopener");
   } catch {
     if (!target.trim() || target.includes("/")) return;
     const note = await learn.createNote({ title: target.trim(), body: "" });
@@ -633,4 +784,7 @@ export async function openLink(target: string, sub?: string) {
 }
 
 /** A book location as a reader link. */
-export const bookLink = (ref: Partial<SourceRef> & { bookId?: string }) => (ref.bookId ? `#/book/${ref.bookId}${ref.page !== undefined ? `?at=${(ref.page + (ref.y ?? 0)).toFixed(3)}` : ref.block !== undefined ? `?at=${ref.block}` : ""}` : "#/library");
+export const bookLink = (ref: Partial<SourceRef> & { bookId?: string }) =>
+  ref.bookId
+    ? `#/book/${ref.bookId}${ref.page !== undefined ? `?at=${(ref.page + (ref.y ?? 0)).toFixed(3)}` : ref.block !== undefined ? `?at=${ref.block}` : ""}`
+    : "#/library";

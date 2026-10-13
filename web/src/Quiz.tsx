@@ -11,7 +11,17 @@ interface Answer {
 }
 
 /** One question at a time, with feedback right after each answer (retrieval with feedback). */
-export function QuizRunner({ quiz, theme, onDone, deck }: { quiz: Quiz; theme: "light" | "dark"; onDone?: () => void; deck?: string }) {
+export function QuizRunner({
+  quiz,
+  theme,
+  onDone,
+  deck,
+}: {
+  quiz: Quiz;
+  theme: "light" | "dark";
+  onDone?: () => void;
+  deck?: string;
+}) {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<(Answer | null)[]>(quiz.questions.map(() => null));
   const [text, setText] = useState("");
@@ -26,7 +36,17 @@ export function QuizRunner({ quiz, theme, onDone, deck }: { quiz: Quiz; theme: "
   const set = (a: Answer) => setAnswers((list) => list.map((x, i) => (i === index ? a : x)));
   const toCard = async (i: number) => {
     const question = quiz.questions[i];
-    await learn.saveCards([{ front: question.question, back: `${question.ideal}\n\n${question.explanation}`, deck: deck || quiz.title, concepts: question.concept ? [question.concept] : [], source: quiz.source.bookId ? { bookId: quiz.source.bookId, chapterId: quiz.source.chapterId, quote: question.quote || undefined } : undefined }]);
+    await learn.saveCards([
+      {
+        front: question.question,
+        back: `${question.ideal}\n\n${question.explanation}`,
+        deck: deck || quiz.title,
+        concepts: question.concept ? [question.concept] : [],
+        source: quiz.source.bookId
+          ? { bookId: quiz.source.bookId, chapterId: quiz.source.chapterId, quote: question.quote || undefined }
+          : undefined,
+      },
+    ]);
     setCarded((s) => new Set(s).add(i));
   };
 
@@ -34,7 +54,16 @@ export function QuizRunner({ quiz, theme, onDone, deck }: { quiz: Quiz; theme: "
     const missed = quiz.questions.map((qq, i) => ({ qq, i })).filter(({ i }) => (answers[i]?.score ?? 0) < 0.7);
     if (!recorded) {
       setRecorded(true);
-      learn.recordQuiz({ title: quiz.title, mode: quiz.mode, bookId: quiz.source.bookId, score: Math.round(score * 10) / 10, total: quiz.questions.length, concepts: [...new Set(quiz.questions.map((x) => x.concept).filter(Boolean))] }).catch(() => {});
+      learn
+        .recordQuiz({
+          title: quiz.title,
+          mode: quiz.mode,
+          bookId: quiz.source.bookId,
+          score: Math.round(score * 10) / 10,
+          total: quiz.questions.length,
+          concepts: [...new Set(quiz.questions.map((x) => x.concept).filter(Boolean))],
+        })
+        .catch(() => {});
     }
     return (
       <div className="quiz-done">
@@ -42,7 +71,13 @@ export function QuizRunner({ quiz, theme, onDone, deck }: { quiz: Quiz; theme: "
           <span className="tile-number">
             {Math.round(score * 10) / 10}/{quiz.questions.length}
           </span>
-          <span className="fine">{quiz.mode === "pretest" ? "Now read the chapter: the questions you missed are exactly what to look for." : score / quiz.questions.length >= 0.8 ? "Solid. The spaced reviews will keep it that way." : "The misses are the most valuable part: they show what to revisit."}</span>
+          <span className="fine">
+            {quiz.mode === "pretest"
+              ? "Now read the chapter: the questions you missed are exactly what to look for."
+              : score / quiz.questions.length >= 0.8
+                ? "Solid. The spaced reviews will keep it that way."
+                : "The misses are the most valuable part: they show what to revisit."}
+          </span>
         </div>
         {missed.length > 0 && (
           <>
@@ -52,19 +87,26 @@ export function QuizRunner({ quiz, theme, onDone, deck }: { quiz: Quiz; theme: "
                 <li key={i}>
                   <Markdown text={qq.question} theme={theme} />
                   <p className="fine">{qq.ideal}</p>
-                  <button className="button" disabled={carded.has(i)} onClick={() => toCard(i)}>
+                  <button type="button" className="button" disabled={carded.has(i)} onClick={() => toCard(i)}>
                     {carded.has(i) ? "Card made" : "Make a card"}
                   </button>
                 </li>
               ))}
             </ul>
-            <button className="button primary" disabled={missed.every(({ i }) => carded.has(i))} onClick={() => missed.forEach(({ i }) => !carded.has(i) && toCard(i))}>
+            <button
+              type="button"
+              className="button primary"
+              disabled={missed.every(({ i }) => carded.has(i))}
+              onClick={() => {
+                for (const { i } of missed) if (!carded.has(i)) toCard(i);
+              }}
+            >
               Make cards from all misses
             </button>
           </>
         )}
         {onDone && (
-          <button className="button" onClick={onDone}>
+          <button type="button" className="button" onClick={onDone}>
             Close
           </button>
         )}
@@ -75,7 +117,9 @@ export function QuizRunner({ quiz, theme, onDone, deck }: { quiz: Quiz; theme: "
   return (
     <div className="quiz">
       <div className="quiz-head">
-        <span className="eyebrow">{quiz.mode === "pretest" ? "Pretest" : quiz.mode === "review" ? "Mixed review" : "Quiz"} · {quiz.title}</span>
+        <span className="eyebrow">
+          {quiz.mode === "pretest" ? "Pretest" : quiz.mode === "review" ? "Mixed review" : "Quiz"} · {quiz.title}
+        </span>
         <span className="fine">
           {index + 1} / {quiz.questions.length}
         </span>
@@ -87,7 +131,16 @@ export function QuizRunner({ quiz, theme, onDone, deck }: { quiz: Quiz; theme: "
       {q.kind === "mcq" ? (
         <div className="quiz-choices">
           {q.choices.map((c, i) => (
-            <button key={i} className="choice" disabled={!!answer} data-right={answer && i === q.answer ? "" : undefined} data-wrong={answer && answer.choice === i && i !== q.answer ? "" : undefined} onClick={() => set({ choice: i, score: i === q.answer ? 1 : 0 })}>
+            <button
+              type="button"
+              // biome-ignore lint/suspicious/noArrayIndexKey: choices are fixed for a question
+              key={i}
+              className="choice"
+              disabled={!!answer}
+              data-right={answer && i === q.answer ? "" : undefined}
+              data-wrong={answer && answer.choice === i && i !== q.answer ? "" : undefined}
+              onClick={() => set({ choice: i, score: i === q.answer ? 1 : 0 })}
+            >
               <span className="choice-key">{String.fromCharCode(65 + i)}</span>
               <Markdown text={c} theme={theme} />
             </button>
@@ -95,9 +148,16 @@ export function QuizRunner({ quiz, theme, onDone, deck }: { quiz: Quiz; theme: "
         </div>
       ) : (
         <div className="quiz-short">
-          <textarea rows={3} value={text} disabled={!!answer} onChange={(e) => setText(e.target.value)} placeholder="Answer in your own words…" />
+          <textarea
+            rows={3}
+            value={text}
+            disabled={!!answer}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Answer in your own words…"
+          />
           {!answer && (
             <button
+              type="button"
               className="button primary"
               disabled={grading || !text.trim()}
               onClick={async () => {
@@ -121,11 +181,12 @@ export function QuizRunner({ quiz, theme, onDone, deck }: { quiz: Quiz; theme: "
       {answer && (
         <div className="quiz-actions">
           {answer.score < 0.7 && (
-            <button className="button" disabled={carded.has(index)} onClick={() => toCard(index)}>
+            <button type="button" className="button" disabled={carded.has(index)} onClick={() => toCard(index)}>
               {carded.has(index) ? "Card made" : "Make a card"}
             </button>
           )}
           <button
+            type="button"
             className="button primary"
             autoFocus
             onClick={() => {
@@ -145,7 +206,8 @@ function Feedback({ q, answer, theme }: { q: Question; answer: Answer; theme: "l
   const right = answer.score >= 0.7;
   return (
     <div className="quiz-feedback" data-right={right || undefined}>
-      <b>{right ? "Right." : answer.score > 0.3 ? "Partly." : "Not quite."}</b> {answer.feedback && <span>{answer.feedback} </span>}
+      <b>{right ? "Right." : answer.score > 0.3 ? "Partly." : "Not quite."}</b>{" "}
+      {answer.feedback && <span>{answer.feedback} </span>}
       <Markdown text={q.explanation} theme={theme} />
       {q.quote && <blockquote className="quote">“{q.quote}”</blockquote>}
     </div>

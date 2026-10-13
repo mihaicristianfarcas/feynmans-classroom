@@ -36,7 +36,13 @@ export function createNote(input: Partial<Note> & { folder?: string }, options: 
   };
   notes.save(note, `notes/${folder ? `${folder}/` : ""}${title}`);
   changed(`note ${note.title}`);
-  if (options.log !== false) logActivity({ type: note.type === "connection" ? "connect" : "note", bookId: note.source?.bookId, concepts: note.concepts, text: `Wrote: ${note.title}` });
+  if (options.log !== false)
+    logActivity({
+      type: note.type === "connection" ? "connect" : "note",
+      bookId: note.source?.bookId,
+      concepts: note.concepts,
+      text: `Wrote: ${note.title}`,
+    });
   return note;
 }
 
@@ -90,10 +96,17 @@ export function deleteNote(id: string) {
 export function bookNote(bookId: string): Note {
   const book = getBook(bookId);
   if (!book) throw new Error("book not found");
-  const existing = notes.list().find((n) => n.props?.book === bookId || (n.source?.bookId === bookId && n.props?.reading === true));
+  const existing = notes
+    .list()
+    .find((n) => n.props?.book === bookId || (n.source?.bookId === bookId && n.props?.reading === true));
   if (existing) return existing;
   const source: SourceRef = { bookId };
-  const note = createNote({ title: `${book.title} — notes`, body: `Notes while reading [[${book.title}]].\n`, source, tags: ["reading"] });
+  const note = createNote({
+    title: `${book.title} — notes`,
+    body: `Notes while reading [[${book.title}]].\n`,
+    source,
+    tags: ["reading"],
+  });
   note.props = { ...(note.props || {}), book: bookId };
   notes.save(note);
   return note;

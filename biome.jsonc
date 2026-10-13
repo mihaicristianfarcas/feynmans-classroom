@@ -1,0 +1,65 @@
+// Formatting and lint for the whole repository (npm run check / npm run fix).
+// Biome is one fast binary for both, and it doesn't depend on the TypeScript compiler (the project
+// uses TypeScript 7, which typescript-eslint can't load).
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true, "defaultBranch": "main" },
+  "files": {
+    // vendor/ and .agents/ are third-party skills, kept byte for byte as published upstream
+    "includes": ["**", "!vendor", "!.agents", "!runtime/dist", "!web/dist", "!data", "!package-lock.json"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "arrowParentheses": "always"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        // `map.get(key)!` right after `map.has(key)` (and similar) is deliberate; strict mode catches the rest
+        "noNonNullAssertion": "off"
+      },
+      "complexity": {
+        // page styles override the base controls (.button, inputs) in places; a specificity cleanup
+        // has to come before this can be turned on
+        "noImportantStyles": "off"
+      },
+      "a11y": {
+        // the interface doesn't meet these yet: warnings until the accessibility pass fixes the code
+        "noAutofocus": "warn",
+        "noStaticElementInteractions": "warn",
+        "noSvgWithoutTitle": "warn",
+        "useKeyWithClickEvents": "warn",
+        "useSemanticElements": "warn",
+        "useValidAnchor": "warn"
+      }
+    }
+  },
+  "css": {
+    "linter": { "enabled": true }
+  },
+  "overrides": [
+    {
+      // only test files can focus tests; elsewhere `fit()` is a layout function
+      "includes": ["**", "!tests/**"],
+      "linter": { "rules": { "suspicious": { "noFocusedTests": "off" } } }
+    },
+    {
+      // stylesheets are ordered by component, not by specificity
+      "includes": ["**/*.css"],
+      "linter": { "rules": { "style": { "noDescendingSpecificity": "off" } } }
+    }
+  ],
+  "assist": { "actions": { "source": { "organizeImports": "on" } } }
+}

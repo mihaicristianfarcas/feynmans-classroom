@@ -96,15 +96,110 @@ export interface Axis {
 }
 
 export type PlotLayer =
-  | { type: "function"; id: string; expr: Expr; label: string; tone: Tone; dashed: boolean; domain: [Expr, Expr] | null; when: Expr; info: string }
-  | { type: "parametric"; id: string; x: Expr; y: Expr; from: Expr; to: Expr; label: string; tone: Tone; dashed: boolean; when: Expr; info: string }
-  | { type: "area"; id: string; expr: Expr; base: Expr; from: Expr; to: Expr; label: string; tone: Tone; when: Expr; info: string }
-  | { type: "series"; id: string; points: [number, number][]; label: string; tone: Tone; dashed: boolean; dots: boolean; line: boolean; when: Expr; info: string }
-  | { type: "bars"; id: string; xs: Expr[]; heights: Expr[]; width: number; labels: string[]; tone: Tone; when: Expr; info: string }
-  | { type: "point"; id: string; x: Expr; y: Expr; label: string; tone: Tone; drag: { x: string; y: string } | null; trail: boolean; when: Expr; info: string }
-  | { type: "vector"; id: string; from: [Expr, Expr]; to: [Expr, Expr]; label: string; tone: Tone; arrow: boolean; dashed: boolean; when: Expr; info: string }
-  | { type: "tangent"; id: string; of: string; at: Expr; label: string; tone: Tone; dashed: boolean; when: Expr; info: string }
-  | { type: "hline" | "vline"; id: string; at: Expr; label: string; tone: Tone; dashed: boolean; when: Expr; info: string }
+  | {
+      type: "function";
+      id: string;
+      expr: Expr;
+      label: string;
+      tone: Tone;
+      dashed: boolean;
+      domain: [Expr, Expr] | null;
+      when: Expr;
+      info: string;
+    }
+  | {
+      type: "parametric";
+      id: string;
+      x: Expr;
+      y: Expr;
+      from: Expr;
+      to: Expr;
+      label: string;
+      tone: Tone;
+      dashed: boolean;
+      when: Expr;
+      info: string;
+    }
+  | {
+      type: "area";
+      id: string;
+      expr: Expr;
+      base: Expr;
+      from: Expr;
+      to: Expr;
+      label: string;
+      tone: Tone;
+      when: Expr;
+      info: string;
+    }
+  | {
+      type: "series";
+      id: string;
+      points: [number, number][];
+      label: string;
+      tone: Tone;
+      dashed: boolean;
+      dots: boolean;
+      line: boolean;
+      when: Expr;
+      info: string;
+    }
+  | {
+      type: "bars";
+      id: string;
+      xs: Expr[];
+      heights: Expr[];
+      width: number;
+      labels: string[];
+      tone: Tone;
+      when: Expr;
+      info: string;
+    }
+  | {
+      type: "point";
+      id: string;
+      x: Expr;
+      y: Expr;
+      label: string;
+      tone: Tone;
+      drag: { x: string; y: string } | null;
+      trail: boolean;
+      when: Expr;
+      info: string;
+    }
+  | {
+      type: "vector";
+      id: string;
+      from: [Expr, Expr];
+      to: [Expr, Expr];
+      label: string;
+      tone: Tone;
+      arrow: boolean;
+      dashed: boolean;
+      when: Expr;
+      info: string;
+    }
+  | {
+      type: "tangent";
+      id: string;
+      of: string;
+      at: Expr;
+      label: string;
+      tone: Tone;
+      dashed: boolean;
+      when: Expr;
+      info: string;
+    }
+  | {
+      type: "hline" | "vline";
+      id: string;
+      at: Expr;
+      label: string;
+      tone: Tone;
+      dashed: boolean;
+      when: Expr;
+      info: string;
+    }
   | { type: "label"; id: string; x: Expr; y: Expr; text: string; tone: Tone; when: Expr; info: string };
 
 export interface PlotScene extends Base {
@@ -130,11 +225,43 @@ export interface Actor {
 }
 
 export type SeqEvent =
-  | { type: "message"; id: string; from: string; to: string; at: Expr; arrive: Expr; label: string; tone: Tone; lost: boolean; reply: boolean; narration: string; when: Expr }
+  | {
+      type: "message";
+      id: string;
+      from: string;
+      to: string;
+      at: Expr;
+      arrive: Expr;
+      label: string;
+      tone: Tone;
+      lost: boolean;
+      reply: boolean;
+      narration: string;
+      when: Expr;
+    }
   | { type: "state"; id: string; actor: string; at: Expr; text: string; tone: Tone; narration: string; when: Expr }
-  | { type: "span"; id: string; actor: string; at: Expr; until: Expr; label: string; tone: Tone; narration: string; when: Expr }
+  | {
+      type: "span";
+      id: string;
+      actor: string;
+      at: Expr;
+      until: Expr;
+      label: string;
+      tone: Tone;
+      narration: string;
+      when: Expr;
+    }
   | { type: "crash" | "recover"; id: string; actor: string; at: Expr; label: string; narration: string; when: Expr }
-  | { type: "partition"; id: string; actors: string[]; at: Expr; until: Expr; label: string; narration: string; when: Expr };
+  | {
+      type: "partition";
+      id: string;
+      actors: string[];
+      at: Expr;
+      until: Expr;
+      label: string;
+      narration: string;
+      when: Expr;
+    };
 
 export interface SequenceScene extends Base {
   kind: "sequence";
@@ -264,7 +391,16 @@ interface ShapeBase {
 }
 
 export type Shape =
-  | (ShapeBase & { type: "rect"; x: Expr; y: Expr; w: Expr; h: Expr; rotate: Expr; fill: Fill; drag: { x: string; y: string } | null })
+  | (ShapeBase & {
+      type: "rect";
+      x: Expr;
+      y: Expr;
+      w: Expr;
+      h: Expr;
+      rotate: Expr;
+      fill: Fill;
+      drag: { x: string; y: string } | null;
+    })
   | (ShapeBase & { type: "circle"; x: Expr; y: Expr; r: Expr; fill: Fill; drag: { x: string; y: string } | null })
   | (ShapeBase & { type: "line"; points: [Expr, Expr][]; dashed: boolean; arrow: boolean; width: number })
   | (ShapeBase & { type: "polygon"; points: [Expr, Expr][]; fill: Fill })

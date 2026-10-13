@@ -10,13 +10,14 @@ const ACTIVE = '[aria-current="page"], [aria-pressed="true"]';
  */
 export function useIndicator<T extends HTMLElement>(active: unknown, axis: "x" | "y" = "x") {
   const ref = useRef<T>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the indicator moves whenever the active item changes
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     let frame = 0;
     const place = () => {
       const on = el.querySelector<HTMLElement>(ACTIVE);
-      if (!on || !on.offsetWidth) {
+      if (!on?.offsetWidth) {
         el.removeAttribute("data-ind");
         return;
       }

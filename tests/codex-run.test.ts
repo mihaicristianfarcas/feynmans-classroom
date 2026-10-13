@@ -6,7 +6,10 @@ import { beforeAll, describe, expect, it } from "vitest";
 // A stand-in for the codex binary: prints the JSONL events named by FAKE_CODEX_EVENTS and exits.
 const dir = mkdtempSync(join(tmpdir(), "fake-codex-"));
 const bin = join(dir, "codex");
-writeFileSync(bin, `#!/usr/bin/env node\nprocess.stdin.resume();process.stdin.on("end",()=>{for(const e of JSON.parse(process.env.FAKE_CODEX_EVENTS))console.log(JSON.stringify(e));process.exit(Number(process.env.FAKE_CODEX_EXIT||0));});\n`);
+writeFileSync(
+  bin,
+  `#!/usr/bin/env node\nprocess.stdin.resume();process.stdin.on("end",()=>{for(const e of JSON.parse(process.env.FAKE_CODEX_EVENTS))console.log(JSON.stringify(e));process.exit(Number(process.env.FAKE_CODEX_EXIT||0));});\n`,
+);
 chmodSync(bin, 0o755);
 process.env.CODEX_BIN = bin;
 

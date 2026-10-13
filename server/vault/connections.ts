@@ -21,10 +21,11 @@ export function listConnections(): Connection[] {
       if (!line.trim()) continue;
       try {
         const c = JSON.parse(line) as Connection;
-        if (c && c.id && c.from && c.to) out.push(c);
+        if (c?.id && c.from && c.to) out.push(c);
       } catch {}
     }
-  return (cache = out);
+  cache = out;
+  return out;
 }
 
 export function saveConnections(list: Connection[], what = "connections") {

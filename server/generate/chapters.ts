@@ -1,9 +1,9 @@
 import { join } from "node:path";
 import { locateInPages } from "../anchor.ts";
-import { structured } from "../llm.ts";
 import { publish } from "../events.ts";
 import { finishToc, titleCase } from "../ingest/pdf.ts";
 import { queue } from "../jobs.ts";
+import { structured } from "../llm.ts";
 import { bookDir, getBook, getPages, readJson, saveBook } from "../store.ts";
 import type { TocEntry } from "../types.ts";
 
@@ -24,7 +24,12 @@ const SCHEMA = {
           heading: { type: "string", description: "the heading text exactly as it appears on that page" },
           sections: {
             type: "array",
-            items: { type: "object", additionalProperties: false, required: ["title", "page"], properties: { title: { type: "string" }, page: { type: "integer" } } },
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["title", "page"],
+              properties: { title: { type: "string" }, page: { type: "integer" } },
+            },
           },
         },
       },
@@ -38,20 +43,29 @@ const SCHEMA = {
  */
 export function detectChapters(bookId: string) {
   const book = getBook(bookId);
-  if (!book || book.format !== "pdf") throw new Error("chapter detection is for PDF books");
+  if (book?.format !== "pdf") throw new Error("chapter detection is for PDF books");
   return queue.add({ bookId, kind: "plan", message: "Codex is reading the headings" }, async (job, signal) => {
     const pages = getPages(bookId);
     const markdown = readJson<string[]>(join(bookDir(bookId), "markdown.json"), []);
     let digest = "";
     for (const page of pages) {
       const md = markdown[page.n - 1] || "";
-      const heads = md.split("\n").filter((l) => /^#{1,4}\s/.test(l)).slice(0, 6);
-      const first = page.lines.slice(0, 2).map((l) => l.t).join(" / ").slice(0, 140);
+      const heads = md
+        .split("\n")
+        .filter((l) => /^#{1,4}\s/.test(l))
+        .slice(0, 6);
+      const first = page.lines
+        .slice(0, 2)
+        .map((l) => l.t)
+        .join(" / ")
+        .slice(0, 140);
       digest += `[[page ${page.n}]] ${heads.join(" | ")}${heads.length ? " || " : ""}${first}\n`;
       if (digest.length > 150000) break;
     }
     {
-      const result = await structured<{ chapters: { title: string; page: number; heading: string; sections: { title: string; page: number }[] }[] }>({
+      const result = await structured<{
+        chapters: { title: string; page: number; heading: string; sections: { title: string; page: number }[] }[];
+      }>({
         schema: SCHEMA,
         tier: "fast",
         effort: "medium",
@@ -75,7 +89,9 @@ export function detectChapters(bookId: string) {
           title: titleCase(c.title.trim()),
           start: { page: c.page, y: Math.max(0, (at?.loc.y ?? 0.05) - 0.01) },
           end: { page: pages.length },
-          sections: c.sections.filter((s) => s.page >= c.page && s.page <= pages.length).map((s) => ({ id: "", title: s.title.trim(), start: { page: s.page, y: 0 } })),
+          sections: c.sections
+            .filter((s) => s.page >= c.page && s.page <= pages.length)
+            .map((s) => ({ id: "", title: s.title.trim(), start: { page: s.page, y: 0 } })),
         };
       });
       finishToc(toc, pages.length);

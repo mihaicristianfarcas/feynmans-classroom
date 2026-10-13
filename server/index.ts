@@ -6,22 +6,37 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
 import { buildDemoPage } from "../runtime/page.mjs";
-import { chromePath, CODEX, DATA_DIR, PORT, PROD, RUNTIME_DIR, WEB_DIST } from "./config.ts";
+import { migrateHighlightNotes, resumeAnnotations } from "./annotations/index.ts";
+import { registerAnnotationRoutes } from "./annotations/routes.ts";
 import { codexStatus } from "./codex.ts";
+import { CODEX, chromePath, DATA_DIR, PORT, PROD, RUNTIME_DIR, WEB_DIST } from "./config.ts";
 import { publish, subscribe } from "./events.ts";
 import { detectChapters } from "./generate/chapters.ts";
 import { enqueueBuild, figOf, generateChapter, regenerate, resumeInterrupted, withFigs } from "./generate/index.ts";
+import { formatOf, ingestBook } from "./ingest/index.ts";
+import { queue } from "./jobs.ts";
 import { registerRoutes } from "./routes.ts";
-import { migrateHighlightNotes, resumeAnnotations } from "./annotations/index.ts";
-import { registerAnnotationRoutes } from "./annotations/routes.ts";
 import { figureFromSelection, figuresForChapter, regenerateFigure, resumeFigures } from "./scene/figures.ts";
 import { activeProvider } from "./settings.ts";
+import {
+  bookDir,
+  bookFolder,
+  deleteBook,
+  deleteDemo,
+  demoDir,
+  demoSource,
+  getBlocks,
+  getBook,
+  getDemo,
+  listBooks,
+  listDemos,
+  migrateLegacyBooks,
+  newId,
+  saveDemo,
+} from "./store.ts";
 import { initVault, logActivity } from "./vault/index.ts";
 import { startIndexing } from "./vault/indexes.ts";
 import { exportBook, exportMissingBooks } from "./vault/library.ts";
-import { formatOf, ingestBook } from "./ingest/index.ts";
-import { queue } from "./jobs.ts";
-import { bookDir, bookFolder, deleteBook, deleteDemo, demoDir, demoSource, getBlocks, getBook, getDemo, listBooks, listDemos, migrateLegacyBooks, newId, saveDemo } from "./store.ts";
 
 const app = new Hono();
 const MAX_UPLOAD = 200 * 1024 * 1024;
@@ -48,7 +63,13 @@ const TYPES: Record<string, string> = {
 function sendFile(path: string, extraHeaders: Record<string, string> = {}) {
   const size = statSync(path).size;
   const stream = Readable.toWeb(createReadStream(path)) as ReadableStream;
-  return new Response(stream, { headers: { "content-type": TYPES[extname(path).toLowerCase()] || "application/octet-stream", "content-length": String(size), ...extraHeaders } });
+  return new Response(stream, {
+    headers: {
+      "content-type": TYPES[extname(path).toLowerCase()] || "application/octet-stream",
+      "content-length": String(size),
+      ...extraHeaders,
+    },
+  });
 }
 const within = (base: string, rel: string) => {
   const full = resolve(base, normalize(rel).replace(/^(\.\.(\/|\\|$))+/, ""));
@@ -61,34 +82,47 @@ app.onError((error, c) => {
 });
 
 /* ---------- status ---------- */
-app.get("/api/status", (c) => c.json({ codex: codexStatus(), chrome: !!chromePath(), queue: queue.stats(), concurrency: CODEX.concurrency }));
+app.get("/api/status", (c) =>
+  c.json({ codex: codexStatus(), chrome: !!chromePath(), queue: queue.stats(), concurrency: CODEX.concurrency }),
+);
 
 /* ---------- books ---------- */
 app.get("/api/books", (c) =>
   c.json(
     listBooks().map((book) => {
       const demos = listDemos(book.id);
-      return { ...book, demoCount: demos.filter((d) => d.status === "ready").length, building: demos.filter((d) => !["ready", "failed"].includes(d.status)).length };
+      return {
+        ...book,
+        demoCount: demos.filter((d) => d.status === "ready").length,
+        building: demos.filter((d) => !["ready", "failed"].includes(d.status)).length,
+      };
     }),
   ),
 );
 
-app.post("/api/books", bodyLimit({ maxSize: MAX_UPLOAD + 1024 * 1024, onError: (c) => c.json({ error: "file too large (200 MB max)" }, 413) }), async (c) => {
-  const body = await c.req.parseBody();
-  const file = body.file;
-  if (!(file instanceof File)) return c.json({ error: "send the book as multipart field 'file'" }, 400);
-  if (file.size > MAX_UPLOAD) return c.json({ error: "file too large (200 MB max)" }, 413);
-  if (!formatOf(file.name)) return c.json({ error: "Upload a PDF, EPUB, Markdown or plain-text book." }, 415);
-  const book = await ingestBook({ name: file.name, data: Buffer.from(await file.arrayBuffer()) });
-  if (book.status === "error") return c.json({ error: book.error, book }, 422);
-  try {
-    exportBook(book);
-  } catch (error) {
-    console.warn("[vault] export failed:", (error as Error).message);
-  }
-  logActivity({ type: "book", bookId: book.id, text: `Added ${book.title}` });
-  return c.json(book);
-});
+app.post(
+  "/api/books",
+  bodyLimit({
+    maxSize: MAX_UPLOAD + 1024 * 1024,
+    onError: (c) => c.json({ error: "file too large (200 MB max)" }, 413),
+  }),
+  async (c) => {
+    const body = await c.req.parseBody();
+    const file = body.file;
+    if (!(file instanceof File)) return c.json({ error: "send the book as multipart field 'file'" }, 400);
+    if (file.size > MAX_UPLOAD) return c.json({ error: "file too large (200 MB max)" }, 413);
+    if (!formatOf(file.name)) return c.json({ error: "Upload a PDF, EPUB, Markdown or plain-text book." }, 415);
+    const book = await ingestBook({ name: file.name, data: Buffer.from(await file.arrayBuffer()) });
+    if (book.status === "error") return c.json({ error: book.error, book }, 422);
+    try {
+      exportBook(book);
+    } catch (error) {
+      console.warn("[vault] export failed:", (error as Error).message);
+    }
+    logActivity({ type: "book", bookId: book.id, text: `Added ${book.title}` });
+    return c.json(book);
+  },
+);
 
 app.get("/api/books/:id", (c) => {
   const book = getBook(c.req.param("id"));
@@ -116,7 +150,11 @@ app.get("/api/books/:id/assets/*", (c) => {
   const path = within(join(bookDir(id), "assets"), rel);
   if (!path || !existsSync(path)) return c.json({ error: "not found" }, 404);
   // book images (SVG included) are content, never code: no scripts even when opened directly
-  return sendFile(path, { "cache-control": "private, max-age=86400", "content-security-policy": "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox", "x-content-type-options": "nosniff" });
+  return sendFile(path, {
+    "cache-control": "private, max-age=86400",
+    "content-security-policy": "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox",
+    "x-content-type-options": "nosniff",
+  });
 });
 
 /* ---------- demos ---------- */
@@ -129,23 +167,39 @@ app.get("/api/books/:id/jobs", (c) => c.json(queue.list(c.req.param("id"))));
 app.post("/api/books/:id/chapters/:chapterId/generate", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { count?: number; mode?: "scene" | "code" };
   // scene figures by default (seconds each); hand-built demos on request (minutes each, Codex only)
-  const job = body.mode === "code" ? generateChapter(c.req.param("id"), c.req.param("chapterId"), { count: body.count }) : figuresForChapter(c.req.param("id"), c.req.param("chapterId"), { count: body.count });
+  const job =
+    body.mode === "code"
+      ? generateChapter(c.req.param("id"), c.req.param("chapterId"), { count: body.count })
+      : figuresForChapter(c.req.param("id"), c.req.param("chapterId"), { count: body.count });
   return c.json(job);
 });
 
 app.post("/api/books/:id/detect-chapters", (c) => c.json(detectChapters(c.req.param("id"))));
 
 app.post("/api/books/:id/visualize", async (c) => {
-  const body = (await c.req.json()) as { chapterId: string; text: string; request?: string; kind?: string; quality?: "quick" | "careful"; page?: number; block?: number };
+  const body = (await c.req.json()) as {
+    chapterId: string;
+    text: string;
+    request?: string;
+    kind?: string;
+    quality?: "quick" | "careful";
+    page?: number;
+    block?: number;
+  };
   if (!body.text || body.text.trim().length < 20) return c.json({ error: "select a longer passage" }, 400);
   return c.json(figureFromSelection(c.req.param("id"), body));
 });
 
 app.post("/api/books/:id/demos/:demoId/regenerate", async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as { feedback?: string; quality?: "quick" | "careful"; fresh?: boolean };
+  const body = (await c.req.json().catch(() => ({}))) as {
+    feedback?: string;
+    quality?: "quick" | "careful";
+    fresh?: boolean;
+  };
   const demo = getDemo(c.req.param("id"), c.req.param("demoId"));
   if (!demo) return c.json({ error: "not found" }, 404);
-  if (demo.type === "scene") return c.json(regenerateFigure(demo.bookId, demo.id, body.feedback, { quality: body.quality, fresh: body.fresh }));
+  if (demo.type === "scene")
+    return c.json(regenerateFigure(demo.bookId, demo.id, body.feedback, { quality: body.quality, fresh: body.fresh }));
   return c.json(regenerate(c.req.param("id"), c.req.param("demoId"), body.feedback));
 });
 
@@ -154,10 +208,36 @@ app.post("/api/books/:id/demos/:demoId/craft", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { feedback?: string };
   const demo = getDemo(c.req.param("id"), c.req.param("demoId"));
   if (!demo) return c.json({ error: "not found" }, 404);
-  if (activeProvider() !== "codex") return c.json({ error: "Hand-built demos need Codex (they run in its sandbox). Switch the provider in Settings." }, 400);
+  if (activeProvider() !== "codex")
+    return c.json(
+      { error: "Hand-built demos need Codex (they run in its sandbox). Switch the provider in Settings." },
+      400,
+    );
   const scene = demo.scene as { title?: string; caption?: string; hint?: string } | undefined;
-  const brief = { ...demo.brief, picture: demo.brief.picture || `As in this figure spec, but hand-crafted: ${JSON.stringify(demo.scene || {}).slice(0, 4000)}`, motion: demo.brief.motion || scene?.hint || "", controls: demo.brief.controls || "", readouts: demo.brief.readouts || "", truth: demo.brief.truth || "" };
-  const copy = { ...demo, id: newId("d"), type: "code" as const, scene: undefined, status: "queued" as const, brief, attempts: 0, threadId: undefined, checks: undefined, feedback: body.feedback, createdAt: new Date().toISOString(), activity: "waiting for a Codex slot" };
+  const brief = {
+    ...demo.brief,
+    picture:
+      demo.brief.picture ||
+      `As in this figure spec, but hand-crafted: ${JSON.stringify(demo.scene || {}).slice(0, 4000)}`,
+    motion: demo.brief.motion || scene?.hint || "",
+    controls: demo.brief.controls || "",
+    readouts: demo.brief.readouts || "",
+    truth: demo.brief.truth || "",
+  };
+  const copy = {
+    ...demo,
+    id: newId("d"),
+    type: "code" as const,
+    scene: undefined,
+    status: "queued" as const,
+    brief,
+    attempts: 0,
+    threadId: undefined,
+    checks: undefined,
+    feedback: body.feedback,
+    createdAt: new Date().toISOString(),
+    activity: "waiting for a Codex slot",
+  };
   saveDemo(copy, { create: true });
   publish(copy.bookId, { type: "demo", data: copy });
   return c.json(enqueueBuild(copy));
@@ -176,7 +256,8 @@ app.delete("/api/books/:id/demos/:demoId", (c) => {
   return c.json({ ok: true });
 });
 
-const PAGE_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; sandbox allow-scripts";
+const PAGE_CSP =
+  "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; sandbox allow-scripts";
 
 app.get("/api/books/:id/demos/:demoId/page", (c) => {
   const { id, demoId } = c.req.param();
@@ -184,8 +265,19 @@ app.get("/api/books/:id/demos/:demoId/page", (c) => {
   const source = demoSource(id, demoId);
   if (!demo || !source) return c.text("not ready", 404);
   const theme = c.req.query("theme") === "dark" ? "dark" : "light";
-  const html = buildDemoPage({ source, theme, fig: figOf(id, demoId), title: demo.brief.title, predict: c.req.query("predict") !== "0" });
-  return c.body(html, 200, { "content-type": "text/html; charset=utf-8", "content-security-policy": PAGE_CSP, "cache-control": "no-store", "x-content-type-options": "nosniff" });
+  const html = buildDemoPage({
+    source,
+    theme,
+    fig: figOf(id, demoId),
+    title: demo.brief.title,
+    predict: c.req.query("predict") !== "0",
+  });
+  return c.body(html, 200, {
+    "content-type": "text/html; charset=utf-8",
+    "content-security-policy": PAGE_CSP,
+    "cache-control": "no-store",
+    "x-content-type-options": "nosniff",
+  });
 });
 
 app.get("/api/books/:id/demos/:demoId/source", (c) => {
@@ -206,7 +298,13 @@ app.get("/api/dev/scenes", (c) => {
   if (PROD) return c.json({});
   const dir = join(DATA_DIR, "scenes-dev");
   if (!existsSync(dir)) return c.json({});
-  return c.json(Object.fromEntries(readdirSync(dir).filter((f) => f.endsWith(".json")).map((f) => [f.replace(/\.json$/, ""), JSON.parse(readFileSync(join(dir, f), "utf8"))])));
+  return c.json(
+    Object.fromEntries(
+      readdirSync(dir)
+        .filter((f) => f.endsWith(".json"))
+        .map((f) => [f.replace(/\.json$/, ""), JSON.parse(readFileSync(join(dir, f), "utf8"))]),
+    ),
+  );
 });
 
 /* ---------- reference demos (the runtime's own examples) ---------- */
@@ -214,7 +312,11 @@ app.get("/api/examples/:name", (c) => {
   const name = c.req.param("name").replace(/[^a-z0-9-]/g, "");
   const path = join(RUNTIME_DIR, "examples", `${name}.demo.js`);
   if (!existsSync(path)) return c.text("not found", 404);
-  const html = buildDemoPage({ source: readFileSync(path, "utf8"), theme: c.req.query("theme") === "dark" ? "dark" : "light", fig: "Fig 0" });
+  const html = buildDemoPage({
+    source: readFileSync(path, "utf8"),
+    theme: c.req.query("theme") === "dark" ? "dark" : "light",
+    fig: "Fig 0",
+  });
   return c.body(html, 200, { "content-type": "text/html; charset=utf-8", "content-security-policy": PAGE_CSP });
 });
 
@@ -241,14 +343,19 @@ registerAnnotationRoutes(app);
 if (PROD && existsSync(WEB_DIST)) {
   app.get("*", (c) => {
     const path = within(WEB_DIST, c.req.path.replace(/^\/+/, "")) || "";
-    if (path && existsSync(path) && statSync(path).isFile()) return sendFile(path, path.includes("/assets/") ? { "cache-control": "public, max-age=31536000, immutable" } : {});
+    if (path && existsSync(path) && statSync(path).isFile())
+      return sendFile(
+        path,
+        path.includes("/assets/") ? { "cache-control": "public, max-age=31536000, immutable" } : {},
+      );
     return sendFile(join(WEB_DIST, "index.html"));
   });
 }
 
 initVault();
 const moved = migrateLegacyBooks();
-if (moved.length) console.log(`[vault] moved ${moved.length} book${moved.length === 1 ? "" : "s"} into the vault: ${moved.join(", ")}`);
+if (moved.length)
+  console.log(`[vault] moved ${moved.length} book${moved.length === 1 ? "" : "s"} into the vault: ${moved.join(", ")}`);
 exportMissingBooks();
 migrateHighlightNotes();
 startIndexing();
@@ -258,5 +365,7 @@ resumeFigures();
 serve({ fetch: app.fetch, port: PORT, hostname: process.env.HOST || "127.0.0.1" }, (info) => {
   const status = codexStatus();
   console.log(`Feynman's Classroom API on http://${info.address}:${info.port}`);
-  console.log(`codex: ${status.installed ? `${status.version}, ${status.loggedIn ? "logged in" : "NOT logged in (run: codex login)"}` : "not installed"} · chrome: ${chromePath() ? "found" : "not found"}`);
+  console.log(
+    `codex: ${status.installed ? `${status.version}, ${status.loggedIn ? "logged in" : "NOT logged in (run: codex login)"}` : "not installed"} · chrome: ${chromePath() ? "found" : "not found"}`,
+  );
 });

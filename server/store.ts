@@ -3,7 +3,7 @@
  * original file, the extracted text and its figures. The book id (used by the API) maps to the
  * folder through book.json. */
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { BOOKS_DIR, LEGACY_BOOKS_DIR } from "./config.ts";
 import type { Block, Book, Demo, PageText } from "./types.ts";
@@ -57,7 +57,10 @@ export function bookDir(bookId: string) {
 export const demosDir = (bookId: string) => join(bookDir(bookId), "demos");
 export const demoDir = (bookId: string, demoId: string) => join(demosDir(bookId), safe(demoId));
 /** The book's folder name inside library/ (what agents and links see). */
-export const bookFolder = (bookId: string) => folders.get(bookId) || (scanFolders(), folders.get(bookId)) || null;
+export function bookFolder(bookId: string): string | null {
+  if (!folders.has(bookId)) scanFolders();
+  return folders.get(bookId) || null;
+}
 
 /** Makes the folder for a new book, named after `hint` (the file name, until the title is known). */
 export function createBookDir(bookId: string, hint: string) {
@@ -125,7 +128,9 @@ export function onBooksChange(fn: () => void) {
   bookListeners.add(fn);
   return () => bookListeners.delete(fn);
 }
-const booksChanged = () => bookListeners.forEach((fn) => fn());
+const booksChanged = () => {
+  for (const fn of bookListeners) fn();
+};
 
 export function listBooks(): Book[] {
   scanFolders();

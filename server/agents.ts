@@ -17,9 +17,22 @@ import { parse as parseYaml } from "yaml";
 import type { AgentRun } from "../shared/vault-types.ts";
 import { RUNS_DIR } from "./config.ts";
 import { publish } from "./events.ts";
-import { agent } from "./llm.ts";
 import { learnerSummary } from "./learn/context.ts";
-import { appendLog, changed, commitNow, git, gitIdentity, GENERATED, hasGit, readLog, reloadFile, shortId, touched, VAULT } from "./vault/index.ts";
+import { agent } from "./llm.ts";
+import {
+  appendLog,
+  changed,
+  commitNow,
+  GENERATED,
+  git,
+  gitIdentity,
+  hasGit,
+  readLog,
+  reloadFile,
+  shortId,
+  touched,
+  VAULT,
+} from "./vault/index.ts";
 import { writeIndexes } from "./vault/indexes.ts";
 
 const runs = new Map<string, AgentRun>();
@@ -29,7 +42,8 @@ function load() {
   loaded = true;
   for (const r of readLog<AgentRun>("agents.jsonl")) runs.set(r.id, r);
   // a run that was going when the server stopped can't be resumed
-  for (const r of runs.values()) if (r.status === "running") save({ ...r, status: "failed", error: "the server stopped during the run" });
+  for (const r of runs.values())
+    if (r.status === "running") save({ ...r, status: "failed", error: "the server stopped during the run" });
 }
 function save(run: AgentRun) {
   runs.set(run.id, run);
@@ -45,7 +59,17 @@ export function listRuns(): AgentRun[] {
 }
 
 /** Paths an agent may never change: the app's own records. */
-const FORBIDDEN = [/^log\//, /^profile\.md$/, /^AGENTS\.md$/, /^CLAUDE\.md$/, /^\.gitignore$/, /^\.classroom\.json$/, /^library\/[^/]+\/book\.json$/, /^library\/[^/]+\/demos\//, /^\.obsidian\//];
+const FORBIDDEN = [
+  /^log\//,
+  /^profile\.md$/,
+  /^AGENTS\.md$/,
+  /^CLAUDE\.md$/,
+  /^\.gitignore$/,
+  /^\.classroom\.json$/,
+  /^library\/[^/]+\/book\.json$/,
+  /^library\/[^/]+\/demos\//,
+  /^\.obsidian\//,
+];
 /** Changes that wait for the learner: deleting anything, or taking lines out of their notes and concepts. */
 const PROTECTED = /^(notes|concepts)\//;
 
@@ -87,7 +111,10 @@ function parseChanges(dir: string): { files: NonNullable<AgentRun["files"]>; rem
       })
     : [];
   const removed = new Map<string, number>();
-  for (const line of git(["diff", "--numstat", "--no-renames", "HEAD~1", "HEAD"], dir).stdout.trim().split("\n").filter(Boolean)) {
+  for (const line of git(["diff", "--numstat", "--no-renames", "HEAD~1", "HEAD"], dir)
+    .stdout.trim()
+    .split("\n")
+    .filter(Boolean)) {
     const [, del, ...rest] = line.split("\t");
     removed.set(rest.join("\t"), Number(del) || 0);
   }
@@ -98,15 +125,17 @@ function parseChanges(dir: string): { files: NonNullable<AgentRun["files"]>; rem
 function problemsIn(dir: string, files: NonNullable<AgentRun["files"]>): string[] {
   const problems: string[] = [];
   for (const f of files) {
-    if (FORBIDDEN.some((re) => re.test(f.path))) problems.push(`${f.path}: the app keeps this file; agents may not change it`);
+    if (FORBIDDEN.some((re) => re.test(f.path)))
+      problems.push(`${f.path}: the app keeps this file; agents may not change it`);
     if (f.change === "D") continue;
     const full = join(dir, f.path);
     if (!existsSync(full) || lstatSync(full).isSymbolicLink()) continue;
     const text = readFileSync(full, "utf8");
     try {
       if (f.path.endsWith(".json")) JSON.parse(text);
-      else if (f.path.endsWith(".jsonl")) text.split("\n").filter((l) => l.trim()).forEach((l) => JSON.parse(l));
-      else if (f.path.endsWith(".md")) {
+      else if (f.path.endsWith(".jsonl")) {
+        for (const line of text.split("\n")) if (line.trim()) JSON.parse(line);
+      } else if (f.path.endsWith(".md")) {
         const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
         if (m) parseYaml(m[1]);
         else if (text.startsWith("---")) throw new Error("frontmatter is not closed");
@@ -118,7 +147,9 @@ function problemsIn(dir: string, files: NonNullable<AgentRun["files"]>): string[
   return problems;
 }
 
-const PROMPT = (task: string) => `You are the learner's librarian. Your working folder is a copy of their knowledge vault, on its own branch: change files here freely; nothing reaches the real vault until it passes checks (and, for deletions or rewrites of their notes, until they approve).
+const PROMPT = (
+  task: string,
+) => `You are the learner's librarian. Your working folder is a copy of their knowledge vault, on its own branch: change files here freely; nothing reaches the real vault until it passes checks (and, for deletions or rewrites of their notes, until they approve).
 
 Read AGENTS.md first: it explains the layout and the rules. Start from INDEX.md and the folder indexes; search with rg; read only the files you need. The books' text (library/*/text/) and the indexes are read-only links.
 
@@ -135,10 +166,19 @@ Do it well, then reply with a short summary (Markdown) of what you changed and w
 /** Starts a run; returns at once (the run continues, and announces itself on the global event stream). */
 export function startRun(task: string): AgentRun {
   load();
-  if (!hasGit || !existsSync(join(VAULT, ".git"))) throw new Error("agents that write need git (the vault's history is how their changes are checked and undone)");
-  if ([...runs.values()].some((r) => r.status === "running")) throw new Error("an agent is already working on the vault; wait for it to finish");
+  if (!hasGit || !existsSync(join(VAULT, ".git")))
+    throw new Error("agents that write need git (the vault's history is how their changes are checked and undone)");
+  if ([...runs.values()].some((r) => r.status === "running"))
+    throw new Error("an agent is already working on the vault; wait for it to finish");
   const id = shortId("r");
-  const run = save({ id, task: task.trim().slice(0, 2000), mode: "write", status: "running", started: new Date().toISOString(), activity: "preparing a working copy" });
+  const run = save({
+    id,
+    task: task.trim().slice(0, 2000),
+    mode: "write",
+    status: "running",
+    started: new Date().toISOString(),
+    activity: "preparing a working copy",
+  });
   void execute(run);
   return run;
 }
@@ -175,7 +215,14 @@ async function execute(run: AgentRun) {
     }
     git(["add", "-A"], dir);
     const committed = git([...gitIdentity, "commit", "-q", "-m", `agent: ${run.task.slice(0, 100)}`], dir);
-    const base = { ...runs.get(run.id)!, activity: undefined, ms: Date.now() - started, provider: result.provider, model: result.model, answer: String(result.data || "").trim() };
+    const base = {
+      ...runs.get(run.id)!,
+      activity: undefined,
+      ms: Date.now() - started,
+      provider: result.provider,
+      model: result.model,
+      answer: String(result.data || "").trim(),
+    };
     if (!committed.ok) {
       save({ ...base, status: "done", files: [] });
       cleanup(run.id);
@@ -188,14 +235,26 @@ async function execute(run: AgentRun) {
       cleanup(run.id);
       return;
     }
-    const review = [...problems.map((p) => `Can't be read: ${p}`), ...files.filter((f) => f.change === "D").map((f) => `Deletes ${f.path}`), ...files.filter((f) => f.change === "M" && PROTECTED.test(f.path) && (removed.get(f.path) || 0) > 0).map((f) => `Rewrites ${f.path} (${removed.get(f.path)} line${removed.get(f.path) === 1 ? "" : "s"} out)`)];
+    const review = [
+      ...problems.map((p) => `Can't be read: ${p}`),
+      ...files.filter((f) => f.change === "D").map((f) => `Deletes ${f.path}`),
+      ...files
+        .filter((f) => f.change === "M" && PROTECTED.test(f.path) && (removed.get(f.path) || 0) > 0)
+        .map((f) => `Rewrites ${f.path} (${removed.get(f.path)} line${removed.get(f.path) === 1 ? "" : "s"} out)`),
+    ];
     if (review.length) {
       save({ ...base, status: "review", files, review });
       return;
     }
     save(merge({ ...base, files }));
   } catch (error) {
-    save({ ...runs.get(run.id)!, status: "failed", activity: undefined, ms: Date.now() - started, error: (error as Error).message.slice(0, 600) });
+    save({
+      ...runs.get(run.id)!,
+      status: "failed",
+      activity: undefined,
+      ms: Date.now() - started,
+      error: (error as Error).message.slice(0, 600),
+    });
     cleanup(run.id);
   }
 }
@@ -203,11 +262,23 @@ async function execute(run: AgentRun) {
 /** Brings a run's branch into the vault as one merge commit, and reloads what it changed. */
 function merge(run: AgentRun): AgentRun {
   commitNow("your edits before an agent's changes");
-  const merged = git([...gitIdentity, "merge", "--no-ff", "-q", "-m", `agent: ${run.task.slice(0, 100)}`, branch(run.id)]);
+  const merged = git([
+    ...gitIdentity,
+    "merge",
+    "--no-ff",
+    "-q",
+    "-m",
+    `agent: ${run.task.slice(0, 100)}`,
+    branch(run.id),
+  ]);
   if (!merged.ok) {
     git(["merge", "--abort"]);
     cleanup(run.id);
-    return { ...run, status: "failed", error: `its changes clash with edits you made meanwhile: ${merged.stderr.trim().slice(0, 300) || merged.stdout.trim().slice(0, 300)}` };
+    return {
+      ...run,
+      status: "failed",
+      error: `its changes clash with edits you made meanwhile: ${merged.stderr.trim().slice(0, 300) || merged.stdout.trim().slice(0, 300)}`,
+    };
   }
   const commit = git(["rev-parse", "HEAD"]).stdout.trim();
   for (const f of run.files || []) {
@@ -229,14 +300,14 @@ function cleanup(id: string) {
 export function approveRun(id: string): AgentRun {
   load();
   const run = runs.get(id);
-  if (!run || run.status !== "review") throw new Error("nothing waiting for approval");
+  if (run?.status !== "review") throw new Error("nothing waiting for approval");
   return save(merge(run));
 }
 
 export function discardRun(id: string): AgentRun {
   load();
   const run = runs.get(id);
-  if (!run || run.status !== "review") throw new Error("nothing waiting for approval");
+  if (run?.status !== "review") throw new Error("nothing waiting for approval");
   cleanup(id);
   return save({ ...run, status: "discarded" });
 }
@@ -245,7 +316,7 @@ export function discardRun(id: string): AgentRun {
 export function undoRun(id: string): AgentRun {
   load();
   const run = runs.get(id);
-  if (!run || run.status !== "merged" || !run.commit) throw new Error("only a merged run can be undone");
+  if (run?.status !== "merged" || !run.commit) throw new Error("only a merged run can be undone");
   commitNow("your edits before undoing an agent run");
   const reverted = git([...gitIdentity, "revert", "-m", "1", "--no-edit", run.commit]);
   if (!reverted.ok) {
@@ -264,7 +335,8 @@ export function runDiff(id: string): string {
   load();
   const run = runs.get(id);
   if (!run) throw new Error("run not found");
-  if (run.status === "review" && existsSync(dirOf(id))) return git(["diff", "--no-color", "HEAD~1", "HEAD"], dirOf(id)).stdout;
+  if (run.status === "review" && existsSync(dirOf(id)))
+    return git(["diff", "--no-color", "HEAD~1", "HEAD"], dirOf(id)).stdout;
   if (run.commit) return git(["diff", "--no-color", `${run.commit}^1`, run.commit]).stdout;
   return "";
 }

@@ -3,8 +3,8 @@
  * note (linked to its page), with or without a transcription (LaTeX for formulas, a Markdown table,
  * or a description of a figure, by the model looking at it). */
 import { useRef, useState } from "react";
-import { learn, type Book, type Note } from "./api";
 import { pageEls } from "./anchoring";
+import { type Book, learn, type Note } from "./api";
 import { Markdown } from "./Markdown";
 import { Spinner } from "./Shell";
 
@@ -40,7 +40,25 @@ function cut(root: HTMLElement, box: Box): { data: string; page: number } | null
   return { data: out.toDataURL("image/png"), page: page.page };
 }
 
-export function CaptureLayer({ book, root, theme, note, ensureNote, onNote, onDone, say }: { book: Book; root: HTMLElement | null; theme: "light" | "dark"; note: Note | null; ensureNote: () => Promise<Note>; onNote: (n: Note) => void; onDone: () => void; say: (text: string, action?: { label: string; href: string }) => void }) {
+export function CaptureLayer({
+  book,
+  root,
+  theme,
+  note,
+  ensureNote,
+  onNote,
+  onDone,
+  say,
+}: {
+  book: Book;
+  root: HTMLElement | null;
+  theme: "light" | "dark";
+  note: Note | null;
+  ensureNote: () => Promise<Note>;
+  onNote: (n: Note) => void;
+  onDone: () => void;
+  say: (text: string, action?: { label: string; href: string }) => void;
+}) {
   const [drag, setDrag] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [shot, setShot] = useState<{ data: string; page: number; box: Box } | null>(null);
   const [busy, setBusy] = useState<{ what: string; at: number } | null>(null);
@@ -51,7 +69,11 @@ export function CaptureLayer({ book, root, theme, note, ensureNote, onNote, onDo
 
   const save = async () => {
     if (!shot) throw new Error("nothing captured");
-    if (!saved.current) saved.current = await learn.attach(shot.data, `${book.title.slice(0, 50)} p${shot.page} ${new Date().toISOString().slice(11, 19).replace(/:/g, ".")}`);
+    if (!saved.current)
+      saved.current = await learn.attach(
+        shot.data,
+        `${book.title.slice(0, 50)} p${shot.page} ${new Date().toISOString().slice(11, 19).replace(/:/g, ".")}`,
+      );
     return saved.current;
   };
   const addToNote = async (withText: boolean) => {
@@ -59,7 +81,10 @@ export function CaptureLayer({ book, root, theme, note, ensureNote, onNote, onDo
     try {
       const pic = await save();
       const n = await ensureNote();
-      const pageLink = book.folder && book.file ? `[[library/${book.folder}/${book.file}#page=${shot!.page}|${book.title}, p. ${shot!.page}]]` : `${book.title}, p. ${shot!.page}`;
+      const pageLink =
+        book.folder && book.file
+          ? `[[library/${book.folder}/${book.file}#page=${shot!.page}|${book.title}, p. ${shot!.page}]]`
+          : `${book.title}, p. ${shot!.page}`;
       const md = `![[${pic.name}]]\n*${pageLink}*${withText && text ? `\n\n${text}` : ""}`;
       const updated = await learn.appendToNote(n.id, md);
       onNote(updated);
@@ -83,7 +108,14 @@ export function CaptureLayer({ book, root, theme, note, ensureNote, onNote, onDo
     }
   };
 
-  const box = drag ? { x: Math.min(drag.x0, drag.x1), y: Math.min(drag.y0, drag.y1), w: Math.abs(drag.x1 - drag.x0), h: Math.abs(drag.y1 - drag.y0) } : shot?.box;
+  const box = drag
+    ? {
+        x: Math.min(drag.x0, drag.x1),
+        y: Math.min(drag.y0, drag.y1),
+        w: Math.abs(drag.x1 - drag.x0),
+        h: Math.abs(drag.y1 - drag.y0),
+      }
+    : shot?.box;
   return (
     <div
       ref={layer}
@@ -96,7 +128,12 @@ export function CaptureLayer({ book, root, theme, note, ensureNote, onNote, onDo
       onPointerMove={(e) => drag && setDrag({ ...drag, x1: e.clientX, y1: e.clientY })}
       onPointerUp={() => {
         if (!drag || !root) return;
-        const b = { x: Math.min(drag.x0, drag.x1), y: Math.min(drag.y0, drag.y1), w: Math.abs(drag.x1 - drag.x0), h: Math.abs(drag.y1 - drag.y0) };
+        const b = {
+          x: Math.min(drag.x0, drag.x1),
+          y: Math.min(drag.y0, drag.y1),
+          w: Math.abs(drag.x1 - drag.x0),
+          h: Math.abs(drag.y1 - drag.y0),
+        };
         setDrag(null);
         const got = b.w > 8 && b.h > 8 ? cut(root, b) : null;
         if (got) setShot({ ...got, box: b });
@@ -106,26 +143,51 @@ export function CaptureLayer({ book, root, theme, note, ensureNote, onNote, onDo
       tabIndex={-1}
     >
       {!shot && !drag && <div className="capture-hint">Drag a box around a figure, formula or table · Esc to stop</div>}
-      {box && frame && <div className="capture-box" style={{ left: box.x - frame.left, top: box.y - frame.top, width: box.w, height: box.h }} />}
+      {box && frame && (
+        <div
+          className="capture-box"
+          style={{ left: box.x - frame.left, top: box.y - frame.top, width: box.w, height: box.h }}
+        />
+      )}
       {shot && frame && (
-        <div className="capture-pop" style={{ left: Math.min(frame.width - 380, Math.max(10, shot.box.x - frame.left)), top: Math.min(frame.height - 120, shot.box.y - frame.top + shot.box.h + 10) }}>
+        <div
+          className="capture-pop"
+          style={{
+            left: Math.min(frame.width - 380, Math.max(10, shot.box.x - frame.left)),
+            top: Math.min(frame.height - 120, shot.box.y - frame.top + shot.box.h + 10),
+          }}
+        >
           <img src={shot.data} alt="The captured region" />
           {text !== null && <Markdown text={text} theme={theme} className="capture-text" />}
           {busy && <Spinner label={busy.what} since={busy.at} />}
           <div className="row gap">
-            <button className="button primary" disabled={!!busy} onClick={() => addToNote(text !== null)}>
+            <button type="button" className="button primary" disabled={!!busy} onClick={() => addToNote(text !== null)}>
               Add to {note ? `“${note.title.length > 24 ? `${note.title.slice(0, 22)}…` : note.title}”` : "your note"}
             </button>
             {text === null && (
-              <button className="button" disabled={!!busy} onClick={transcribe} title="The model reads the picture: LaTeX for formulas, a table, or a description">
+              <button
+                type="button"
+                className="button"
+                disabled={!!busy}
+                onClick={transcribe}
+                title="The model reads the picture: LaTeX for formulas, a table, or a description"
+              >
                 Transcribe
               </button>
             )}
             <span className="spacer" />
-            <button className="link" onClick={() => (setShot(null), setText(null), (saved.current = null))}>
+            <button
+              type="button"
+              className="link"
+              onClick={() => {
+                setShot(null);
+                setText(null);
+                saved.current = null;
+              }}
+            >
               Again
             </button>
-            <button className="link" onClick={onDone}>
+            <button type="button" className="link" onClick={onDone}>
               Close
             </button>
           </div>

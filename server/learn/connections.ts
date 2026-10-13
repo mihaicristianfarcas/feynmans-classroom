@@ -9,8 +9,8 @@ import { agent } from "../llm.ts";
 import { getSettings } from "../settings.ts";
 import { listConnections, saveConnections } from "../vault/connections.ts";
 import { changed, logActivity, notes, now, shortId, VAULT } from "../vault/index.ts";
-import { resolveLink } from "../vault/links.ts";
 import { writeIndexes } from "../vault/indexes.ts";
+import { resolveLink } from "../vault/links.ts";
 import { learnerSummary } from "./context.ts";
 import { updateNote } from "./notes.ts";
 
@@ -47,7 +47,10 @@ function linkedFrom(path: string): Set<string> {
   return keys;
 }
 
-export async function suggestConnections(path?: string, opts: { onActivity?: (t: string) => void } = {}): Promise<{ suggested: Connection[]; ms: number }> {
+export async function suggestConnections(
+  path?: string,
+  opts: { onActivity?: (t: string) => void } = {},
+): Promise<{ suggested: Connection[]; ms: number }> {
   if (path && !notes.byPath(path)) throw new Error("note not found");
   if (!path && !notes.items.size) return { suggested: [], ms: 0 };
   writeIndexes(); // the agent starts from the indexes: make sure they're current
@@ -72,7 +75,14 @@ The learner:
 ${learnerSummary()}
 
 Return JSON.`;
-  const result = await agent({ cwd: VAULT, prompt, schema: SCHEMA, tier: "smart", effort: "low", onActivity: opts.onActivity });
+  const result = await agent({
+    cwd: VAULT,
+    prompt,
+    schema: SCHEMA,
+    tier: "smart",
+    effort: "low",
+    onActivity: opts.onActivity,
+  });
   const data = result.data as { suggestions: { from: string; to: string; why: string }[] };
   const list = listConnections();
   const decided = new Set(list.map((c) => `${c.from}\u0000${resolveLink(c.to)?.node || linkKey(c.to)}`));
@@ -86,13 +96,25 @@ Return JSON.`;
     const key = `${from}\u0000${target.node}`;
     if (decided.has(key) || linkedFrom(from).has(target.node)) continue;
     decided.add(key);
-    const c: Connection = { id: shortId("c"), from, to: target.title, why: s.why.trim().slice(0, 300), status: auto ? "accepted" : "suggested", by: { provider: result.provider, model: result.model }, created: now(), ...(auto ? { decided: now() } : {}) };
+    const c: Connection = {
+      id: shortId("c"),
+      from,
+      to: target.title,
+      why: s.why.trim().slice(0, 300),
+      status: auto ? "accepted" : "suggested",
+      by: { provider: result.provider, model: result.model },
+      created: now(),
+      ...(auto ? { decided: now() } : {}),
+    };
     added.push(c);
     if (auto) addRelated(note.id, c.to);
   }
   if (added.length) {
     saveConnections([...list, ...added], `${added.length} connection${added.length === 1 ? "" : "s"}`);
-    logActivity({ type: "connect", text: `${auto ? "Linked" : "Suggested"} ${added.length} connection${added.length === 1 ? "" : "s"}${path ? ` for ${notes.byPath(path)?.title}` : ""}` });
+    logActivity({
+      type: "connect",
+      text: `${auto ? "Linked" : "Suggested"} ${added.length} connection${added.length === 1 ? "" : "s"}${path ? ` for ${notes.byPath(path)?.title}` : ""}`,
+    });
   }
   return { suggested: added, ms: result.ms };
 }
@@ -115,7 +137,10 @@ export function decideConnection(id: string, decision: "accept" | "reject" | "re
     addRelated(note.id, c.to);
     c.status = "accepted";
   } else if (decision === "remove") {
-    if (note) updateNote(note.id, { related: note.related.filter((r) => linkKey(r.replace(/^\[\[|\]\]$/g, "").split("|")[0]) !== linkKey(c.to)) });
+    if (note)
+      updateNote(note.id, {
+        related: note.related.filter((r) => linkKey(r.replace(/^\[\[|\]\]$/g, "").split("|")[0]) !== linkKey(c.to)),
+      });
     c.status = "removed";
   } else c.status = "rejected";
   c.decided = now();

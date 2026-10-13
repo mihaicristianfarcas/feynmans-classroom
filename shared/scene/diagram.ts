@@ -4,7 +4,7 @@
  * `dots` draws a whole field of particles from one rule in i, and `curve` a path in s. */
 import { compile, evalNum, fillTemplate, type Scope } from "./expr.ts";
 import { AROUND, Labels } from "./labels.ts";
-import { arrow, arrowHead, circle, line, pathOf, type Pt, r1, rect, shape, text } from "./svg.ts";
+import { arrow, arrowHead, circle, line, type Pt, pathOf, r1, rect, shape, text } from "./svg.ts";
 import type { DiagramScene, FrameState, RenderOut, Tone } from "./types.ts";
 import { HEIGHT, WIDTH } from "./types.ts";
 
@@ -66,7 +66,11 @@ export function renderDiagram(spec: DiagramScene, state: FrameState): RenderOut 
         const [cx, cy] = P(n(sh.x), n(sh.y));
         const r = Math.abs(n(sh.r, scope, 1)) * F.k;
         const svg = circle(cx, cy, r, sh.fill, style);
-        body.push(sh.drag ? `<g data-drag="${sh.id}" class="sc-draggable">${circle(cx, cy, Math.max(r, 12), "none", { cls: "sc-hit" })}${svg}</g>` : svg);
+        body.push(
+          sh.drag
+            ? `<g data-drag="${sh.id}" class="sc-draggable">${circle(cx, cy, Math.max(r, 12), "none", { cls: "sc-hit" })}${svg}</g>`
+            : svg,
+        );
         labels.reserve({ x: cx - r, y: cy - r, w: 2 * r, h: 2 * r });
         labelAt = [cx + r * 0.7, cy - r * 0.7];
         break;
@@ -76,7 +80,9 @@ export function renderDiagram(spec: DiagramScene, state: FrameState): RenderOut 
         if (pts.length < 2) break;
         if (sh.arrow) {
           const head = arrowHead(pts[pts.length - 2], pts[pts.length - 1], 7);
-          body.push(`<path d="${pathOf(pts)}${pathOf(head)}" class="sc-line" data-tone="${tone}" data-id="${sh.id}"${sh.dashed ? " data-dashed" : ""} style="${sh.width ? `stroke-width:${sh.width}px;` : ""}${o < 1 ? `opacity:${r1(o * 100) / 100}` : ""}"/>`);
+          body.push(
+            `<path d="${pathOf(pts)}${pathOf(head)}" class="sc-line" data-tone="${tone}" data-id="${sh.id}"${sh.dashed ? " data-dashed" : ""} style="${sh.width ? `stroke-width:${sh.width}px;` : ""}${o < 1 ? `opacity:${r1(o * 100) / 100}` : ""}"/>`,
+          );
         } else body.push(line(pts, { ...style, dashed: sh.dashed, width: sh.width || undefined }));
         const mid = pts[Math.floor((pts.length - 1) / 2)],
           next = pts[Math.floor((pts.length - 1) / 2) + 1];
@@ -104,7 +110,12 @@ export function renderDiagram(spec: DiagramScene, state: FrameState): RenderOut 
             if (Number.isFinite(x) && Number.isFinite(y)) pts.push(P(x, y));
           } catch {}
         }
-        if (pts.length > 1) body.push(sh.fill !== "none" ? shape(pathOf(pts, true), sh.fill, { ...style, dashed: sh.dashed }) : line(pts, { ...style, dashed: sh.dashed, width: tone === "lit" ? 2 : undefined }));
+        if (pts.length > 1)
+          body.push(
+            sh.fill !== "none"
+              ? shape(pathOf(pts, true), sh.fill, { ...style, dashed: sh.dashed })
+              : line(pts, { ...style, dashed: sh.dashed, width: tone === "lit" ? 2 : undefined }),
+          );
         labelAt = pts[Math.floor(pts.length * 0.8)] || null;
         break;
       }
@@ -120,10 +131,13 @@ export function renderDiagram(spec: DiagramScene, state: FrameState): RenderOut 
             const x = Number(cx(local)),
               y = Number(cy(local));
             const r = Math.max(0.6, Math.abs(Number(cr(local))) * F.k);
-            if (Number.isFinite(x) && Number.isFinite(y)) parts.push(`<circle cx="${r1(F.sx(x))}" cy="${r1(F.sy(y))}" r="${r1(r)}"/>`);
+            if (Number.isFinite(x) && Number.isFinite(y))
+              parts.push(`<circle cx="${r1(F.sx(x))}" cy="${r1(F.sy(y))}" r="${r1(r)}"/>`);
           } catch {}
         }
-        body.push(`<g class="sc-shape" data-fill="solid" data-tone="${tone}" data-id="${sh.id}"${o < 1 ? ` style="opacity:${r1(o * 100) / 100}"` : ""}>${parts.join("")}</g>`);
+        body.push(
+          `<g class="sc-shape" data-fill="solid" data-tone="${tone}" data-id="${sh.id}"${o < 1 ? ` style="opacity:${r1(o * 100) / 100}"` : ""}>${parts.join("")}</g>`,
+        );
         break;
       }
       case "spring": {
@@ -157,7 +171,11 @@ export function renderDiagram(spec: DiagramScene, state: FrameState): RenderOut 
           const a = a0 + ((a1 - a0) * i) / steps;
           pts.push([cx + r * Math.cos(a), cy - r * Math.sin(a)]);
         }
-        body.push(sh.arrow && pts.length > 1 ? arrow(pts[pts.length - 2], pts[pts.length - 1], { ...style, head: 6 }) + line(pts, style) : line(pts, style));
+        body.push(
+          sh.arrow && pts.length > 1
+            ? arrow(pts[pts.length - 2], pts[pts.length - 1], { ...style, head: 6 }) + line(pts, style)
+            : line(pts, style),
+        );
         labelAt = pts[Math.floor(pts.length / 2)] || null;
         break;
       }
@@ -165,25 +183,54 @@ export function renderDiagram(spec: DiagramScene, state: FrameState): RenderOut 
         const x1 = F.sx(n(sh.x1)),
           x2 = F.sx(n(sh.x2, scope, spec.width)),
           y = F.sy(n(sh.y));
-        let d = pathOf([[x1, y], [x2, y]]);
-        for (let x = x1 + 5; x <= x2; x += 9) d += pathOf([[x, y], [x - 6, y + 7]]);
+        let d = pathOf([
+          [x1, y],
+          [x2, y],
+        ]);
+        for (let x = x1 + 5; x <= x2; x += 9)
+          d += pathOf([
+            [x, y],
+            [x - 6, y + 7],
+          ]);
         body.push(`<path d="${d}" class="sc-line" data-tone="${tone}" data-id="${sh.id}"/>`);
         break;
       }
       case "text": {
         const [x, y] = P(n(sh.x), n(sh.y));
         const label = fillTemplate(sh.text, scope);
-        const at = labels.place(x, y, label, sh.size || 12, [[0, 0, "middle"], [0, -14, "middle"], [0, 16, "middle"]]);
-        front.push(text(at.x, at.y, label, { size: sh.size || 12, anchor: at.anchor, tone, id: sh.id, opacity: o, halo: true }));
+        const at = labels.place(x, y, label, sh.size || 12, [
+          [0, 0, "middle"],
+          [0, -14, "middle"],
+          [0, 16, "middle"],
+        ]);
+        front.push(
+          text(at.x, at.y, label, { size: sh.size || 12, anchor: at.anchor, tone, id: sh.id, opacity: o, halo: true }),
+        );
         break;
       }
     }
-    if (sh.label && labelAt) pending.push({ at: labelAt, label: fillTemplate(sh.label, scope), tone: tone === "faint" || tone === "lo" ? "mid" : tone, o });
+    if (sh.label && labelAt)
+      pending.push({
+        at: labelAt,
+        label: fillTemplate(sh.label, scope),
+        tone: tone === "faint" || tone === "lo" ? "mid" : tone,
+        o,
+      });
   }
   for (const p of pending) {
     const at = labels.place(p.at[0], p.at[1], p.label, 11.5, AROUND);
-    front.push(text(at.x, at.y, p.label, { size: 11.5, anchor: at.anchor, tone: p.tone === "lit" ? "hi" : p.tone, opacity: p.o, halo: true }));
+    front.push(
+      text(at.x, at.y, p.label, {
+        size: 11.5,
+        anchor: at.anchor,
+        tone: p.tone === "lit" ? "hi" : p.tone,
+        opacity: p.o,
+        halo: true,
+      }),
+    );
   }
-  return { svg: `<g>${body.join("")}</g><g class="sc-front">${front.join("")}</g>`, invert: (px, py) => [F.ix(px), F.iy(py)] };
+  return {
+    svg: `<g>${body.join("")}</g><g class="sc-front">${front.join("")}</g>`,
+    invert: (px, py) => [F.ix(px), F.iy(py)],
+  };
 }
-

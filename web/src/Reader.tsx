@@ -1,15 +1,29 @@
 import { ArrowLeft, CircleHelp, Crop, Layers, Pin, PinOff, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, learn, posOf, useBookLive, withFigs, type Anchor, type Annotation, type Block, type Book, type Demo, type Loc, type Note, type SourceRef } from "./api";
 import { blockAnchor, pdfAnchor } from "./anchoring";
+import {
+  type Anchor,
+  type Annotation,
+  api,
+  type Block,
+  type Book,
+  type Demo,
+  type Loc,
+  learn,
+  type Note,
+  posOf,
+  type SourceRef,
+  useBookLive,
+  withFigs,
+} from "./api";
 import { CaptureLayer } from "./Capture";
 import { DemoPanel } from "./DemoPanel";
 import { Margin, type MarginItem } from "./Margin";
 import { ReaderNote } from "./ReaderNote";
 import { HtmlReader, MarksContext, PdfReader, type ReaderHandle } from "./readers";
-import { SelectionMenu, type SelectionAction } from "./SelectionMenu";
+import { type SelectionAction, SelectionMenu } from "./SelectionMenu";
 import { ThemeButton, useDueCount } from "./Shell";
-import { StudyTab, TutorTab, type TutorMessage } from "./StudyPanel";
+import { StudyTab, type TutorMessage, TutorTab } from "./StudyPanel";
 import { CardDrafter, Connector, ExplainBack } from "./tools";
 import { useIndicator } from "./ui";
 
@@ -54,10 +68,22 @@ function savedPos(bookId: string): number | null {
     return null;
   }
 }
-const locOfPos = (book: Book, pos: number): Loc => (book.format === "pdf" ? { page: Math.floor(pos), y: pos - Math.floor(pos) } : { block: Math.floor(pos), y: pos - Math.floor(pos) });
-const locOfAnchor = (a: Anchor): Loc => (a.page !== undefined ? { page: a.page, y: a.y ?? 0 } : { block: a.block ?? 0 });
+const locOfPos = (book: Book, pos: number): Loc =>
+  book.format === "pdf"
+    ? { page: Math.floor(pos), y: pos - Math.floor(pos) }
+    : { block: Math.floor(pos), y: pos - Math.floor(pos) };
+const locOfAnchor = (a: Anchor): Loc =>
+  a.page !== undefined ? { page: a.page, y: a.y ?? 0 } : { block: a.block ?? 0 };
 
-export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "light" | "dark"; setTheme: (t: "light" | "dark") => void }) {
+export function Reader({
+  bookId,
+  theme,
+  setTheme,
+}: {
+  bookId: string;
+  theme: "light" | "dark";
+  setTheme: (t: "light" | "dark") => void;
+}) {
   const [book, setBook] = useState<Book | null>(null);
   const [blocks, setBlocks] = useState<Block[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -134,12 +160,22 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
   );
 
   const demos = useMemo(() => (book ? withFigs(book, rawDemos) : []), [book, rawDemos]);
-  const chapterOf = useCallback((p: number) => (book ? [...book.toc].reverse().find((entry) => posOf(entry.start) <= p + 1e-6) || book.toc[0] || null : null), [book]);
+  const chapterOf = useCallback(
+    (p: number) =>
+      book ? [...book.toc].reverse().find((entry) => posOf(entry.start) <= p + 1e-6) || book.toc[0] || null : null,
+    [book],
+  );
   const chapter = chapterOf(pos);
   const chapterOfRef = useRef(chapterOf);
   chapterOfRef.current = chapterOf;
   const chapterDemos = useMemo(() => demos.filter((d) => d.chapterId === chapter?.id), [demos, chapter]);
-  const marginItems = useMemo<MarginItem[]>(() => [...annotations.map((a) => ({ id: a.id, annotation: a })), ...demos.filter((d) => d.anchor.matched !== false).map((d) => ({ id: d.id, demo: d }))], [annotations, demos]);
+  const marginItems = useMemo<MarginItem[]>(
+    () => [
+      ...annotations.map((a) => ({ id: a.id, annotation: a })),
+      ...demos.filter((d) => d.anchor.matched !== false).map((d) => ({ id: d.id, demo: d })),
+    ],
+    [annotations, demos],
+  );
 
   /** Recompute reading position and gutter markers from what is on screen. */
   const measure = useCallback(() => {
@@ -153,20 +189,37 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
     for (const demo of demos) {
       const y = r.clientYOf(demo.anchor);
       if (y === null || y < box.top + 6 || y > box.bottom - 6) continue;
-      next.push({ id: demo.id, top: y - box.top, status: demo.status, fig: demo.fig, title: demo.brief.eyebrow || demo.brief.title });
+      next.push({
+        id: demo.id,
+        top: y - box.top,
+        status: demo.status,
+        fig: demo.fig,
+        title: demo.brief.eyebrow || demo.brief.title,
+      });
     }
-    setMarkers((old) => (old.length === next.length && old.every((m, i) => m.id === next[i].id && Math.abs(m.top - next[i].top) < 0.5 && m.status === next[i].status) ? old : next));
+    setMarkers((old) =>
+      old.length === next.length &&
+      old.every((m, i) => m.id === next[i].id && Math.abs(m.top - next[i].top) < 0.5 && m.status === next[i].status)
+        ? old
+        : next,
+    );
     const nextNotes: NoteMarker[] = [];
     for (const note of notes) {
       const src = note.source;
       if (!src) continue;
-      const loc: Loc | null = src.page !== undefined ? { page: src.page, y: src.y } : src.block !== undefined ? { block: src.block } : null;
+      const loc: Loc | null =
+        src.page !== undefined ? { page: src.page, y: src.y } : src.block !== undefined ? { block: src.block } : null;
       if (!loc) continue;
       const y = r.clientYOf(loc);
       if (y === null || y < box.top + 6 || y > box.bottom - 6) continue;
       nextNotes.push({ id: note.id, top: y - box.top, type: note.type, title: note.title });
     }
-    setNoteMarkers((old) => (old.length === nextNotes.length && old.every((m, i) => m.id === nextNotes[i].id && Math.abs(m.top - nextNotes[i].top) < 0.5) ? old : nextNotes));
+    setNoteMarkers((old) =>
+      old.length === nextNotes.length &&
+      old.every((m, i) => m.id === nextNotes[i].id && Math.abs(m.top - nextNotes[i].top) < 0.5)
+        ? old
+        : nextNotes,
+    );
     lastScroll.current = Date.now();
     bus.dispatchEvent(new Event("scroll"));
   }, [demos, notes, bus]);
@@ -175,7 +228,14 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
     measure();
   }, [measure]);
   useEffect(() => {
-    if (import.meta.env.DEV) (window as unknown as { __classroom: unknown }).__classroom = { reader: reader.current, demos, annotations, pos, pane: pane.current };
+    if (import.meta.env.DEV)
+      (window as unknown as { __classroom: unknown }).__classroom = {
+        reader: reader.current,
+        demos,
+        annotations,
+        pos,
+        pane: pane.current,
+      };
   });
 
   // the active demo: the last anchor the reading line has passed, within the current chapter
@@ -191,7 +251,9 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
     if (!found && chapterDemos[0] && posOf(chapterDemos[0].anchor) - pos < 0.35) return chapterDemos[0];
     return found;
   }, [demos, pos, chapter, chapterDemos]);
-  const active = (heldId && demos.find((d) => d.id === heldId)) || (pickedId && demos.find((d) => d.id === pickedId)) || autoActive;
+  const active =
+    (heldId && demos.find((d) => d.id === heldId)) || (pickedId && demos.find((d) => d.id === pickedId)) || autoActive;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: when the reading line reaches another figure, the one picked by hand gives way
   useEffect(() => {
     setPickedId(null);
   }, [autoActive?.id]);
@@ -225,7 +287,15 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
     const ping = () => {
       if (document.visibilityState !== "visible" || Date.now() - lastScroll.current > 3 * 60000) return;
       const { chapter: ch, pos: p } = readState.current;
-      learn.readPing({ bookId: book.id, chapter: ch?.title, chapterId: ch?.id, position: p, page: book.format === "pdf" ? Math.floor(p) : undefined }).catch(() => {});
+      learn
+        .readPing({
+          bookId: book.id,
+          chapter: ch?.title,
+          chapterId: ch?.id,
+          position: p,
+          page: book.format === "pdf" ? Math.floor(p) : undefined,
+        })
+        .catch(() => {});
     };
     const first = setTimeout(ping, 15000);
     const timer = setInterval(ping, 60000);
@@ -239,8 +309,18 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
   const sourceOf = useCallback(
     (sel: Selection): SourceRef => {
       const at = sel.at ?? pos;
-      const base = { bookId, chapterId: sel.chapterId || chapter?.id, quote: sel.text.split(/\s+/).slice(0, 24).join(" ") };
-      return book?.format === "pdf" ? { ...base, page: sel.anchor.page ?? Math.floor(at), y: Math.round((sel.anchor.y ?? at - Math.floor(at)) * 1000) / 1000 } : { ...base, block: sel.anchor.block ?? Math.floor(at) };
+      const base = {
+        bookId,
+        chapterId: sel.chapterId || chapter?.id,
+        quote: sel.text.split(/\s+/).slice(0, 24).join(" "),
+      };
+      return book?.format === "pdf"
+        ? {
+            ...base,
+            page: sel.anchor.page ?? Math.floor(at),
+            y: Math.round((sel.anchor.y ?? at - Math.floor(at)) * 1000) / 1000,
+          }
+        : { ...base, block: sel.anchor.block ?? Math.floor(at) };
     },
     [book, bookId, chapter, pos],
   );
@@ -260,6 +340,7 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
   );
 
   // a link to an annotation (from a note, the palette): go to its passage and open its card
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-checked as the position changes, because `restored` is a ref set once the book is back where you left off
   useEffect(() => {
     if (focusJumped.current || !focused || !annotations.length || !restored.current) return;
     const a = annotations.find((x) => x.id === focused);
@@ -273,7 +354,12 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
   const nextAfterPos = demos.find((d) => posOf(d.anchor) > pos + 0.02);
   const step = useCallback(
     (direction: -1 | 1) => {
-      const target = index >= 0 ? demos[index + direction] : direction === 1 ? nextAfterPos : [...demos].reverse().find((d) => posOf(d.anchor) < pos);
+      const target =
+        index >= 0
+          ? demos[index + direction]
+          : direction === 1
+            ? nextAfterPos
+            : [...demos].reverse().find((d) => posOf(d.anchor) < pos);
       if (target) jumpToDemo(target);
     },
     [demos, index, jumpToDemo, nextAfterPos, pos],
@@ -315,7 +401,17 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
           setSelection(null);
           // a click (no selection) on a marked passage: open its card
           if (root?.contains(event.target as Node) && reader.current) {
-            const hit = annotationsRef.current.find((a) => reader.current!.boxesOf(a.anchor, a.id)?.some((r) => event.clientX >= r.left - 2 && event.clientX <= r.right + 2 && event.clientY >= r.top - 2 && event.clientY <= r.bottom + 2));
+            const hit = annotationsRef.current.find((a) =>
+              reader
+                .current!.boxesOf(a.anchor, a.id)
+                ?.some(
+                  (r) =>
+                    event.clientX >= r.left - 2 &&
+                    event.clientX <= r.right + 2 &&
+                    event.clientY >= r.top - 2 &&
+                    event.clientY <= r.bottom + 2,
+                ),
+            );
             if (hit) {
               setTab("margin");
               setFocused(hit.id);
@@ -331,7 +427,15 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
         const above = rect.top - box.top > 70;
         const y = above ? rect.top - box.top - 48 : Math.min(box.height - 60, rect.bottom - box.top + 10);
         const at = reader.current?.positionAt(Math.max(box.top + 1, rect.top + 2));
-        setSelection({ text, anchor, x: rect.left - box.left + rect.width / 2, y: Math.max(8, y), side: above ? "top" : "bottom", chapterId: at != null ? chapterOfRef.current(at)?.id : undefined, at: at ?? undefined });
+        setSelection({
+          text,
+          anchor,
+          x: rect.left - box.left + rect.width / 2,
+          y: Math.max(8, y),
+          side: above ? "top" : "bottom",
+          chapterId: at != null ? chapterOfRef.current(at)?.id : undefined,
+          at: at ?? undefined,
+        });
       }, 10);
     };
     document.addEventListener("mouseup", onUp);
@@ -391,7 +495,13 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
           await annotate({ kind: "ask", anchor: sel.anchor, request: action.question });
           break;
         case "visualize":
-          await annotate({ kind: "visualize", anchor: sel.anchor, request: action.request || undefined, sceneKind: action.sceneKind, quality: action.quality });
+          await annotate({
+            kind: "visualize",
+            anchor: sel.anchor,
+            request: action.request || undefined,
+            sceneKind: action.sceneKind,
+            quality: action.quality,
+          });
           say(action.quality === "careful" ? "Drawing carefully: about a minute." : "Drawing: about fifteen seconds.");
           break;
         case "note":
@@ -425,7 +535,10 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
   if (failed) return <div className="center-note">Could not open this book: {failed}</div>;
   if (!book) return <div className="center-note">Opening…</div>;
 
-  const pageLabel = book.format === "pdf" ? `p. ${Math.max(1, Math.floor(pos))} / ${book.pageCount}` : `${Math.round((Math.floor(pos) / Math.max(1, book.blockCount || 1)) * 100)}%`;
+  const pageLabel =
+    book.format === "pdf"
+      ? `p. ${Math.max(1, Math.floor(pos))} / ${book.pageCount}`
+      : `${Math.round((Math.floor(pos) / Math.max(1, book.blockCount || 1)) * 100)}%`;
   const sections = chapter?.sections || [];
   const section = [...sections].reverse().find((s) => posOf(s.start) <= pos + 1e-6);
   const counted = annotations.filter((a) => a.kind !== "highlight").length;
@@ -477,17 +590,29 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
         )}
         {(book.tocSource === "chunks" || book.tocSource === "headings") && book.format === "pdf" && (
           <button
+            type="button"
             className="button"
             disabled={jobs.some((j) => j.kind === "plan" && j.status === "running" && !j.chapterId)}
             title="This PDF has no bookmarks: let the model read the headings and build the chapter list"
             onClick={() => api.detectChapters(book.id).catch((e) => say((e as Error).message))}
           >
-            {jobs.some((j) => j.kind === "plan" && j.status === "running" && !j.chapterId) ? "Finding chapters…" : "Find chapters"}
+            {jobs.some((j) => j.kind === "plan" && j.status === "running" && !j.chapterId)
+              ? "Finding chapters…"
+              : "Find chapters"}
           </button>
         )}
         <span className="spacer" />
         {book.format === "pdf" && (
-          <button className={`button subtle ${capturing ? "on" : ""}`} onClick={() => (setCapturing((v) => !v), setSelection(null))} aria-pressed={capturing} title="Capture a figure, formula or table from the page into your note (C)">
+          <button
+            type="button"
+            className={`button subtle ${capturing ? "on" : ""}`}
+            onClick={() => {
+              setCapturing((v) => !v);
+              setSelection(null);
+            }}
+            aria-pressed={capturing}
+            title="Capture a figure, formula or table from the page into your note (C)"
+          >
             <Crop aria-hidden="true" />
             Capture
           </button>
@@ -498,14 +623,28 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
           Review{due ? <span className="badge">{due}</span> : null}
         </a>
         {tab === "figures" && (
-          <button className={`button subtle ${heldId ? "on" : ""}`} onClick={() => setHeldId(heldId ? null : active?.id || null)} disabled={!active && !heldId} aria-pressed={!!heldId} title="Keep this figure while you scroll (h)">
+          <button
+            type="button"
+            className={`button subtle ${heldId ? "on" : ""}`}
+            onClick={() => setHeldId(heldId ? null : active?.id || null)}
+            disabled={!active && !heldId}
+            aria-pressed={!!heldId}
+            title="Keep this figure while you scroll (h)"
+          >
             {heldId ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
             {heldId ? "Release" : "Hold"}
           </button>
         )}
         <span className="topbar-sep" />
         <ThemeButton theme={theme} setTheme={setTheme} />
-        <button className="icon-button" onClick={() => setHelp(!help)} aria-label="Help" aria-expanded={help} title="Help (?)">
+        <button
+          type="button"
+          className="icon-button"
+          onClick={() => setHelp(!help)}
+          aria-label="Help"
+          aria-expanded={help}
+          title="Help (?)"
+        >
           <CircleHelp aria-hidden="true" />
         </button>
       </header>
@@ -515,8 +654,16 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
           <div className="pane-head">
             <nav className="pane-tabs segmented" aria-label="Study panel" ref={tabs}>
               {(["margin", "figures", "note", "tutor", "study"] as Tab[]).map((t) => (
-                <button key={t} className="pane-tab" aria-pressed={tab === t} onClick={() => setTab(t)}>
-                  {t === "margin" ? "Margin" : t === "figures" ? "Figures" : t === "note" ? "Note" : t === "tutor" ? "Tutor" : "Study"}
+                <button type="button" key={t} className="pane-tab" aria-pressed={tab === t} onClick={() => setTab(t)}>
+                  {t === "margin"
+                    ? "Margin"
+                    : t === "figures"
+                      ? "Figures"
+                      : t === "note"
+                        ? "Note"
+                        : t === "tutor"
+                          ? "Tutor"
+                          : "Study"}
                   {t === "margin" && counted > 0 && <span className="tab-count">{counted}</span>}
                 </button>
               ))}
@@ -536,7 +683,10 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
                 leader={leader}
                 theme={theme}
                 onToNote={(a: Annotation, mode) => toNote({ annotationId: a.id }, mode)}
-                onOpenDemo={(d) => (setTab("figures"), jumpToDemo(d))}
+                onOpenDemo={(d) => {
+                  setTab("figures");
+                  jumpToDemo(d);
+                }}
                 toast={say}
               />
             )}
@@ -552,11 +702,35 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
                 held={!!heldId}
                 onJump={jumpToDemo}
                 onStep={step}
-                canStep={{ prev: index > 0 || (index < 0 && demos.some((d) => posOf(d.anchor) < pos)), next: index >= 0 ? index < demos.length - 1 : !!nextAfterPos }}
+                canStep={{
+                  prev: index > 0 || (index < 0 && demos.some((d) => posOf(d.anchor) < pos)),
+                  next: index >= 0 ? index < demos.length - 1 : !!nextAfterPos,
+                }}
               />
             )}
-            {tab === "note" && <ReaderNote book={book} note={workingNote} onChoose={chooseNote} ensureNote={ensureNote} bookNotes={notes} theme={theme} onJump={(loc) => jumpTo(loc)} reload={loadNotes} />}
-            {tab === "tutor" && <TutorTab book={book} chapter={chapter} pinned={pinned} onUnpin={() => setPinned(null)} theme={theme} messages={tutorMessages} setMessages={setTutorMessages} />}
+            {tab === "note" && (
+              <ReaderNote
+                book={book}
+                note={workingNote}
+                onChoose={chooseNote}
+                ensureNote={ensureNote}
+                bookNotes={notes}
+                theme={theme}
+                onJump={(loc) => jumpTo(loc)}
+                reload={loadNotes}
+              />
+            )}
+            {tab === "tutor" && (
+              <TutorTab
+                book={book}
+                chapter={chapter}
+                pinned={pinned}
+                onUnpin={() => setPinned(null)}
+                theme={theme}
+                messages={tutorMessages}
+                setMessages={setTutorMessages}
+              />
+            )}
             {tab === "study" && <StudyTab book={book} chapter={chapter} theme={theme} autoQuiz={autoQuiz} />}
           </div>
         </section>
@@ -564,10 +738,20 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
           <div className="gutter" aria-hidden="false">
             <span className="reading-line" style={{ top: `${LINE * 100}%` }} title="Reading line" />
             {noteMarkers.map((m) => (
-              <button key={m.id} className="note-mark" data-type={m.type} style={{ top: m.top }} title={`${m.type}: ${m.title}`} aria-label={`${m.type}: ${m.title}`} onClick={() => setTab("note")} />
+              <button
+                type="button"
+                key={m.id}
+                className="note-mark"
+                data-type={m.type}
+                style={{ top: m.top }}
+                title={`${m.type}: ${m.title}`}
+                aria-label={`${m.type}: ${m.title}`}
+                onClick={() => setTab("note")}
+              />
             ))}
             {markers.map((m) => (
               <button
+                type="button"
                 key={m.id}
                 className="anchor"
                 data-active={active?.id === m.id || undefined}
@@ -588,7 +772,13 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
           <div className="book-view">
             <MarksContext.Provider value={marks}>
               {book.format === "pdf" ? (
-                <PdfReader ref={reader} url={api.fileUrl(book.id)} dark={theme === "dark"} onScroll={measure} onReady={onReady} />
+                <PdfReader
+                  ref={reader}
+                  url={api.fileUrl(book.id)}
+                  dark={theme === "dark"}
+                  onScroll={measure}
+                  onReady={onReady}
+                />
               ) : blocks ? (
                 <HtmlReader ref={reader} blocks={blocks} onScroll={measure} onReady={onReady} />
               ) : (
@@ -596,8 +786,27 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
               )}
             </MarksContext.Provider>
           </div>
-          {selection && !capturing && <SelectionMenu x={selection.x} y={selection.y} side={selection.side} onAction={onAction} noteTitle={workingNote?.title} />}
-          {capturing && <CaptureLayer book={book} root={pane.current} theme={theme} note={workingNote} ensureNote={ensureNote} onNote={chooseNote} onDone={() => setCapturing(false)} say={say} />}
+          {selection && !capturing && (
+            <SelectionMenu
+              x={selection.x}
+              y={selection.y}
+              side={selection.side}
+              onAction={onAction}
+              noteTitle={workingNote?.title}
+            />
+          )}
+          {capturing && (
+            <CaptureLayer
+              book={book}
+              root={pane.current}
+              theme={theme}
+              note={workingNote}
+              ensureNote={ensureNote}
+              onNote={chooseNote}
+              onDone={() => setCapturing(false)}
+              say={say}
+            />
+          )}
         </section>
         <svg className="leader" aria-hidden="true">
           <path ref={leader} />
@@ -613,29 +822,55 @@ export function Reader({ bookId, theme, setTheme }: { bookId: string; theme: "li
           )}
         </div>
       )}
-      {tool?.kind === "cards" && <CardDrafter passage={tool.text} source={tool.source} deck={book.title} onClose={() => setTool(null)} />}
-      {tool?.kind === "explain" && <ExplainBack passage={tool.text} source={tool.source} theme={theme} onClose={() => setTool(null)} />}
-      {tool?.kind === "connect" && <Connector passage={tool.text} source={tool.source} theme={theme} onClose={() => (setTool(null), loadNotes())} />}
+      {tool?.kind === "cards" && (
+        <CardDrafter passage={tool.text} source={tool.source} deck={book.title} onClose={() => setTool(null)} />
+      )}
+      {tool?.kind === "explain" && (
+        <ExplainBack passage={tool.text} source={tool.source} theme={theme} onClose={() => setTool(null)} />
+      )}
+      {tool?.kind === "connect" && (
+        <Connector
+          passage={tool.text}
+          source={tool.source}
+          theme={theme}
+          onClose={() => {
+            setTool(null);
+            loadNotes();
+          }}
+        />
+      )}
       {help && (
         <div className="help-pop" role="dialog" aria-label="Help">
-          <button className="icon-button help-close" onClick={() => setHelp(false)} aria-label="Close help">
+          <button
+            type="button"
+            className="icon-button help-close"
+            onClick={() => setHelp(false)}
+            aria-label="Close help"
+          >
             <X aria-hidden="true" />
           </button>
           <h3>How this works</h3>
-          <p>Read on the right. Select any passage for the menu: an explanation, a definition, an answer or a figure appears in the margin on the left, beside the passage, and is saved with the book in your vault.</p>
+          <p>
+            Read on the right. Select any passage for the menu: an explanation, a definition, an answer or a figure
+            appears in the margin on the left, beside the passage, and is saved with the book in your vault.
+          </p>
           <ul>
             <li>
-              Select, then <kbd>H</kbd> highlight · <kbd>E</kbd> explain · <kbd>V</kbd> visualize · <kbd>A</kbd> ask · <kbd>D</kbd> define · <kbd>N</kbd> add the passage to your note
+              Select, then <kbd>H</kbd> highlight · <kbd>E</kbd> explain · <kbd>V</kbd> visualize · <kbd>A</kbd> ask ·{" "}
+              <kbd>D</kbd> define · <kbd>N</kbd> add the passage to your note
             </li>
             <li>Click a marked passage to open its card; ask follow-ups in the card</li>
             <li>
-              <kbd>C</kbd> capture a figure, formula or table from the page into your note (with a transcription if you like)
+              <kbd>C</kbd> capture a figure, formula or table from the page into your note (with a transcription if you
+              like)
             </li>
             <li>
-              <em>Note</em>: your notes while reading (passages land there). <em>Figures</em>: the chapter’s figures, large. <em>Study</em>: pretest, quiz, concepts
+              <em>Note</em>: your notes while reading (passages land there). <em>Figures</em>: the chapter’s figures,
+              large. <em>Study</em>: pretest, quiz, concepts
             </li>
             <li>
-              <kbd>[</kbd> <kbd>]</kbd> previous / next figure · <kbd>⌘K</kbd> searches everything you’ve read and written
+              <kbd>[</kbd> <kbd>]</kbd> previous / next figure · <kbd>⌘K</kbd> searches everything you’ve read and
+              written
             </li>
           </ul>
         </div>

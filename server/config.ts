@@ -19,7 +19,8 @@ export const WEB_DIST = join(ROOT, "web", "dist");
 export const PORT = Number(process.env.PORT || 8787);
 export const PROD = process.env.NODE_ENV === "production";
 
-const num = (value: string | undefined, fallback: number) => (value && Number.isFinite(Number(value)) ? Number(value) : fallback);
+const num = (value: string | undefined, fallback: number) =>
+  value && Number.isFinite(Number(value)) ? Number(value) : fallback;
 
 /** How the platform drives Codex. Every value can be overridden from the environment. */
 export const CODEX = {
@@ -34,7 +35,10 @@ export const CODEX = {
   fixRounds: num(process.env.CODEX_FIX_ROUNDS, 2),
   critiqueRounds: num(process.env.CODEX_CRITIQUE_ROUNDS, 1),
   /** Models to try when the configured one is at capacity (comma-separated); default: the next ones Codex lists. */
-  fallbackModels: (process.env.CODEX_FALLBACK_MODELS || "").split(",").map((m) => m.trim()).filter(Boolean),
+  fallbackModels: (process.env.CODEX_FALLBACK_MODELS || "")
+    .split(",")
+    .map((m) => m.trim())
+    .filter(Boolean),
   /** Hard stop for a single codex exec call. */
   timeoutMs: num(process.env.CODEX_TIMEOUT_MS, 20 * 60 * 1000),
 };
@@ -61,13 +65,24 @@ export function chromePath(): string | null {
   for (const cache of [join(homedir(), "Library/Caches/ms-playwright"), join(homedir(), ".cache/ms-playwright")]) {
     if (!existsSync(cache)) continue;
     for (const dir of readdirSync(cache).sort().reverse()) {
-      for (const sub of ["chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing", "chrome-mac/Chromium.app/Contents/MacOS/Chromium", "chrome-linux/chrome", "chrome-linux64/chrome"]) candidates.push(join(cache, dir, sub));
+      for (const sub of [
+        "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+        "chrome-mac/Chromium.app/Contents/MacOS/Chromium",
+        "chrome-linux/chrome",
+        "chrome-linux64/chrome",
+      ])
+        candidates.push(join(cache, dir, sub));
     }
   }
   const puppeteer = join(homedir(), ".cache/puppeteer/chrome");
   if (existsSync(puppeteer)) {
     for (const dir of readdirSync(puppeteer).sort().reverse()) {
-      for (const sub of ["chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing", "chrome-mac-x64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing", "chrome-linux64/chrome"]) candidates.push(join(puppeteer, dir, sub));
+      for (const sub of [
+        "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+        "chrome-mac-x64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+        "chrome-linux64/chrome",
+      ])
+        candidates.push(join(puppeteer, dir, sub));
     }
   }
   return candidates.find((path) => existsSync(path)) || null;

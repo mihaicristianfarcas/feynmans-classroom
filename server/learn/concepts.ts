@@ -1,12 +1,13 @@
 /* Concepts: the nodes of the knowledge graph. One vault page each, linked to the passages they
  * come from, to related concepts, and (through cards, notes and explanations) to how well the
  * learner knows them. */
+
+import { basename } from "node:path";
+import { fileNameOf } from "../../shared/links.ts";
 import type { Concept, SourceRef } from "../../shared/vault-types.ts";
 import { locateInBlocks, locateInPages } from "../anchor.ts";
 import { structured } from "../llm.ts";
 import { getBlocks, getBook, getPages } from "../store.ts";
-import { basename } from "node:path";
-import { fileNameOf } from "../../shared/links.ts";
 import { changed, concepts, logActivity, now, slugify } from "../vault/index.ts";
 import { carryLinks } from "../vault/links.ts";
 import { chapterContext, learnerSummary, sourceLine } from "./context.ts";
@@ -15,27 +16,44 @@ import { chapterContext, learnerSummary, sourceLine } from "./context.ts";
 export function findConcept(name: string): Concept | undefined {
   const key = name.trim().toLowerCase();
   const slug = slugify(name);
-  return concepts.list().find((c) => c.id === slug || c.name.toLowerCase() === key || c.aliases.some((a) => a.toLowerCase() === key));
+  return concepts
+    .list()
+    .find((c) => c.id === slug || c.name.toLowerCase() === key || c.aliases.some((a) => a.toLowerCase() === key));
 }
 
 /** Creates a concept, or adds to an existing one (a new source, a summary if it had none, related links). */
-export function upsertConcept(input: { name: string; summary?: string; body?: string; source?: SourceRef; related?: string[]; aliases?: string[] }): Concept {
+export function upsertConcept(input: {
+  name: string;
+  summary?: string;
+  body?: string;
+  source?: SourceRef;
+  related?: string[];
+  aliases?: string[];
+}): Concept {
   const existing = findConcept(input.name);
-  const related = (input.related || []).map((r) => findConcept(r)?.id || slugify(r)).filter((id) => id !== slugify(input.name));
+  const related = (input.related || [])
+    .map((r) => findConcept(r)?.id || slugify(r))
+    .filter((id) => id !== slugify(input.name));
   if (existing) {
     let dirty = false;
     if (!existing.summary && input.summary) {
       existing.summary = input.summary;
       dirty = true;
     }
-    if (input.source && !existing.sources.some((s) => s.bookId === input.source!.bookId && (s.page ?? s.block) === (input.source!.page ?? input.source!.block))) {
+    if (
+      input.source &&
+      !existing.sources.some(
+        (s) => s.bookId === input.source!.bookId && (s.page ?? s.block) === (input.source!.page ?? input.source!.block),
+      )
+    ) {
       existing.sources.push(input.source);
       dirty = true;
     }
-    for (const r of related) if (!existing.related.includes(r)) {
-      existing.related.push(r);
-      dirty = true;
-    }
+    for (const r of related)
+      if (!existing.related.includes(r)) {
+        existing.related.push(r);
+        dirty = true;
+      }
     if (dirty) {
       existing.updated = now();
       concepts.save(existing);
@@ -43,7 +61,17 @@ export function upsertConcept(input: { name: string; summary?: string; body?: st
     }
     return existing;
   }
-  const concept: Concept = { id: slugify(input.name), name: input.name.trim(), aliases: input.aliases || [], summary: input.summary || "", body: input.body || "", related, sources: input.source ? [input.source] : [], created: now(), updated: now() };
+  const concept: Concept = {
+    id: slugify(input.name),
+    name: input.name.trim(),
+    aliases: input.aliases || [],
+    summary: input.summary || "",
+    body: input.body || "",
+    related,
+    sources: input.source ? [input.source] : [],
+    created: now(),
+    updated: now(),
+  };
   concepts.save(concept);
   changed(`concept ${concept.name}`);
   return concept;
@@ -84,8 +112,15 @@ const SCHEMA = {
         properties: {
           name: { type: "string", description: "the concept's usual name, 1–4 words" },
           summary: { type: "string", description: "one or two plain sentences, in the book's terms" },
-          quote: { type: "string", description: "an EXACT quote of 8–16 consecutive words from the text where it is introduced" },
-          related: { type: "array", items: { type: "string" }, description: "names of other concepts (from this list or the known ones) it builds on or contrasts with" },
+          quote: {
+            type: "string",
+            description: "an EXACT quote of 8–16 consecutive words from the text where it is introduced",
+          },
+          related: {
+            type: "array",
+            items: { type: "string" },
+            description: "names of other concepts (from this list or the known ones) it builds on or contrasts with",
+          },
         },
       },
     },
@@ -108,7 +143,12 @@ ${ctx.context}
 </chapter>
 
 Return JSON.`;
-  const result = await structured<{ concepts: { name: string; summary: string; quote: string; related: string[] }[] }>({ prompt, schema: SCHEMA, tier: "fast", effort: "medium" });
+  const result = await structured<{ concepts: { name: string; summary: string; quote: string; related: string[] }[] }>({
+    prompt,
+    schema: SCHEMA,
+    tier: "fast",
+    effort: "medium",
+  });
   const out: Concept[] = [];
   for (const c of result.data.concepts) {
     const source: SourceRef = { bookId, chapterId, quote: c.quote };
@@ -122,6 +162,11 @@ Return JSON.`;
     }
     out.push(upsertConcept({ name: c.name, summary: c.summary, source, related: c.related }));
   }
-  logActivity({ type: "concept", bookId, concepts: out.map((c) => c.id), text: `Mapped ${out.length} concepts in ${ctx.source.chapter}` });
+  logActivity({
+    type: "concept",
+    bookId,
+    concepts: out.map((c) => c.id),
+    text: `Mapped ${out.length} concepts in ${ctx.source.chapter}`,
+  });
   return out;
 }

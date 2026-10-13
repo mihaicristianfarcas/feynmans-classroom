@@ -14,7 +14,9 @@ export function anchorFor(book: Book, chapter: TocEntry, brief: Brief): Demo["an
   const range = chapterRange(chapter);
   if (book.format === "pdf") {
     const pages = getPages(book.id);
-    const hit = locateInPages(pages, brief.anchorQuote, range, brief.page) || locateInPages(pages, brief.anchorQuote, undefined, brief.page);
+    const hit =
+      locateInPages(pages, brief.anchorQuote, range, brief.page) ||
+      locateInPages(pages, brief.anchorQuote, undefined, brief.page);
     if (hit) return { ...hit.loc, quote: brief.anchorQuote, matched: true };
     const page = brief.page >= range.from && brief.page <= range.to ? brief.page : range.from;
     return { page, y: 0.1, quote: brief.anchorQuote, matched: false };
@@ -26,7 +28,7 @@ export function anchorFor(book: Book, chapter: TocEntry, brief: Brief): Demo["an
   return { block, quote: brief.anchorQuote, matched: false };
 }
 
-const position = (loc: Loc) => (loc.page !== undefined ? loc.page + (loc.y ?? 0) : loc.block ?? 0);
+const position = (loc: Loc) => (loc.page !== undefined ? loc.page + (loc.y ?? 0) : (loc.block ?? 0));
 
 /** Fig numbers follow reading order inside each chapter ("Fig 7.2"); computed on read, never stored. */
 export function withFigs(book: Book, demos: Demo[]): Demo[] {
@@ -40,7 +42,7 @@ export function withFigs(book: Book, demos: Demo[]): Demo[] {
   for (const [chapterId, list] of byChapter) {
     const index = book.toc.findIndex((entry) => entry.id === chapterId);
     list.sort((a, b) => position(a.anchor) - position(b.anchor) || a.createdAt.localeCompare(b.createdAt));
-    list.forEach((demo, i) => (demo.fig = `Fig ${index + 1}.${i + 1}`));
+    for (const [i, demo] of list.entries()) demo.fig = `Fig ${index + 1}.${i + 1}`;
   }
   return demos;
 }
@@ -81,7 +83,9 @@ function createDemo(book: Book, chapter: TocEntry, brief: Brief, source: Demo["s
 }
 
 export function enqueueBuild(demo: Demo) {
-  return queue.add({ bookId: demo.bookId, kind: "build", demoId: demo.id, chapterId: demo.chapterId }, (job, signal) => buildDemo(demo.id, demo.bookId, signal));
+  return queue.add({ bookId: demo.bookId, kind: "build", demoId: demo.id, chapterId: demo.chapterId }, (_job, signal) =>
+    buildDemo(demo.id, demo.bookId, signal),
+  );
 }
 
 /** Plans a chapter with Codex, then queues one build per planned demo. */
@@ -91,23 +95,26 @@ export function generateChapter(bookId: string, chapterId: string, options: { co
   const chapter = findChapter(book, chapterId);
   if (!chapter) throw new Error("chapter not found");
   const existing = listDemos(bookId).filter((demo) => demo.chapterId === chapterId);
-  return queue.add({ bookId, kind: "plan", chapterId, message: "Codex is reading the chapter" }, async (job, signal) => {
-    const say = (message: string) => {
-      job.message = message;
-      publish(bookId, { type: "job", data: job });
-    };
-    const text = chapterText(book, chapter, GENERATION.maxChapterChars);
-    const briefs = await planChapter(book, chapter, text, {
-      count: options.count,
-      existing: existing.map((demo) => `${demo.brief.title}: ${demo.brief.idea}`),
-      onActivity: say,
-      signal,
-      log: join(bookDir(bookId), "plan.jsonl"),
-    });
-    if (signal.aborted || !getBook(bookId)) return;
-    say(`planned ${briefs.length} demos`);
-    for (const brief of briefs) enqueueBuild(createDemo(book, chapter, brief, "chapter"));
-  });
+  return queue.add(
+    { bookId, kind: "plan", chapterId, message: "Codex is reading the chapter" },
+    async (job, signal) => {
+      const say = (message: string) => {
+        job.message = message;
+        publish(bookId, { type: "job", data: job });
+      };
+      const text = chapterText(book, chapter, GENERATION.maxChapterChars);
+      const briefs = await planChapter(book, chapter, text, {
+        count: options.count,
+        existing: existing.map((demo) => `${demo.brief.title}: ${demo.brief.idea}`),
+        onActivity: say,
+        signal,
+        log: join(bookDir(bookId), "plan.jsonl"),
+      });
+      if (signal.aborted || !getBook(bookId)) return;
+      say(`planned ${briefs.length} demos`);
+      for (const brief of briefs) enqueueBuild(createDemo(book, chapter, brief, "chapter"));
+    },
+  );
 }
 
 export function regenerate(bookId: string, demoId: string, feedback?: string) {
@@ -115,7 +122,13 @@ export function regenerate(bookId: string, demoId: string, feedback?: string) {
   if (!demo) throw new Error("demo not found");
   if (queue.isBusy(demoId)) throw new Error("this demo is already being built");
   resetWorkspace(demo);
-  Object.assign(demo, { status: "queued", feedback: feedback?.trim() || undefined, threadId: undefined, error: undefined, activity: "waiting for a Codex slot" });
+  Object.assign(demo, {
+    status: "queued",
+    feedback: feedback?.trim() || undefined,
+    threadId: undefined,
+    error: undefined,
+    activity: "waiting for a Codex slot",
+  });
   saveDemo(demo);
   publish(bookId, { type: "demo", data: demo });
   return enqueueBuild(demo);

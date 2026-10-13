@@ -16,16 +16,25 @@ import type { Book, TocEntry } from "../types.ts";
 import { VAULT } from "../vault/index.ts";
 import { chapterFile } from "../vault/library.ts";
 
-const posOf = (l: { page?: number; y?: number; block?: number }) => (l.page !== undefined ? l.page + (l.y ?? 0) : (l.block ?? 0));
+const posOf = (l: { page?: number; y?: number; block?: number }) =>
+  l.page !== undefined ? l.page + (l.y ?? 0) : (l.block ?? 0);
 
-export function chapterAt(book: Book, anchor: Pick<Anchor, "page" | "y" | "block">): { entry: TocEntry; index: number } | null {
+export function chapterAt(
+  book: Book,
+  anchor: Pick<Anchor, "page" | "y" | "block">,
+): { entry: TocEntry; index: number } | null {
   const at = posOf(anchor);
-  for (let i = book.toc.length - 1; i >= 0; i--) if (posOf(book.toc[i].start) <= at + 1e-6) return { entry: book.toc[i], index: i };
+  for (let i = book.toc.length - 1; i >= 0; i--)
+    if (posOf(book.toc[i].start) <= at + 1e-6) return { entry: book.toc[i], index: i };
   return book.toc[0] ? { entry: book.toc[0], index: 0 } : null;
 }
 
 /** The top of the quote on its PDF page (0–1), found in the page's extracted lines. */
-export function locateOnPage(book: Book, page: number, anchor: Pick<Anchor, "quote" | "prefix" | "suffix">): number | undefined {
+export function locateOnPage(
+  book: Book,
+  page: number,
+  anchor: Pick<Anchor, "quote" | "prefix" | "suffix">,
+): number | undefined {
   const lines = getPages(book.id)[page - 1]?.lines;
   if (!lines?.length) return undefined;
   let text = "";
@@ -54,7 +63,12 @@ export function locateInText(book: Book, anchor: Anchor): Anchor["md"] | undefin
     const text = readFileSync(path, "utf8");
     const marker = anchor.page !== undefined ? `[[page ${anchor.page}]]` : `[[block ${anchor.block}]]`;
     const hint = text.indexOf(marker);
-    const m = findQuote(text, anchor.quote, { prefix: anchor.prefix, suffix: anchor.suffix, hint: hint >= 0 ? hint : undefined, markdown: true });
+    const m = findQuote(text, anchor.quote, {
+      prefix: anchor.prefix,
+      suffix: anchor.suffix,
+      hint: hint >= 0 ? hint : undefined,
+      markdown: true,
+    });
     if (m && m.score >= 0.7) return { file, line: lineAt(text, m.start), score: Math.round(m.score * 100) / 100 };
   }
   return undefined;
@@ -71,7 +85,8 @@ export function locateInBlock(book: Book, anchor: Anchor): { start: number; end:
 
 /** Fills in what an anchor is missing (height, chapter text location), cleaning what was sent. */
 export function completeAnchor(book: Book, raw: Anchor): Anchor {
-  const clip = (s: unknown, n: number) => (typeof s === "string" ? s.replace(/\s+/g, " ").trim().slice(0, n) : undefined);
+  const clip = (s: unknown, n: number) =>
+    typeof s === "string" ? s.replace(/\s+/g, " ").trim().slice(0, n) : undefined;
   const anchor: Anchor = {
     quote: clip(raw.quote, 6000) || "",
     prefix: clip(raw.prefix, 64),
@@ -84,10 +99,20 @@ export function completeAnchor(book: Book, raw: Anchor): Anchor {
     anchor.rects = (raw.rects || [])
       .filter((r) => [r.x, r.y, r.w, r.h].every((v) => Number.isFinite(v)) && r.w > 0 && r.h > 0)
       .slice(0, 400)
-      .map((r) => ({ x: clamp01(r.x), y: clamp01(r.y), w: clamp01(r.w), h: clamp01(r.h), ...(r.p !== undefined && r.p !== anchor.page ? { p: Math.round(r.p) } : {}) }));
+      .map((r) => ({
+        x: clamp01(r.x),
+        y: clamp01(r.y),
+        w: clamp01(r.w),
+        h: clamp01(r.h),
+        ...(r.p !== undefined && r.p !== anchor.page ? { p: Math.round(r.p) } : {}),
+      }));
     if (!anchor.rects.length) delete anchor.rects;
     const onPage = anchor.rects?.filter((r) => r.p === undefined);
-    anchor.y = onPage?.length ? Math.min(...onPage.map((r) => r.y)) : Number.isFinite(raw.y) ? clamp01(raw.y!) : locateOnPage(book, anchor.page, anchor);
+    anchor.y = onPage?.length
+      ? Math.min(...onPage.map((r) => r.y))
+      : Number.isFinite(raw.y)
+        ? clamp01(raw.y!)
+        : locateOnPage(book, anchor.page, anchor);
     // a page that's off by one (an agent counting printed pages, a passage that starts on the page before)
     if (anchor.y === undefined && !anchor.rects)
       for (const page of [anchor.page - 1, anchor.page + 1]) {

@@ -26,7 +26,8 @@ Classroom.demo({
     question: "Make dx ten times smaller. What happens to the corner's share of the new area?",
     choices: ["Stays the same", "About ten times smaller", "A hundred times smaller"],
     answer: 1,
-    explain: "The share is dx² ÷ (2x·dx + dx²) ≈ dx/2x, so it shrinks in step with dx, while the corner's own area falls a hundredfold.",
+    explain:
+      "The share is dx² ÷ (2x·dx + dx²) ≈ dx/2x, so it shrinks in step with dx, while the corner's own area falls a hundredfold.",
   },
 
   setup(ctx) {
@@ -40,7 +41,8 @@ Classroom.demo({
     const fig = ctx.part("fig");
 
     function picture(x, dx) {
-      const s = x * U, d = dx * U;
+      const s = x * U,
+        d = dx * U;
       const [ox, oy] = O;
       const out = [];
       // the old square
@@ -51,11 +53,57 @@ Classroom.demo({
       // the corner: the lit part
       out.push(d2.rect(ox + s, oy - s - d, d, d, { tone: "hi", fill: "solid", lit: true }));
       // labels: x under and beside the square, dx beside the strips
-      out.push(d2.line([[ox, oy + 12], [ox + s, oy + 12]], { tone: "lo" }));
-      out.push(d2.line([[ox, oy + 8], [ox, oy + 16]], { tone: "lo" }), d2.line([[ox + s, oy + 8], [ox + s, oy + 16]], { tone: "lo" }));
+      out.push(
+        d2.line(
+          [
+            [ox, oy + 12],
+            [ox + s, oy + 12],
+          ],
+          { tone: "lo" },
+        ),
+      );
+      out.push(
+        d2.line(
+          [
+            [ox, oy + 8],
+            [ox, oy + 16],
+          ],
+          { tone: "lo" },
+        ),
+        d2.line(
+          [
+            [ox + s, oy + 8],
+            [ox + s, oy + 16],
+          ],
+          { tone: "lo" },
+        ),
+      );
       out.push(d2.text(ox + s / 2, oy + 28, "x", { italic: true, tone: "hi", size: 14, anchor: "middle" }));
-      out.push(d2.line([[ox - 12, oy], [ox - 12, oy - s]], { tone: "lo" }));
-      out.push(d2.line([[ox - 16, oy], [ox - 8, oy]], { tone: "lo" }), d2.line([[ox - 16, oy - s], [ox - 8, oy - s]], { tone: "lo" }));
+      out.push(
+        d2.line(
+          [
+            [ox - 12, oy],
+            [ox - 12, oy - s],
+          ],
+          { tone: "lo" },
+        ),
+      );
+      out.push(
+        d2.line(
+          [
+            [ox - 16, oy],
+            [ox - 8, oy],
+          ],
+          { tone: "lo" },
+        ),
+        d2.line(
+          [
+            [ox - 16, oy - s],
+            [ox - 8, oy - s],
+          ],
+          { tone: "lo" },
+        ),
+      );
       out.push(d2.text(ox - 22, oy - s / 2 + 5, "x", { italic: true, tone: "hi", size: 14, anchor: "end" }));
       if (d > 9) {
         out.push(d2.text(ox + s + d / 2, oy + 28, "dx", { italic: true, tone: "mid", size: 13, anchor: "middle" }));
@@ -63,7 +111,9 @@ Classroom.demo({
       }
       out.push(d2.text(ox + s / 2, oy - s / 2 + 6, "x²", { italic: true, tone: "hi", size: 18, anchor: "middle" }));
       if (d > 14) {
-        out.push(d2.text(ox + s + d / 2, oy - s / 2 + 5, "x·dx", { italic: true, tone: "mid", size: 12, anchor: "middle" }));
+        out.push(
+          d2.text(ox + s + d / 2, oy - s / 2 + 5, "x·dx", { italic: true, tone: "mid", size: 12, anchor: "middle" }),
+        );
       }
       return out.join("");
     }
@@ -82,8 +132,10 @@ Classroom.demo({
 
         fig.innerHTML = picture(shown.x, shown.dx);
 
-        const x = shown.x, dx = shown.dx;
-        const strips = 2 * x * dx, corner = dx * dx;
+        const x = shown.x,
+          dx = shown.dx;
+        const strips = 2 * x * dx,
+          corner = dx * dx;
         const share = corner / (strips + corner);
         ctx.stat("strips", strips);
         ctx.stat("corner", corner, 4);

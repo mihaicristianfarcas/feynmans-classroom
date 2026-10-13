@@ -2,7 +2,17 @@ import { CanvasLayer, CustomLayer, Page, Pages, Root, TextLayer, usePdf, usePdfJ
 import { GlobalWorkerOptions } from "pdfjs-dist/legacy/build/pdf.mjs";
 import workerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import "pdfjs-dist/web/pdf_viewer.css";
-import { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
+import {
+  createContext,
+  forwardRef,
+  useCallback,
+  useContext,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { blockRange, pageEls, pdfRects } from "./anchoring";
 import type { Anchor, Annotation, Block, Loc } from "./api";
 
@@ -47,13 +57,21 @@ interface PdfProps {
 
 export const PdfReader = forwardRef<ReaderHandle, PdfProps>(function PdfReader({ url, dark, onScroll, onReady }, ref) {
   return (
-    <Root source={url} className="pdf-root" colorScheme={dark ? "dark" : "light"} loader={<div className="reader-loading">Opening the book…</div>}>
+    <Root
+      source={url}
+      className="pdf-root"
+      colorScheme={dark ? "dark" : "light"}
+      loader={<div className="reader-loading">Opening the book…</div>}
+    >
       <PdfInner ref={ref} onScroll={onScroll} onReady={onReady} />
     </Root>
   );
 });
 
-const PdfInner = forwardRef<ReaderHandle, Omit<PdfProps, "url" | "dark">>(function PdfInner({ onScroll, onReady }, ref) {
+const PdfInner = forwardRef<ReaderHandle, Omit<PdfProps, "url" | "dark">>(function PdfInner(
+  { onScroll, onReady },
+  ref,
+) {
   const viewportRef = usePdf((state) => state.viewportRef);
   const doc = usePdf((state) => state.pdfDocumentProxy);
   const viewports = usePdf((state) => state.viewports);
@@ -61,7 +79,11 @@ const PdfInner = forwardRef<ReaderHandle, Omit<PdfProps, "url" | "dark">>(functi
   const { jumpToPage } = usePdfJump();
   const pending = useRef<{ loc: Loc; clientY: number; tries: number } | null>(null);
 
-  const pageEl = useCallback((page: number) => viewportRef.current?.querySelector<HTMLElement>(`[data-cr-page="${page}"]`)?.parentElement || null, [viewportRef]);
+  const pageEl = useCallback(
+    (page: number) =>
+      viewportRef.current?.querySelector<HTMLElement>(`[data-cr-page="${page}"]`)?.parentElement || null,
+    [viewportRef],
+  );
 
   const settleJump = useCallback(() => {
     const job = pending.current;
@@ -128,7 +150,10 @@ const PdfInner = forwardRef<ReaderHandle, Omit<PdfProps, "url" | "dark">>(functi
         const scroller = viewportRef.current;
         if (el && scroller) {
           const rect = el.getBoundingClientRect();
-          scroller.scrollBy({ top: rect.top + (loc.y ?? 0) * rect.height - clientY, behavior: smooth ? "smooth" : "auto" });
+          scroller.scrollBy({
+            top: rect.top + (loc.y ?? 0) * rect.height - clientY,
+            behavior: smooth ? "smooth" : "auto",
+          });
           return;
         }
         pending.current = { loc, clientY, tries: 0 };
@@ -193,12 +218,13 @@ function PageMarks({ page }: { page: number }) {
   const here = annotations.filter((a) => a.anchor.page === page || a.anchor.rects?.some((r) => r.p === page));
   // an annotation with only a quote is found in the text layer once it has rendered
   const missing = here.some((a) => !a.anchor.rects?.length);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: polls again for each page
   useEffect(() => {
     if (!missing) return;
     let tries = 0;
     const timer = setInterval(() => {
       const layer = ref.current?.parentElement?.querySelector(".textLayer");
-      if ((layer && layer.childNodes.length) || ++tries > 40) {
+      if (layer?.childNodes.length || ++tries > 40) {
         clearInterval(timer);
         setTick((t) => t + 1);
       }
@@ -214,7 +240,18 @@ function PageMarks({ page }: { page: number }) {
         const rects = a.anchor.rects?.length ? a.anchor.rects : pageRef ? pdfRects(a.anchor, a.id, pageRef) : null;
         return (rects || [])
           .filter((r) => (r.p ?? a.anchor.page) === page)
-          .map((r, i) => <span key={`${a.id}-${i}`} className="mark" data-style={markStyle(a)} data-kind={a.kind} data-color={a.color || undefined} data-state={a.id === focused ? "focused" : a.id === hovered ? "hovered" : undefined} style={{ left: `${r.x * 100}%`, top: `${r.y * 100}%`, width: `${r.w * 100}%`, height: `${r.h * 100}%` }} />);
+          .map((r, i) => (
+            <span
+              // biome-ignore lint/suspicious/noArrayIndexKey: a passage's boxes are fixed for its anchor
+              key={`${a.id}-${i}`}
+              className="mark"
+              data-style={markStyle(a)}
+              data-kind={a.kind}
+              data-color={a.color || undefined}
+              data-state={a.id === focused ? "focused" : a.id === hovered ? "hovered" : undefined}
+              style={{ left: `${r.x * 100}%`, top: `${r.y * 100}%`, width: `${r.w * 100}%`, height: `${r.h * 100}%` }}
+            />
+          ));
       })}
     </div>
   );
@@ -232,6 +269,7 @@ export const HtmlReader = forwardRef<ReaderHandle, HtmlProps>(function HtmlReade
   const scrollRef = useRef<HTMLDivElement>(null);
   const blockEl = (id: number) => scrollRef.current?.querySelector<HTMLElement>(`[data-block="${id}"]`) || null;
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the handle reads the DOM through refs; it only changes with the book's blocks
   useImperativeHandle(
     ref,
     () => ({
@@ -272,7 +310,10 @@ export const HtmlReader = forwardRef<ReaderHandle, HtmlProps>(function HtmlReade
         const el = blockEl(loc.block ?? 0);
         if (!el || !scrollRef.current) return;
         const rect = el.getBoundingClientRect();
-        scrollRef.current.scrollBy({ top: rect.top + (loc.y ?? 0) * rect.height - clientY, behavior: smooth ? "smooth" : "auto" });
+        scrollRef.current.scrollBy({
+          top: rect.top + (loc.y ?? 0) * rect.height - clientY,
+          behavior: smooth ? "smooth" : "auto",
+        });
       },
     }),
     [blocks],
@@ -301,6 +342,7 @@ export const HtmlReader = forwardRef<ReaderHandle, HtmlProps>(function HtmlReade
 
   // highlights through the CSS Custom Highlight API: no change to the book's DOM
   const { annotations, focused } = useContext(MarksContext);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the marks are drawn again when the book's blocks render
   useLayoutEffect(() => {
     const registry = (CSS as unknown as { highlights?: Map<string, unknown> }).highlights;
     const HighlightCtor = (window as unknown as { Highlight?: new (...ranges: Range[]) => unknown }).Highlight;
@@ -310,7 +352,8 @@ export const HtmlReader = forwardRef<ReaderHandle, HtmlProps>(function HtmlReade
     for (const a of annotations) {
       const range = blockRange(a.anchor, root);
       if (!range) continue;
-      const name = a.id === focused ? "anno-focused" : markStyle(a) === "fill" ? `anno-${a.color || "yellow"}` : "anno-line";
+      const name =
+        a.id === focused ? "anno-focused" : markStyle(a) === "fill" ? `anno-${a.color || "yellow"}` : "anno-line";
       if (!groups.has(name)) groups.set(name, []);
       groups.get(name)!.push(range);
     }
@@ -320,17 +363,47 @@ export const HtmlReader = forwardRef<ReaderHandle, HtmlProps>(function HtmlReade
       if (ranges?.length) registry.set(name, new HighlightCtor(...ranges));
       else registry.delete(name);
     }
-    return () => names.forEach((n) => registry.delete(n));
+    return () => {
+      for (const n of names) registry.delete(n);
+    };
   }, [annotations, focused, blocks]);
 
   return (
     <div className="html-reader" ref={scrollRef}>
       <article className="html-book">
         {blocks.map((block) => {
-          const Tag = (["h1", "h2", "h3", "h4", "h5", "h6", "p", "li", "blockquote", "pre", "figure", "table", "dt", "dd", "hr"].includes(block.tag) ? block.tag : "p") as "p";
+          const Tag = (
+            [
+              "h1",
+              "h2",
+              "h3",
+              "h4",
+              "h5",
+              "h6",
+              "p",
+              "li",
+              "blockquote",
+              "pre",
+              "figure",
+              "table",
+              "dt",
+              "dd",
+              "hr",
+            ].includes(block.tag)
+              ? block.tag
+              : "p"
+          ) as "p";
           if (block.tag === "hr") return <hr key={block.id} data-block={block.id} />;
           // block.html is sanitized on the server (allow-listed inline tags, no attributes but img src/alt)
-          return <Tag key={block.id} data-block={block.id} className={`b-${block.tag}`} dangerouslySetInnerHTML={{ __html: block.html }} />;
+          return (
+            <Tag
+              key={block.id}
+              data-block={block.id}
+              className={`b-${block.tag}`}
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: block HTML is sanitized at ingest (server/ingest/html.ts)
+              dangerouslySetInnerHTML={{ __html: block.html }}
+            />
+          );
         })}
       </article>
     </div>

@@ -3,12 +3,12 @@
  * a hand-coded demo takes, and the result always lands in the house frame and style. */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { EXAMPLES } from "../../shared/scene/examples.ts";
+import { normalize, type Scene, type SceneKind } from "../../shared/scene/index.ts";
+import { coerceToSchema, KIND_SCHEMAS, sceneSchema } from "../../shared/scene/schema.ts";
+import { validateScene } from "../../shared/scene/validate.ts";
 import { ROOT } from "../config.ts";
 import { structured } from "../llm.ts";
-import { EXAMPLES } from "../../shared/scene/examples.ts";
-import { coerceToSchema, KIND_SCHEMAS, sceneSchema } from "../../shared/scene/schema.ts";
-import { normalize, type Scene, type SceneKind } from "../../shared/scene/index.ts";
-import { validateScene } from "../../shared/scene/validate.ts";
 
 const DIR = join(ROOT, "server", "scene");
 let guideCache: { guide: string; kinds: Record<string, string> } | null = null;
@@ -23,11 +23,22 @@ function guides() {
 }
 
 /** The reference figures shown for each kind (compact JSON, in the schema's exact shape). */
-const EXAMPLE_FOR: Record<SceneKind, string[]> = { plot: ["tangent", "market"], sequence: ["twoPhaseCommit"], graph: ["raft", "replication"], object3d: ["engine"], diagram: ["pendulum", "gas"] };
+const EXAMPLE_FOR: Record<SceneKind, string[]> = {
+  plot: ["tangent", "market"],
+  sequence: ["twoPhaseCommit"],
+  graph: ["raft", "replication"],
+  object3d: ["engine"],
+  diagram: ["pendulum", "gas"],
+};
 function examplesFor(kind: SceneKind | "auto"): string {
   const kinds: SceneKind[] = kind === "auto" ? ["plot", "sequence", "graph", "object3d", "diagram"] : [kind];
   const names = kinds.flatMap((k) => (kind === "auto" ? EXAMPLE_FOR[k].slice(0, 1) : EXAMPLE_FOR[k]));
-  return names.map((name) => `### Reference: ${name}\n${JSON.stringify(coerceToSchema(EXAMPLES[name], KIND_SCHEMAS[EXAMPLES[name].kind as SceneKind]))}`).join("\n\n");
+  return names
+    .map(
+      (name) =>
+        `### Reference: ${name}\n${JSON.stringify(coerceToSchema(EXAMPLES[name], KIND_SCHEMAS[EXAMPLES[name].kind as SceneKind]))}`,
+    )
+    .join("\n\n");
 }
 
 export interface SceneRequest {
@@ -102,11 +113,21 @@ ${JSON.stringify(raw)}
 Return JSON: {"scene": { …the corrected figure… }}.`;
 }
 
-export async function generateScene(req: SceneRequest, opts: { signal?: AbortSignal; onActivity?: (text: string) => void; log?: string } = {}): Promise<SceneResult> {
+export async function generateScene(
+  req: SceneRequest,
+  opts: { signal?: AbortSignal; onActivity?: (text: string) => void; log?: string } = {},
+): Promise<SceneResult> {
   const started = Date.now();
   const kind = req.kind || "auto";
   opts.onActivity?.("drawing the figure");
-  const first = await structured<{ scene: unknown }>({ prompt: prompt(req, kind), schema: sceneSchema(kind), tier: req.tier || "fast", signal: opts.signal, onActivity: opts.onActivity, log: opts.log });
+  const first = await structured<{ scene: unknown }>({
+    prompt: prompt(req, kind),
+    schema: sceneSchema(kind),
+    tier: req.tier || "fast",
+    signal: opts.signal,
+    onActivity: opts.onActivity,
+    log: opts.log,
+  });
   let raw = first.data?.scene;
   let check = validateScene(raw);
   let attempts = 1;
@@ -114,7 +135,14 @@ export async function generateScene(req: SceneRequest, opts: { signal?: AbortSig
   for (let round = 0; round < 2 && !check.ok; round++) {
     opts.onActivity?.(`fixing ${check.errors.length} problem${check.errors.length === 1 ? "" : "s"}`);
     const k = (check.scene?.kind || (raw as { kind?: SceneKind })?.kind || kind) as SceneKind | "auto";
-    const next = await structured<{ scene: unknown }>({ prompt: repairPrompt(raw, check.errors, check.warnings), schema: sceneSchema(k), tier: req.tier || "fast", signal: opts.signal, onActivity: opts.onActivity, log: opts.log });
+    const next = await structured<{ scene: unknown }>({
+      prompt: repairPrompt(raw, check.errors, check.warnings),
+      schema: sceneSchema(k),
+      tier: req.tier || "fast",
+      signal: opts.signal,
+      onActivity: opts.onActivity,
+      log: opts.log,
+    });
     attempts++;
     const retry = validateScene(next.data?.scene);
     if (retry.ok || retry.errors.length <= check.errors.length) {
@@ -122,6 +150,14 @@ export async function generateScene(req: SceneRequest, opts: { signal?: AbortSig
       check = retry;
     }
   }
-  if (!check.ok || !check.scene) throw new Error(`the figure did not pass its checks: ${check.errors.slice(0, 3).join("; ")}`);
-  return { scene: normalize(raw), warnings: check.warnings, ms: Date.now() - started, attempts, provider: first.provider, model: first.model };
+  if (!check.ok || !check.scene)
+    throw new Error(`the figure did not pass its checks: ${check.errors.slice(0, 3).join("; ")}`);
+  return {
+    scene: normalize(raw),
+    warnings: check.warnings,
+    ms: Date.now() - started,
+    attempts,
+    provider: first.provider,
+    model: first.model,
+  };
 }

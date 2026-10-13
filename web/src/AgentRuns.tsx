@@ -2,7 +2,7 @@
  * changes land only after the checks (and your OK, when it deletes files or rewrites your notes), and
  * every run can be undone. */
 import { useEffect, useState } from "react";
-import { learn, type AgentRun } from "./api";
+import { type AgentRun, learn } from "./api";
 import { Markdown } from "./Markdown";
 import { Spinner, timeAgo } from "./Shell";
 
@@ -13,7 +13,15 @@ const EXAMPLES = [
   "Add [[links]] to concepts that my notes mention but don't link",
 ];
 
-const STATUS: Record<AgentRun["status"], string> = { running: "Working", review: "Waiting for your OK", merged: "Done · in your vault", discarded: "Discarded", failed: "Failed", undone: "Undone", done: "Done · nothing changed" };
+const STATUS: Record<AgentRun["status"], string> = {
+  running: "Working",
+  review: "Waiting for your OK",
+  merged: "Done · in your vault",
+  discarded: "Discarded",
+  failed: "Failed",
+  undone: "Undone",
+  done: "Done · nothing changed",
+};
 
 export function AgentRuns({ theme }: { theme: "light" | "dark" }) {
   const [task, setTask] = useState("");
@@ -25,7 +33,9 @@ export function AgentRuns({ theme }: { theme: "light" | "dark" }) {
     const source = new EventSource("/api/events");
     source.addEventListener("agent", (e) => {
       const run = JSON.parse((e as MessageEvent).data) as AgentRun;
-      setRuns((list) => [run, ...(list || []).filter((r) => r.id !== run.id)].sort((a, b) => b.started.localeCompare(a.started)));
+      setRuns((list) =>
+        [run, ...(list || []).filter((r) => r.id !== run.id)].sort((a, b) => b.started.localeCompare(a.started)),
+      );
     });
     return () => source.close();
   }, []);
@@ -54,9 +64,18 @@ export function AgentRuns({ theme }: { theme: "light" | "dark" }) {
           }
         }}
       >
-        <textarea rows={3} value={task} onChange={(e) => setTask(e.target.value)} placeholder="What should the agent do in your vault?" disabled={busy} />
+        <textarea
+          rows={3}
+          value={task}
+          onChange={(e) => setTask(e.target.value)}
+          placeholder="What should the agent do in your vault?"
+          disabled={busy}
+        />
         <div className="row gap">
-          <span className="fine">It works on a copy of your vault with its own shell (rg, sed, …), can't reach the network or anything outside the vault, and you can undo every run.</span>
+          <span className="fine">
+            It works on a copy of your vault with its own shell (rg, sed, …), can't reach the network or anything
+            outside the vault, and you can undo every run.
+          </span>
           <span className="spacer" />
           <button className="button primary" type="submit" disabled={busy || task.trim().length < 8}>
             {busy ? "Working…" : "Start"}
@@ -88,22 +107,29 @@ export function AgentRuns({ theme }: { theme: "light" | "dark" }) {
               <span className="spacer" />
               {run.status === "review" && (
                 <>
-                  <button className="button primary" onClick={() => act(run, "approve")}>
+                  <button type="button" className="button primary" onClick={() => act(run, "approve")}>
                     Apply
                   </button>
-                  <button className="button" onClick={() => act(run, "discard")}>
+                  <button type="button" className="button" onClick={() => act(run, "discard")}>
                     Discard
                   </button>
                 </>
               )}
               {run.status === "merged" && (
-                <button className="button" onClick={() => act(run, "undo")} title="Revert this run's commit">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => act(run, "undo")}
+                  title="Revert this run's commit"
+                >
                   Undo
                 </button>
               )}
             </header>
             <p className="run-task">{run.task}</p>
-            {run.status === "running" && <Spinner label={run.activity || "Working"} since={new Date(run.started).getTime()} />}
+            {run.status === "running" && (
+              <Spinner label={run.activity || "Working"} since={new Date(run.started).getTime()} />
+            )}
             {run.review && (
               <ul className="run-review">
                 {run.review.map((r) => (
@@ -116,17 +142,26 @@ export function AgentRuns({ theme }: { theme: "light" | "dark" }) {
             {run.files && run.files.length > 0 && (
               <details
                 onToggle={(e) => {
-                  if ((e.target as HTMLDetailsElement).open && diffs[run.id] === undefined) learn.agentDiff(run.id).then((d) => setDiffs((m) => ({ ...m, [run.id]: d.diff })), () => {});
+                  if ((e.target as HTMLDetailsElement).open && diffs[run.id] === undefined)
+                    learn.agentDiff(run.id).then(
+                      (d) => setDiffs((m) => ({ ...m, [run.id]: d.diff })),
+                      () => {},
+                    );
                 }}
               >
                 <summary className="fine">
-                  {run.files.length} file{run.files.length === 1 ? "" : "s"}: {run.files.map((f) => `${f.change} ${f.path.split("/").pop()}`).join(", ")}
+                  {run.files.length} file{run.files.length === 1 ? "" : "s"}:{" "}
+                  {run.files.map((f) => `${f.change} ${f.path.split("/").pop()}`).join(", ")}
                 </summary>
                 <ul className="run-files">
                   {run.files.map((f) => (
                     <li key={f.path}>
                       <code>{f.change}</code>{" "}
-                      {f.change !== "D" && f.path.endsWith(".md") ? <a href={`#/open?target=${encodeURIComponent(f.path.replace(/\.md$/, ""))}`}>{f.path}</a> : f.path}
+                      {f.change !== "D" && f.path.endsWith(".md") ? (
+                        <a href={`#/open?target=${encodeURIComponent(f.path.replace(/\.md$/, ""))}`}>{f.path}</a>
+                      ) : (
+                        f.path
+                      )}
                     </li>
                   ))}
                 </ul>

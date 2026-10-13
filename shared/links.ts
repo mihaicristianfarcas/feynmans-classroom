@@ -22,7 +22,7 @@ export interface WikiLink {
   line: number;
 }
 
-const LINK = /(!?)\[\[([^\[\]\n|#]*)(?:#([^\[\]\n|]*))?(?:\|([^\[\]\n]*))?\]\]/g;
+const LINK = /(!?)\[\[([^[\]\n|#]*)(?:#([^[\]\n|]*))?(?:\|([^[\]\n]*))?\]\]/g;
 
 /** Character ranges of fenced code blocks and inline code, which never hold links. */
 export function codeRanges(text: string): [number, number][] {
@@ -51,7 +51,15 @@ export function parseWikiLinks(text: string): WikiLink[] {
     if (!target && !m[3]) continue;
     for (let i = scanned; i < at; i++) if (text.charCodeAt(i) === 10) line++;
     scanned = at;
-    out.push({ target, sub: m[3]?.trim() || undefined, alias: m[4]?.trim() || undefined, embed: m[1] === "!", start: at, end: at + m[0].length, line });
+    out.push({
+      target,
+      sub: m[3]?.trim() || undefined,
+      alias: m[4]?.trim() || undefined,
+      embed: m[1] === "!",
+      start: at,
+      end: at + m[0].length,
+      line,
+    });
   }
   return out;
 }
@@ -99,6 +107,7 @@ export function rewriteLinks(text: string, rename: (target: string, link: WikiLi
 /** A name that is safe as a file name everywhere and still reads like the title. */
 export function fileNameOf(title: string, max = 120): string {
   const clean = title
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are not allowed in file names
     .replace(/[\\/:*?"<>|#^[\]{}\u0000-\u001f]/g, " ")
     .replace(/\s+/g, " ")
     .replace(/^[.\s]+|[.\s]+$/g, "")
@@ -115,9 +124,4 @@ export function pageOf(sub?: string): number | undefined {
 
 /** The key a link target is matched by: no extension, case and spacing folded. */
 export const linkKey = (target: string) =>
-  target
-    .replace(/\\/g, "/")
-    .replace(/\.md$/i, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
+  target.replace(/\\/g, "/").replace(/\.md$/i, "").replace(/\s+/g, " ").trim().toLowerCase();

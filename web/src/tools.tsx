@@ -1,19 +1,34 @@
 /* Study tools that open from a passage, a concept or a note: make cards, explain it back, connect
  * it to the world, draw a figure. Each one saves into the vault. */
 import { Shapes, X } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { learn, type Connection, type DraftCard, type ExplainFeedback, type SavedFigure, type SourceRef } from "./api";
+import { type Connection, type DraftCard, type ExplainFeedback, learn, type SavedFigure, type SourceRef } from "./api";
 import { Markdown } from "./Markdown";
-import { SceneView } from "./scene/SceneView";
 import { Spinner } from "./Shell";
+import { SceneView } from "./scene/SceneView";
 
-export function Modal({ title, eyebrow, onClose, children, wide }: { title: string; eyebrow?: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+export function Modal({
+  title,
+  eyebrow,
+  onClose,
+  children,
+  wide,
+}: {
+  title: string;
+  eyebrow?: string;
+  onClose: () => void;
+  children: ReactNode;
+  wide?: boolean;
+}) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
-    (box.current?.querySelector<HTMLElement>(".modal-body textarea, .modal-body input:not([type=checkbox])") || box.current?.querySelector<HTMLElement>("button"))?.focus();
+    (
+      box.current?.querySelector<HTMLElement>(".modal-body textarea, .modal-body input:not([type=checkbox])") ||
+      box.current?.querySelector<HTMLElement>("button")
+    )?.focus();
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   // in a portal: a page's own transforms (its entrance animation) must not become the backdrop's frame
@@ -25,7 +40,7 @@ export function Modal({ title, eyebrow, onClose, children, wide }: { title: stri
             {eyebrow && <div className="eyebrow">{eyebrow}</div>}
             <h2 className="modal-title">{title}</h2>
           </div>
-          <button className="icon-button" onClick={onClose} aria-label="Close">
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
             <X aria-hidden="true" />
           </button>
         </header>
@@ -43,7 +58,17 @@ function Passage({ text }: { text?: string }) {
 
 /* ---------------- cards ---------------- */
 
-export function CardDrafter({ passage, source, deck, onClose }: { passage: string; source?: SourceRef; deck?: string; onClose: () => void }) {
+export function CardDrafter({
+  passage,
+  source,
+  deck,
+  onClose,
+}: {
+  passage: string;
+  source?: SourceRef;
+  deck?: string;
+  onClose: () => void;
+}) {
   const [drafts, setDrafts] = useState<(DraftCard & { keep: boolean })[] | null>(null);
   const [concepts, setConcepts] = useState<{ name: string; summary: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +84,8 @@ export function CardDrafter({ passage, source, deck, onClose }: { passage: strin
       (e) => setError(e.message),
     );
   }, [passage, source]);
-  const edit = (i: number, patch: Partial<DraftCard & { keep: boolean }>) => setDrafts((list) => list!.map((d, k) => (k === i ? { ...d, ...patch } : d)));
+  const edit = (i: number, patch: Partial<DraftCard & { keep: boolean }>) =>
+    setDrafts((list) => list!.map((d, k) => (k === i ? { ...d, ...patch } : d)));
   return (
     <Modal title="Flashcards from this passage" eyebrow="Retrieval practice" onClose={onClose} wide>
       <Passage text={passage} />
@@ -70,23 +96,40 @@ export function CardDrafter({ passage, source, deck, onClose }: { passage: strin
           <p>
             Saved {saved} card{saved === 1 ? "" : "s"}. They'll come back in Review just before you'd forget them.
           </p>
-          <button className="button primary" onClick={onClose}>
+          <button type="button" className="button primary" onClick={onClose}>
             Done
           </button>
         </div>
       ) : (
         drafts && (
           <>
-            <p className="fine">Keep the ones worth remembering, and edit them into your own words: it helps them stick.</p>
+            <p className="fine">
+              Keep the ones worth remembering, and edit them into your own words: it helps them stick.
+            </p>
             <ul className="drafts">
               {drafts.map((d, i) => (
-                <li key={i} className="draft" data-off={!d.keep || undefined}>
+                <li
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a read-only list, replaced whole when it changes
+                  key={i}
+                  className="draft"
+                  data-off={!d.keep || undefined}
+                >
                   <label className="check">
                     <input type="checkbox" checked={d.keep} onChange={(e) => edit(i, { keep: e.target.checked })} />
                   </label>
                   <div className="draft-body">
-                    <textarea rows={2} value={d.front} onChange={(e) => edit(i, { front: e.target.value })} aria-label="Front" />
-                    <textarea rows={2} value={d.back} onChange={(e) => edit(i, { back: e.target.value })} aria-label="Back" />
+                    <textarea
+                      rows={2}
+                      value={d.front}
+                      onChange={(e) => edit(i, { front: e.target.value })}
+                      aria-label="Front"
+                    />
+                    <textarea
+                      rows={2}
+                      value={d.back}
+                      onChange={(e) => edit(i, { back: e.target.value })}
+                      aria-label="Back"
+                    />
                     <span className="fine">
                       {d.kind === "cloze" ? "cloze · " : ""}
                       {d.concept}
@@ -97,6 +140,7 @@ export function CardDrafter({ passage, source, deck, onClose }: { passage: strin
             </ul>
             <div className="form-actions">
               <button
+                type="button"
                 className="button primary"
                 disabled={saving || !drafts.some((d) => d.keep)}
                 onClick={async () => {
@@ -115,7 +159,7 @@ export function CardDrafter({ passage, source, deck, onClose }: { passage: strin
               >
                 Save {drafts.filter((d) => d.keep).length} cards
               </button>
-              <button className="button" onClick={onClose}>
+              <button type="button" className="button" onClick={onClose}>
                 Cancel
               </button>
             </div>
@@ -128,7 +172,19 @@ export function CardDrafter({ passage, source, deck, onClose }: { passage: strin
 
 /* ---------------- explain it back ---------------- */
 
-export function ExplainBack({ concept: initial, passage, source, onClose, theme }: { concept?: string; passage?: string; source?: SourceRef; onClose: () => void; theme: "light" | "dark" }) {
+export function ExplainBack({
+  concept: initial,
+  passage,
+  source,
+  onClose,
+  theme,
+}: {
+  concept?: string;
+  passage?: string;
+  source?: SourceRef;
+  onClose: () => void;
+  theme: "light" | "dark";
+}) {
   const [concept, setConcept] = useState(initial || "");
   const [text, setText] = useState("");
   const [feedback, setFeedback] = useState<ExplainFeedback | null>(null);
@@ -147,10 +203,18 @@ export function ExplainBack({ concept: initial, passage, source, onClose, theme 
     }
   };
   return (
-    <Modal title={concept ? `Explain “${concept}”` : "Explain it in your own words"} eyebrow="The Feynman technique" onClose={onClose} wide>
+    <Modal
+      title={concept ? `Explain “${concept}”` : "Explain it in your own words"}
+      eyebrow="The Feynman technique"
+      onClose={onClose}
+      wide
+    >
       {!feedback ? (
         <>
-          <p className="fine">Explain it as if to a smart friend who has never heard of it: plain words, no jargon you can't unpack. Where you get stuck is exactly what you don't understand yet.</p>
+          <p className="fine">
+            Explain it as if to a smart friend who has never heard of it: plain words, no jargon you can't unpack. Where
+            you get stuck is exactly what you don't understand yet.
+          </p>
           {!initial && (
             <label className="field">
               <span>What are you explaining?</span>
@@ -158,10 +222,21 @@ export function ExplainBack({ concept: initial, passage, source, onClose, theme 
             </label>
           )}
           <Passage text={passage} />
-          <textarea className="explain-box" rows={8} value={text} onChange={(e) => setText(e.target.value)} placeholder="In my own words…" />
+          <textarea
+            className="explain-box"
+            rows={8}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="In my own words…"
+          />
           {error && <p className="form-error">{error}</p>}
           <div className="form-actions">
-            <button className="button primary" disabled={!!busy || !concept.trim() || text.trim().split(/\s+/).length < 8} onClick={submit}>
+            <button
+              type="button"
+              className="button primary"
+              disabled={!!busy || !concept.trim() || text.trim().split(/\s+/).length < 8}
+              onClick={submit}
+            >
               {busy ? <Spinner label="Reading your explanation" since={busy} /> : "Check my understanding"}
             </button>
           </div>
@@ -187,16 +262,28 @@ export function ExplainBack({ concept: initial, passage, source, onClose, theme 
           {feedback.quote && <blockquote className="quote">Reread: “{feedback.quote}”</blockquote>}
           <div className="form-actions">
             <button
+              type="button"
               className="button primary"
               disabled={saved}
               onClick={async () => {
-                await learn.saveExplanation({ concept, explanation: text, score: feedback.score, feedback: [feedback.verdict, ...feedback.gaps.map((g) => `- ${g}`), `Follow-up: ${feedback.followUp}`].join("\n"), source });
+                await learn.saveExplanation({
+                  concept,
+                  explanation: text,
+                  score: feedback.score,
+                  feedback: [
+                    feedback.verdict,
+                    ...feedback.gaps.map((g) => `- ${g}`),
+                    `Follow-up: ${feedback.followUp}`,
+                  ].join("\n"),
+                  source,
+                });
                 setSaved(true);
               }}
             >
               {saved ? "Saved to your brain" : "Save to my brain"}
             </button>
             <button
+              type="button"
               className="button"
               onClick={() => {
                 setFeedback(null);
@@ -219,7 +306,12 @@ function FeedbackList({ title, items }: { title: string; items: string[] }) {
       <span className="eyebrow">{title}</span>
       <ul>
         {items.map((x, i) => (
-          <li key={i}>{x}</li>
+          <li
+            // biome-ignore lint/suspicious/noArrayIndexKey: a read-only list, replaced whole when it changes
+            key={i}
+          >
+            {x}
+          </li>
         ))}
       </ul>
     </div>
@@ -228,9 +320,23 @@ function FeedbackList({ title, items }: { title: string; items: string[] }) {
 
 /* ---------------- connect ---------------- */
 
-const CONNECT_LABEL: Record<string, string> = { today: "In the world today", "your-work": "In your work", across: "Across fields" };
+const CONNECT_LABEL: Record<string, string> = {
+  today: "In the world today",
+  "your-work": "In your work",
+  across: "Across fields",
+};
 
-export function Connector({ passage, source, onClose, theme }: { passage: string; source?: SourceRef; onClose: () => void; theme: "light" | "dark" }) {
+export function Connector({
+  passage,
+  source,
+  onClose,
+  theme,
+}: {
+  passage: string;
+  source?: SourceRef;
+  onClose: () => void;
+  theme: "light" | "dark";
+}) {
   const [items, setItems] = useState<Connection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Set<number>>(new Set());
@@ -244,15 +350,26 @@ export function Connector({ passage, source, onClose, theme }: { passage: string
       {error && <p className="form-error">{error}</p>}
       {!items && !error && <Spinner label="Finding connections" since={started} />}
       {items?.map((c, i) => (
-        <article key={i} className="connection">
+        <article
+          // biome-ignore lint/suspicious/noArrayIndexKey: a read-only list, replaced whole when it changes
+          key={i}
+          className="connection"
+        >
           <span className="eyebrow">{CONNECT_LABEL[c.kind] || c.kind}</span>
           <h3 className="connection-title">{c.title}</h3>
           <Markdown text={c.body} theme={theme} />
           <button
+            type="button"
             className="button"
             disabled={saved.has(i)}
             onClick={async () => {
-              await learn.createNote({ type: "connection", title: c.title, body: `${c.body}\n\n> ${passage.slice(0, 400)}`, concepts: c.concepts, source });
+              await learn.createNote({
+                type: "connection",
+                title: c.title,
+                body: `${c.body}\n\n> ${passage.slice(0, 400)}`,
+                concepts: c.concepts,
+                source,
+              });
               setSaved((s) => new Set(s).add(i));
             }}
           >
@@ -276,7 +393,17 @@ export const KIND_CHOICES = [
 ];
 
 /** What to draw: an optional request in the reader's words, a kind, quick or careful. */
-export function FigureRequest({ onSubmit, busy, autoFocus = true, compact }: { onSubmit: (r: { request: string; kind: string; quality: "quick" | "careful" }) => void; busy?: boolean; autoFocus?: boolean; compact?: boolean }) {
+export function FigureRequest({
+  onSubmit,
+  busy,
+  autoFocus = true,
+  compact,
+}: {
+  onSubmit: (r: { request: string; kind: string; quality: "quick" | "careful" }) => void;
+  busy?: boolean;
+  autoFocus?: boolean;
+  compact?: boolean;
+}) {
   const [request, setRequest] = useState("");
   const [kind, setKind] = useState("auto");
   const [quality, setQuality] = useState<"quick" | "careful">("quick");
@@ -288,7 +415,13 @@ export function FigureRequest({ onSubmit, busy, autoFocus = true, compact }: { o
         onSubmit({ request, kind, quality });
       }}
     >
-      <input autoFocus={autoFocus} value={request} onChange={(e) => setRequest(e.target.value)} placeholder="What should it show? (optional: e.g. “what happens if a message is lost”)" aria-label="What should the figure show?" />
+      <input
+        autoFocus={autoFocus}
+        value={request}
+        onChange={(e) => setRequest(e.target.value)}
+        placeholder="What should it show? (optional: e.g. “what happens if a message is lost”)"
+        aria-label="What should the figure show?"
+      />
       <div className="chips" role="group" aria-label="Kind of figure">
         {KIND_CHOICES.map((k) => (
           <button key={k.id} type="button" className="chip" aria-pressed={kind === k.id} onClick={() => setKind(k.id)}>
@@ -298,7 +431,11 @@ export function FigureRequest({ onSubmit, busy, autoFocus = true, compact }: { o
       </div>
       <div className="figure-request-row">
         <label className="check" title="Careful uses the stronger model: slower, more thorough">
-          <input type="checkbox" checked={quality === "careful"} onChange={(e) => setQuality(e.target.checked ? "careful" : "quick")} />
+          <input
+            type="checkbox"
+            checked={quality === "careful"}
+            onChange={(e) => setQuality(e.target.checked ? "careful" : "quick")}
+          />
           Careful
         </label>
         <button className="button primary" type="submit" disabled={busy}>
@@ -310,7 +447,19 @@ export function FigureRequest({ onSubmit, busy, autoFocus = true, compact }: { o
   );
 }
 
-export function FigureMaker({ passage, source, onClose, theme, onSaved }: { passage: string; source?: SourceRef; onClose: () => void; theme: "light" | "dark"; onSaved?: (f: SavedFigure) => void }) {
+export function FigureMaker({
+  passage,
+  source,
+  onClose,
+  theme,
+  onSaved,
+}: {
+  passage: string;
+  source?: SourceRef;
+  onClose: () => void;
+  theme: "light" | "dark";
+  onSaved?: (f: SavedFigure) => void;
+}) {
   const [figure, setFigure] = useState<SavedFigure | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);

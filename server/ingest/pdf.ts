@@ -71,7 +71,10 @@ export async function ingestPdf(path: string): Promise<PdfIngest> {
     const fast = await loadInspector();
     if (fast) {
       try {
-        const [items, md] = await Promise.all([fast.extractTextWithPositionsAsync(buffer), fast.extractPagesMarkdownAsync(buffer)]);
+        const [items, md] = await Promise.all([
+          fast.extractTextWithPositionsAsync(buffer),
+          fast.extractPagesMarkdownAsync(buffer),
+        ]);
         pages = linesFromItems(items, sizes);
         markdown = sizes.map((_, i) => md.pages.find((p) => p.page === i)?.markdown || "");
         extractor = "pdf-inspector";
@@ -84,7 +87,8 @@ export async function ingestPdf(path: string): Promise<PdfIngest> {
       for (let n = 1; n <= doc.numPages; n++) pages.push(await pageText(doc, n));
     }
     stripRunningHeads(pages);
-    if (!markdown.length || markdown.every((m) => !m.trim())) markdown = pages.map((p) => joinLines(p.lines.map((l) => l.t)));
+    if (!markdown.length || markdown.every((m) => !m.trim()))
+      markdown = pages.map((p) => joinLines(p.lines.map((l) => l.t)));
     const outline = ((await doc.getOutline().catch(() => null)) || []) as OutlineNode[];
     let toc = await tocFromOutline(doc, outline, pages);
     let tocSource: PdfIngest["tocSource"] = "outline";
@@ -93,11 +97,25 @@ export async function ingestPdf(path: string): Promise<PdfIngest> {
     const info = meta?.info || {};
     const clean = (value: unknown) => {
       if (typeof value !== "string") return undefined;
-      const text = value.replace(/^The Project Gutenberg eBook #\d+:\s*/i, "").replace(/^Microsoft Word - /i, "").trim();
+      const text = value
+        .replace(/^The Project Gutenberg eBook #\d+:\s*/i, "")
+        .replace(/^Microsoft Word - /i, "")
+        .trim();
       // print-to-PDF and converters leave junk titles; the file name is better than these
-      return /^(about:blank|untitled|document\d*|https?:\/\/\S+|[\w-]+\.(docx?|html?|tex|pdf))$/i.test(text) ? undefined : text;
+      return /^(about:blank|untitled|document\d*|https?:\/\/\S+|[\w-]+\.(docx?|html?|tex|pdf))$/i.test(text)
+        ? undefined
+        : text;
     };
-    return { title: clean(info.Title) || undefined, author: clean(info.Author) || undefined, pageCount: doc.numPages, pages, markdown, extractor, toc, tocSource };
+    return {
+      title: clean(info.Title) || undefined,
+      author: clean(info.Author) || undefined,
+      pageCount: doc.numPages,
+      pages,
+      markdown,
+      extractor,
+      toc,
+      tocSource,
+    };
   } finally {
     await doc.destroy();
   }
@@ -117,7 +135,10 @@ function linesFromItems(items: InspectorItem[], sizes: { w: number; h: number }[
     for (const item of byPage.get(n) || []) {
       const size = item.fontSize || item.height || 10;
       let row = rows.find((r) => Math.abs(r.base - item.y) < Math.max(1.5, Math.min(size, r.size) * 0.5));
-      if (!row) rows.push((row = { base: item.y, size, runs: [] }));
+      if (!row) {
+        row = { base: item.y, size, runs: [] };
+        rows.push(row);
+      }
       row.runs.push(item);
       row.size = Math.max(row.size, size);
     }
@@ -225,7 +246,8 @@ async function tocFromOutline(doc: Doc, outline: OutlineNode[], pages: PageText[
   if (!outline.length) return [];
   // Containers like "Front Matter / Main Matter / Back Matter" hold the chapters one level down.
   let level: OutlineNode[] = outline;
-  if (outline.length <= 4 && outline.every((node) => (node.items || []).length)) level = outline.flatMap((node) => node.items || []);
+  if (outline.length <= 4 && outline.every((node) => (node.items || []).length))
+    level = outline.flatMap((node) => node.items || []);
   const entries: TocEntry[] = [];
   for (const node of level) {
     const at = await resolvePage(doc, node.dest);
@@ -235,12 +257,19 @@ async function tocFromOutline(doc: Doc, outline: OutlineNode[], pages: PageText[
       const c = await resolvePage(doc, child.dest);
       if (c) sections.push({ id: "", title: child.title.trim(), start: c });
     }
-    entries.push({ id: "", title: node.title.trim(), start: { page: at.page, y: at.y ?? 0 }, end: { page: pages.length }, sections });
+    entries.push({
+      id: "",
+      title: node.title.trim(),
+      start: { page: at.page, y: at.y ?? 0 },
+      end: { page: pages.length },
+      sections,
+    });
   }
-  entries.sort((a, b) => (a.start.page! - b.start.page!) || (a.start.y ?? 0) - (b.start.y ?? 0));
+  entries.sort((a, b) => a.start.page! - b.start.page! || (a.start.y ?? 0) - (b.start.y ?? 0));
   finishToc(entries, pages.length);
   for (const entry of entries) {
-    if (/^(chapter|part|lecture|book|section)\s+[\divxlc]+\.?$/i.test(entry.title)) entry.subtitle = headingNear(pages, entry.start.page!, entry.title);
+    if (/^(chapter|part|lecture|book|section)\s+[\divxlc]+\.?$/i.test(entry.title))
+      entry.subtitle = headingNear(pages, entry.start.page!, entry.title);
   }
   return entries;
 }
@@ -250,37 +279,63 @@ export function finishToc(entries: TocEntry[], pageCount: number) {
     entry.id = `c${i + 1}`;
     const next = entries[i + 1];
     entry.end = next ? { page: next.start.page!, y: next.start.y ?? 0 } : { page: pageCount, y: 1 };
-    entry.sections.forEach((s, j) => (s.id = `${entry.id}s${j + 1}`));
+    for (const [j, s] of entry.sections.entries()) s.id = `${entry.id}s${j + 1}`;
   });
 }
 
 /** The biggest-type line(s) on a chapter's first page that aren't the outline title itself. */
 function headingNear(pages: PageText[], pageNo: number, title: string): string | undefined {
   const page = pages[pageNo - 1];
-  if (!page || !page.lines.length) return undefined;
+  if (!page?.lines.length) return undefined;
   const sizes = page.lines.map((l) => l.s).sort((a, b) => a - b);
   const body = sizes[Math.floor(sizes.length / 2)];
   const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const isHeading = (l: PageLine) => l.y < 0.5 && l.s >= body * 1.08 && norm(l.t) !== norm(title) && l.t.length > 1 && !/^chapter\b/i.test(l.t);
+  const isHeading = (l: PageLine) =>
+    l.y < 0.5 && l.s >= body * 1.08 && norm(l.t) !== norm(title) && l.t.length > 1 && !/^chapter\b/i.test(l.t);
   const first = page.lines.findIndex(isHeading);
   if (first < 0) return undefined;
   // a heading can wrap: keep following lines in the same type size
   const parts = [page.lines[first].t];
-  for (let i = first + 1; i < page.lines.length && Math.abs(page.lines[i].s - page.lines[first].s) < 0.5 && isHeading(page.lines[i]); i++) parts.push(page.lines[i].t);
+  for (
+    let i = first + 1;
+    i < page.lines.length && Math.abs(page.lines[i].s - page.lines[first].s) < 0.5 && isHeading(page.lines[i]);
+    i++
+  )
+    parts.push(page.lines[i].t);
   return titleCase(parts.join(" ").replace(/\.$/, ""));
 }
 
 export function titleCase(text: string) {
   const trimmed = text.replace(/\s+/g, " ").replace(/\.$/, "").trim();
   if (trimmed !== trimmed.toUpperCase()) return trimmed;
-  const small = new Set(["a", "an", "and", "as", "at", "but", "by", "for", "in", "of", "on", "or", "the", "to", "with", "from"]);
-  return trimmed
-    .toLowerCase()
-    .replace(/[a-z0-9]+/g, (word, offset: number, all: string) => {
-      if (/^[ivxlcdm]+$/.test(word) && word.length <= 6 && !["mix", "dim", "mid", "lid", "did", "civil", "vivid"].includes(word)) return word.toUpperCase();
-      const first = offset === 0 || /[—:–(-]\s*$/.test(all.slice(0, offset));
-      return !first && small.has(word) ? word : word.charAt(0).toUpperCase() + word.slice(1);
-    });
+  const small = new Set([
+    "a",
+    "an",
+    "and",
+    "as",
+    "at",
+    "but",
+    "by",
+    "for",
+    "in",
+    "of",
+    "on",
+    "or",
+    "the",
+    "to",
+    "with",
+    "from",
+  ]);
+  return trimmed.toLowerCase().replace(/[a-z0-9]+/g, (word, offset: number, all: string) => {
+    if (
+      /^[ivxlcdm]+$/.test(word) &&
+      word.length <= 6 &&
+      !["mix", "dim", "mid", "lid", "did", "civil", "vivid"].includes(word)
+    )
+      return word.toUpperCase();
+    const first = offset === 0 || /[—:–(-]\s*$/.test(all.slice(0, offset));
+    return !first && small.has(word) ? word : word.charAt(0).toUpperCase() + word.slice(1);
+  });
 }
 
 /** No outline: look for short lines in noticeably larger type near the top of a page. */
@@ -290,16 +345,29 @@ function tocFromHeadings(pages: PageText[]): TocEntry[] {
   const body = all[Math.floor(all.length / 2)];
   const entries: TocEntry[] = [];
   for (const page of pages) {
-    const at = page.lines.findIndex((l) => l.s >= body * 1.35 && l.t.length >= 3 && l.t.length <= 80 && l.y < 0.6 && /[a-z]/i.test(l.t));
+    const at = page.lines.findIndex(
+      (l) => l.s >= body * 1.35 && l.t.length >= 3 && l.t.length <= 80 && l.y < 0.6 && /[a-z]/i.test(l.t),
+    );
     if (at < 0) continue;
     const heading = page.lines[at];
     // a heading can wrap onto a second line in the same size
     const words = [heading.t];
-    for (let i = at + 1; i < page.lines.length && Math.abs(page.lines[i].s - heading.s) < 0.5 && words.join(" ").length < 120; i++) words.push(page.lines[i].t);
+    for (
+      let i = at + 1;
+      i < page.lines.length && Math.abs(page.lines[i].s - heading.s) < 0.5 && words.join(" ").length < 120;
+      i++
+    )
+      words.push(page.lines[i].t);
     const title = words.join(" ");
     const prev = entries[entries.length - 1];
     if (prev && page.n - prev.start.page! < 2) continue;
-    entries.push({ id: "", title: titleCase(title), start: { page: page.n, y: Math.max(0, heading.y - 0.02) }, end: { page: pages.length }, sections: [] });
+    entries.push({
+      id: "",
+      title: titleCase(title),
+      start: { page: page.n, y: Math.max(0, heading.y - 0.02) },
+      end: { page: pages.length },
+      sections: [],
+    });
   }
   if (entries.length > 80 || entries.length < 2) return [];
   finishToc(entries, pages.length);
@@ -310,14 +378,27 @@ function tocByChunks(pageCount: number, size = 12): TocEntry[] {
   const entries: TocEntry[] = [];
   for (let start = 1; start <= pageCount; start += size) {
     const end = Math.min(pageCount, start + size - 1);
-    entries.push({ id: "", title: `Pages ${start}–${end}`, start: { page: start, y: 0 }, end: { page: end }, sections: [] });
+    entries.push({
+      id: "",
+      title: `Pages ${start}–${end}`,
+      start: { page: start, y: 0 },
+      end: { page: end },
+      sections: [],
+    });
   }
   finishToc(entries, pageCount);
   return entries;
 }
 
 /** Text of a page range with page markers, for the generators. Prefers the per-page Markdown. */
-export function pagesText(pages: PageText[], from: number, to: number, maxChars = Infinity, markdown: string[] = [], edges: { fromY?: number; toY?: number } = {}): string {
+export function pagesText(
+  pages: PageText[],
+  from: number,
+  to: number,
+  maxChars = Infinity,
+  markdown: string[] = [],
+  edges: { fromY?: number; toY?: number } = {},
+): string {
   const out: string[] = [];
   let total = 0;
   for (let n = from; n <= to && n <= pages.length; n++) {
@@ -326,7 +407,13 @@ export function pagesText(pages: PageText[], from: number, to: number, maxChars 
     const cutBottom = n === to && edges.toY !== undefined && edges.toY < 1;
     const body =
       cutTop || cutBottom
-        ? joinLines(pages[n - 1].lines.filter((l) => (!cutTop || l.y >= (edges.fromY ?? 0) - 0.02) && (!cutBottom || l.y < (edges.toY ?? 1) - 0.005)).map((l) => l.t))
+        ? joinLines(
+            pages[n - 1].lines
+              .filter(
+                (l) => (!cutTop || l.y >= (edges.fromY ?? 0) - 0.02) && (!cutBottom || l.y < (edges.toY ?? 1) - 0.005),
+              )
+              .map((l) => l.t),
+          )
         : (markdown[n - 1] || "").trim() || joinLines(pages[n - 1].lines.map((l) => l.t));
     if (!body.trim()) continue;
     const chunk = `\n[[page ${n}]]\n${body}\n`;
@@ -345,7 +432,7 @@ export function joinLines(lines: string[]): string {
   for (const line of lines) {
     if (!text) text = line;
     else if (/[a-z]-$/.test(text) && /^[a-z]/.test(line)) text = text.slice(0, -1) + line;
-    else text += "\n" + line;
+    else text += `\n${line}`;
   }
   return text;
 }

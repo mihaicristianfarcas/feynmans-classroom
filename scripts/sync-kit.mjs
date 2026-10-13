@@ -17,7 +17,9 @@ const candidates = [
   join(homedir(), ".agents", "skills", "anatomy"),
   join(homedir(), ".claude", "skills", "anatomy"),
 ].filter(Boolean);
-const source = candidates.find((dir) => existsSync(join(dir, "SKILL.md")) && existsSync(join(dir, "kit", "iso-kit.mjs")));
+const source = candidates.find(
+  (dir) => existsSync(join(dir, "SKILL.md")) && existsSync(join(dir, "kit", "iso-kit.mjs")),
+);
 
 if (source) {
   rmSync(VENDOR, { recursive: true, force: true });

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { humanInterval } from "../../shared/fsrs.ts";
-import { bookLink, learn, type CardView, type Quiz } from "./api";
+import { bookLink, type CardView, learn, type Quiz } from "./api";
 import { Markdown } from "./Markdown";
 import { QuizRunner } from "./Quiz";
 import { Spinner, useLoad } from "./Shell";
@@ -25,11 +25,13 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
     learn.queue(deck || undefined).then((q) => setQueue(q.cards));
   }, [deck]);
   useEffect(load, [load]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once, for the query the page was opened with
   useEffect(() => {
     if (query.get("mixed")) startMixed();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const card = queue?.[0];
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resets the answer state when the next card comes up
   useEffect(() => {
     shownAt.current = Date.now();
     setRevealed(false);
@@ -46,7 +48,8 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
         if (!q) return q;
         const rest = q.slice(1);
         // a card that comes back within the session goes a few cards later
-        if (updated.state && updated.state.due - Date.now() < 20 * 60000) rest.splice(Math.min(rest.length, 3), 0, updated);
+        if (updated.state && updated.state.due - Date.now() < 20 * 60000)
+          rest.splice(Math.min(rest.length, 3), 0, updated);
         return rest;
       });
       window.dispatchEvent(new Event("classroom:reviewed"));
@@ -117,7 +120,7 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
           />
           Type answers first
         </label>
-        <button className="button" onClick={startMixed} disabled={quizLoading}>
+        <button type="button" className="button" onClick={startMixed} disabled={quizLoading}>
           {quizLoading ? <Spinner label="Writing a quiz" /> : "Mixed quiz"}
         </button>
       </header>
@@ -137,7 +140,7 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
               : "Cards come back when you're about to forget them. Make new ones while you read: select a passage and choose Cards."}
           </p>
           <div className="row gap">
-            <button className="button primary" onClick={startMixed} disabled={quizLoading}>
+            <button type="button" className="button primary" onClick={startMixed} disabled={quizLoading}>
               Mixed quiz across your topics
             </button>
             <a className="button" href="#/library">
@@ -149,7 +152,11 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
         <article className="flash" data-revealed={revealed || undefined}>
           <div className="flash-meta">
             <span className="eyebrow">{card.deck}</span>
-            <span className="fine">{card.state ? `${card.state.phase} · seen ${card.state.reps}×${card.state.lapses ? ` · forgot ${card.state.lapses}×` : ""}` : "new"}</span>
+            <span className="fine">
+              {card.state
+                ? `${card.state.phase} · seen ${card.state.reps}×${card.state.lapses ? ` · forgot ${card.state.lapses}×` : ""}`
+                : "new"}
+            </span>
           </div>
           <Markdown text={card.front} theme={theme} className="flash-front" hideCloze={!revealed} />
           {typing && !revealed && (
@@ -183,7 +190,7 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
               )}
               <div className="ratings">
                 {([1, 2, 3, 4] as const).map((r) => (
-                  <button key={r} className="rating" data-rating={r} onClick={() => rate(r)}>
+                  <button type="button" key={r} className="rating" data-rating={r} onClick={() => rate(r)}>
                     <span className="rating-label">{LABELS[r]}</span>
                     <span className="rating-when">{card.next ? humanInterval(card.next[r]) : ""}</span>
                     <kbd>{r}</kbd>
@@ -192,13 +199,17 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
               </div>
             </>
           ) : (
-            <button className="button primary reveal" onClick={() => setRevealed(true)}>
+            <button type="button" className="button primary reveal" onClick={() => setRevealed(true)}>
               Show answer <kbd>space</kbd>
             </button>
           )}
         </article>
       )}
-      {queue && card && <p className="fine center">{queue.length} left in this session · {stats.done} done</p>}
+      {queue && card && (
+        <p className="fine center">
+          {queue.length} left in this session · {stats.done} done
+        </p>
+      )}
     </div>
   );
 }

@@ -78,7 +78,19 @@ export interface ReviewLog {
   took?: number;
 }
 
-export type ActivityType = "read" | "review" | "note" | "highlight" | "card" | "figure" | "quiz" | "explain" | "connect" | "ask" | "concept" | "book";
+export type ActivityType =
+  | "read"
+  | "review"
+  | "note"
+  | "highlight"
+  | "card"
+  | "figure"
+  | "quiz"
+  | "explain"
+  | "connect"
+  | "ask"
+  | "concept"
+  | "book";
 
 export interface Activity {
   ts: number;

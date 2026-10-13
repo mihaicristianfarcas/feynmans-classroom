@@ -1,10 +1,10 @@
 import { ArrowLeft, Pause, Play, Shapes } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { bookLink, go, learn, openLink, type Concept, type Note } from "./api";
+import { bookLink, type Concept, go, learn, type Note, openLink } from "./api";
 import { GraphView } from "./GraphView";
 import { Markdown } from "./Markdown";
-import { SceneView } from "./scene/SceneView";
 import { Mastery, Spinner, timeAgo, useLoad } from "./Shell";
+import { SceneView } from "./scene/SceneView";
 import { CardDrafter, Connector, ExplainBack, FigureMaker } from "./tools";
 import { useIndicator } from "./ui";
 
@@ -24,7 +24,12 @@ export function Brain({ theme }: { theme: "light" | "dark" }) {
   if (section === "note" && id) return <Redirect to={`#/notes/${id}`} />;
   if (section === "new") return <Redirect to="#/notes" />;
   if (section === "find" && id) return <Find target={id} />;
-  return <BrainHome tab={(["graph", "concepts", "notes", "figures"].includes(section) ? section : "graph") as Tab} theme={theme} />;
+  return (
+    <BrainHome
+      tab={(["graph", "concepts", "notes", "figures"].includes(section) ? section : "graph") as Tab}
+      theme={theme}
+    />
+  );
 }
 
 /** Old [[link]] routes: resolve the link the same way notes do. */
@@ -43,7 +48,13 @@ function BrainHome({ tab, theme }: { tab: Tab; theme: "light" | "dark" }) {
       <header className="page-head row">
         <h1 className="page-title">Your brain</h1>
         <span className="spacer" />
-        <input className="search" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter…" aria-label="Filter" />
+        <input
+          className="search"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter…"
+          aria-label="Filter"
+        />
         <a className="button primary" href="#/notes">
           Notes
         </a>
@@ -75,7 +86,16 @@ function GraphTab({ filter }: { filter: string }) {
   // the learning journey: replay how the graph grew
   const [until, setUntil] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
-  const times = useMemo(() => (data ? data.nodes.map((n) => n.created).filter(Number.isFinite).sort((a, b) => a - b) : []), [data]);
+  const times = useMemo(
+    () =>
+      data
+        ? data.nodes
+            .map((n) => n.created)
+            .filter(Number.isFinite)
+            .sort((a, b) => a - b)
+        : [],
+    [data],
+  );
   const first = times[0] ?? Date.now(),
     last = times[times.length - 1] ?? Date.now();
   useEffect(() => {
@@ -97,7 +117,10 @@ function GraphTab({ filter }: { filter: string }) {
   if (!data.nodes.some((n) => n.kind !== "book"))
     return (
       <div className="empty">
-        <p className="lede small">Your graph grows as you learn: concepts come from the chapters you map (Study → Map concepts in the reader), the cards you make and the ideas you explain.</p>
+        <p className="lede small">
+          Your graph grows as you learn: concepts come from the chapters you map (Study → Map concepts in the reader),
+          the cards you make and the ideas you explain.
+        </p>
       </div>
     );
   return (
@@ -115,24 +138,75 @@ function GraphTab({ filter }: { filter: string }) {
           <input type="checkbox" checked={suggestions} onChange={(e) => setSuggestions(e.target.checked)} />
           Suggestions
         </label>
-        <span className="legend-item"><span className="legend-line" data-kind="link" /> your link</span>
-        <span className="legend-item"><span className="legend-line" data-kind="ai" /> accepted</span>
-        <span className="legend-item"><span className="legend-line" data-kind="suggested" /> suggested</span>
-        <span className="legend-item"><span className="legend-ring" data-level="strong" /> well known</span>
-        <span className="legend-item"><span className="legend-ring" data-level="ok" /> getting there</span>
-        <span className="legend-item"><span className="legend-ring" data-level="weak" /> fading</span>
-        <span className="legend-item"><span className="legend-ring" data-level="none" /> not studied</span>
+        <span className="legend-item">
+          <span className="legend-line" data-kind="link" /> your link
+        </span>
+        <span className="legend-item">
+          <span className="legend-line" data-kind="ai" /> accepted
+        </span>
+        <span className="legend-item">
+          <span className="legend-line" data-kind="suggested" /> suggested
+        </span>
+        <span className="legend-item">
+          <span className="legend-ring" data-level="strong" /> well known
+        </span>
+        <span className="legend-item">
+          <span className="legend-ring" data-level="ok" /> getting there
+        </span>
+        <span className="legend-item">
+          <span className="legend-ring" data-level="weak" /> fading
+        </span>
+        <span className="legend-item">
+          <span className="legend-ring" data-level="none" /> not studied
+        </span>
         <span className="fine">Drag to move · ⌘-scroll to zoom · click to open</span>
       </div>
-      <GraphView data={data} showNotes={notes} showAnnotations={annotationsShown} showSuggestions={suggestions} highlight={filter} until={until ?? undefined} />
+      <GraphView
+        data={data}
+        showNotes={notes}
+        showAnnotations={annotationsShown}
+        showSuggestions={suggestions}
+        highlight={filter}
+        until={until ?? undefined}
+      />
       {times.length > 1 && (
         <div className="growth">
-          <button className="icon-button" onClick={() => (playing ? setPlaying(false) : (setUntil(first), setPlaying(true)))} aria-label={playing ? "Pause" : "Replay your graph's growth"} title="Replay how your graph grew">
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => {
+              if (!playing) setUntil(first);
+              setPlaying(!playing);
+            }}
+            aria-label={playing ? "Pause" : "Replay your graph's growth"}
+            title="Replay how your graph grew"
+          >
             {playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
           </button>
-          <input type="range" min={first} max={last} step={Math.max(1, (last - first) / 400)} value={until ?? last} onChange={(e) => (setPlaying(false), setUntil(Number(e.target.value) >= last ? null : Number(e.target.value)))} aria-label="Your graph over time" />
+          <input
+            type="range"
+            min={first}
+            max={last}
+            step={Math.max(1, (last - first) / 400)}
+            value={until ?? last}
+            onChange={(e) => {
+              setPlaying(false);
+              setUntil(Number(e.target.value) >= last ? null : Number(e.target.value));
+            }}
+            aria-label="Your graph over time"
+          />
           <span className="fine">
-            {until === null ? "now" : new Date(until).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} · {data.nodes.filter((n) => until === null || n.created <= until).filter((n) => n.kind === "concept").length} concepts
+            {until === null
+              ? "now"
+              : new Date(until).toLocaleString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}{" "}
+            ·{" "}
+            {data.nodes.filter((n) => until === null || n.created <= until).filter((n) => n.kind === "concept").length}{" "}
+            concepts
           </span>
         </div>
       )}
@@ -141,6 +215,7 @@ function GraphTab({ filter }: { filter: string }) {
           <h3 className="sub-title">Connections the agent suggests</h3>
           <span className="spacer" />
           <button
+            type="button"
             className="button"
             disabled={!!busy}
             onClick={async () => {
@@ -162,7 +237,10 @@ function GraphTab({ filter }: { filter: string }) {
         {busy && <Spinner label="The agent is reading your notes" since={busy} />}
         {error && <p className="form-error">{error}</p>}
         {pending.length === 0 ? (
-          <p className="fine">None waiting. The agent reads your notes (with its own shell, inside your vault) and proposes links worth following; you accept or reject each one.</p>
+          <p className="fine">
+            None waiting. The agent reads your notes (with its own shell, inside your vault) and proposes links worth
+            following; you accept or reject each one.
+          </p>
         ) : (
           <ul className="suggestions">
             {pending.map((e) => (
@@ -172,10 +250,24 @@ function GraphTab({ filter }: { filter: string }) {
                 </span>
                 <span className="fine">{e.why}</span>
                 <span className="row gap">
-                  <button className="button" onClick={async () => (await learn.decideConnection(e.id!, "accept"), reload())}>
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={async () => {
+                      await learn.decideConnection(e.id!, "accept");
+                      reload();
+                    }}
+                  >
                     Link
                   </button>
-                  <button className="link" onClick={async () => (await learn.decideConnection(e.id!, "reject"), reload())}>
+                  <button
+                    type="button"
+                    className="link"
+                    onClick={async () => {
+                      await learn.decideConnection(e.id!, "reject");
+                      reload();
+                    }}
+                  >
                     Not related
                   </button>
                 </span>
@@ -191,7 +283,10 @@ function GraphTab({ filter }: { filter: string }) {
 function ConceptsTab({ filter }: { filter: string }) {
   const { data } = useLoad(() => learn.concepts());
   const [name, setName] = useState("");
-  const list = useMemo(() => (data || []).filter((c) => !filter || `${c.name} ${c.summary}`.toLowerCase().includes(filter.toLowerCase())), [data, filter]);
+  const list = useMemo(
+    () => (data || []).filter((c) => !filter || `${c.name} ${c.summary}`.toLowerCase().includes(filter.toLowerCase())),
+    [data, filter],
+  );
   if (!data) return <Spinner label="Loading concepts" />;
   return (
     <div>
@@ -229,7 +324,9 @@ function ConceptsTab({ filter }: { filter: string }) {
                 <Mastery value={c.mastery} />
               </td>
               <td className="num">{c.cards || ""}</td>
-              <td className="fine">{c.sources.length ? `${c.sources.length} passage${c.sources.length === 1 ? "" : "s"}` : ""}</td>
+              <td className="fine">
+                {c.sources.length ? `${c.sources.length} passage${c.sources.length === 1 ? "" : "s"}` : ""}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -239,17 +336,26 @@ function ConceptsTab({ filter }: { filter: string }) {
   );
 }
 
-const TYPE_LABEL: Record<string, string> = { note: "Note", highlight: "Highlight", explanation: "Explanation", connection: "Connection", answer: "Answer", summary: "Summary" };
+const TYPE_LABEL: Record<string, string> = {
+  note: "Note",
+  highlight: "Highlight",
+  explanation: "Explanation",
+  connection: "Connection",
+  answer: "Answer",
+  summary: "Summary",
+};
 
 function NotesTab({ filter, theme }: { filter: string; theme: "light" | "dark" }) {
   const [type, setType] = useState("");
   const { data } = useLoad(() => learn.notes(type ? { type } : {}), [type]);
-  const list = (data || []).filter((n) => !filter || `${n.title} ${n.body}`.toLowerCase().includes(filter.toLowerCase()));
+  const list = (data || []).filter(
+    (n) => !filter || `${n.title} ${n.body}`.toLowerCase().includes(filter.toLowerCase()),
+  );
   return (
     <div>
       <div className="chips">
         {["", "note", "highlight", "explanation", "connection", "answer"].map((t) => (
-          <button key={t} className="chip" aria-pressed={type === t} onClick={() => setType(t)}>
+          <button type="button" key={t} className="chip" aria-pressed={type === t} onClick={() => setType(t)}>
             {t ? TYPE_LABEL[t] : "All"}
           </button>
         ))}
@@ -290,7 +396,11 @@ function FiguresTab({ filter, theme }: { filter: string; theme: "light" | "dark"
           if (topic.trim()) setMaking(true);
         }}
       >
-        <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Draw a figure of any idea… (e.g. how a B-tree splits a full node)" />
+        <input
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+          placeholder="Draw a figure of any idea… (e.g. how a B-tree splits a full node)"
+        />
         <button className="button" type="submit">
           <Shapes aria-hidden="true" />
           Draw
@@ -318,6 +428,7 @@ function FiguresTab({ filter, theme }: { filter: string; theme: "light" | "dark"
                 <code className="fine">![[figure:{f.id}]]</code>
                 <span className="spacer" />
                 <button
+                  type="button"
                   className="button danger"
                   onClick={async () => {
                     if (!confirm(`Delete "${f.title}"?`)) return;
@@ -330,7 +441,11 @@ function FiguresTab({ filter, theme }: { filter: string; theme: "light" | "dark"
               </div>
             </section>
           ))}
-          {!list.length && <p className="fine">Figures you draw from notes and concepts collect here. Figures drawn in a book stay beside its text.</p>}
+          {!list.length && (
+            <p className="fine">
+              Figures you draw from notes and concepts collect here. Figures drawn in a book stay beside its text.
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -343,9 +458,16 @@ function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
   const { data: c, error, reload } = useLoad(() => learn.concept(id), [id]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ summary: "", body: "" });
-  const [tool, setTool] = useState<"explain" | "cards" | "connect" | "figure" | null>(new URLSearchParams(location.hash.split("?")[1] || "").get("explain") ? "explain" : null);
+  const [tool, setTool] = useState<"explain" | "cards" | "connect" | "figure" | null>(
+    new URLSearchParams(location.hash.split("?")[1] || "").get("explain") ? "explain" : null,
+  );
   if (error) return <div className="center-note">{error}</div>;
-  if (!c) return <div className="center-note"><Spinner label="Opening" /></div>;
+  if (!c)
+    return (
+      <div className="center-note">
+        <Spinner label="Opening" />
+      </div>
+    );
   const text = `${c.name}: ${c.summary}\n\n${c.body}`;
   const source = c.sources[0];
   return (
@@ -360,20 +482,23 @@ function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
         <Mastery value={c.mastery} wide />
       </header>
       <div className="concept-actions">
-        <button className="button primary" onClick={() => setTool("explain")}>
+        <button type="button" className="button primary" onClick={() => setTool("explain")}>
           Explain it back
         </button>
-        <button className="button" onClick={() => setTool("cards")}>
+        <button type="button" className="button" onClick={() => setTool("cards")}>
           Make cards
         </button>
-        <button className="button" onClick={() => setTool("figure")}>
+        <button type="button" className="button" onClick={() => setTool("figure")}>
           <Shapes aria-hidden="true" />
           Draw it
         </button>
-        <button className="button" onClick={() => setTool("connect")}>
+        <button type="button" className="button" onClick={() => setTool("connect")}>
           Connect
         </button>
-        <a className="button" href={`#/ask?q=${encodeURIComponent(`Explain ${c.name} using everything in my library`)}`}>
+        <a
+          className="button"
+          href={`#/ask?q=${encodeURIComponent(`Explain ${c.name} using everything in my library`)}`}
+        >
           Ask the library
         </a>
       </div>
@@ -381,7 +506,11 @@ function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
         <div className="form">
           <label className="field">
             <span>Summary</span>
-            <textarea rows={2} value={draft.summary} onChange={(e) => setDraft({ ...draft, summary: e.target.value })} />
+            <textarea
+              rows={2}
+              value={draft.summary}
+              onChange={(e) => setDraft({ ...draft, summary: e.target.value })}
+            />
           </label>
           <label className="field">
             <span>In depth (Markdown, [[links]], ![[figure:id]])</span>
@@ -389,6 +518,7 @@ function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
           </label>
           <div className="form-actions">
             <button
+              type="button"
               className="button primary"
               onClick={async () => {
                 await learn.updateConcept(c.id, draft);
@@ -398,16 +528,29 @@ function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
             >
               Save
             </button>
-            <button className="button" onClick={() => setEditing(false)}>
+            <button type="button" className="button" onClick={() => setEditing(false)}>
               Cancel
             </button>
           </div>
         </div>
       ) : (
-        <section className="concept-text" onDoubleClick={() => (setDraft({ summary: c.summary, body: c.body }), setEditing(true))}>
+        <section
+          className="concept-text"
+          onDoubleClick={() => {
+            setDraft({ summary: c.summary, body: c.body });
+            setEditing(true);
+          }}
+        >
           <p className="lede small">{c.summary || <span className="muted">No summary yet.</span>}</p>
           {c.body && <Markdown text={c.body} theme={theme} />}
-          <button className="link" onClick={() => (setDraft({ summary: c.summary, body: c.body }), setEditing(true))}>
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              setDraft({ summary: c.summary, body: c.body });
+              setEditing(true);
+            }}
+          >
             Edit
           </button>
         </section>
@@ -418,7 +561,10 @@ function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
           {c.sources.length ? (
             <ul className="plain">
               {c.sources.map((s, i) => (
-                <li key={i}>
+                <li
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a read-only list, replaced whole when it reloads
+                  key={i}
+                >
                   <a href={bookLink(s)}>{s.title || "A book"}</a>
                   {s.quote && <blockquote className="quote">“{s.quote}”</blockquote>}
                 </li>
@@ -430,7 +576,14 @@ function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
           <h2 className="section-title">Connected to</h2>
           <div className="chips">
             {[...c.related, ...c.backlinks.filter((b) => !c.related.some((r) => r.id === b.id))].map((r) => (
-              <a key={r.id} className="chip concept-chip" href={`#/brain/concept/${r.id}`} data-level={r.mastery === null ? "none" : r.mastery >= 0.8 ? "strong" : r.mastery >= 0.55 ? "ok" : "weak"}>
+              <a
+                key={r.id}
+                className="chip concept-chip"
+                href={`#/brain/concept/${r.id}`}
+                data-level={
+                  r.mastery === null ? "none" : r.mastery >= 0.8 ? "strong" : r.mastery >= 0.55 ? "ok" : "weak"
+                }
+              >
                 {r.name}
               </a>
             ))}
@@ -443,7 +596,11 @@ function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
             {c.cards.map((k) => (
               <li key={k.id}>
                 <Markdown text={k.front} theme={theme} />
-                <span className="fine">{k.state ? `due ${timeAgo(k.state.due).replace(" ago", "")}${k.state.due > Date.now() ? " from now" : ""}` : "new"}</span>
+                <span className="fine">
+                  {k.state
+                    ? `due ${timeAgo(k.state.due).replace(" ago", "")}${k.state.due > Date.now() ? " from now" : ""}`
+                    : "new"}
+                </span>
               </li>
             ))}
           </ul>
@@ -458,6 +615,7 @@ function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
         </section>
       </div>
       <button
+        type="button"
         className="button danger subtle"
         onClick={async () => {
           if (!confirm(`Delete the concept "${c.name}"? Cards and notes stay.`)) return;

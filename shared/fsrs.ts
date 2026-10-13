@@ -10,7 +10,10 @@ export type Rating = 1 | 2 | 3 | 4; // again, hard, good, easy
 export const RATINGS: Rating[] = [1, 2, 3, 4];
 export const RATING_NAMES: Record<Rating, string> = { 1: "Again", 2: "Hard", 3: "Good", 4: "Easy" };
 
-export const W = [0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334, 3.0194, 0.001, 1.8722, 0.1666, 0.796, 1.4835, 0.0614, 0.2629, 1.6483, 0.6014, 1.8729, 0.5425, 0.0912, 0.0658, 0.1542];
+export const W = [
+  0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334, 3.0194, 0.001, 1.8722, 0.1666, 0.796, 1.4835, 0.0614, 0.2629, 1.6483,
+  0.6014, 1.8729, 0.5425, 0.0912, 0.0658, 0.1542,
+];
 
 export interface MemoryState {
   /** Stability in days. */
@@ -101,22 +104,56 @@ export function review(state: MemoryState | null, g: Rating, now = Date.now(), r
   if (state.phase === "review") {
     if (g === 1) {
       const s = sameDay ? shortTermS(state.s, g, w) : forgetS(state.s, state.d, r, w);
-      return { s, d, last: now, due: now + RELEARN, phase: "relearning", step: 0, reps: state.reps + 1, lapses: state.lapses + 1 };
+      return {
+        s,
+        d,
+        last: now,
+        due: now + RELEARN,
+        phase: "relearning",
+        step: 0,
+        reps: state.reps + 1,
+        lapses: state.lapses + 1,
+      };
     }
     const s = sameDay ? shortTermS(state.s, g, w) : recallS(state.s, state.d, r, g, w);
     return graduate(s, d, state.reps + 1, state.lapses);
   }
   // learning or relearning: short steps until the card is passed with Good (or Easy)
-  const s = sameDay ? shortTermS(state.s, g, w) : g === 1 ? forgetS(state.s, state.d, r, w) : recallS(state.s, state.d, r, g, w);
-  if (g === 1) return { ...state, s, d, last: now, due: now + (state.phase === "learning" ? LEARN[0] : RELEARN), step: 0, reps: state.reps + 1 };
-  if (g === 2) return { ...state, s, d, last: now, due: now + (state.phase === "learning" ? (LEARN[0] + LEARN[1]) / 2 : RELEARN), reps: state.reps + 1 };
-  if (g === 4 || state.phase === "relearning" || state.step + 1 >= LEARN.length) return graduate(s, d, state.reps + 1, state.lapses);
+  const s = sameDay
+    ? shortTermS(state.s, g, w)
+    : g === 1
+      ? forgetS(state.s, state.d, r, w)
+      : recallS(state.s, state.d, r, g, w);
+  if (g === 1)
+    return {
+      ...state,
+      s,
+      d,
+      last: now,
+      due: now + (state.phase === "learning" ? LEARN[0] : RELEARN),
+      step: 0,
+      reps: state.reps + 1,
+    };
+  if (g === 2)
+    return {
+      ...state,
+      s,
+      d,
+      last: now,
+      due: now + (state.phase === "learning" ? (LEARN[0] + LEARN[1]) / 2 : RELEARN),
+      reps: state.reps + 1,
+    };
+  if (g === 4 || state.phase === "relearning" || state.step + 1 >= LEARN.length)
+    return graduate(s, d, state.reps + 1, state.lapses);
   return { ...state, s, d, last: now, due: now + LEARN[state.step + 1], step: state.step + 1, reps: state.reps + 1 };
 }
 
 /** What each button would do now, for labels like "1m · 6m · 10m · 4d". */
 export function preview(state: MemoryState | null, now = Date.now(), retention = 0.9): Record<Rating, number> {
-  return Object.fromEntries(RATINGS.map((g) => [g, review(state, g, now, retention).due - now])) as Record<Rating, number>;
+  return Object.fromEntries(RATINGS.map((g) => [g, review(state, g, now, retention).due - now])) as Record<
+    Rating,
+    number
+  >;
 }
 
 export function humanInterval(ms: number): string {

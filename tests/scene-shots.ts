@@ -33,7 +33,9 @@ for (const item of items) {
   await item.screenshot({ path: join(outDir, `${name}-${theme}.png`) as `${string}.png` });
   console.log("shot", name);
 }
-const playerErrors = await page.evaluate(() => ((window as any).__players || []).flatMap((p: any) => p.errors));
+const playerErrors = await page.evaluate(() =>
+  ((window as unknown as { __players?: { errors: string[] }[] }).__players || []).flatMap((p) => p.errors),
+);
 if (playerErrors.length) console.log("player errors:", playerErrors);
 if (errors.length) console.log("errors:", errors);
 await browser.close();

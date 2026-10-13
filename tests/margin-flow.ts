@@ -21,17 +21,30 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 await page.goto(`${base}#/book/${bookId}?at=${Number(pageNo) + 0.15}`, { waitUntil: "domcontentloaded" });
 const layer = `.textLayer[data-page-number="${pageNo}"]`;
-await page.waitForFunction((sel) => (document.querySelector(sel)?.querySelectorAll("span").length || 0) > 10, { timeout: 30000 }, layer);
+await page.waitForFunction(
+  (sel) => (document.querySelector(sel)?.querySelectorAll("span").length || 0) > 10,
+  { timeout: 30000 },
+  layer,
+);
 await wait(1200);
 
 /** Selects spans [from, to) of the page's text layer and lets the reader see the mouseup. */
 async function select(p: Page, from: number, to: number) {
   // scroll first and let the page settle: re-rendering the text layer would drop a selection
-  await p.evaluate((sel, a) => [...document.querySelector(sel)!.querySelectorAll("span")].filter((s) => (s.textContent || "").trim().length > 0)[a].scrollIntoView({ block: "center" }), layer, from);
+  await p.evaluate(
+    (sel, a) =>
+      [...document.querySelector(sel)!.querySelectorAll("span")]
+        .filter((s) => (s.textContent || "").trim().length > 0)
+        [a].scrollIntoView({ block: "center" }),
+    layer,
+    from,
+  );
   await wait(900);
   const box = await p.evaluate(
     (sel, a, b) => {
-      const spans = [...document.querySelector(sel)!.querySelectorAll("span")].filter((s) => (s.textContent || "").trim().length > 0);
+      const spans = [...document.querySelector(sel)!.querySelectorAll("span")].filter(
+        (s) => (s.textContent || "").trim().length > 0,
+      );
       const first = spans[a];
       const last = spans[Math.min(b, spans.length) - 1];
       const range = document.createRange();
@@ -55,16 +68,27 @@ async function select(p: Page, from: number, to: number) {
 const sel1 = await select(page, 4, 9);
 console.log("selected:", JSON.stringify(sel1.text));
 await shot("1-menu");
-console.log("menu:", await page.$$eval(".sel-row .sel-btn", (els) => els.map((e) => e.textContent?.trim()).join(" | ")));
+console.log(
+  "menu:",
+  await page.$$eval(".sel-row .sel-btn", (els) => els.map((e) => e.textContent?.trim()).join(" | ")),
+);
 
 if (!only || only === "explain") {
   const started = Date.now();
-  await page.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>(".sel-btn")].find((b) => b.textContent?.trim() === "Explain")!.click());
+  await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLButtonElement>(".sel-btn")]
+      .find((b) => b.textContent?.trim() === "Explain")!
+      .click(),
+  );
   await page.waitForSelector(".mcard.open", { timeout: 10000 });
   await wait(600);
   await shot("2-explaining");
-  await page.waitForFunction(() => document.querySelector(".mcard.open")?.getAttribute("data-status") !== "pending", { timeout: 180000 });
-  console.log(`explanation in ${((Date.now() - started) / 1000).toFixed(1)} s, status ${await page.$eval(".mcard.open", (e) => e.getAttribute("data-status"))}`);
+  await page.waitForFunction(() => document.querySelector(".mcard.open")?.getAttribute("data-status") !== "pending", {
+    timeout: 180000,
+  });
+  console.log(
+    `explanation in ${((Date.now() - started) / 1000).toFixed(1)} s, status ${await page.$eval(".mcard.open", (e) => e.getAttribute("data-status"))}`,
+  );
   await wait(800);
   await shot("3-explained");
   console.log("card:", (await page.$eval(".mcard.open .mcard-body", (e) => e.textContent || "")).slice(0, 300));
@@ -75,7 +99,12 @@ if (!only || only === "explain") {
   await page.type(".mcard-ask input", "Can you give a numeric example?");
   const asked = Date.now();
   await page.click(".mcard-send");
-  await page.waitForFunction(() => /Follow-up/.test(document.querySelector(".mcard.open .mcard-body")?.textContent || "") || document.querySelectorAll(".mcard.open h2").length > 0, { timeout: 180000 });
+  await page.waitForFunction(
+    () =>
+      /Follow-up/.test(document.querySelector(".mcard.open .mcard-body")?.textContent || "") ||
+      document.querySelectorAll(".mcard.open h2").length > 0,
+    { timeout: 180000 },
+  );
   console.log(`follow-up in ${((Date.now() - asked) / 1000).toFixed(1)} s`);
   await wait(800);
   await shot("4-follow-up");
@@ -84,15 +113,28 @@ if (!only || only === "explain") {
 // a highlight, then a passage into the note
 await page.evaluate(() => document.querySelector<HTMLElement>(".margin")?.click());
 const sel2 = await select(page, 14, 18);
-await page.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>(".sel-btn")].find((b) => b.textContent?.trim() === "Highlight")!.click());
+await page.evaluate(() =>
+  [...document.querySelectorAll<HTMLButtonElement>(".sel-btn")]
+    .find((b) => b.textContent?.trim() === "Highlight")!
+    .click(),
+);
 await wait(1200);
-console.log("highlighted:", JSON.stringify(sel2.text.slice(0, 60)), "marks:", await page.$$eval(`.page-marks .mark[data-style="fill"]`, (els) => els.length));
+console.log(
+  "highlighted:",
+  JSON.stringify(sel2.text.slice(0, 60)),
+  "marks:",
+  await page.$$eval(`.page-marks .mark[data-style="fill"]`, (els) => els.length),
+);
 await shot("5-highlight");
 await select(page, 20, 24);
 await page.keyboard.press("n");
 await page.waitForSelector(".toast", { timeout: 15000 });
 console.log("toast:", await page.$eval(".toast", (e) => e.textContent));
-await page.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>(".pane-tab")].find((b) => b.textContent?.startsWith("Note"))!.click());
+await page.evaluate(() =>
+  [...document.querySelectorAll<HTMLButtonElement>(".pane-tab")]
+    .find((b) => b.textContent?.startsWith("Note"))!
+    .click(),
+);
 await page.waitForSelector(".reader-note .cm-content", { timeout: 10000 });
 await wait(800);
 await shot("6-note");

@@ -48,7 +48,10 @@ export interface PageEl {
   el: HTMLElement;
 }
 export function pageEls(root: ParentNode): PageEl[] {
-  return [...root.querySelectorAll<HTMLElement>("[data-cr-page]")].map((m) => ({ page: Number(m.dataset.crPage), el: m.parentElement as HTMLElement }));
+  return [...root.querySelectorAll<HTMLElement>("[data-cr-page]")].map((m) => ({
+    page: Number(m.dataset.crPage),
+    el: m.parentElement as HTMLElement,
+  }));
 }
 
 /** Boxes of a range as fractions of the pages they fall on, merged into one box per line. */
@@ -61,13 +64,24 @@ function rectsOf(range: Range, pages: PageEl[], firstPage: number): Rect[] {
     const cy = r.top + r.height / 2;
     const p = boxes.find((b) => cx >= b.box.left && cx <= b.box.right && cy >= b.box.top && cy <= b.box.bottom);
     if (!p) continue;
-    raw.push({ ...(p.page !== firstPage ? { p: p.page } : {}), x: (r.left - p.box.left) / p.box.width, y: (r.top - p.box.top) / p.box.height, w: r.width / p.box.width, h: r.height / p.box.height });
+    raw.push({
+      ...(p.page !== firstPage ? { p: p.page } : {}),
+      x: (r.left - p.box.left) / p.box.width,
+      y: (r.top - p.box.top) / p.box.height,
+      w: r.width / p.box.width,
+      h: r.height / p.box.height,
+    });
   }
   raw.sort((a, b) => (a.p ?? firstPage) - (b.p ?? firstPage) || a.y - b.y || a.x - b.x);
   const out: Rect[] = [];
   for (const r of raw) {
     const prev = out[out.length - 1];
-    if (prev && prev.p === r.p && Math.abs(prev.y + prev.h / 2 - (r.y + r.h / 2)) < Math.min(prev.h, r.h) * 0.6 && r.x <= prev.x + prev.w + 0.02) {
+    if (
+      prev &&
+      prev.p === r.p &&
+      Math.abs(prev.y + prev.h / 2 - (r.y + r.h / 2)) < Math.min(prev.h, r.h) * 0.6 &&
+      r.x <= prev.x + prev.w + 0.02
+    ) {
       const x1 = Math.min(prev.x, r.x);
       const x2 = Math.max(prev.x + prev.w, r.x + r.w);
       const y1 = Math.min(prev.y, r.y);
@@ -84,20 +98,30 @@ export function pdfAnchor(selection: Selection, root: HTMLElement): Anchor | nul
   if (!selection.rangeCount) return null;
   const range = selection.getRangeAt(0);
   const pages = pageEls(root);
-  const startEl = range.startContainer.nodeType === Node.ELEMENT_NODE ? (range.startContainer as Element) : range.startContainer.parentElement;
+  const startEl =
+    range.startContainer.nodeType === Node.ELEMENT_NODE
+      ? (range.startContainer as Element)
+      : range.startContainer.parentElement;
   const start = pages.find((p) => startEl && p.el.contains(startEl));
   if (!start) return null;
   const layer = start.el.querySelector<HTMLElement>(".textLayer");
   const quote = clean(selection.toString());
   if (!quote) return null;
   const anchor: Anchor = { page: start.page, quote, rects: rectsOf(range, pages, start.page) };
-  if (layer && layer.contains(range.startContainer)) {
+  if (layer?.contains(range.startContainer)) {
     const pageText = textOf(layer);
     const before = textOf(layer, { node: range.startContainer, offset: range.startOffset });
     const startAt = before.length;
     const sameLayer = layer.contains(range.endContainer);
-    const endAt = sameLayer ? textOf(layer, { node: range.endContainer, offset: range.endOffset }).length : pageText.length;
-    Object.assign(anchor, { start: startAt, end: endAt, prefix: clean(pageText.slice(Math.max(0, startAt - CONTEXT), startAt)) || undefined, suffix: clean(pageText.slice(endAt, endAt + CONTEXT)) || undefined });
+    const endAt = sameLayer
+      ? textOf(layer, { node: range.endContainer, offset: range.endOffset }).length
+      : pageText.length;
+    Object.assign(anchor, {
+      start: startAt,
+      end: endAt,
+      prefix: clean(pageText.slice(Math.max(0, startAt - CONTEXT), startAt)) || undefined,
+      suffix: clean(pageText.slice(endAt, endAt + CONTEXT)) || undefined,
+    });
   }
   const onPage = anchor.rects!.filter((r) => r.p === undefined);
   if (onPage.length) anchor.y = Math.min(...onPage.map((r) => r.y));
@@ -108,19 +132,37 @@ export function pdfAnchor(selection: Selection, root: HTMLElement): Anchor | nul
 export function blockAnchor(selection: Selection): Anchor | null {
   if (!selection.rangeCount) return null;
   const range = selection.getRangeAt(0);
-  const blockOf = (n: Node) => (n.nodeType === Node.ELEMENT_NODE ? (n as Element) : n.parentElement)?.closest<HTMLElement>("[data-block]") || null;
+  const blockOf = (n: Node) =>
+    (n.nodeType === Node.ELEMENT_NODE ? (n as Element) : n.parentElement)?.closest<HTMLElement>("[data-block]") || null;
   // a selection that starts or ends between blocks (or spans the whole book) starts at the first block it touches
-  const touched = () => [...(range.commonAncestorContainer as Element).querySelectorAll?.<HTMLElement>("[data-block]") || []].filter((el) => range.intersectsNode(el));
-  let blocks: HTMLElement[] | null = null;
-  const first = blockOf(range.startContainer) || (blocks ||= touched())[0] || null;
-  const last = blockOf(range.endContainer) || (blocks ||= touched()).at(-1) || first;
+  let touched: HTMLElement[] | null = null;
+  const touchedBlocks = () => {
+    touched ??= [
+      ...((range.commonAncestorContainer as Element).querySelectorAll?.<HTMLElement>("[data-block]") || []),
+    ].filter((el) => range.intersectsNode(el));
+    return touched;
+  };
+  const first = blockOf(range.startContainer) || touchedBlocks()[0] || null;
+  const last = blockOf(range.endContainer) || touchedBlocks().at(-1) || first;
   if (!first) return null;
   const quote = clean(selection.toString());
   if (!quote) return null;
   const text = textOf(first);
-  const startAt = first.contains(range.startContainer) ? textOf(first, { node: range.startContainer, offset: range.startOffset }).length : 0;
-  const endAt = last === first && first.contains(range.endContainer) ? textOf(first, { node: range.endContainer, offset: range.endOffset }).length : text.length;
-  const anchor: Anchor = { block: Number(first.dataset.block), quote, start: startAt, end: endAt, prefix: clean(text.slice(Math.max(0, startAt - CONTEXT), startAt)) || undefined, suffix: clean(text.slice(endAt, endAt + CONTEXT)) || undefined };
+  const startAt = first.contains(range.startContainer)
+    ? textOf(first, { node: range.startContainer, offset: range.startOffset }).length
+    : 0;
+  const endAt =
+    last === first && first.contains(range.endContainer)
+      ? textOf(first, { node: range.endContainer, offset: range.endOffset }).length
+      : text.length;
+  const anchor: Anchor = {
+    block: Number(first.dataset.block),
+    quote,
+    start: startAt,
+    end: endAt,
+    prefix: clean(text.slice(Math.max(0, startAt - CONTEXT), startAt)) || undefined,
+    suffix: clean(text.slice(endAt, endAt + CONTEXT)) || undefined,
+  };
   if (last && last !== first) anchor.blockEnd = Number(last.dataset.block);
   return anchor;
 }
@@ -137,7 +179,7 @@ export function pdfRects(anchor: Anchor, key: string, page: PageEl | undefined):
   if (anchor.rects?.length) return anchor.rects;
   if (found.has(key)) return found.get(key)!;
   const layer = page?.el.querySelector<HTMLElement>(".textLayer");
-  if (!page || !layer || !layer.childNodes.length) return null;
+  if (!page || !layer?.childNodes.length) return null;
   const text = textOf(layer);
   const m = findQuote(text, anchor.quote, { prefix: anchor.prefix, suffix: anchor.suffix, hint: anchor.start });
   let rects: Rect[] | null = null;
@@ -160,11 +202,15 @@ export function blockRange(anchor: Anchor, root: ParentNode): Range | null {
   if (anchor.block === undefined) return null;
   const first = root.querySelector<HTMLElement>(`[data-block="${anchor.block}"]`);
   if (!first) return null;
-  const last = anchor.blockEnd !== undefined ? root.querySelector<HTMLElement>(`[data-block="${anchor.blockEnd}"]`) || first : first;
+  const last =
+    anchor.blockEnd !== undefined
+      ? root.querySelector<HTMLElement>(`[data-block="${anchor.blockEnd}"]`) || first
+      : first;
   const text = textOf(first);
   let start = anchor.start;
   let end = last === first ? anchor.end : undefined;
-  const fits = start !== undefined && clean(text.slice(start, end ?? text.length)).slice(0, 24) === anchor.quote.slice(0, 24);
+  const fits =
+    start !== undefined && clean(text.slice(start, end ?? text.length)).slice(0, 24) === anchor.quote.slice(0, 24);
   if (!fits) {
     const m = findQuote(text, anchor.quote, { prefix: anchor.prefix, suffix: anchor.suffix });
     if (!m) return null;
@@ -172,7 +218,8 @@ export function blockRange(anchor: Anchor, root: ParentNode): Range | null {
     end = last === first ? m.end : undefined;
   }
   const a = pointAt(first, start!);
-  const b = last === first ? pointAt(first, end ?? text.length) : pointAt(last, Math.max(0, (anchor.end ?? textOf(last).length)));
+  const b =
+    last === first ? pointAt(first, end ?? text.length) : pointAt(last, Math.max(0, anchor.end ?? textOf(last).length));
   if (!a || !b) return null;
   const range = document.createRange();
   range.setStart(a.node, a.offset);

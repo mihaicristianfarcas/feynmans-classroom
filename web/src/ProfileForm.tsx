@@ -8,7 +8,17 @@ const STYLE_HELP = {
 };
 
 /** Who the learner is and how they like to learn. Everything the tutor and the figures adapt to. */
-export function ProfileForm({ initial, onSave, saving, submitLabel = "Save" }: { initial: Profile; onSave: (p: Profile) => void; saving?: boolean; submitLabel?: string }) {
+export function ProfileForm({
+  initial,
+  onSave,
+  saving,
+  submitLabel = "Save",
+}: {
+  initial: Profile;
+  onSave: (p: Profile) => void;
+  saving?: boolean;
+  submitLabel?: string;
+}) {
   const [p, setP] = useState<Profile>(initial);
   const set = <K extends keyof Profile>(key: K, value: Profile[K]) => setP((old) => ({ ...old, [key]: value }));
   return (
@@ -22,7 +32,11 @@ export function ProfileForm({ initial, onSave, saving, submitLabel = "Save" }: {
       <div className="form-row two">
         <label className="field">
           <span>Your name</span>
-          <input value={p.name} onChange={(e) => set("name", e.target.value)} placeholder="What should the tutor call you?" />
+          <input
+            value={p.name}
+            onChange={(e) => set("name", e.target.value)}
+            placeholder="What should the tutor call you?"
+          />
         </label>
         <label className="field">
           <span>You are a</span>
@@ -36,11 +50,21 @@ export function ProfileForm({ initial, onSave, saving, submitLabel = "Save" }: {
       </div>
       <label className="field">
         <span>What do you want to learn, and why?</span>
-        <textarea rows={3} value={p.goals} onChange={(e) => set("goals", e.target.value)} placeholder="e.g. Engineer software systems; specialise in agentic infrastructure and distributed systems. Understand how markets today map to Adam Smith's principles." />
+        <textarea
+          rows={3}
+          value={p.goals}
+          onChange={(e) => set("goals", e.target.value)}
+          placeholder="e.g. Engineer software systems; specialise in agentic infrastructure and distributed systems. Understand how markets today map to Adam Smith's principles."
+        />
       </label>
       <label className="field">
         <span>Your background</span>
-        <textarea rows={2} value={p.background} onChange={(e) => set("background", e.target.value)} placeholder="e.g. Software engineer, 6 years of backend work; comfortable with calculus, rusty on statistics." />
+        <textarea
+          rows={2}
+          value={p.background}
+          onChange={(e) => set("background", e.target.value)}
+          placeholder="e.g. Software engineer, 6 years of backend work; comfortable with calculus, rusty on statistics."
+        />
       </label>
       <div className="form-row two">
         <label className="field">
@@ -54,7 +78,19 @@ export function ProfileForm({ initial, onSave, saving, submitLabel = "Save" }: {
         </label>
         <label className="field">
           <span>Interests (comma separated)</span>
-          <input value={p.interests.join(", ")} onChange={(e) => set("interests", e.target.value.split(",").map((x) => x.trim()).filter(Boolean))} placeholder="distributed systems, AI agents, economics" />
+          <input
+            value={p.interests.join(", ")}
+            onChange={(e) =>
+              set(
+                "interests",
+                e.target.value
+                  .split(",")
+                  .map((x) => x.trim())
+                  .filter(Boolean),
+              )
+            }
+            placeholder="distributed systems, AI agents, economics"
+          />
         </label>
       </div>
       <fieldset className="styles">
@@ -63,7 +99,14 @@ export function ProfileForm({ initial, onSave, saving, submitLabel = "Save" }: {
         {(Object.keys(STYLE_HELP) as (keyof Profile["styles"])[]).map((key) => (
           <label key={key} className="style-row">
             <span className="style-name">{key === "visual" ? "Seeing" : key === "reader" ? "Reading" : "Doing"}</span>
-            <input type="range" min={0} max={1} step={0.1} value={p.styles[key]} onChange={(e) => set("styles", { ...p.styles, [key]: Number(e.target.value) })} />
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.1}
+              value={p.styles[key]}
+              onChange={(e) => set("styles", { ...p.styles, [key]: Number(e.target.value) })}
+            />
             <span className="style-help">{STYLE_HELP[key]}</span>
           </label>
         ))}
@@ -71,16 +114,34 @@ export function ProfileForm({ initial, onSave, saving, submitLabel = "Save" }: {
       <div className="form-row two">
         <label className="field">
           <span>New flashcards per day</span>
-          <input type="number" min={0} max={200} value={p.dailyNew} onChange={(e) => set("dailyNew", Number(e.target.value))} />
+          <input
+            type="number"
+            min={0}
+            max={200}
+            value={p.dailyNew}
+            onChange={(e) => set("dailyNew", Number(e.target.value))}
+          />
         </label>
         <label className="field">
           <span>Target recall ({Math.round(p.retention * 100)}%)</span>
-          <input type="range" min={0.8} max={0.95} step={0.01} value={p.retention} onChange={(e) => set("retention", Number(e.target.value))} />
+          <input
+            type="range"
+            min={0.8}
+            max={0.95}
+            step={0.01}
+            value={p.retention}
+            onChange={(e) => set("retention", Number(e.target.value))}
+          />
         </label>
       </div>
       <label className="field">
         <span>Anything else about how you learn</span>
-        <textarea rows={2} value={p.notes.startsWith("_Anything") ? "" : p.notes} onChange={(e) => set("notes", e.target.value)} placeholder="e.g. I understand things best through concrete systems I've worked on. Don't over-explain the basics." />
+        <textarea
+          rows={2}
+          value={p.notes.startsWith("_Anything") ? "" : p.notes}
+          onChange={(e) => set("notes", e.target.value)}
+          placeholder="e.g. I understand things best through concrete systems I've worked on. Don't over-explain the basics."
+        />
       </label>
       <div className="form-actions">
         <button className="button primary" type="submit" disabled={saving}>

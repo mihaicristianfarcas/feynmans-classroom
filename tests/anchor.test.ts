@@ -3,7 +3,15 @@ import { chapterRange, locateInBlocks, locateInPages, squash } from "../server/a
 import type { Block, PageText } from "../server/types.ts";
 
 const pages: PageText[] = [
-  { n: 1, w: 400, h: 600, lines: [{ y: 0.1, x: 0.1, s: 12, t: "CHAPTER I." }, { y: 0.2, x: 0.1, s: 10, t: "Some words about nothing in particular." }] },
+  {
+    n: 1,
+    w: 400,
+    h: 600,
+    lines: [
+      { y: 0.1, x: 0.1, s: 12, t: "CHAPTER I." },
+      { y: 0.2, x: 0.1, s: 10, t: "Some words about nothing in particular." },
+    ],
+  },
   {
     n: 2,
     w: 400,
@@ -49,12 +57,19 @@ describe("chapter edges on a shared page", () => {
   it("doesn't anchor into the next chapter's part of a boundary page", () => {
     // page 2 holds the end of chapter A (y < 0.5) and the start of chapter B (y >= 0.5)
     expect(locateInPages(pages, "thus causing x to become x + dx", { from: 1, to: 2, toY: 0.5 })).toBeNull();
-    expect(locateInPages(pages, "thus causing x to become x + dx", { from: 2, to: 2, fromY: 0.5 })?.loc).toEqual({ page: 2, y: 0.5 });
+    expect(locateInPages(pages, "thus causing x to become x + dx", { from: 2, to: 2, fromY: 0.5 })?.loc).toEqual({
+      page: 2,
+      y: 0.5,
+    });
   });
 });
 
 describe("locateInBlocks", () => {
-  const blocks: Block[] = ["Lecture one.", "The candle flame is hollow.", "Air rushes in at the bottom of the flame."].map((text, id) => ({ id, chapter: 0, tag: "p", html: text, text }));
+  const blocks: Block[] = [
+    "Lecture one.",
+    "The candle flame is hollow.",
+    "Air rushes in at the bottom of the flame.",
+  ].map((text, id) => ({ id, chapter: 0, tag: "p", html: text, text }));
   it("finds the block a quote starts in", () => {
     expect(locateInBlocks(blocks, "Air rushes in at the bottom")?.loc).toEqual({ block: 2 });
   });
@@ -62,7 +77,12 @@ describe("locateInBlocks", () => {
 
 describe("chapterRange", () => {
   it("covers pages for PDFs and blocks for reflowable books", () => {
-    expect(chapterRange({ id: "c1", title: "", start: { page: 20, y: 0.1 }, end: { page: 28, y: 0.4 }, sections: [] })).toEqual({ from: 20, to: 28, fromY: 0.1, toY: 0.4 });
-    expect(chapterRange({ id: "c1", title: "", start: { block: 4 }, end: { block: 9 }, sections: [] })).toEqual({ from: 4, to: 9 });
+    expect(
+      chapterRange({ id: "c1", title: "", start: { page: 20, y: 0.1 }, end: { page: 28, y: 0.4 }, sections: [] }),
+    ).toEqual({ from: 20, to: 28, fromY: 0.1, toY: 0.4 });
+    expect(chapterRange({ id: "c1", title: "", start: { block: 4 }, end: { block: 9 }, sections: [] })).toEqual({
+      from: 4,
+      to: 9,
+    });
   });
 });

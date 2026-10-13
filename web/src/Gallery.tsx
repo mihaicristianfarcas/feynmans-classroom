@@ -7,9 +7,13 @@ export function Gallery({ theme }: { theme: "light" | "dark" }) {
   const query = new URLSearchParams(location.hash.split("?")[1] || "");
   const only = query.get("only");
   const [specs, setSpecs] = useState<Record<string, unknown>>(query.get("dev") ? {} : EXAMPLES);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once, for the query the page was opened with
   useEffect(() => {
-    if (query.get("dev")) fetch("/api/dev/scenes").then((r) => r.json()).then(setSpecs, () => setSpecs({}));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (query.get("dev"))
+      fetch("/api/dev/scenes")
+        .then((r) => r.json())
+        .then(setSpecs, () => setSpecs({}));
+  }, []);
   const names = Object.keys(specs).filter((name) => !only || only.split(",").includes(name));
   return (
     <div className="gallery">

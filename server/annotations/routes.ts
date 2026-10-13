@@ -1,12 +1,22 @@
 /* The margin's API: annotations of a book, follow-ups, redraws, and sending a passage to a note. */
 import type { Hono } from "hono";
-import type { Annotation, Anchor, AnnotationKind } from "../../shared/vault-types.ts";
+import type { Anchor, Annotation, AnnotationKind } from "../../shared/vault-types.ts";
 import { appendToNote, bookNote } from "../learn/notes.ts";
 import { getBook } from "../store.ts";
 import { annotations, notes } from "../vault/index.ts";
-import { createAnnotation, deleteAnnotation, followUp, getAnnotation, listAnnotations, redraw, retryAnnotation, updateAnnotation } from "./index.ts";
+import {
+  createAnnotation,
+  deleteAnnotation,
+  followUp,
+  getAnnotation,
+  listAnnotations,
+  redraw,
+  retryAnnotation,
+  updateAnnotation,
+} from "./index.ts";
 
-const body = async <T>(c: { req: { json: () => Promise<unknown> } }) => ((await c.req.json().catch(() => ({}))) || {}) as T;
+const body = async <T>(c: { req: { json: () => Promise<unknown> } }) =>
+  ((await c.req.json().catch(() => ({}))) || {}) as T;
 
 /** How a passage goes into a note: a link to it, the quote (as a callout linked to it), or the whole annotation embedded. */
 export function noteMarkdown(a: Annotation, mode: "reference" | "passage" | "embed"): string {
@@ -28,9 +38,18 @@ export function noteMarkdown(a: Annotation, mode: "reference" | "passage" | "emb
 export function registerAnnotationRoutes(app: Hono) {
   app.get("/api/books/:id/annotations", (c) => c.json(listAnnotations(c.req.param("id"))));
   app.post("/api/books/:id/annotations", async (c) => {
-    const b = await body<{ kind: AnnotationKind; anchor: Anchor; request?: string; color?: string; body?: string; quality?: "quick" | "careful"; sceneKind?: string }>(c);
+    const b = await body<{
+      kind: AnnotationKind;
+      anchor: Anchor;
+      request?: string;
+      color?: string;
+      body?: string;
+      quality?: "quick" | "careful";
+      sceneKind?: string;
+    }>(c);
     if (!b.anchor?.quote?.trim()) return c.json({ error: "select some text first" }, 400);
-    if ((b.kind === "ask" || b.kind === "comment") && !(b.request?.trim() || b.body?.trim())) return c.json({ error: b.kind === "ask" ? "ask a question" : "write something" }, 400);
+    if ((b.kind === "ask" || b.kind === "comment") && !(b.request?.trim() || b.body?.trim()))
+      return c.json({ error: b.kind === "ask" ? "ask a question" : "write something" }, 400);
     return c.json(createAnnotation(c.req.param("id"), b));
   });
   app.get("/api/annotations/:id", (c) => {
@@ -53,7 +72,13 @@ export function registerAnnotationRoutes(app: Hono) {
    * The note is the one given, or the book's reading note.
    */
   app.post("/api/books/:id/to-note", async (c) => {
-    const b = await body<{ annotationId?: string; anchor?: Anchor; noteId?: string; mode?: "reference" | "passage" | "embed"; comment?: string }>(c);
+    const b = await body<{
+      annotationId?: string;
+      anchor?: Anchor;
+      noteId?: string;
+      mode?: "reference" | "passage" | "embed";
+      comment?: string;
+    }>(c);
     const bookId = c.req.param("id");
     let a = b.annotationId ? annotations.get(b.annotationId) : undefined;
     if (!a) {

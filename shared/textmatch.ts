@@ -12,7 +12,19 @@ export interface Folded {
   map: number[];
 }
 
-const QUOTES: Record<string, string> = { "‘": "'", "’": "'", "‚": "'", "‛": "'", "′": "'", "“": '"', "”": '"', "„": '"', "″": '"', "«": '"', "»": '"' };
+const QUOTES: Record<string, string> = {
+  "‘": "'",
+  "’": "'",
+  "‚": "'",
+  "‛": "'",
+  "′": "'",
+  "“": '"',
+  "”": '"',
+  "„": '"',
+  "″": '"',
+  "«": '"',
+  "»": '"',
+};
 const DASHES = /[‐-―−⸺⸻]/;
 const SPACE = /[\s\u00a0\u2000-\u200b\u2028\u2029\u202f\u205f\u3000]/;
 const MD_MARKS = new Set(["*", "_", "#", ">", "|", "`", "~", "[", "]", "=", "^"]);
@@ -120,7 +132,11 @@ function overlap(actual: string, expected: string, fromEnd: boolean) {
  * Finds `quote` in `text`. `prefix`/`suffix` (the text just before and after it where it was
  * selected) pick among repeats; `hint` (an offset in `text`) prefers the nearest one.
  */
-export function findQuote(text: string, quote: string, ctx: { prefix?: string; suffix?: string; hint?: number; markdown?: boolean } = {}): QuoteMatch | null {
+export function findQuote(
+  text: string,
+  quote: string,
+  ctx: { prefix?: string; suffix?: string; hint?: number; markdown?: boolean } = {},
+): QuoteMatch | null {
   const T = fold(text, { markdown: ctx.markdown });
   const q = fold(quote, { markdown: ctx.markdown }).text;
   if (!q || !T.text) return null;
@@ -132,7 +148,11 @@ export function findQuote(text: string, quote: string, ctx: { prefix?: string; s
     const near = hint >= 0 ? 1 - Math.min(1, Math.abs(start - hint) / Math.max(2000, T.text.length)) : 0;
     return exact * 50 + contextScore(T.text, start, end, prefix, suffix) * 20 + near * 2;
   };
-  const back = (start: number, end: number, errors: number): QuoteMatch => ({ start: T.map[start], end: T.map[Math.max(start, end - 1)] + 1, score: Math.max(0, 1 - errors / Math.max(1, q.length)) });
+  const back = (start: number, end: number, errors: number): QuoteMatch => ({
+    start: T.map[start],
+    end: T.map[Math.max(start, end - 1)] + 1,
+    score: Math.max(0, 1 - errors / Math.max(1, q.length)),
+  });
 
   // exact
   const exact: number[] = [];
@@ -148,7 +168,8 @@ export function findQuote(text: string, quote: string, ctx: { prefix?: string; s
     const tail = findQuote(text, quote.slice(-80), { ...ctx, prefix: undefined, hint: head ? head.start : ctx.hint });
     if (head && tail && tail.end > head.start) {
       const len = tail.end - head.start;
-      if (len > quote.length * 0.6 && len < quote.length * 1.6) return { start: head.start, end: tail.end, score: Math.min(head.score, tail.score) * 0.95 };
+      if (len > quote.length * 0.6 && len < quote.length * 1.6)
+        return { start: head.start, end: tail.end, score: Math.min(head.score, tail.score) * 0.95 };
     }
     return null;
   }

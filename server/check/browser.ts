@@ -1,6 +1,6 @@
 import puppeteer, { type Browser } from "puppeteer-core";
-import { chromePath } from "../config.ts";
 import { buildDemoPage } from "../../runtime/page.mjs";
+import { chromePath } from "../config.ts";
 import type { BrowserReport } from "../types.ts";
 
 let browser: Promise<Browser> | null = null;
@@ -12,7 +12,14 @@ async function getBrowser(): Promise<Browser> {
     browser = puppeteer.launch({
       executablePath,
       headless: true,
-      args: ["--no-first-run", "--no-default-browser-check", "--hide-scrollbars", "--mute-audio", "--use-gl=angle", "--enable-unsafe-swiftshader"],
+      args: [
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--hide-scrollbars",
+        "--mute-audio",
+        "--use-gl=angle",
+        "--enable-unsafe-swiftshader",
+      ],
     });
     browser.then((b) => b.on("disconnected", () => (browser = null))).catch(() => (browser = null));
   }
@@ -28,7 +35,11 @@ export async function closeBrowser() {
  * Renders a demo in real Chrome: collects runtime and console errors, checks that frames run, and
  * captures the card in light and dark theme (and a phone-width shot) for review.
  */
-export async function browserCheck(source: string, shotBase: string, options: { fig?: string; wait?: number } = {}): Promise<BrowserReport> {
+export async function browserCheck(
+  source: string,
+  shotBase: string,
+  options: { fig?: string; wait?: number } = {},
+): Promise<BrowserReport> {
   const report: BrowserReport = { ok: false, errors: [], frames: 0, readout: "", shots: [] };
   const b = await getBrowser();
   const page = await b.newPage();
@@ -42,16 +53,24 @@ export async function browserCheck(source: string, shotBase: string, options: { 
     await page.setContent(html, { waitUntil: "load" });
     await new Promise((r) => setTimeout(r, options.wait ?? 2200));
     const state = await page.evaluate(() => {
-      const S = (window as any).__classroom;
+      const S = (
+        window as unknown as {
+          __classroom?: { errors?: { where: string; message: string }[]; frames?: number; [key: string]: unknown };
+        }
+      ).__classroom;
       const root = document.querySelector(".cr-root") as HTMLElement | null;
       const svg = document.querySelector(".cr-stage svg") as SVGSVGElement | null;
       // labels that collide with each other are the most common layout fault
-      const boxes = [...document.querySelectorAll(".cr-stage svg text")].map((t) => (t as SVGTextElement).getBoundingClientRect()).filter((r) => r.width > 0);
+      const boxes = [...document.querySelectorAll(".cr-stage svg text")]
+        .map((t) => (t as SVGTextElement).getBoundingClientRect())
+        .filter((r) => r.width > 0);
       let overlaps = 0;
       for (let i = 0; i < boxes.length; i++)
         for (let j = i + 1; j < boxes.length; j++) {
-          const a = boxes[i], c = boxes[j];
-          const w = Math.min(a.right, c.right) - Math.max(a.left, c.left), h = Math.min(a.bottom, c.bottom) - Math.max(a.top, c.top);
+          const a = boxes[i],
+            c = boxes[j];
+          const w = Math.min(a.right, c.right) - Math.max(a.left, c.left),
+            h = Math.min(a.bottom, c.bottom) - Math.max(a.top, c.top);
           if (w > 2 && h > 2) overlaps++;
         }
       // drawing extent against the viewBox
@@ -74,19 +93,27 @@ export async function browserCheck(source: string, shotBase: string, options: { 
     report.frames = state.frames;
     report.readout = state.readout;
     if (state.overlaps) report.errors.push(`${state.overlaps} pair(s) of labels overlap each other in the drawing`);
-    if (state.fill && state.fill < 0.45) report.errors.push(`the drawing uses only ${Math.round(state.fill * 100)}% of the viewBox: enlarge it or shrink the viewBox`);
+    if (state.fill && state.fill < 0.45)
+      report.errors.push(
+        `the drawing uses only ${Math.round(state.fill * 100)}% of the viewBox: enlarge it or shrink the viewBox`,
+      );
     if (state.overflow) report.errors.push("the page scrolls sideways at 720 px wide");
 
     const card = await page.$(".cr-root");
     const light = `${shotBase}-light.png`;
     await (card || page).screenshot({ path: light as `${string}.png` });
     report.shots.push(light);
-    await page.evaluate(() => (window as any).Classroom.setTheme("dark"));
+    await page.evaluate(() =>
+      (window as unknown as { Classroom: { setTheme(theme: string): void } }).Classroom.setTheme("dark"),
+    );
     await new Promise((r) => setTimeout(r, 500));
     const dark = `${shotBase}-dark.png`;
     await (card || page).screenshot({ path: dark as `${string}.png` });
     report.shots.push(dark);
-    if (report.frames < 5) report.errors.push(`only ${report.frames} frames ran in ${((options.wait ?? 2200) / 1000).toFixed(1)} s: the demo should animate on its own`);
+    if (report.frames < 5)
+      report.errors.push(
+        `only ${report.frames} frames ran in ${((options.wait ?? 2200) / 1000).toFixed(1)} s: the demo should animate on its own`,
+      );
     report.ok = report.errors.length === 0;
     return report;
   } finally {

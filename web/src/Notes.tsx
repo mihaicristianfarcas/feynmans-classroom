@@ -3,7 +3,7 @@
  * without a link, and the connections the agent suggests (accept, reject, or remove later). */
 import { ArrowUpRight, ChevronRight, FolderPlus, SquarePen, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { go, learn, openLink, type NoteDetail, type SuggestedLink } from "./api";
+import { go, learn, type NoteDetail, openLink, type SuggestedLink } from "./api";
 import { Markdown } from "./Markdown";
 import { NoteEditor } from "./NoteEditor";
 import { Spinner, timeAgo, useLoad } from "./Shell";
@@ -64,8 +64,12 @@ function EmptyNotes({ tree }: { tree: Tree | null }) {
     <div className="note-pane empty-pane">
       <div className="empty rise">
         <h1 className="page-title">Notes</h1>
-        <p className="lede small">Write what you think as you learn. Link ideas with <code>[[double brackets]]</code>, embed passages, figures and pictures with <code>![[…]]</code>. Every note is a Markdown file in your vault, named by its title, so Obsidian and AI agents can work with it too.</p>
-        <button className="button primary" onClick={() => newNote("")}>
+        <p className="lede small">
+          Write what you think as you learn. Link ideas with <code>[[double brackets]]</code>, embed passages, figures
+          and pictures with <code>![[…]]</code>. Every note is a Markdown file in your vault, named by its title, so
+          Obsidian and AI agents can work with it too.
+        </p>
+        <button type="button" className="button primary" onClick={() => newNote("")}>
           <SquarePen aria-hidden="true" />
           New note
         </button>
@@ -98,7 +102,10 @@ function buildTree(tree: Tree): Folder {
     for (const part of path.split("/")) {
       acc = acc ? `${acc}/${part}` : part;
       let next = node.folders.find((f) => f.name === part);
-      if (!next) node.folders.push((next = { name: part, path: acc, folders: [], notes: [] }));
+      if (!next) {
+        next = { name: part, path: acc, folders: [], notes: [] };
+        node.folders.push(next);
+      }
       node = next;
     }
     return node;
@@ -134,13 +141,26 @@ function FileTree({ tree, current, reload }: { tree: Tree | null; current: strin
       return next;
     });
   const root = useMemo(() => (tree ? buildTree(tree) : null), [tree]);
-  const currentFolder = tree?.notes.find((n) => n.id === current)?.path.split("/").slice(1, -1).join("/") || "";
-  const matches = filter.trim() ? (tree?.notes || []).filter((n) => n.path.toLowerCase().includes(filter.trim().toLowerCase())) : null;
+  const currentFolder =
+    tree?.notes
+      .find((n) => n.id === current)
+      ?.path.split("/")
+      .slice(1, -1)
+      .join("/") || "";
+  const matches = filter.trim()
+    ? (tree?.notes || []).filter((n) => n.path.toLowerCase().includes(filter.trim().toLowerCase()))
+    : null;
   const renderFolder = (f: Folder, depth: number): React.ReactNode => (
     <>
       {f.folders.map((sub) => (
         <li key={`d:${sub.path}`}>
-          <button className="tree-row folder" style={{ paddingLeft: 6 + depth * 14 }} onClick={() => toggle(sub.path)} aria-expanded={!closed.has(sub.path)}>
+          <button
+            type="button"
+            className="tree-row folder"
+            style={{ paddingLeft: 6 + depth * 14 }}
+            onClick={() => toggle(sub.path)}
+            aria-expanded={!closed.has(sub.path)}
+          >
             <ChevronRight className="tree-caret" aria-hidden="true" />
             {sub.name}
           </button>
@@ -149,7 +169,13 @@ function FileTree({ tree, current, reload }: { tree: Tree | null; current: strin
       ))}
       {f.notes.map((n) => (
         <li key={n.id}>
-          <a className="tree-row" href={`#/notes/${n.id}`} aria-current={n.id === current ? "page" : undefined} style={{ paddingLeft: 26 + depth * 14 }} title={n.path}>
+          <a
+            className="tree-row"
+            href={`#/notes/${n.id}`}
+            aria-current={n.id === current ? "page" : undefined}
+            style={{ paddingLeft: 26 + depth * 14 }}
+            title={n.path}
+          >
             {n.title}
           </a>
         </li>
@@ -159,11 +185,24 @@ function FileTree({ tree, current, reload }: { tree: Tree | null; current: strin
   return (
     <aside className="file-tree" aria-label="Notes">
       <div className="tree-head">
-        <input className="search" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find a note…" aria-label="Find a note" />
-        <button className="icon-button" title="New note" aria-label="New note" onClick={() => newNote(currentFolder)}>
+        <input
+          className="search"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Find a note…"
+          aria-label="Find a note"
+        />
+        <button
+          type="button"
+          className="icon-button"
+          title="New note"
+          aria-label="New note"
+          onClick={() => newNote(currentFolder)}
+        >
           <SquarePen aria-hidden="true" />
         </button>
         <button
+          type="button"
           className="icon-button"
           title="New folder"
           aria-label="New folder"
@@ -185,7 +224,8 @@ function FileTree({ tree, current, reload }: { tree: Tree | null; current: strin
           {matches.map((n) => (
             <li key={n.id}>
               <a className="tree-row" href={`#/notes/${n.id}`} aria-current={n.id === current ? "page" : undefined}>
-                <span className="tree-title">{n.title}</span> <span className="tree-folder">{n.path.split("/").slice(1, -1).join("/")}</span>
+                <span className="tree-title">{n.title}</span>{" "}
+                <span className="tree-folder">{n.path.split("/").slice(1, -1).join("/")}</span>
               </a>
             </li>
           ))}
@@ -271,12 +311,15 @@ function NotePane({ id, theme, onChanged }: { id: string; theme: "light" | "dark
     timer.current = setTimeout(() => save({ body: text }), 700);
   };
   // leaving the note with changes still waiting: save them now
-  useEffect(() => () => {
-    if (dirty.current) {
-      clearTimeout(timer.current);
-      void learn.updateNote(id, { body: bodyRef.current });
-    }
-  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(
+    () => () => {
+      if (dirty.current) {
+        clearTimeout(timer.current);
+        void learn.updateNote(id, { body: bodyRef.current });
+      }
+    },
+    [id],
+  );
   const bodyRef = useRef(body);
   bodyRef.current = body;
 
@@ -308,6 +351,7 @@ function NotePane({ id, theme, onChanged }: { id: string; theme: "light" | "dark
             <div className="segmented" role="group" aria-label="Mode" ref={modes}>
               {(["edit", "read"] as const).map((m) => (
                 <button
+                  type="button"
                   key={m}
                   aria-pressed={mode === m}
                   onClick={() => {
@@ -321,12 +365,21 @@ function NotePane({ id, theme, onChanged }: { id: string; theme: "light" | "dark
                 </button>
               ))}
             </div>
-            <span className="fine">{saving === "saving" ? "Saving…" : saving === "saved" ? "Saved" : dirty.current ? "Unsaved" : `Edited ${timeAgo(note.updated)}`}</span>
+            <span className="fine">
+              {saving === "saving"
+                ? "Saving…"
+                : saving === "saved"
+                  ? "Saved"
+                  : dirty.current
+                    ? "Unsaved"
+                    : `Edited ${timeAgo(note.updated)}`}
+            </span>
             <span className="spacer" />
             <code className="fine path" title="The file in your vault">
               {note.path}
             </code>
             <button
+              type="button"
               className="icon-button danger"
               title="Move to the vault’s trash"
               aria-label="Delete note"
@@ -340,35 +393,75 @@ function NotePane({ id, theme, onChanged }: { id: string; theme: "light" | "dark
               <Trash2 aria-hidden="true" />
             </button>
           </div>
-          <Properties note={note} onSave={async (patch) => (await learn.updateNote(note.id, patch), load())} />
+          <Properties
+            note={note}
+            onSave={async (patch) => {
+              await learn.updateNote(note.id, patch);
+              load();
+            }}
+          />
         </header>
-        <div className="note-body">{mode === "edit" ? <NoteEditor value={body} onChange={onBody} placeholder="Write… [[ links a note, ![[ embeds one; paste a picture" autoFocus={!location.hash.includes("new=1") && !body} /> : <Markdown text={body} theme={theme} className="note-read" base={note.path} />}</div>
+        <div className="note-body">
+          {mode === "edit" ? (
+            <NoteEditor
+              value={body}
+              onChange={onBody}
+              placeholder="Write… [[ links a note, ![[ embeds one; paste a picture"
+              autoFocus={!location.hash.includes("new=1") && !body}
+            />
+          ) : (
+            <Markdown text={body} theme={theme} className="note-read" base={note.path} />
+          )}
+        </div>
       </div>
       <NoteSidebar note={note} reload={load} />
     </div>
   );
 }
 
-function Properties({ note, onSave }: { note: NoteDetail; onSave: (patch: { tags?: string[]; aliases?: string[] }) => Promise<void> }) {
+function Properties({
+  note,
+  onSave,
+}: {
+  note: NoteDetail;
+  onSave: (patch: { tags?: string[]; aliases?: string[] }) => Promise<void>;
+}) {
   const [tags, setTags] = useState(note.tags.join(", "));
   const [aliases, setAliases] = useState(note.aliases.join(", "));
   useEffect(() => {
     setTags(note.tags.join(", "));
     setAliases(note.aliases.join(", "));
   }, [note.tags, note.aliases]);
-  const list = (s: string) => s.split(",").map((x) => x.trim().replace(/^#/, "")).filter(Boolean);
+  const list = (s: string) =>
+    s
+      .split(",")
+      .map((x) => x.trim().replace(/^#/, ""))
+      .filter(Boolean);
   return (
     <div className="properties">
       <label>
         <span>tags</span>
-        <input value={tags} onChange={(e) => setTags(e.target.value)} onBlur={() => tags !== note.tags.join(", ") && onSave({ tags: list(tags) })} placeholder="add tags" />
+        <input
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          onBlur={() => tags !== note.tags.join(", ") && onSave({ tags: list(tags) })}
+          placeholder="add tags"
+        />
       </label>
       <label>
         <span>aliases</span>
-        <input value={aliases} onChange={(e) => setAliases(e.target.value)} onBlur={() => aliases !== note.aliases.join(", ") && onSave({ aliases: list(aliases) })} placeholder="other names links can use" />
+        <input
+          value={aliases}
+          onChange={(e) => setAliases(e.target.value)}
+          onBlur={() => aliases !== note.aliases.join(", ") && onSave({ aliases: list(aliases) })}
+          placeholder="other names links can use"
+        />
       </label>
       {note.source?.bookId && (
-        <a className="link" href={`#/book/${note.source.bookId}${note.source.page !== undefined ? `?at=${(note.source.page + (note.source.y ?? 0)).toFixed(3)}` : ""}`}>
+        <a
+          className="link"
+          href={`#/book/${note.source.bookId}${note.source.page !== undefined ? `?at=${(note.source.page + (note.source.y ?? 0)).toFixed(3)}` : ""}`}
+        >
           from a book
           <ArrowUpRight aria-hidden="true" />
         </a>
@@ -399,9 +492,26 @@ function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => void })
         ) : (
           <ul className="link-list">
             {note.backlinks.map((b, i) => (
-              <li key={i}>
-                <a href={b.from.startsWith("note:") ? `#/notes/${b.from.slice(5)}` : b.from.startsWith("concept:") ? `#/brain/concept/${b.from.slice(8)}` : `#/open?target=${encodeURIComponent(b.path.replace(/\.md$/, ""))}`}>{b.title}</a>
-                {b.kind === "ai" && <span className="ai-badge" title="A connection you accepted">AI</span>}
+              <li
+                // biome-ignore lint/suspicious/noArrayIndexKey: a read-only list, replaced whole when it reloads
+                key={i}
+              >
+                <a
+                  href={
+                    b.from.startsWith("note:")
+                      ? `#/notes/${b.from.slice(5)}`
+                      : b.from.startsWith("concept:")
+                        ? `#/brain/concept/${b.from.slice(8)}`
+                        : `#/open?target=${encodeURIComponent(b.path.replace(/\.md$/, ""))}`
+                  }
+                >
+                  {b.title}
+                </a>
+                {b.kind === "ai" && (
+                  <span className="ai-badge" title="A connection you accepted">
+                    AI
+                  </span>
+                )}
                 {b.context && <div className="context">{b.context}</div>}
               </li>
             ))}
@@ -415,13 +525,21 @@ function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => void })
           </h3>
           <ul className="link-list">
             {note.mentions.map((m, i) => (
-              <li key={i}>
+              <li
+                // biome-ignore lint/suspicious/noArrayIndexKey: a read-only list, replaced whole when it reloads
+                key={i}
+              >
                 <span>{m.title}</span>{" "}
                 <button
+                  type="button"
                   className="link"
                   title={`Turn the mention into [[${note.title}]]`}
                   onClick={async () => {
-                    await fetch(`/api/notes/${note.id}/link-mention`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path: m.path }) });
+                    await fetch(`/api/notes/${note.id}/link-mention`, {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ path: m.path }),
+                    });
                     reload();
                   }}
                 >
@@ -439,8 +557,18 @@ function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => void })
         </h3>
         <ul className="link-list compact">
           {note.outgoing.map((o, i) => (
-            <li key={i} data-missing={!o.to || undefined}>
-              <a href={`#/open?target=${encodeURIComponent(o.target)}`} onClick={(e) => (e.preventDefault(), openLink(o.target))}>
+            <li
+              // biome-ignore lint/suspicious/noArrayIndexKey: a read-only list, replaced whole when it reloads
+              key={i}
+              data-missing={!o.to || undefined}
+            >
+              <a
+                href={`#/open?target=${encodeURIComponent(o.target)}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  openLink(o.target);
+                }}
+              >
                 {o.title}
               </a>
               {!o.to && <span className="fine"> (new)</span>}
@@ -451,7 +579,9 @@ function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => void })
       </section>
       <section>
         <h3 className="side-title">Connections</h3>
-        <p className="fine">An agent reads your vault and suggests notes and concepts this one should link to. You decide.</p>
+        <p className="fine">
+          An agent reads your vault and suggests notes and concepts this one should link to. You decide.
+        </p>
         {suggested.map((c) => (
           <div key={c.id} className="suggestion">
             <div>
@@ -459,10 +589,10 @@ function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => void })
             </div>
             <div className="context">{c.why}</div>
             <div className="row gap">
-              <button className="button" onClick={() => decide(c, "accept")}>
+              <button type="button" className="button" onClick={() => decide(c, "accept")}>
                 Link it
               </button>
-              <button className="link" onClick={() => decide(c, "reject")}>
+              <button type="button" className="link" onClick={() => decide(c, "reject")}>
                 Not related
               </button>
             </div>
@@ -472,13 +602,25 @@ function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => void })
           <ul className="link-list compact">
             {accepted.map((c) => (
               <li key={c.id}>
-                <a href={`#/open?target=${encodeURIComponent(c.to)}`} onClick={(e) => (e.preventDefault(), openLink(c.to))}>
+                <a
+                  href={`#/open?target=${encodeURIComponent(c.to)}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    openLink(c.to);
+                  }}
+                >
                   {c.to}
                 </a>
                 <span className="ai-badge" title={c.why}>
                   AI
                 </span>
-                <button className="link danger" title="Remove this link" aria-label="Remove this link" onClick={() => decide(c, "remove")}>
+                <button
+                  type="button"
+                  className="link danger"
+                  title="Remove this link"
+                  aria-label="Remove this link"
+                  onClick={() => decide(c, "remove")}
+                >
                   <X aria-hidden="true" />
                 </button>
               </li>
@@ -486,6 +628,7 @@ function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => void })
           </ul>
         )}
         <button
+          type="button"
           className="button"
           disabled={!!busy}
           onClick={async () => {

@@ -24,21 +24,61 @@ export const PLAN_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["slug", "kind", "eyebrow", "title", "caption", "anchorQuote", "page", "idea", "picture", "motion", "controls", "readouts", "truth", "predict"],
+        required: [
+          "slug",
+          "kind",
+          "eyebrow",
+          "title",
+          "caption",
+          "anchorQuote",
+          "page",
+          "idea",
+          "picture",
+          "motion",
+          "controls",
+          "readouts",
+          "truth",
+          "predict",
+        ],
         properties: {
           slug: { type: "string", description: "kebab-case id, e.g. work-done-by-gravity" },
-          kind: { type: "string", enum: ["plot", "sequence", "graph", "object3d", "diagram"], description: "plot: quantities and curves · sequence: actors exchanging messages over time · graph: things and connections, states, flows with moving tokens · object3d: a physical object and its parts in 3D · diagram: a 2D sketch of a physical setup that moves (a pendulum, a wick, rays, molecules)" },
-          eyebrow: { type: "string", description: "2–5 word topic label shown above the demo, e.g. 'Work done by gravity'" },
+          kind: {
+            type: "string",
+            enum: ["plot", "sequence", "graph", "object3d", "diagram"],
+            description:
+              "plot: quantities and curves · sequence: actors exchanging messages over time · graph: things and connections, states, flows with moving tokens · object3d: a physical object and its parts in 3D · diagram: a 2D sketch of a physical setup that moves (a pendulum, a wick, rays, molecules)",
+          },
+          eyebrow: {
+            type: "string",
+            description: "2–5 word topic label shown above the demo, e.g. 'Work done by gravity'",
+          },
           title: { type: "string", description: "card title, at most 32 characters" },
-          caption: { type: "string", description: "one or two plain sentences (max ~30 words) saying what the reader sees and why it matters" },
-          anchorQuote: { type: "string", description: "an EXACT quote of 8–16 consecutive words copied from the text where this idea is introduced" },
+          caption: {
+            type: "string",
+            description: "one or two plain sentences (max ~30 words) saying what the reader sees and why it matters",
+          },
+          anchorQuote: {
+            type: "string",
+            description: "an EXACT quote of 8–16 consecutive words copied from the text where this idea is introduced",
+          },
           page: { type: "integer", description: "the [[page N]] or [[block N]] marker number where the quote appears" },
           idea: { type: "string", description: "the one idea the demo makes obvious" },
-          picture: { type: "string", description: "what is drawn: a simple 2D picture (side view, plot, diagram) and which part is the lit accent" },
+          picture: {
+            type: "string",
+            description:
+              "what is drawn: a simple 2D picture (side view, plot, diagram) and which part is the lit accent",
+          },
           motion: { type: "string", description: "what moves on its own and what the motion shows" },
           controls: { type: "string", description: "1–3 controls with ranges, units and the book's default values" },
-          readouts: { type: "string", description: "the live readout and 0–4 stats with units, all quantities the book talks about; for a qualitative idea, a state word (e.g. 'flame: upward') and no invented numbers" },
-          truth: { type: "string", description: "the equations, constants and example numbers from the text that the demo must obey" },
+          readouts: {
+            type: "string",
+            description:
+              "the live readout and 0–4 stats with units, all quantities the book talks about; for a qualitative idea, a state word (e.g. 'flame: upward') and no invented numbers",
+          },
+          truth: {
+            type: "string",
+            description: "the equations, constants and example numbers from the text that the demo must obey",
+          },
           predict: { anyOf: [{ type: "null" }, predictSchema] },
         },
       },
@@ -46,7 +86,12 @@ export const PLAN_SCHEMA = {
   },
 };
 
-function planPrompt(book: Book, chapter: TocEntry, text: string, options: { count?: number; focus?: string; existing?: string[] }) {
+function planPrompt(
+  book: Book,
+  chapter: TocEntry,
+  text: string,
+  options: { count?: number; focus?: string; existing?: string[] },
+) {
   const unit = book.format === "pdf" ? "page" : "block";
   const want = options.focus
     ? "Design exactly ONE demo for the passage the reader selected (below). Its anchorQuote must come from that passage."
@@ -77,18 +122,54 @@ ${text}
 Return JSON matching the schema.`;
 }
 
-export async function planChapter(book: Book, chapter: TocEntry, text: string, options: { count?: number; focus?: string; existing?: string[]; onActivity?: (t: string) => void; signal?: AbortSignal; log?: string }): Promise<Brief[]> {
-  const result = await structured<{ demos?: Brief[] }>({ prompt: planPrompt(book, chapter, text, options), schema: PLAN_SCHEMA, tier: "fast", effort: "medium", onActivity: options.onActivity, signal: options.signal, log: options.log, timeoutMs: Math.min(CODEX.timeoutMs, 10 * 60 * 1000) });
+export async function planChapter(
+  book: Book,
+  chapter: TocEntry,
+  text: string,
+  options: {
+    count?: number;
+    focus?: string;
+    existing?: string[];
+    onActivity?: (t: string) => void;
+    signal?: AbortSignal;
+    log?: string;
+  },
+): Promise<Brief[]> {
+  const result = await structured<{ demos?: Brief[] }>({
+    prompt: planPrompt(book, chapter, text, options),
+    schema: PLAN_SCHEMA,
+    tier: "fast",
+    effort: "medium",
+    onActivity: options.onActivity,
+    signal: options.signal,
+    log: options.log,
+    timeoutMs: Math.min(CODEX.timeoutMs, 10 * 60 * 1000),
+  });
   const demos = (result.data?.demos || []) as Brief[];
   if (!demos.length) throw new Error("the planner returned no figures");
   return demos.slice(0, options.focus ? 1 : GENERATION.maxDemos + 1).map(normalizeBrief);
 }
 
 function normalizeBrief(raw: Brief): Brief {
-  const s = (v: unknown, max = 600) => String(v ?? "").trim().slice(0, max);
-  const predict = raw.predict && Array.isArray(raw.predict.choices) && raw.predict.choices.length >= 2 ? { question: s(raw.predict.question), choices: raw.predict.choices.map((c) => s(c, 120)).slice(0, 4), answer: Math.max(0, Math.min(raw.predict.choices.length - 1, Number(raw.predict.answer) || 0)), explain: s(raw.predict.explain) } : null;
+  const s = (v: unknown, max = 600) =>
+    String(v ?? "")
+      .trim()
+      .slice(0, max);
+  const predict =
+    raw.predict && Array.isArray(raw.predict.choices) && raw.predict.choices.length >= 2
+      ? {
+          question: s(raw.predict.question),
+          choices: raw.predict.choices.map((c) => s(c, 120)).slice(0, 4),
+          answer: Math.max(0, Math.min(raw.predict.choices.length - 1, Number(raw.predict.answer) || 0)),
+          explain: s(raw.predict.explain),
+        }
+      : null;
   return {
-    slug: s(raw.slug, 60).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "demo",
+    slug:
+      s(raw.slug, 60)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "") || "demo",
     eyebrow: s(raw.eyebrow, 60),
     title: s(raw.title, 40),
     caption: s(raw.caption, 280),
@@ -101,7 +182,9 @@ function normalizeBrief(raw: Brief): Brief {
     readouts: s(raw.readouts),
     truth: s(raw.truth, 1200),
     predict,
-    kind: ["plot", "sequence", "graph", "object3d", "diagram"].includes(String(raw.kind)) ? String(raw.kind) : undefined,
+    kind: ["plot", "sequence", "graph", "object3d", "diagram"].includes(String(raw.kind))
+      ? String(raw.kind)
+      : undefined,
   };
 }
 

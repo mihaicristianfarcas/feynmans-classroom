@@ -11,22 +11,9 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "noEmit": true,
-    "lib": [
-      "ES2023",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "types": [
-      "node"
-    ],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
     "allowImportingTsExtensions": true
   },
-  "include": [
-    "server",
-    "shared",
-    "web/src",
-    "scripts",
-    "tests",
-    "runtime/*.d.ts"
-  ]
+  "include": ["server", "shared", "web/src", "scripts", "tests", "runtime/*.d.ts"]
 }

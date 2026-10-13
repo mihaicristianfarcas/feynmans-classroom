@@ -31,7 +31,8 @@ if (!bookId || demos.length < 2) {
   console.log("Need a book with at least two ready demos. Generate some first.");
   process.exit(1);
 }
-const pos = (loc: { page?: number; y?: number; block?: number }) => (loc.page !== undefined ? loc.page + (loc.y ?? 0) : (loc.block ?? 0) + (loc.y ?? 0));
+const pos = (loc: { page?: number; y?: number; block?: number }) =>
+  loc.page !== undefined ? loc.page + (loc.y ?? 0) : (loc.block ?? 0) + (loc.y ?? 0);
 const [first, second] = demos;
 
 const browser = await puppeteer.launch({ executablePath: chromePath()!, headless: true });
@@ -40,7 +41,13 @@ await page.setViewport({ width: 1440, height: 900 });
 const pageErrors: string[] = [];
 page.on("pageerror", (e) => pageErrors.push((e as Error).message));
 
-const active = (p: Page) => p.evaluate(() => document.querySelector(".anchor[data-active]")?.getAttribute("title") || document.querySelector(".demo-count")?.textContent || "");
+const active = (p: Page) =>
+  p.evaluate(
+    () =>
+      document.querySelector(".anchor[data-active]")?.getAttribute("title") ||
+      document.querySelector(".demo-count")?.textContent ||
+      "",
+  );
 const demoFrame = async (p: Page): Promise<Frame | null> => {
   for (let i = 0; i < 40; i++) {
     const frame = p.frames().find((f) => f.url().includes("/demos/") && f.url().includes("/page"));
@@ -51,7 +58,8 @@ const demoFrame = async (p: Page): Promise<Frame | null> => {
 };
 
 async function clickTab(p: Page, name: string) {
-  for (const b of await p.$$(".pane-tab")) if ((await b.evaluate((el) => el.textContent || "")).startsWith(name)) await b.click();
+  for (const b of await p.$$(".pane-tab"))
+    if ((await b.evaluate((el) => el.textContent || "")).startsWith(name)) await b.click();
 }
 async function selectAll(p: Page) {
   await p.evaluate(() => {
@@ -72,19 +80,31 @@ try {
   check("library lists books", (await page.$$(".book-card")).length >= 1);
 
   // open the reader just past the first demo's anchor: the margin first, then the chapter's figures
-  await page.goto(`${BASE}#/book/${bookId}?at=${(pos(first.anchor) + 0.03).toFixed(3)}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${BASE}#/book/${bookId}?at=${(pos(first.anchor) + 0.03).toFixed(3)}`, {
+    waitUntil: "domcontentloaded",
+  });
   await page.waitForSelector(".margin", { timeout: 20000 });
-  check("the reader opens on the margin", !!(await page.$(".pane-tab[aria-pressed=true]")) && (await page.$eval(".pane-tab[aria-pressed=true]", (e) => e.textContent || "")).startsWith("Margin"));
+  check(
+    "the reader opens on the margin",
+    !!(await page.$(".pane-tab[aria-pressed=true]")) &&
+      (await page.$eval(".pane-tab[aria-pressed=true]", (e) => e.textContent || "")).startsWith("Margin"),
+  );
   await clickTab(page, "Figures");
   await page.waitForSelector(".demo-frame", { timeout: 20000 });
   await wait(2500);
-  check("first demo is active when the reading line passes its anchor", (await active(page)).includes(first.fig), await active(page));
+  check(
+    "first demo is active when the reading line passes its anchor",
+    (await active(page)).includes(first.fig),
+    await active(page),
+  );
   const frame = await demoFrame(page);
   check("the demo loads in its iframe", !!frame);
   if (frame) {
     // a predict-first question pauses the demo until it's answered or skipped
     const skipped = await frame.evaluate(() => {
-      const skip = [...document.querySelectorAll<HTMLElement>("button, a")].find((el) => /^skip$/i.test((el.textContent || "").trim()));
+      const skip = [...document.querySelectorAll<HTMLElement>("button, a")].find((el) =>
+        /^skip$/i.test((el.textContent || "").trim()),
+      );
       skip?.click();
       return !!skip;
     });
@@ -144,20 +164,47 @@ try {
     document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
   });
   await wait(300);
-  const labels = await page.$$eval(".sel-menu .sel-row .sel-btn", (els) => els.map((e) => (e.textContent || "").trim()));
-  check("selecting a passage opens the menu", ["Highlight", "Explain", "Visualize", "Ask", "Define", "Note"].every((l) => labels.includes(l)), `selected ${selected} chars: ${labels.join(" | ")}`);
+  const labels = await page.$$eval(".sel-menu .sel-row .sel-btn", (els) =>
+    els.map((e) => (e.textContent || "").trim()),
+  );
+  check(
+    "selecting a passage opens the menu",
+    ["Highlight", "Explain", "Visualize", "Ask", "Define", "Note"].every((l) => labels.includes(l)),
+    `selected ${selected} chars: ${labels.join(" | ")}`,
+  );
   if (await page.$(".sel-menu")) {
     // a highlight needs no model: it is marked on the page and kept as a file beside the book
-    const before = ((await (await fetch(`${BASE}api/books/${bookId}/annotations`)).json()) as { id: string }[]).map((a) => a.id);
-    await page.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>(".sel-btn")].find((b) => b.textContent?.trim() === "Highlight")!.click());
+    const before = ((await (await fetch(`${BASE}api/books/${bookId}/annotations`)).json()) as { id: string }[]).map(
+      (a) => a.id,
+    );
+    await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLButtonElement>(".sel-btn")]
+        .find((b) => b.textContent?.trim() === "Highlight")!
+        .click(),
+    );
     await wait(1200);
-    const after = (await (await fetch(`${BASE}api/books/${bookId}/annotations`)).json()) as { id: string; kind: string; path: string }[];
+    const after = (await (await fetch(`${BASE}api/books/${bookId}/annotations`)).json()) as {
+      id: string;
+      kind: string;
+      path: string;
+    }[];
     const made = after.find((a) => !before.includes(a.id));
-    check("Highlight saves an annotation file beside the book", !!made && made.kind === "highlight" && /^library\/[^/]+\/annotations\//.test(made.path), made?.path);
-    check("the highlight is marked in the book", (await page.$$(".page-marks .mark[data-style=fill], .html-reader")).length > 0);
+    check(
+      "Highlight saves an annotation file beside the book",
+      !!made && made.kind === "highlight" && /^library\/[^/]+\/annotations\//.test(made.path),
+      made?.path,
+    );
+    check(
+      "the highlight is marked in the book",
+      (await page.$$(".page-marks .mark[data-style=fill], .html-reader")).length > 0,
+    );
     if (made) await fetch(`${BASE}api/annotations/${made.id}`, { method: "DELETE" });
     await selectAll(page);
-    await page.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>(".sel-btn")].find((b) => b.textContent?.includes("Visualize"))!.click());
+    await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLButtonElement>(".sel-btn")]
+        .find((b) => b.textContent?.includes("Visualize"))!
+        .click(),
+    );
     await wait(200);
     check("Visualize opens the request composer", !!(await page.$(".sel-menu .figure-request input")));
     if (process.argv.includes("--generate")) {
@@ -169,7 +216,12 @@ try {
       check("the figure is drawn in the margin", true, `${((Date.now() - started) / 1000).toFixed(1)} s`);
     }
   }
-  for (const [tab, selector] of [["Margin", ".margin"], ["Note", ".reader-note"], ["Tutor", ".tutor"], ["Study", ".study-tab"]]) {
+  for (const [tab, selector] of [
+    ["Margin", ".margin"],
+    ["Note", ".reader-note"],
+    ["Tutor", ".tutor"],
+    ["Study", ".study-tab"],
+  ]) {
     await clickTab(page, tab);
     await wait(300);
     check(`the ${tab} tab opens`, !!(await page.$(selector)));

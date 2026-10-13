@@ -7,7 +7,12 @@ const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)}%
 export function Journey() {
   const { data } = useLoad(() => learn.journey());
   const { data: vault } = useLoad(() => learn.vault());
-  if (!data) return <div className="center-note"><Spinner label="Opening your journey" /></div>;
+  if (!data)
+    return (
+      <div className="center-note">
+        <Spinner label="Opening your journey" />
+      </div>
+    );
   const weeks = 26;
   const end = new Date();
   end.setHours(0, 0, 0, 0);
@@ -53,11 +58,18 @@ export function Journey() {
         <h2 className="section-title">Study days</h2>
         <div className="heatmap" style={{ gridTemplateColumns: `repeat(${Math.ceil(cells.length / 7)}, 1fr)` }}>
           {cells.map((c) => (
-            <span key={c.key} className="heat" title={`${c.date.toDateString()}: ${data.days[c.key] ? `${data.days[c.key].reviews} reviews, ${data.days[c.key].events} activities` : "nothing"}`} data-level={c.value === 0 ? 0 : Math.min(4, 1 + Math.floor((c.value / max) * 3.999))} />
+            <span
+              key={c.key}
+              className="heat"
+              title={`${c.date.toDateString()}: ${data.days[c.key] ? `${data.days[c.key].reviews} reviews, ${data.days[c.key].events} activities` : "nothing"}`}
+              data-level={c.value === 0 ? 0 : Math.min(4, 1 + Math.floor((c.value / max) * 3.999))}
+            />
           ))}
         </div>
         <p className="fine">
-          {data.totals.reviews} reviews · {data.totals.cards} cards ({data.retention.mature} mature, {data.retention.learning} learning, {data.retention.unseen} new) · {data.totals.notes} notes · {data.totals.figures} figures · {data.totals.books} books
+          {data.totals.reviews} reviews · {data.totals.cards} cards ({data.retention.mature} mature,{" "}
+          {data.retention.learning} learning, {data.retention.unseen} new) · {data.totals.notes} notes ·{" "}
+          {data.totals.figures} figures · {data.totals.books} books
         </p>
       </section>
       <div className="concept-grid">
@@ -80,7 +92,10 @@ export function Journey() {
           <h2 className="section-title">Timeline</h2>
           <ul className="activity">
             {data.recent.map((a, i) => (
-              <li key={i}>
+              <li
+                // biome-ignore lint/suspicious/noArrayIndexKey: a read-only list, replaced whole when it reloads
+                key={i}
+              >
                 <span className="activity-type">{a.type}</span>
                 <span className="activity-text">{a.text}</span>
                 <span className="activity-when">{timeAgo(a.ts)}</span>

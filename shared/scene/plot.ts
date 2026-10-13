@@ -3,7 +3,21 @@
  * Zoom rescales the axes and resamples every curve (zoom into a curve and watch it straighten). */
 import { compile, evalNum, fillTemplate, type Scope } from "./expr.ts";
 import { AROUND, Labels } from "./labels.ts";
-import { arrow, circle, dot, line, niceTicks, pathOf, type Pt, r1, rect, shape, text, textWidth, tickLabel } from "./svg.ts";
+import {
+  arrow,
+  circle,
+  dot,
+  line,
+  niceTicks,
+  type Pt,
+  pathOf,
+  r1,
+  rect,
+  shape,
+  text,
+  textWidth,
+  tickLabel,
+} from "./svg.ts";
 import type { FrameState, PlotLayer, PlotScene, RenderOut, Tone } from "./types.ts";
 import { HEIGHT, WIDTH } from "./types.ts";
 
@@ -60,7 +74,8 @@ export function plotFrame(spec: PlotScene, view: FrameState["view"]): PlotFrame 
   };
 }
 
-const inBox = ([x, y]: Pt, pad = 0) => x >= BOX.x - pad && x <= BOX.x + BOX.w + pad && y >= BOX.y - pad && y <= BOX.y + BOX.h + pad;
+const inBox = ([x, y]: Pt, pad = 0) =>
+  x >= BOX.x - pad && x <= BOX.x + BOX.w + pad && y >= BOX.y - pad && y <= BOX.y + BOX.h + pad;
 
 /** Samples y = f(x) into polylines, broken where the function is undefined or jumps off the box. */
 function sampleRuns(fn: (x: number) => number, a: number, b: number, F: PlotFrame, n = 360, log = false): Pt[][] {
@@ -118,13 +133,41 @@ export function renderPlot(spec: PlotScene, state: FrameState, memo: Record<stri
   const toneOf = (l: { id: string; tone: Tone }): Tone => (focus.has(l.id) ? "lit" : l.tone);
 
   /* axes */
-  const xt = spec.x.ticks.length && state.view.zoom === 1 && !state.view.panX ? spec.x.ticks.filter((v) => v >= Math.min(F.x0, F.x1) && v <= Math.max(F.x0, F.x1)) : spec.x.log ? logTicks(F.x0, F.x1) : niceTicks(F.x0, F.x1, 7);
-  const yt = spec.y.ticks.length && state.view.zoom === 1 && !state.view.panY ? spec.y.ticks.filter((v) => v >= Math.min(F.y0, F.y1) && v <= Math.max(F.y0, F.y1)) : spec.y.log ? logTicks(F.y0, F.y1) : niceTicks(F.y0, F.y1, 6);
+  const xt =
+    spec.x.ticks.length && state.view.zoom === 1 && !state.view.panX
+      ? spec.x.ticks.filter((v) => v >= Math.min(F.x0, F.x1) && v <= Math.max(F.x0, F.x1))
+      : spec.x.log
+        ? logTicks(F.x0, F.x1)
+        : niceTicks(F.x0, F.x1, 7);
+  const yt =
+    spec.y.ticks.length && state.view.zoom === 1 && !state.view.panY
+      ? spec.y.ticks.filter((v) => v >= Math.min(F.y0, F.y1) && v <= Math.max(F.y0, F.y1))
+      : spec.y.log
+        ? logTicks(F.y0, F.y1)
+        : niceTicks(F.y0, F.y1, 6);
   const ox = Math.min(Math.max(F.sx(!spec.x.log && F.x0 <= 0 && F.x1 >= 0 ? 0 : F.x0), BOX.x), BOX.x + BOX.w);
   const oy = Math.min(Math.max(F.sy(!spec.y.log && F.y0 <= 0 && F.y1 >= 0 ? 0 : F.y0), BOX.y), BOX.y + BOX.h);
   if (spec.grid) {
-    for (const v of xt) back.push(line([[F.sx(v), BOX.y], [F.sx(v), BOX.y + BOX.h]], { tone: "faint" }));
-    for (const v of yt) back.push(line([[BOX.x, F.sy(v)], [BOX.x + BOX.w, F.sy(v)]], { tone: "faint" }));
+    for (const v of xt)
+      back.push(
+        line(
+          [
+            [F.sx(v), BOX.y],
+            [F.sx(v), BOX.y + BOX.h],
+          ],
+          { tone: "faint" },
+        ),
+      );
+    for (const v of yt)
+      back.push(
+        line(
+          [
+            [BOX.x, F.sy(v)],
+            [BOX.x + BOX.w, F.sy(v)],
+          ],
+          { tone: "faint" },
+        ),
+      );
   }
   back.push(arrow([BOX.x - 6, oy], [BOX.x + BOX.w + 14, oy], { tone: "mid", head: 6 }));
   back.push(arrow([ox, BOX.y + BOX.h + 6], [ox, BOX.y - 14], { tone: "mid", head: 6 }));
@@ -141,12 +184,22 @@ export function renderPlot(spec: PlotScene, state: FrameState, memo: Record<stri
     back.push(text(lx, BOX.y - 13, spec.y.label, { size: 12, tone: "hi", italic: true }));
   }
 
-  const barLabels = spec.layers.filter((l): l is Extract<PlotLayer, { type: "bars" }> => l.type === "bars" && l.labels.some(Boolean) && vis(l.id) > 0);
+  const barLabels = spec.layers.filter(
+    (l): l is Extract<PlotLayer, { type: "bars" }> => l.type === "bars" && l.labels.some(Boolean) && vis(l.id) > 0,
+  );
   if (!barLabels.length) {
     for (const v of xt) {
       const px = F.sx(v);
       if (px < BOX.x - 1 || px > BOX.x + BOX.w + 1) continue;
-      back.push(line([[px, oy], [px, oy + 4]], { tone: "mid" }));
+      back.push(
+        line(
+          [
+            [px, oy],
+            [px, oy + 4],
+          ],
+          { tone: "mid" },
+        ),
+      );
       if (Math.abs(px - ox) < 2 && v === 0 && !spec.y.log) continue;
       const label = tickLabel(v);
       const box = { x: px - textWidth(label, 10, true) / 2, y: oy + 7, w: textWidth(label, 10, true), h: 11 };
@@ -158,7 +211,15 @@ export function renderPlot(spec: PlotScene, state: FrameState, memo: Record<stri
   for (const v of yt) {
     const py = F.sy(v);
     if (py < BOX.y - 1 || py > BOX.y + BOX.h + 1) continue;
-    back.push(line([[ox - 4, py], [ox, py]], { tone: "mid" }));
+    back.push(
+      line(
+        [
+          [ox - 4, py],
+          [ox, py],
+        ],
+        { tone: "mid" },
+      ),
+    );
     if (Math.abs(py - oy) < 2 && v === 0 && !spec.x.log) continue;
     const label = tickLabel(v);
     const box = { x: ox - 8 - textWidth(label, 10, true), y: py - 5, w: textWidth(label, 10, true), h: 11 };
@@ -197,11 +258,21 @@ export function renderPlot(spec: PlotScene, state: FrameState, memo: Record<stri
         }
         if (!(b > a)) break;
         const runs = sampleRuns(fn, a, b, F, 360, spec.x.log);
-        for (const run of runs) body.push(line(run, { tone, dashed: layer.dashed, id, opacity, width: tone === "lit" ? 2.2 : tone === "hi" ? 1.7 : undefined }));
+        for (const run of runs)
+          body.push(
+            line(run, {
+              tone,
+              dashed: layer.dashed,
+              id,
+              opacity,
+              width: tone === "lit" ? 2.2 : tone === "hi" ? 1.7 : undefined,
+            }),
+          );
         if (layer.label) {
           const last = runs.flat().filter((p) => inBox(p, -4));
           const at = last[Math.max(0, last.length - 1 - Math.round(last.length * 0.04))];
-          if (at) curveLabels.push({ x: at[0], y: at[1], text: layer.label, tone: tone === "faint" ? "mid" : tone, opacity });
+          if (at)
+            curveLabels.push({ x: at[0], y: at[1], text: layer.label, tone: tone === "faint" ? "mid" : tone, opacity });
         }
         break;
       }
@@ -220,7 +291,15 @@ export function renderPlot(spec: PlotScene, state: FrameState, memo: Record<stri
             if (Number.isFinite(x) && Number.isFinite(y)) pts.push([F.sx(x), F.sy(y)]);
           } catch {}
         }
-        body.push(line(pts, { tone, dashed: layer.dashed, id, opacity, width: tone === "lit" ? 2.2 : tone === "hi" ? 1.7 : undefined }));
+        body.push(
+          line(pts, {
+            tone,
+            dashed: layer.dashed,
+            id,
+            opacity,
+            width: tone === "lit" ? 2.2 : tone === "hi" ? 1.7 : undefined,
+          }),
+        );
         if (layer.label && pts.length) {
           const at = pts[Math.round(pts.length * 0.9)] || pts[pts.length - 1];
           curveLabels.push({ x: at[0], y: at[1], text: layer.label, tone, opacity });
@@ -228,8 +307,17 @@ export function renderPlot(spec: PlotScene, state: FrameState, memo: Record<stri
         break;
       }
       case "area": {
-        const fn = fnOf({ ...layer, type: "function", domain: null, dashed: false } as Extract<PlotLayer, { type: "function" }>, scope);
-        const baseFn = fnOf({ ...layer, type: "function", expr: layer.base, domain: null, dashed: false } as Extract<PlotLayer, { type: "function" }>, scope);
+        const fn = fnOf(
+          { ...layer, type: "function", domain: null, dashed: false } as Extract<PlotLayer, { type: "function" }>,
+          scope,
+        );
+        const baseFn = fnOf(
+          { ...layer, type: "function", expr: layer.base, domain: null, dashed: false } as Extract<
+            PlotLayer,
+            { type: "function" }
+          >,
+          scope,
+        );
         const a = Math.max(xLo, evalNum(layer.from, scope, xLo)),
           b = Math.min(xHi, evalNum(layer.to, scope, xHi));
         if (!(b > a)) break;
@@ -243,11 +331,18 @@ export function renderPlot(spec: PlotScene, state: FrameState, memo: Record<stri
           top.push([F.sx(x), F.sy(y)]);
           bottom.push([F.sx(x), F.sy(y0)]);
         }
-        if (top.length > 1) back.push(shape(pathOf([...top, ...bottom.reverse()], true), "tint", { tone, id, opacity }));
+        if (top.length > 1)
+          back.push(shape(pathOf([...top, ...bottom.reverse()], true), "tint", { tone, id, opacity }));
         if (layer.label && top.length) {
           const mid = top[Math.floor(top.length / 2)];
           const base = bottom[bottom.length - 1 - Math.floor(top.length / 2)] || mid;
-          curveLabels.push({ x: mid[0], y: (mid[1] + base[1]) / 2 + 4, text: layer.label, tone: tone === "faint" ? "mid" : tone, opacity });
+          curveLabels.push({
+            x: mid[0],
+            y: (mid[1] + base[1]) / 2 + 4,
+            text: layer.label,
+            tone: tone === "faint" ? "mid" : tone,
+            opacity,
+          });
         }
         break;
       }
@@ -269,7 +364,13 @@ export function renderPlot(spec: PlotScene, state: FrameState, memo: Record<stri
           const half = (F.sx(x + layer.width / 2) - F.sx(x - layer.width / 2)) / 2;
           const px = F.sx(x),
             py = F.sy(h);
-          body.push(rect(px - half, Math.min(py, zeroY), half * 2, Math.abs(zeroY - py), "tint", { tone: focus.has(`${id}.${i}`) ? "lit" : tone, id, opacity }));
+          body.push(
+            rect(px - half, Math.min(py, zeroY), half * 2, Math.abs(zeroY - py), "tint", {
+              tone: focus.has(`${id}.${i}`) ? "lit" : tone,
+              id,
+              opacity,
+            }),
+          );
           const label = layer.labels[i];
           if (label) back.push(text(px, oy + 16, label, { size: 10, anchor: "middle", tone: "mid" }));
         });
@@ -289,17 +390,28 @@ export function renderPlot(spec: PlotScene, state: FrameState, memo: Record<stri
           trail.forEach(([tx, ty], i) => {
             if (i % 2) return;
             const tp: Pt = [F.sx(tx), F.sy(ty)];
-            if (inBox(tp)) body.push(dot(tp[0], tp[1], 1.5, { tone: "lo", opacity: opacity * (0.3 + (0.7 * i) / trail.length) }));
+            if (inBox(tp))
+              body.push(dot(tp[0], tp[1], 1.5, { tone: "lo", opacity: opacity * (0.3 + (0.7 * i) / trail.length) }));
           });
         }
         if (!inBox(p, 8)) break;
         labels.reserve({ x: p[0] - 6, y: p[1] - 6, w: 12, h: 12 });
         const ring = tone === "lit" || focus.has(id);
-        front.push(`<g data-id="${id}"${layer.drag ? ` data-drag="${id}" class="sc-draggable"` : ""}${opacity < 1 ? ` style="opacity:${r1(opacity * 100) / 100}"` : ""}>${layer.drag ? circle(p[0], p[1], 16, "none", { cls: "sc-hit" }) : ""}${ring ? circle(p[0], p[1], 7.5, "paper", { tone }) : ""}${dot(p[0], p[1], ring ? 3.2 : 4, { tone })}</g>`);
+        front.push(
+          `<g data-id="${id}"${layer.drag ? ` data-drag="${id}" class="sc-draggable"` : ""}${opacity < 1 ? ` style="opacity:${r1(opacity * 100) / 100}"` : ""}>${layer.drag ? circle(p[0], p[1], 16, "none", { cls: "sc-hit" }) : ""}${ring ? circle(p[0], p[1], 7.5, "paper", { tone }) : ""}${dot(p[0], p[1], ring ? 3.2 : 4, { tone })}</g>`,
+        );
         if (layer.label) {
           const label = fillTemplate(layer.label, scope);
           const at = labels.place(p[0], p[1], label, 12, AROUND);
-          front.push(text(at.x, at.y, label, { size: 12, anchor: at.anchor, tone: tone === "lit" ? "hi" : tone, opacity, halo: true }));
+          front.push(
+            text(at.x, at.y, label, {
+              size: 12,
+              anchor: at.anchor,
+              tone: tone === "lit" ? "hi" : tone,
+              opacity,
+              halo: true,
+            }),
+          );
         }
         break;
       }
@@ -307,7 +419,11 @@ export function renderPlot(spec: PlotScene, state: FrameState, memo: Record<stri
         const a: Pt = [F.sx(evalNum(layer.from[0], scope, 0)), F.sy(evalNum(layer.from[1], scope, 0))];
         const b: Pt = [F.sx(evalNum(layer.to[0], scope, 0)), F.sy(evalNum(layer.to[1], scope, 0))];
         if (![...a, ...b].every(Number.isFinite)) break;
-        body.push(layer.arrow ? arrow(a, b, { tone, dashed: layer.dashed, id, opacity, width: tone === "lit" ? 2 : 1.5, head: 8 }) : line([a, b], { tone, dashed: layer.dashed, id, opacity }));
+        body.push(
+          layer.arrow
+            ? arrow(a, b, { tone, dashed: layer.dashed, id, opacity, width: tone === "lit" ? 2 : 1.5, head: 8 })
+            : line([a, b], { tone, dashed: layer.dashed, id, opacity }),
+        );
         if (layer.label) {
           const label = fillTemplate(layer.label, scope);
           const mx = (a[0] + b[0]) / 2,
@@ -316,8 +432,20 @@ export function renderPlot(spec: PlotScene, state: FrameState, memo: Record<stri
             ny = b[0] - a[0];
           const len = Math.hypot(nx, ny) || 1;
           const side = ny / len > 0 ? -1 : 1;
-          const at = labels.place(mx + (side * nx * 12) / len, my + (side * ny * 12) / len + 4, label, 12, [[0, 0, "middle"], [0, -14, "middle"], [0, 16, "middle"]]);
-          front.push(text(at.x, at.y, label, { size: 12, anchor: at.anchor, tone: tone === "faint" ? "mid" : tone, opacity, halo: true }));
+          const at = labels.place(mx + (side * nx * 12) / len, my + (side * ny * 12) / len + 4, label, 12, [
+            [0, 0, "middle"],
+            [0, -14, "middle"],
+            [0, 16, "middle"],
+          ]);
+          front.push(
+            text(at.x, at.y, label, {
+              size: 12,
+              anchor: at.anchor,
+              tone: tone === "faint" ? "mid" : tone,
+              opacity,
+              halo: true,
+            }),
+          );
         }
         break;
       }
@@ -339,8 +467,20 @@ export function renderPlot(spec: PlotScene, state: FrameState, memo: Record<stri
           const p: Pt = [F.sx(x), F.sy(y)];
           const ux = Math.min(BOX.x + BOX.w - 20, p[0] + 60);
           const uy = F.sy(y + slope * (F.ix(ux) - x));
-          const at = labels.place(ux, Math.max(BOX.y + 12, Math.min(BOX.y + BOX.h - 6, uy)), label, 11, [[4, -8, "start"], [4, 16, "start"], [-4, -8, "end"]]);
-          front.push(text(at.x, at.y, label, { size: 11, anchor: at.anchor, tone: tone === "lit" ? "hi" : tone, opacity, halo: true }));
+          const at = labels.place(ux, Math.max(BOX.y + 12, Math.min(BOX.y + BOX.h - 6, uy)), label, 11, [
+            [4, -8, "start"],
+            [4, 16, "start"],
+            [-4, -8, "end"],
+          ]);
+          front.push(
+            text(at.x, at.y, label, {
+              size: 11,
+              anchor: at.anchor,
+              tone: tone === "lit" ? "hi" : tone,
+              opacity,
+              halo: true,
+            }),
+          );
         }
         break;
       }
@@ -348,12 +488,38 @@ export function renderPlot(spec: PlotScene, state: FrameState, memo: Record<stri
       case "vline": {
         const v = evalNum(layer.at, scope);
         if (!Number.isFinite(v)) break;
-        const pts: Pt[] = layer.type === "hline" ? [[BOX.x, F.sy(v)], [BOX.x + BOX.w, F.sy(v)]] : [[F.sx(v), BOX.y], [F.sx(v), BOX.y + BOX.h]];
+        const pts: Pt[] =
+          layer.type === "hline"
+            ? [
+                [BOX.x, F.sy(v)],
+                [BOX.x + BOX.w, F.sy(v)],
+              ]
+            : [
+                [F.sx(v), BOX.y],
+                [F.sx(v), BOX.y + BOX.h],
+              ];
         body.push(line(pts, { tone, dashed: layer.dashed, id, opacity }));
         if (layer.label) {
           const label = fillTemplate(layer.label, scope);
-          const at = layer.type === "hline" ? labels.place(BOX.x + BOX.w - 4, F.sy(v), label, 11, [[0, -6, "end"], [0, 14, "end"]]) : labels.place(F.sx(v), BOX.y + 4, label, 11, [[5, 8, "start"], [-5, 8, "end"]]);
-          front.push(text(at.x, at.y, label, { size: 11, anchor: at.anchor, tone: tone === "faint" ? "mid" : tone, opacity, halo: true }));
+          const at =
+            layer.type === "hline"
+              ? labels.place(BOX.x + BOX.w - 4, F.sy(v), label, 11, [
+                  [0, -6, "end"],
+                  [0, 14, "end"],
+                ])
+              : labels.place(F.sx(v), BOX.y + 4, label, 11, [
+                  [5, 8, "start"],
+                  [-5, 8, "end"],
+                ]);
+          front.push(
+            text(at.x, at.y, label, {
+              size: 11,
+              anchor: at.anchor,
+              tone: tone === "faint" ? "mid" : tone,
+              opacity,
+              halo: true,
+            }),
+          );
         }
         break;
       }
@@ -362,7 +528,11 @@ export function renderPlot(spec: PlotScene, state: FrameState, memo: Record<stri
           y = evalNum(layer.y, scope);
         if (!Number.isFinite(x) || !Number.isFinite(y)) break;
         const label = fillTemplate(layer.text, scope);
-        const at = labels.place(F.sx(x), F.sy(y), label, 12, [[0, 0, "middle"], [0, -14, "middle"], [0, 16, "middle"]]);
+        const at = labels.place(F.sx(x), F.sy(y), label, 12, [
+          [0, 0, "middle"],
+          [0, -14, "middle"],
+          [0, 16, "middle"],
+        ]);
         front.push(text(at.x, at.y, label, { size: 12, anchor: at.anchor, tone, id, opacity, halo: true }));
         break;
       }
@@ -371,7 +541,13 @@ export function renderPlot(spec: PlotScene, state: FrameState, memo: Record<stri
 
   for (const l of curveLabels) {
     const label = fillTemplate(l.text, scope);
-    const at = labels.place(l.x, l.y, label, 12, [[6, -8, "start"], [-6, -9, "end"], [6, 16, "start"], [-6, 16, "end"], [0, -14, "middle"]]);
+    const at = labels.place(l.x, l.y, label, 12, [
+      [6, -8, "start"],
+      [-6, -9, "end"],
+      [6, 16, "start"],
+      [-6, 16, "end"],
+      [0, -14, "middle"],
+    ]);
     front.push(text(at.x, at.y, label, { size: 12, anchor: at.anchor, tone: l.tone, opacity: l.opacity, halo: true }));
   }
 

@@ -1,10 +1,18 @@
 /* graph: nodes and edges — networks, state machines, dependency graphs, trees, arrays (row of
  * cells), hash rings (circle). Layouts are deterministic, so the same spec always draws the same
  * picture; tokens (packets, requests, goods) travel along paths of nodes while the clock runs. */
-import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type SimulationNodeDatum } from "d3-force";
+import {
+  forceCollide,
+  forceLink,
+  forceManyBody,
+  forceSimulation,
+  forceX,
+  forceY,
+  type SimulationNodeDatum,
+} from "d3-force";
 import { evalNum, fillTemplate } from "./expr.ts";
 import { Labels } from "./labels.ts";
-import { circle, curvedArrow, pathOf, type Pt, r1, rect, shape, text, textWidth } from "./svg.ts";
+import { circle, curvedArrow, type Pt, pathOf, r1, rect, shape, text, textWidth } from "./svg.ts";
 import type { FrameState, GNode, GraphScene, RenderOut, Tone } from "./types.ts";
 import { HEIGHT, WIDTH } from "./types.ts";
 
@@ -19,7 +27,8 @@ interface Size {
 export function nodeSize(node: GNode): Size {
   const label = node.label || node.id;
   // a sublabel sits inside boxes (but under circles), so boxes grow to hold it
-  const sub = node.sublabel && node.shape !== "circle" ? textWidth(node.sublabel.replace(/\{[^}]*\}/g, "0000"), 10, true) : 0;
+  const sub =
+    node.sublabel && node.shape !== "circle" ? textWidth(node.sublabel.replace(/\{[^}]*\}/g, "0000"), 10, true) : 0;
   const tw = Math.max(textWidth(label, 12), sub);
   switch (node.shape) {
     case "circle": {
@@ -45,7 +54,11 @@ export function layoutGraph(spec: GraphScene): Map<string, Pt> {
 
 /** Pushes overlapping nodes apart (a model's hand-placed positions are often too close). */
 function separate(spec: GraphScene, pos: Map<string, Pt>): Map<string, Pt> {
-  const nodes = spec.nodes.map((n) => ({ id: n.id, s: nodeSize(n), p: [...(pos.get(n.id) || [WIDTH / 2, HEIGHT / 2])] as Pt }));
+  const nodes = spec.nodes.map((n) => ({
+    id: n.id,
+    s: nodeSize(n),
+    p: [...(pos.get(n.id) || [WIDTH / 2, HEIGHT / 2])] as Pt,
+  }));
   const gap = 16;
   for (let iter = 0; iter < 80; iter++) {
     let moved = false;
@@ -80,7 +93,12 @@ function placeNodes(spec: GraphScene): Map<string, Pt> {
   const hinted = nodes.every((node) => Number.isFinite(node.x) && Number.isFinite(node.y));
   switch (spec.layout) {
     case "manual":
-      nodes.forEach((node, i) => raw.set(node.id, [Number.isFinite(node.x) ? node.x : (i / Math.max(1, n - 1)) * 100, Number.isFinite(node.y) ? node.y : 50]));
+      for (const [i, node] of nodes.entries()) {
+        raw.set(node.id, [
+          Number.isFinite(node.x) ? node.x : (i / Math.max(1, n - 1)) * 100,
+          Number.isFinite(node.y) ? node.y : 50,
+        ]);
+      }
       return fit(spec, raw, { keepAspect: false, fromPercent: true });
     case "circle":
       nodes.forEach((node, i) => {
@@ -100,7 +118,7 @@ function placeNodes(spec: GraphScene): Map<string, Pt> {
     }
     case "grid": {
       const cols = Math.ceil(Math.sqrt(n * 1.6));
-      nodes.forEach((node, i) => raw.set(node.id, [i % cols, Math.floor(i / cols)]));
+      for (const [i, node] of nodes.entries()) raw.set(node.id, [i % cols, Math.floor(i / cols)]);
       return fit(spec, raw, { keepAspect: false });
     }
     case "layered":
@@ -112,13 +130,27 @@ function placeNodes(spec: GraphScene): Map<string, Pt> {
       const sim: N[] = nodes.map((node, i) => {
         const a = (i / n) * Math.PI * 2;
         const s = nodeSize(node);
-        return { id: node.id, r: Math.max(s.w, s.h) / 2, x: hinted ? (node.x - 50) * 6 : Math.cos(a) * 150, y: hinted ? (node.y - 50) * 4 : Math.sin(a) * 100 };
+        return {
+          id: node.id,
+          r: Math.max(s.w, s.h) / 2,
+          x: hinted ? (node.x - 50) * 6 : Math.cos(a) * 150,
+          y: hinted ? (node.y - 50) * 4 : Math.sin(a) * 100,
+        };
       });
       const links = spec.edges.map((e) => ({ source: e.from, target: e.to }));
       const simulation = forceSimulation(sim)
-        .force("link", forceLink(links).id((d) => (d as N).id).distance(90).strength(0.7))
+        .force(
+          "link",
+          forceLink(links)
+            .id((d) => (d as N).id)
+            .distance(90)
+            .strength(0.7),
+        )
         .force("charge", forceManyBody().strength(-380))
-        .force("collide", forceCollide<N>().radius((d) => d.r + 14))
+        .force(
+          "collide",
+          forceCollide<N>().radius((d) => d.r + 14),
+        )
         .force("x", forceX(0).strength(0.06))
         .force("y", forceY(0).strength(0.1))
         .stop();
@@ -143,12 +175,18 @@ function layeredFit(spec: GraphScene): Map<string, Pt> {
   const place = (across: boolean) => {
     const out = new Map<string, Pt>();
     const step = across ? { along: maxW + 34, side: maxH + 26 } : { along: maxH + 42, side: maxW + 26 };
-    for (const [id, [order, layer]] of grid) out.set(id, across ? [layer * step.along, order * step.side] : [order * step.side, layer * step.along]);
+    for (const [id, [order, layer]] of grid)
+      out.set(id, across ? [layer * step.along, order * step.side] : [order * step.side, layer * step.along]);
     const xs = [...out.values()].map((q) => q[0]),
       ys = [...out.values()].map((q) => q[1]);
     const w = Math.max(...xs) - Math.min(...xs) + maxW,
       h = Math.max(...ys) - Math.min(...ys) + maxH;
-    return { out, scale: Math.min(1, area.w / w, area.h / h), cx: (Math.max(...xs) + Math.min(...xs)) / 2, cy: (Math.max(...ys) + Math.min(...ys)) / 2 };
+    return {
+      out,
+      scale: Math.min(1, area.w / w, area.h / h),
+      cx: (Math.max(...xs) + Math.min(...xs)) / 2,
+      cy: (Math.max(...ys) + Math.min(...ys)) / 2,
+    };
   };
   const down = place(false),
     across = place(true);
@@ -179,7 +217,11 @@ function layered(spec: GraphScene): Map<string, Pt> {
   };
   ids.forEach(depthOf);
   const layers: string[][] = [];
-  for (const id of ids) (layers[depth.get(id)!] ||= []).push(id);
+  for (const id of ids) {
+    const layer = depth.get(id)!;
+    layers[layer] ??= [];
+    layers[layer].push(id);
+  }
   const order = new Map<string, number>();
   layers.forEach((layer, li) => {
     if (li > 0) {
@@ -189,20 +231,29 @@ function layered(spec: GraphScene): Map<string, Pt> {
       };
       layer.sort((a, b) => score(a) - score(b));
     }
-    layer.forEach((id, i) => order.set(id, i - (layer.length - 1) / 2));
+    for (const [i, id] of layer.entries()) order.set(id, i - (layer.length - 1) / 2);
   });
   const out = new Map<string, Pt>();
-  layers.forEach((layer, li) => layer.forEach((id) => out.set(id, [order.get(id)!, li])));
+  for (const [li, layer] of layers.entries()) for (const id of layer) out.set(id, [order.get(id)!, li]);
   return out;
 }
 
-function fit(spec: GraphScene, raw: Map<string, Pt>, opts: { keepAspect: boolean; fromPercent?: boolean; maxScale?: number }): Map<string, Pt> {
+function fit(
+  spec: GraphScene,
+  raw: Map<string, Pt>,
+  opts: { keepAspect: boolean; fromPercent?: boolean; maxScale?: number },
+): Map<string, Pt> {
   const pts = [...raw.values()];
   const sizes = new Map(spec.nodes.map((n) => [n.id, nodeSize(n)]));
   const maxW = Math.max(40, ...[...sizes.values()].map((s) => s.w));
   const maxH = Math.max(30, ...[...sizes.values()].map((s) => s.h));
   const groupPad = spec.groups.length ? 18 : 0;
-  const box = { x: PAD.x + maxW / 2 + groupPad, y: PAD.top + maxH / 2 + groupPad + (spec.groups.length ? 10 : 0), w: WIDTH - 2 * PAD.x - maxW - 2 * groupPad, h: HEIGHT - PAD.top - PAD.bottom - maxH - 2 * groupPad - 14 };
+  const box = {
+    x: PAD.x + maxW / 2 + groupPad,
+    y: PAD.top + maxH / 2 + groupPad + (spec.groups.length ? 10 : 0),
+    w: WIDTH - 2 * PAD.x - maxW - 2 * groupPad,
+    h: HEIGHT - PAD.top - PAD.bottom - maxH - 2 * groupPad - 14,
+  };
   if (opts.fromPercent) {
     const out = new Map<string, Pt>();
     for (const [id, [x, y]] of raw) out.set(id, [box.x + (x / 100) * box.w, box.y + (y / 100) * box.h]);
@@ -249,7 +300,10 @@ function boundary(node: GNode, size: Size, c: Pt, toward: Pt): Pt {
     const t = 1 / (Math.abs(dx) / hw + Math.abs(dy) / hh);
     return [c[0] + dx * t, c[1] + dy * t];
   }
-  const t = Math.min(Math.abs(dx) > 1e-9 ? hw / Math.abs(dx) : Infinity, Math.abs(dy) > 1e-9 ? hh / Math.abs(dy) : Infinity);
+  const t = Math.min(
+    Math.abs(dx) > 1e-9 ? hw / Math.abs(dx) : Infinity,
+    Math.abs(dy) > 1e-9 ? hh / Math.abs(dy) : Infinity,
+  );
   return [c[0] + dx * t, c[1] + dy * t];
 }
 
@@ -259,12 +313,31 @@ function nodeShape(node: GNode, size: Size, [x, y]: Pt, tone: Tone, opacity: num
     case "circle":
       return circle(x, y, size.r, "paper", s);
     case "diamond":
-      return shape(pathOf([[x, y - size.h / 2], [x + size.w / 2, y], [x, y + size.h / 2], [x - size.w / 2, y]], true), "paper", s);
+      return shape(
+        pathOf(
+          [
+            [x, y - size.h / 2],
+            [x + size.w / 2, y],
+            [x, y + size.h / 2],
+            [x - size.w / 2, y],
+          ],
+          true,
+        ),
+        "paper",
+        s,
+      );
     case "database": {
       const w = size.w / 2,
         h = size.h / 2,
         ry = 5;
-      return shape(`M${r1(x - w)} ${r1(y - h + ry)}v${r1(size.h - 2 * ry)}a${r1(w)} ${ry} 0 0 0 ${r1(2 * w)} 0v${r1(-(size.h - 2 * ry))}`, "paper", s) + `<ellipse cx="${r1(x)}" cy="${r1(y - h + ry)}" rx="${r1(w)}" ry="${ry}" class="sc-shape" data-fill="paper" data-tone="${tone}"/>`;
+      return (
+        shape(
+          `M${r1(x - w)} ${r1(y - h + ry)}v${r1(size.h - 2 * ry)}a${r1(w)} ${ry} 0 0 0 ${r1(2 * w)} 0v${r1(-(size.h - 2 * ry))}`,
+          "paper",
+          s,
+        ) +
+        `<ellipse cx="${r1(x)}" cy="${r1(y - h + ry)}" rx="${r1(w)}" ry="${ry}" class="sc-shape" data-fill="paper" data-tone="${tone}"/>`
+      );
     }
     case "cell":
       return rect(x - size.w / 2, y - size.h / 2, size.w, size.h, "paper", { ...s, rx: 0 });
@@ -275,7 +348,8 @@ function nodeShape(node: GNode, size: Size, [x, y]: Pt, tone: Tone, opacity: num
 
 export function renderGraph(spec: GraphScene, state: FrameState, memo: Record<string, unknown>): RenderOut {
   const { scope, vis, focus } = state;
-  const base = (memo.layout as Map<string, Pt>) || (memo.layout = layoutGraph(spec));
+  memo.layout ??= layoutGraph(spec);
+  const base = memo.layout as Map<string, Pt>;
   const pos = new Map(base);
   for (const [id, p] of Object.entries(state.view.moved || {})) if (pos.has(id)) pos.set(id, p);
   const sizes = new Map(spec.nodes.map((n) => [n.id, nodeSize(n)]));
@@ -291,7 +365,13 @@ export function renderGraph(spec: GraphScene, state: FrameState, memo: Record<st
   for (const node of spec.nodes) {
     const p = pos.get(node.id)!,
       s = sizes.get(node.id)!;
-    if (nodeOpacity.get(node.id)) labels.reserve({ x: p[0] - s.w / 2, y: p[1] - s.h / 2, w: s.w, h: s.h + (node.sublabel && node.shape === "circle" ? 14 : 0) });
+    if (nodeOpacity.get(node.id))
+      labels.reserve({
+        x: p[0] - s.w / 2,
+        y: p[1] - s.h / 2,
+        w: s.w,
+        h: s.h + (node.sublabel && node.shape === "circle" ? 14 : 0),
+      });
   }
   const back: string[] = [],
     edgesSvg: string[] = [],
@@ -307,7 +387,9 @@ export function renderGraph(spec: GraphScene, state: FrameState, memo: Record<st
       x1 = Math.max(...members.map(([p, s]) => p[0] + s.w / 2)) + 16;
     const y0 = Math.min(...members.map(([p, s]) => p[1] - s.h / 2)) - 24,
       y1 = Math.max(...members.map(([p, s]) => p[1] + s.h / 2)) + 14;
-    back.push(rect(x0, y0, x1 - x0, y1 - y0, "tint", { tone: focus.has(g.id) ? "lit" : "faint", rx: 6, id: g.id, opacity: o }));
+    back.push(
+      rect(x0, y0, x1 - x0, y1 - y0, "tint", { tone: focus.has(g.id) ? "lit" : "faint", rx: 6, id: g.id, opacity: o }),
+    );
     if (g.label) back.push(text(x0 + 9, y0 + 14, g.label, { size: 10, mono: true, tone: "mid", opacity: o }));
     labels.reserve({ x: x0 + 6, y: y0 + 3, w: textWidth(g.label, 10, true) + 6, h: 13 });
   }
@@ -332,17 +414,41 @@ export function renderGraph(spec: GraphScene, state: FrameState, memo: Record<st
       const d = `M${r1(top[0] - 8)} ${r1(top[1])}C${r1(top[0] - 26)} ${r1(top[1] - 34)} ${r1(top[0] + 26)} ${r1(top[1] - 34)} ${r1(top[0] + 8)} ${r1(top[1])}`;
       geometry.set(e.id, (u) => [top[0] + Math.sin(u * Math.PI * 2) * 14, top[1] - Math.sin(u * Math.PI) * 26]);
       if (!o) continue;
-      edgesSvg.push(`<path d="${d}" class="sc-line" data-tone="${tone}" data-id="${e.id}"${e.dashed ? " data-dashed" : ""}/>`);
-      if (e.label) front.push(text(top[0], top[1] - 30, fillTemplate(e.label, scope), { size: 10.5, anchor: "middle", tone: "mid", halo: true, opacity: o }));
+      edgesSvg.push(
+        `<path d="${d}" class="sc-line" data-tone="${tone}" data-id="${e.id}"${e.dashed ? " data-dashed" : ""}/>`,
+      );
+      if (e.label)
+        front.push(
+          text(top[0], top[1] - 30, fillTemplate(e.label, scope), {
+            size: 10.5,
+            anchor: "middle",
+            tone: "mid",
+            halo: true,
+            opacity: o,
+          }),
+        );
       continue;
     }
     // two edges between the same pair bend apart automatically
     const dup = (pairCount.get([e.from, e.to].sort().join("|")) || 1) > 1;
-    const bend = (e.curve || (dup ? 0.35 * (e.from < e.to ? 1 : -1) : 0)) * Math.min(120, Math.hypot(pb[0] - pa[0], pb[1] - pa[1])) * 0.5;
-    const mid: Pt = [(pa[0] + pb[0]) / 2 + (-(pb[1] - pa[1]) / (Math.hypot(pb[0] - pa[0], pb[1] - pa[1]) || 1)) * bend, (pa[1] + pb[1]) / 2 + ((pb[0] - pa[0]) / (Math.hypot(pb[0] - pa[0], pb[1] - pa[1]) || 1)) * bend];
+    const bend =
+      (e.curve || (dup ? 0.35 * (e.from < e.to ? 1 : -1) : 0)) *
+      Math.min(120, Math.hypot(pb[0] - pa[0], pb[1] - pa[1])) *
+      0.5;
+    const mid: Pt = [
+      (pa[0] + pb[0]) / 2 + (-(pb[1] - pa[1]) / (Math.hypot(pb[0] - pa[0], pb[1] - pa[1]) || 1)) * bend,
+      (pa[1] + pb[1]) / 2 + ((pb[0] - pa[0]) / (Math.hypot(pb[0] - pa[0], pb[1] - pa[1]) || 1)) * bend,
+    ];
     const from = boundary(a, sizes.get(a.id)!, pa, mid);
     const to = boundary(b, sizes.get(b.id)!, pb, mid);
-    const curved = curvedArrow(from, to, bend * 0.92, { tone, dashed: e.dashed, id: e.id, arrow: e.arrow, opacity: o, width: tone === "lit" ? 2 : undefined });
+    const curved = curvedArrow(from, to, bend * 0.92, {
+      tone,
+      dashed: e.dashed,
+      id: e.id,
+      arrow: e.arrow,
+      opacity: o,
+      width: tone === "lit" ? 2 : undefined,
+    });
     geometry.set(e.id, curved.at);
     geometry.set(`${e.from}>${e.to}`, curved.at);
     if (!o) continue;
@@ -362,8 +468,24 @@ export function renderGraph(spec: GraphScene, state: FrameState, memo: Record<st
       const lx = mx + nx * off,
         ly = my + ny * off + 3.5;
       // a label with nowhere to go is dropped rather than drawn over another (its edge still shows it on hover)
-      const at = labels.placeOptional(lx, ly, label, 10.5, [[0, 0, "middle"], [-nx * off * 2, -ny * off * 2, "middle"], [0, -12, "middle"], [0, 14, "middle"]]) || (focus.has(e.id) ? labels.place(lx, ly, label, 10.5, [[0, 0, "middle"]]) : null);
-      if (at) front.push(text(at.x, at.y, label, { size: 10.5, anchor: at.anchor, tone: tone === "faint" || tone === "lo" ? "mid" : tone, halo: true, opacity: o, id: e.id }));
+      const at =
+        labels.placeOptional(lx, ly, label, 10.5, [
+          [0, 0, "middle"],
+          [-nx * off * 2, -ny * off * 2, "middle"],
+          [0, -12, "middle"],
+          [0, 14, "middle"],
+        ]) || (focus.has(e.id) ? labels.place(lx, ly, label, 10.5, [[0, 0, "middle"]]) : null);
+      if (at)
+        front.push(
+          text(at.x, at.y, label, {
+            size: 10.5,
+            anchor: at.anchor,
+            tone: tone === "faint" || tone === "lo" ? "mid" : tone,
+            halo: true,
+            opacity: o,
+            id: e.id,
+          }),
+        );
     }
   }
 
@@ -380,7 +502,15 @@ export function renderGraph(spec: GraphScene, state: FrameState, memo: Record<st
     const labelY = inside && sub ? p[1] - 2 : p[1] + 4;
     nodesSvg.push(
       `<g data-id="${node.id}" data-drag="${node.id}" class="sc-draggable"${o < 1 ? ` style="opacity:${r1(o * 100) / 100}"` : ""}>${nodeShape(node, s, p, tone, 1)}${text(p[0], labelY, label, { size: 12, anchor: "middle", tone: tone === "lit" ? "lit" : "hi", weight: 500 })}${
-        sub ? text(p[0], inside ? p[1] + 11 : p[1] + s.r + 14, sub, { size: 10, anchor: "middle", mono: true, tone: "mid", halo: !inside }) : ""
+        sub
+          ? text(p[0], inside ? p[1] + 11 : p[1] + s.r + 14, sub, {
+              size: 10,
+              anchor: "middle",
+              mono: true,
+              tone: "mid",
+              halo: !inside,
+            })
+          : ""
       }</g>`,
     );
   }
@@ -406,13 +536,38 @@ export function renderGraph(spec: GraphScene, state: FrameState, memo: Record<st
     const pa = pos.get(from)!,
       pb = pos.get(to)!;
     const ease = u * u * (3 - 2 * u);
-    const p: Pt = along ? along(ease) : back2 ? back2(1 - ease) : [pa[0] + (pb[0] - pa[0]) * ease, pa[1] + (pb[1] - pa[1]) * ease];
+    const p: Pt = along
+      ? along(ease)
+      : back2
+        ? back2(1 - ease)
+        : [pa[0] + (pb[0] - pa[0]) * ease, pa[1] + (pb[1] - pa[1]) * ease];
     const tone: Tone = focus.has(k.id) ? "lit" : k.tone;
     front.push(circle(p[0], p[1], 5.5, "solid", { tone, opacity: o, id: k.id }));
     if (k.label) {
       const label = fillTemplate(k.label, scope);
-      const at2 = labels.place(p[0], p[1], label, 10.5, [[0, -10, "middle"], [0, 18, "middle"], [9, 4, "start"], [-9, 4, "end"]], true);
-      front.push(text(at2.x, at2.y, label, { size: 10.5, anchor: at2.anchor, mono: true, tone: tone === "lit" ? "hi" : tone, halo: true, opacity: o }));
+      const at2 = labels.place(
+        p[0],
+        p[1],
+        label,
+        10.5,
+        [
+          [0, -10, "middle"],
+          [0, 18, "middle"],
+          [9, 4, "start"],
+          [-9, 4, "end"],
+        ],
+        true,
+      );
+      front.push(
+        text(at2.x, at2.y, label, {
+          size: 10.5,
+          anchor: at2.anchor,
+          mono: true,
+          tone: tone === "lit" ? "hi" : tone,
+          halo: true,
+          opacity: o,
+        }),
+      );
     }
   }
 
@@ -439,4 +594,3 @@ export function renderGraph(spec: GraphScene, state: FrameState, memo: Record<st
     invert: (px, py) => [(px - WIDTH / 2) / k + mx, (py - HEIGHT / 2 - 4) / k + my],
   };
 }
-

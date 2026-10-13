@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { EXAMPLES } from "../shared/scene/examples.ts";
 import { compile, evalNum, fillTemplate, formatNumber } from "../shared/scene/expr.ts";
-import { buildScope, defaults, normalize, renderScene, stepParamTargets, timelineOf, visibilityAt, type FrameState, type Scene } from "../shared/scene/index.ts";
+import {
+  buildScope,
+  defaults,
+  type FrameState,
+  normalize,
+  renderScene,
+  type Scene,
+  stepParamTargets,
+  timelineOf,
+  visibilityAt,
+} from "../shared/scene/index.ts";
 import { coerceToSchema, KIND_SCHEMAS, sceneSchema } from "../shared/scene/schema.ts";
 import { validateScene } from "../shared/scene/validate.ts";
 
@@ -33,7 +43,7 @@ describe("expressions", () => {
     expect(evalNum("process", {}, -1)).toBe(-1);
   });
   it("fills templates, digits included", () => {
-    expect(fillTemplate("v = {v:2} m/s", { v: 3.14159 })).toBe("v = 3.14 m/s");
+    expect(fillTemplate("v = {v:2} m/s", { v: 1.23456 })).toBe("v = 1.23 m/s");
     expect(fillTemplate("{n} items, {ok ? 'fine' : 'bad'}", { n: 4, ok: 0 })).toBe("4 items, bad");
     expect(fillTemplate("{missing}", {})).toBe("—");
     expect(formatNumber(-2.5, 1)).toBe("−2.5");
@@ -73,22 +83,42 @@ describe("validation catches what a model gets wrong", () => {
     expect(validateScene(bad).errors.join(" ")).toMatch(/unknown name "slop"/);
   });
   it("references to elements and params that don't exist", () => {
-    const bad = { ...base, steps: [{ title: "x", narration: "", set: [{ param: "nope", value: "1" }], show: ["ghost"], hide: [], focus: [] }] };
+    const bad = {
+      ...base,
+      steps: [
+        { title: "x", narration: "", set: [{ param: "nope", value: "1" }], show: ["ghost"], hide: [], focus: [] },
+      ],
+    };
     const errors = validateScene(bad).errors.join(" ");
     expect(errors).toMatch(/param "nope"/);
     expect(errors).toMatch(/"ghost"/);
   });
   it("reserved names for params", () => {
-    const bad = { ...base, params: [{ id: "t", label: "t", kind: "slider", min: 0, max: 1, step: 0.1, value: 0, unit: "", options: [] }] };
+    const bad = {
+      ...base,
+      params: [{ id: "t", label: "t", kind: "slider", min: 0, max: 1, step: 0.1, value: 0, unit: "", options: [] }],
+    };
     expect(validateScene(bad).errors.join(" ")).toMatch(/platform defines/);
   });
   it("derived values used before they are defined", () => {
-    const bad = { ...base, derived: [{ id: "a2", expr: "b2 + 1" }, { id: "b2", expr: "2" }] };
+    const bad = {
+      ...base,
+      derived: [
+        { id: "a2", expr: "b2 + 1" },
+        { id: "b2", expr: "2" },
+      ],
+    };
     expect(validateScene(bad).errors.join(" ")).toMatch(/not defined before it/);
   });
   it("crowded states on a lifeline", () => {
     const seq = EXAMPLES.twoPhaseCommit as { events: Record<string, unknown>[] };
-    const bad = { ...seq, events: [...seq.events, { type: "state", id: "dup", actor: "A", at: "lat + 0.16", text: "X", tone: "hi", narration: "", when: "" }] };
+    const bad = {
+      ...seq,
+      events: [
+        ...seq.events,
+        { type: "state", id: "dup", actor: "A", at: "lat + 0.16", text: "X", tone: "hi", narration: "", when: "" },
+      ],
+    };
     expect(validateScene(bad).errors.join(" ")).toMatch(/boxes overlap/);
   });
   it("an unknown kind", () => {
@@ -115,14 +145,25 @@ describe("time, steps and visibility", () => {
     expect(slow.length).toBeGreaterThan(fast.length);
   });
   it("steps set params", () => {
-    const spec = normalize({ ...EXAMPLES.tangent, steps: [{ title: "a", narration: "", set: [{ param: "dx", value: "0.1" }], show: [], hide: [], focus: [] }] });
+    const spec = normalize({
+      ...EXAMPLES.tangent,
+      steps: [{ title: "a", narration: "", set: [{ param: "dx", value: "0.1" }], show: [], hide: [], focus: [] }],
+    });
     expect(stepParamTargets(spec, 0, {}).dx).toBeCloseTo(0.1);
   });
 });
 
 describe("specs can't inject markup", () => {
   it("strips unsafe characters from ids and references", () => {
-    const spec = normalize({ kind: "graph", layout: "row", nodes: [{ id: 'a" onmouseover="alert(1)', label: "<b>A</b>" }, { id: "b", label: "B" }], edges: [{ from: 'a" onmouseover="alert(1)', to: "b" }] });
+    const spec = normalize({
+      kind: "graph",
+      layout: "row",
+      nodes: [
+        { id: 'a" onmouseover="alert(1)', label: "<b>A</b>" },
+        { id: "b", label: "B" },
+      ],
+      edges: [{ from: 'a" onmouseover="alert(1)', to: "b" }],
+    });
     const out = renderScene(spec, frame(spec), {});
     expect(out.svg).not.toMatch(/onmouseover="/);
     expect(out.svg).not.toMatch(/<b>/);

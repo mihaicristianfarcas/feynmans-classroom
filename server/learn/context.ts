@@ -1,18 +1,21 @@
 /* What every prompt needs to know: who the learner is (and how they're doing), and the book text
  * around what they're looking at. */
+
+import { retrievability } from "../../shared/fsrs.ts";
+import type { SourceRef } from "../../shared/vault-types.ts";
 import { chapterRange } from "../anchor.ts";
 import { chapterText, findChapter, passageAround } from "../ingest/index.ts";
 import { getBook } from "../store.ts";
 import { cards, concepts, getProfile, notes } from "../vault/index.ts";
-import { retrievability } from "../../shared/fsrs.ts";
-import type { SourceRef } from "../../shared/vault-types.ts";
 import { cardState } from "./cards.ts";
 
 /** Mastery of a concept, 0–1: recall of its cards now, else its best explanation score. Null when unknown. */
 export function conceptMastery(conceptId: string, now = Date.now()): number | null {
   const linked = cards.list().filter((c) => c.concepts.includes(conceptId) && !c.suspended);
   const reviewed = linked.map((c) => cardState(c.id)).filter(Boolean);
-  const explained = notes.list().filter((n) => n.type === "explanation" && n.concepts.includes(conceptId) && typeof n.score === "number");
+  const explained = notes
+    .list()
+    .filter((n) => n.type === "explanation" && n.concepts.includes(conceptId) && typeof n.score === "number");
   const fromExplain = explained.length ? Math.max(...explained.map((n) => n.score!)) / 100 : null;
   if (!reviewed.length) return fromExplain;
   const recall = reviewed.reduce((sum, s) => sum + retrievability(s, now), 0) / linked.length;
@@ -27,7 +30,10 @@ export function learnerSummary(): string {
     .list()
     .map((c) => ({ c, m: conceptMastery(c.id) }))
     .filter((x) => x.m !== null);
-  const strong = known.filter((x) => x.m! >= 0.8).map((x) => x.c.name).slice(0, 12);
+  const strong = known
+    .filter((x) => x.m! >= 0.8)
+    .map((x) => x.c.name)
+    .slice(0, 12);
   const weak = known
     .filter((x) => x.m! < 0.6)
     .sort((a, b) => a.m! - b.m!)
@@ -61,34 +67,75 @@ export function bookContext(ref: Partial<SourceRef> | undefined, chars = 9000): 
   let chapter = ref.chapterId ? findChapter(book, ref.chapterId) : null;
   if (!chapter && (ref.page !== undefined || ref.block !== undefined)) {
     const at = ref.page !== undefined ? ref.page + (ref.y ?? 0) : (ref.block ?? 0);
-    chapter = [...book.toc].reverse().find((c) => (c.start.page !== undefined ? c.start.page + (c.start.y ?? 0) : (c.start.block ?? 0)) <= at + 1e-6) || book.toc[0] || null;
+    chapter =
+      [...book.toc]
+        .reverse()
+        .find(
+          (c) => (c.start.page !== undefined ? c.start.page + (c.start.y ?? 0) : (c.start.block ?? 0)) <= at + 1e-6,
+        ) ||
+      book.toc[0] ||
+      null;
   }
-  const source = { title: book.title, author: book.author, chapter: chapter ? `${chapter.title}${chapter.subtitle ? ` — ${chapter.subtitle}` : ""}` : undefined };
+  const source = {
+    title: book.title,
+    author: book.author,
+    chapter: chapter ? `${chapter.title}${chapter.subtitle ? ` — ${chapter.subtitle}` : ""}` : undefined,
+  };
   let context = "";
-  if (ref.page !== undefined || ref.block !== undefined) context = passageAround(book, { page: ref.page, block: ref.block }, 1);
+  if (ref.page !== undefined || ref.block !== undefined)
+    context = passageAround(book, { page: ref.page, block: ref.block }, 1);
   else if (chapter) context = chapterText(book, chapter, chars);
   if (context.length > chars) context = context.slice(0, chars);
   return { source, context, chapterId: chapter?.id };
 }
 
 /** The whole chapter text (for quizzes and concept extraction). */
-export function chapterContext(bookId: string, chapterId: string, chars = 40000): BookContext & { range?: ReturnType<typeof chapterRange> } {
+export function chapterContext(
+  bookId: string,
+  chapterId: string,
+  chars = 40000,
+): BookContext & { range?: ReturnType<typeof chapterRange> } {
   const book = getBook(bookId);
   if (!book) throw new Error("book not found");
   const chapter = findChapter(book, chapterId);
   if (!chapter) throw new Error("chapter not found");
-  return { source: { title: book.title, author: book.author, chapter: `${chapter.title}${chapter.subtitle ? ` — ${chapter.subtitle}` : ""}` }, context: chapterText(book, chapter, chars), chapterId, range: chapterRange(chapter) };
+  return {
+    source: {
+      title: book.title,
+      author: book.author,
+      chapter: `${chapter.title}${chapter.subtitle ? ` — ${chapter.subtitle}` : ""}`,
+    },
+    context: chapterText(book, chapter, chars),
+    chapterId,
+    range: chapterRange(chapter),
+  };
 }
 
 export function sourceLine(source: BookContext["source"]): string {
-  return source.title ? `${source.title}${source.author ? ` by ${source.author}` : ""}${source.chapter ? `, ${source.chapter}` : ""}` : "";
+  return source.title
+    ? `${source.title}${source.author ? ` by ${source.author}` : ""}${source.chapter ? `, ${source.chapter}` : ""}`
+    : "";
 }
 
-const STOP = new Set("about above after again against because been before being below between both could does doing down during each few from further have having here hers herself himself into itself just more most myself once only other ought ours ourselves over same should some such than that their theirs them themselves then there these they this those through under until very were what when where which while whom with would your yours yourself yourselves also which therefore thus hence however".split(" "));
+const STOP = new Set(
+  "about above after again against because been before being below between both could does doing down during each few from further have having here hers herself himself into itself just more most myself once only other ought ours ourselves over same should some such than that their theirs them themselves then there these they this those through under until very were what when where which while whom with would your yours yourself yourselves also which therefore thus hence however".split(
+    " ",
+  ),
+);
 
 /** Notes and concepts in the vault that share words with a passage: what an answer could link to. */
-export function relatedInVault(text: string, limit = 8): { title: string; kind: "note" | "concept"; summary: string }[] {
-  const words = [...new Set(text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 4 && !STOP.has(w)))];
+export function relatedInVault(
+  text: string,
+  limit = 8,
+): { title: string; kind: "note" | "concept"; summary: string }[] {
+  const words = [
+    ...new Set(
+      text
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}]+/u)
+        .filter((w) => w.length >= 4 && !STOP.has(w)),
+    ),
+  ];
   if (!words.length) return [];
   const score = (hay: string) => {
     const low = hay.toLowerCase();
@@ -97,7 +144,8 @@ export function relatedInVault(text: string, limit = 8): { title: string; kind: 
   const out: { title: string; kind: "note" | "concept"; summary: string; s: number }[] = [];
   for (const c of concepts.list()) {
     const s = score(`${c.name} ${c.name} ${c.aliases.join(" ")} ${c.summary}`);
-    if (s >= 2 || (s >= 1 && words.some((w) => c.name.toLowerCase().includes(w)))) out.push({ title: c.name, kind: "concept", summary: c.summary.slice(0, 120), s: s + 1 });
+    if (s >= 2 || (s >= 1 && words.some((w) => c.name.toLowerCase().includes(w))))
+      out.push({ title: c.name, kind: "concept", summary: c.summary.slice(0, 120), s: s + 1 });
   }
   for (const n of notes.list()) {
     const s = score(`${n.title} ${n.title} ${n.body.slice(0, 1500)}`);

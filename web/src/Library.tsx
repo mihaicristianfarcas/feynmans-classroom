@@ -13,6 +13,7 @@ export function Library() {
   const input = useRef<HTMLInputElement>(null);
 
   const refresh = () => api.books().then(setBooks, (e) => setError(e.message));
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once, when the page opens
   useEffect(() => {
     refresh();
     api.status().then(setStatus, () => setStatus(null));
@@ -37,7 +38,10 @@ export function Library() {
     <div className="library rise">
       <header className="page-head">
         <h1 className="page-title">Library</h1>
-        <p className="lede small">Bring in a hard book and read it with a margin that explains, draws and quizzes. Select any passage to ask about it.</p>
+        <p className="lede small">
+          Bring in a hard book and read it with a margin that explains, draws and quizzes. Select any passage to ask
+          about it.
+        </p>
       </header>
 
       <div
@@ -57,7 +61,13 @@ export function Library() {
         tabIndex={0}
         onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current?.click()}
       >
-        <input ref={input} type="file" accept=".pdf,.epub,.md,.markdown,.txt" hidden onChange={(e) => upload(e.target.files?.[0])} />
+        <input
+          ref={input}
+          type="file"
+          accept=".pdf,.epub,.md,.markdown,.txt"
+          hidden
+          onChange={(e) => upload(e.target.files?.[0])}
+        />
         <span className="well drop-icon" data-tone={drag ? "lavender" : undefined} aria-hidden="true">
           <Upload />
         </span>
@@ -88,12 +98,14 @@ export function Library() {
                 <span className="book-title">{book.title}</span>
                 {book.author && <span className="book-author">{book.author}</span>}
                 <span className="book-meta">
-                  {book.format === "pdf" ? `${book.pageCount} pages` : `${book.toc.length} chapters`} · {book.demoCount || 0} figure{book.demoCount === 1 ? "" : "s"}
+                  {book.format === "pdf" ? `${book.pageCount} pages` : `${book.toc.length} chapters`} ·{" "}
+                  {book.demoCount || 0} figure{book.demoCount === 1 ? "" : "s"}
                   {book.building ? ` · ${book.building} building` : ""}
                 </span>
                 {book.status === "error" && <span className="form-error">{book.error}</span>}
               </a>
               <button
+                type="button"
                 className="icon-button book-delete"
                 aria-label={`Remove ${book.title}`}
                 title="Remove from the library"
@@ -114,9 +126,17 @@ export function Library() {
         {status ? (
           <>
             <span data-ok={status.codex.installed && status.codex.loggedIn}>
-              Codex {status.codex.installed ? (status.codex.loggedIn ? `ready · ${status.codex.detail || "logged in"}` : "installed but not logged in: run codex login") : "not installed"} · <a href="#/settings">settings</a>
+              Codex{" "}
+              {status.codex.installed
+                ? status.codex.loggedIn
+                  ? `ready · ${status.codex.detail || "logged in"}`
+                  : "installed but not logged in: run codex login"
+                : "not installed"}{" "}
+              · <a href="#/settings">settings</a>
             </span>
-            <span data-ok={status.chrome}>Browser check {status.chrome ? "ready" : "unavailable (set CHROME_PATH)"}</span>
+            <span data-ok={status.chrome}>
+              Browser check {status.chrome ? "ready" : "unavailable (set CHROME_PATH)"}
+            </span>
             <span>
               {status.queue.running} building · {status.queue.waiting} waiting
             </span>

@@ -1,34 +1,72 @@
 /* The learning platform's API: profile and settings, the second brain (notes, concepts, cards,
  * figures, graph, search, asking the vault), the study tools and the journey. */
+
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { extname, join, resolve } from "node:path";
 import type { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
+import { fileNameOf } from "../shared/links.ts";
+import { validateScene } from "../shared/scene/validate.ts";
+import type { Note } from "../shared/vault-types.ts";
+import { approveRun, discardRun, listRuns, runDiff, startRun, undoRun } from "./agents.ts";
 import { codexStatus } from "./codex.ts";
 import { publish, subscribe } from "./events.ts";
 import { askVault, journey, knowledgeGraph, saveAnswer, search, today } from "./learn/brain.ts";
 import { deleteCard, draftCards, rateCard, reviewQueue, saveCard, saveDrafts, viewCard } from "./learn/cards.ts";
 import { deleteConcept, extractConcepts, saveConcept, upsertConcept } from "./learn/concepts.ts";
+import { decideConnection, suggestConnections } from "./learn/connections.ts";
 import { conceptMastery } from "./learn/context.ts";
-import { connect, gradeExplanation, gradeShortAnswers, makeQuiz, recordQuiz, saveExplanation, tutor } from "./learn/study.ts";
+import { appendToNote, bookNote, createNote, deleteNote, linkMention, updateNote } from "./learn/notes.ts";
+import {
+  connect,
+  gradeExplanation,
+  gradeShortAnswers,
+  makeQuiz,
+  recordQuiz,
+  saveExplanation,
+  tutor,
+} from "./learn/study.ts";
 import { llmLoad, text } from "./llm.ts";
 import { standaloneFigure } from "./scene/figures.ts";
 import { activeProvider, claudeStatus, getSettings, saveSettings } from "./settings.ts";
 import { getBook, listBooks } from "./store.ts";
-import { annotations, cards, changed, concepts, figures, getProfile, logActivity, notes, now, onVaultChange, saveProfile, shortId, VAULT, vaultHistory, vaultStats } from "./vault/index.ts";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { extname, join, resolve } from "node:path";
-import { fileNameOf } from "../shared/links.ts";
-import { appendToNote, bookNote, createNote, deleteNote, linkMention, updateNote } from "./learn/notes.ts";
-import { decideConnection, suggestConnections } from "./learn/connections.ts";
-import { approveRun, discardRun, listRuns, runDiff, startRun, undoRun } from "./agents.ts";
 import { listConnections } from "./vault/connections.ts";
+import {
+  annotations,
+  cards,
+  changed,
+  concepts,
+  figures,
+  getProfile,
+  logActivity,
+  notes,
+  now,
+  onVaultChange,
+  saveProfile,
+  shortId,
+  VAULT,
+  vaultHistory,
+  vaultStats,
+} from "./vault/index.ts";
 import { allEdges, backlinks, linkTargets, resolveLink, titleOf, unlinkedMentions } from "./vault/links.ts";
-import { validateScene } from "../shared/scene/validate.ts";
-import type { Note } from "../shared/vault-types.ts";
 
-const body = async <T>(c: { req: { json: () => Promise<unknown> } }) => ((await c.req.json().catch(() => ({}))) || {}) as T;
+const body = async <T>(c: { req: { json: () => Promise<unknown> } }) =>
+  ((await c.req.json().catch(() => ({}))) || {}) as T;
 
 /* reading sessions: pings while the reader is open become one activity entry per sitting */
-const sessions = new Map<string, { start: number; last: number; minutes: number; chapter?: string; chapterId?: string; position?: number; pages: Set<number>; timer?: ReturnType<typeof setTimeout> }>();
+const sessions = new Map<
+  string,
+  {
+    start: number;
+    last: number;
+    minutes: number;
+    chapter?: string;
+    chapterId?: string;
+    position?: number;
+    pages: Set<number>;
+    timer?: ReturnType<typeof setTimeout>;
+  }
+>();
 function flushSession(bookId: string) {
   const s = sessions.get(bookId);
   if (!s) return;
@@ -36,7 +74,19 @@ function flushSession(bookId: string) {
   clearTimeout(s.timer);
   if (s.minutes < 1) return;
   const book = getBook(bookId);
-  logActivity({ type: "read", bookId, ts: s.last, text: `Read ${Math.round(s.minutes)} min of ${book?.title || "a book"}${s.chapter ? ` (${s.chapter})` : ""}`, data: { minutes: Math.round(s.minutes), chapter: s.chapter, chapterId: s.chapterId, position: s.position, pages: s.pages.size } });
+  logActivity({
+    type: "read",
+    bookId,
+    ts: s.last,
+    text: `Read ${Math.round(s.minutes)} min of ${book?.title || "a book"}${s.chapter ? ` (${s.chapter})` : ""}`,
+    data: {
+      minutes: Math.round(s.minutes),
+      chapter: s.chapter,
+      chapterId: s.chapterId,
+      position: s.position,
+      pages: s.pages.size,
+    },
+  });
 }
 process.on("exit", () => [...sessions.keys()].forEach(flushSession));
 
@@ -69,7 +119,13 @@ export function registerRoutes(app: Hono) {
   app.put("/api/profile", async (c) => c.json(saveProfile(await body(c))));
   app.get("/api/settings", (c) => {
     const settings = getSettings();
-    return c.json({ settings, active: activeProvider(settings), codex: codexStatus(), claude: claudeStatus(), load: llmLoad() });
+    return c.json({
+      settings,
+      active: activeProvider(settings),
+      codex: codexStatus(),
+      claude: claudeStatus(),
+      load: llmLoad(),
+    });
   });
   app.put("/api/settings", async (c) => {
     const settings = saveSettings(await body(c));
@@ -83,7 +139,14 @@ export function registerRoutes(app: Hono) {
   app.get("/api/graph", (c) => c.json(knowledgeGraph()));
   app.get("/api/search", (c) => c.json(search(c.req.query("q") || "")));
   app.post("/api/activity", async (c) => {
-    const b = await body<{ type: string; bookId: string; chapter?: string; chapterId?: string; position?: number; page?: number }>(c);
+    const b = await body<{
+      type: string;
+      bookId: string;
+      chapter?: string;
+      chapterId?: string;
+      position?: number;
+      page?: number;
+    }>(c);
     if (b.type !== "read" || !b.bookId) return c.json({ ok: false }, 400);
     const at = Date.now();
     let s = sessions.get(b.bookId);
@@ -107,7 +170,13 @@ export function registerRoutes(app: Hono) {
     const { type, book, concept, folder } = c.req.query();
     const list = notes
       .list()
-      .filter((n) => (!type || n.type === type) && (!book || n.source?.bookId === book) && (!concept || n.concepts.includes(concept)) && (!folder || n.path.startsWith(`notes/${folder}/`)))
+      .filter(
+        (n) =>
+          (!type || n.type === type) &&
+          (!book || n.source?.bookId === book) &&
+          (!concept || n.concepts.includes(concept)) &&
+          (!folder || n.path.startsWith(`notes/${folder}/`)),
+      )
       .sort((a, b) => b.updated.localeCompare(a.updated));
     return c.json(list);
   });
@@ -117,7 +186,13 @@ export function registerRoutes(app: Hono) {
     const node = `note:${note.id}`;
     const outgoing = allEdges()
       .filter((e) => e.from === node && e.kind !== "source")
-      .map((e) => ({ target: e.target, kind: e.kind, to: e.to, path: e.toPath, title: e.to ? titleOf(e.to, e.toPath) : e.target }));
+      .map((e) => ({
+        target: e.target,
+        kind: e.kind,
+        to: e.to,
+        path: e.toPath,
+        title: e.to ? titleOf(e.to, e.toPath) : e.target,
+      }));
     const connections = listConnections().filter((x) => x.from === note.path && x.status !== "removed");
     return c.json({ ...note, backlinks: backlinks(node), mentions: unlinkedMentions(note), outgoing, connections });
   });
@@ -137,7 +212,9 @@ export function registerRoutes(app: Hono) {
     return c.json(appendToNote(c.req.param("id"), b.markdown));
   });
   app.delete("/api/notes/:id", (c) => c.json({ ok: deleteNote(c.req.param("id")) }));
-  app.post("/api/notes/:id/link-mention", async (c) => c.json(linkMention(c.req.param("id"), (await body<{ path: string }>(c)).path)));
+  app.post("/api/notes/:id/link-mention", async (c) =>
+    c.json(linkMention(c.req.param("id"), (await body<{ path: string }>(c)).path)),
+  );
 
   /* ---------- agents that work on the vault ---------- */
   app.get("/api/agents", (c) => c.json(listRuns()));
@@ -161,7 +238,9 @@ export function registerRoutes(app: Hono) {
     const path = c.req.query("path");
     return c.json(listConnections().filter((x) => !path || x.from === path));
   });
-  app.post("/api/connections/suggest", async (c) => c.json(await suggestConnections((await body<{ path?: string }>(c)).path || undefined)));
+  app.post("/api/connections/suggest", async (c) =>
+    c.json(await suggestConnections((await body<{ path?: string }>(c)).path || undefined)),
+  );
   app.post("/api/connections/:id/:decision", (c) => {
     const decision = c.req.param("decision");
     if (!["accept", "reject", "remove"].includes(decision)) return c.json({ error: "accept, reject or remove" }, 400);
@@ -192,9 +271,23 @@ export function registerRoutes(app: Hono) {
     const rel = (c.req.query("path") || "").replace(/\\/g, "/");
     const path = rel.startsWith("attachments/") ? safeVaultPath(rel) : null;
     if (!path || !existsSync(path)) return c.json({ error: "not found" }, 404);
-    const type = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml" }[extname(path).slice(1).toLowerCase()];
+    const type = {
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      gif: "image/gif",
+      webp: "image/webp",
+      svg: "image/svg+xml",
+    }[extname(path).slice(1).toLowerCase()];
     if (!type) return c.json({ error: "not a picture" }, 400);
-    return new Response(readFileSync(path), { headers: { "content-type": type, "cache-control": "private, max-age=3600", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox", "x-content-type-options": "nosniff" } });
+    return new Response(readFileSync(path), {
+      headers: {
+        "content-type": type,
+        "cache-control": "private, max-age=3600",
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        "x-content-type-options": "nosniff",
+      },
+    });
   });
   /** Reads a picture: LaTeX for a formula, a Markdown table, or a description of a figure. */
   app.post("/api/transcribe", async (c) => {
@@ -211,7 +304,10 @@ Reply with the Markdown only, no preamble.`,
       images: [path],
       tier: "fast",
     });
-    return c.json({ markdown: result.data.trim().replace(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/, "$1"), ms: result.ms });
+    return c.json({
+      markdown: result.data.trim().replace(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/, "$1"),
+      ms: result.ms,
+    });
   });
   /** Saves a picture (pasted into a note, or captured from a book) under attachments/. */
   app.post("/api/attachments", async (c) => {
@@ -221,7 +317,13 @@ Reply with the Markdown only, no preamble.`,
     const bytes = Buffer.from(m[2], "base64");
     if (bytes.length > 12 * 1024 * 1024) return c.json({ error: "picture too large (12 MB max)" }, 413);
     const ext = m[1] === "jpeg" ? "jpg" : m[1];
-    const base = fileNameOf((b.name || `Pasted ${new Date().toISOString().slice(0, 19).replace("T", " ").replace(/:/g, ".")}`).replace(/\.(png|jpe?g|webp|gif)$/i, ""), 90);
+    const base = fileNameOf(
+      (b.name || `Pasted ${new Date().toISOString().slice(0, 19).replace("T", " ").replace(/:/g, ".")}`).replace(
+        /\.(png|jpe?g|webp|gif)$/i,
+        "",
+      ),
+      90,
+    );
     let rel = `attachments/${base}.${ext}`;
     for (let n = 2; existsSync(join(VAULT, rel)); n++) rel = `attachments/${base} ${n}.${ext}`;
     mkdirSync(join(VAULT, "attachments"), { recursive: true });
@@ -236,20 +338,45 @@ Reply with the Markdown only, no preamble.`,
     return c.json(
       concepts
         .list()
-        .map((x) => ({ ...x, mastery: conceptMastery(x.id, at), cards: cards.list().filter((k) => k.concepts.includes(x.id)).length }))
+        .map((x) => ({
+          ...x,
+          mastery: conceptMastery(x.id, at),
+          cards: cards.list().filter((k) => k.concepts.includes(x.id)).length,
+        }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     );
   });
   app.get("/api/concepts/:id", (c) => {
     const concept = concepts.get(c.req.param("id"));
     if (!concept) return c.json({ error: "not found" }, 404);
-    const linkedCards = cards.list().filter((k) => k.concepts.includes(concept.id)).map((k) => viewCard(k));
-    const linking = new Set(allEdges().filter((e) => e.to === `concept:${concept.id}` && e.from.startsWith("note:")).map((e) => e.from.slice(5)));
+    const linkedCards = cards
+      .list()
+      .filter((k) => k.concepts.includes(concept.id))
+      .map((k) => viewCard(k));
+    const linking = new Set(
+      allEdges()
+        .filter((e) => e.to === `concept:${concept.id}` && e.from.startsWith("note:"))
+        .map((e) => e.from.slice(5)),
+    );
     const linkedNotes = notes.list().filter((n) => n.concepts.includes(concept.id) || linking.has(n.id));
-    const related = concept.related.map((id) => concepts.get(id)).filter(Boolean).map((r) => ({ id: r!.id, name: r!.name, mastery: conceptMastery(r!.id) }));
-    const backlinks = concepts.list().filter((x) => x.related.includes(concept.id)).map((r) => ({ id: r.id, name: r.name, mastery: conceptMastery(r.id) }));
+    const related = concept.related
+      .map((id) => concepts.get(id))
+      .filter(Boolean)
+      .map((r) => ({ id: r!.id, name: r!.name, mastery: conceptMastery(r!.id) }));
+    const backlinks = concepts
+      .list()
+      .filter((x) => x.related.includes(concept.id))
+      .map((r) => ({ id: r.id, name: r.name, mastery: conceptMastery(r.id) }));
     const sources = concept.sources.map((s) => ({ ...s, title: getBook(s.bookId)?.title }));
-    return c.json({ ...concept, sources, mastery: conceptMastery(concept.id), cards: linkedCards, notes: linkedNotes, related, backlinks });
+    return c.json({
+      ...concept,
+      sources,
+      mastery: conceptMastery(concept.id),
+      cards: linkedCards,
+      notes: linkedNotes,
+      related,
+      backlinks,
+    });
   });
   app.post("/api/concepts", async (c) => {
     const b = await body<{ name: string; summary?: string; body?: string; related?: string[] }>(c);
@@ -282,7 +409,12 @@ Reply with the Markdown only, no preamble.`,
     const b = await body<{ cards?: Parameters<typeof saveCard>[0][] } & Partial<Parameters<typeof saveCard>[0]>>(c);
     const list = b.cards || [b as Parameters<typeof saveCard>[0]];
     const saved = list.filter((x) => x.front?.trim() && x.back?.trim()).map(saveCard);
-    if (saved.length) logActivity({ type: "card", text: `Made ${saved.length} card${saved.length === 1 ? "" : "s"}`, concepts: [...new Set(saved.flatMap((k) => k.concepts))] });
+    if (saved.length)
+      logActivity({
+        type: "card",
+        text: `Made ${saved.length} card${saved.length === 1 ? "" : "s"}`,
+        concepts: [...new Set(saved.flatMap((k) => k.concepts))],
+      });
     return c.json(saved);
   });
   app.put("/api/cards/:id", async (c) => {
@@ -297,7 +429,12 @@ Reply with the Markdown only, no preamble.`,
   });
   app.post("/api/cards/draft", async (c) => c.json(await draftCards(await body(c))));
   app.post("/api/cards/save-drafts", async (c) => {
-    const b = await body<{ drafts: { front: string; back: string; kind?: "basic" | "cloze"; concept?: string }[]; deck?: string; source?: Note["source"]; concepts?: { name: string; summary: string }[] }>(c);
+    const b = await body<{
+      drafts: { front: string; back: string; kind?: "basic" | "cloze"; concept?: string }[];
+      deck?: string;
+      source?: Note["source"];
+      concepts?: { name: string; summary: string }[];
+    }>(c);
     const deck = b.deck || (b.source?.bookId ? getBook(b.source.bookId)?.title : undefined) || "general";
     return c.json(saveDrafts(b.drafts || [], { deck, source: b.source, concepts: b.concepts }));
   });
@@ -314,11 +451,18 @@ Reply with the Markdown only, no preamble.`,
 
   /* ---------- study tools ---------- */
   app.post("/api/quiz", async (c) => c.json(await makeQuiz(await body(c))));
-  app.post("/api/quiz/grade", async (c) => c.json(await gradeShortAnswers((await body<{ items: { question: string; ideal: string; answer: string }[] }>(c)).items || [])));
+  app.post("/api/quiz/grade", async (c) =>
+    c.json(
+      await gradeShortAnswers(
+        (await body<{ items: { question: string; ideal: string; answer: string }[] }>(c)).items || [],
+      ),
+    ),
+  );
   app.post("/api/quiz/record", async (c) => c.json(recordQuiz(await body(c))));
   app.post("/api/explain", async (c) => {
     const b = await body<{ concept: string; explanation: string; passage?: string; source?: Note["source"] }>(c);
-    if (!b.explanation?.trim() || b.explanation.trim().split(/\s+/).length < 8) return c.json({ error: "Write at least a couple of sentences in your own words." }, 400);
+    if (!b.explanation?.trim() || b.explanation.trim().split(/\s+/).length < 8)
+      return c.json({ error: "Write at least a couple of sentences in your own words." }, 400);
     return c.json(await gradeExplanation(b));
   });
   app.post("/api/explain/save", async (c) => c.json(saveExplanation(await body(c))));
@@ -346,7 +490,14 @@ Reply with the Markdown only, no preamble.`,
       // keep a figure that was already drawn (e.g. one from a book) in the vault
       const check = validateScene(b.scene);
       if (!check.ok || !check.scene) return c.json({ error: check.errors[0] || "not a figure" }, 400);
-      const figure = { id: shortId("f"), title: b.title || check.scene.title, scene: check.scene, source: b.source, request: b.request, created: now() };
+      const figure = {
+        id: shortId("f"),
+        title: b.title || check.scene.title,
+        scene: check.scene,
+        source: b.source,
+        request: b.request,
+        created: now(),
+      };
       figures.save(figure);
       changed(`figure ${figure.title}`);
       return c.json(figure);
@@ -374,5 +525,14 @@ Reply with the Markdown only, no preamble.`,
     }),
   );
 
-  app.get("/api/books-lite", (c) => c.json(listBooks().map((b) => ({ id: b.id, title: b.title, author: b.author, toc: b.toc.map((t) => ({ id: t.id, title: t.title })) }))));
+  app.get("/api/books-lite", (c) =>
+    c.json(
+      listBooks().map((b) => ({
+        id: b.id,
+        title: b.title,
+        author: b.author,
+        toc: b.toc.map((t) => ({ id: t.id, title: t.title })),
+      })),
+    ),
+  );
 }

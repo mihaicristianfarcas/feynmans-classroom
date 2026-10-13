@@ -1,7 +1,17 @@
-import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type Simulation, type SimulationLinkDatum, type SimulationNodeDatum } from "d3-force";
+import {
+  forceCollide,
+  forceLink,
+  forceManyBody,
+  forceSimulation,
+  forceX,
+  forceY,
+  type Simulation,
+  type SimulationLinkDatum,
+  type SimulationNodeDatum,
+} from "d3-force";
 import { Maximize2, Minus, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { go, openLink, type GraphData } from "./api";
+import { type GraphData, go, openLink } from "./api";
 
 type N = SimulationNodeDatum & GraphData["nodes"][number];
 type L = SimulationLinkDatum<N> & { kind: string };
@@ -9,31 +19,74 @@ type L = SimulationLinkDatum<N> & { kind: string };
 const W = 1000;
 const H = 640;
 
-const radius = (n: N) => (n.kind === "book" ? 0 : n.kind === "concept" ? 5 + n.size * 3 : n.kind === "annotation" ? 2.6 : 3.2);
+const radius = (n: N) =>
+  n.kind === "book" ? 0 : n.kind === "concept" ? 5 + n.size * 3 : n.kind === "annotation" ? 2.6 : 3.2;
 
 /**
  * The knowledge graph: books, concepts, notes (and, if shown, annotations), joined by their links.
  * Each concept's ring shows how well it's known. Links you wrote are solid, connections you accepted
  * from the agent dashed, its pending suggestions dotted.
  */
-export function GraphView({ data, showNotes, showAnnotations = false, showSuggestions = false, highlight, until }: { data: GraphData; showNotes: boolean; showAnnotations?: boolean; showSuggestions?: boolean; highlight: string; until?: number }) {
-  const nodes = useMemo<N[]>(() => data.nodes.filter((n) => (showNotes || n.kind !== "note") && (showAnnotations || n.kind !== "annotation")).map((n) => ({ ...n })), [data, showNotes, showAnnotations]);
+export function GraphView({
+  data,
+  showNotes,
+  showAnnotations = false,
+  showSuggestions = false,
+  highlight,
+  until,
+}: {
+  data: GraphData;
+  showNotes: boolean;
+  showAnnotations?: boolean;
+  showSuggestions?: boolean;
+  highlight: string;
+  until?: number;
+}) {
+  const nodes = useMemo<N[]>(
+    () =>
+      data.nodes
+        .filter((n) => (showNotes || n.kind !== "note") && (showAnnotations || n.kind !== "annotation"))
+        .map((n) => ({ ...n })),
+    [data, showNotes, showAnnotations],
+  );
   const links = useMemo<L[]>(() => {
     const ids = new Set(nodes.map((n) => n.id));
-    return data.edges.filter((e) => ids.has(e.from) && ids.has(e.to) && (showSuggestions || e.kind !== "suggested")).map((e) => ({ source: e.from, target: e.to, kind: e.kind }));
+    return data.edges
+      .filter((e) => ids.has(e.from) && ids.has(e.to) && (showSuggestions || e.kind !== "suggested"))
+      .map((e) => ({ source: e.from, target: e.to, kind: e.kind }));
   }, [data, nodes, showSuggestions]);
   const [, setTick] = useState(0);
   const [hover, setHover] = useState<string | null>(null);
   const [view, setView] = useState({ k: 1, x: 0, y: 0 });
   const sim = useRef<Simulation<N, L> | null>(null);
-  const drag = useRef<{ node?: N; sx: number; sy: number; v: { k: number; x: number; y: number }; moved: boolean } | null>(null);
+  const drag = useRef<{
+    node?: N;
+    sx: number;
+    sy: number;
+    v: { k: number; x: number; y: number };
+    moved: boolean;
+  } | null>(null);
   const svg = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
     const s = forceSimulation<N, L>(nodes)
-      .force("link", forceLink<N, L>(links).id((d) => d.id).distance((l) => (l.kind === "related" ? 70 : l.kind === "source" ? 110 : 50)).strength((l) => (l.kind === "source" ? 0.15 : 0.5)))
-      .force("charge", forceManyBody<N>().strength((d) => (d.kind === "book" ? -900 : d.kind === "concept" ? -160 : -40)))
-      .force("collide", forceCollide<N>().radius((d) => (d.kind === "book" ? 90 : d.kind === "concept" ? radius(d) + 40 : radius(d) + 8)).strength(0.9))
+      .force(
+        "link",
+        forceLink<N, L>(links)
+          .id((d) => d.id)
+          .distance((l) => (l.kind === "related" ? 70 : l.kind === "source" ? 110 : 50))
+          .strength((l) => (l.kind === "source" ? 0.15 : 0.5)),
+      )
+      .force(
+        "charge",
+        forceManyBody<N>().strength((d) => (d.kind === "book" ? -900 : d.kind === "concept" ? -160 : -40)),
+      )
+      .force(
+        "collide",
+        forceCollide<N>()
+          .radius((d) => (d.kind === "book" ? 90 : d.kind === "concept" ? radius(d) + 40 : radius(d) + 8))
+          .strength(0.9),
+      )
       .force("x", forceX(W / 2).strength(0.04))
       .force("y", forceY(H / 2).strength(0.06))
       .alphaDecay(0.035);
@@ -142,8 +195,21 @@ export function GraphView({ data, showNotes, showAnnotations = false, showSugges
             const a = l.source as N,
               b = l.target as N;
             if (a.x === undefined || b.x === undefined || !born(a) || !born(b)) return null;
-            const lit = focus && focus.has(a.id) && focus.has(b.id);
-            return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} className="g-edge" data-kind={l.kind} data-lit={lit || undefined} data-dim={(focus && !lit) || undefined} />;
+            const lit = focus?.has(a.id) && focus.has(b.id);
+            return (
+              <line
+                // biome-ignore lint/suspicious/noArrayIndexKey: edges are rebuilt whole with the graph
+                key={i}
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                className="g-edge"
+                data-kind={l.kind}
+                data-lit={lit || undefined}
+                data-dim={(focus && !lit) || undefined}
+              />
+            );
           })}
           {nodes.map((n) => {
             if (n.x === undefined || n.y === undefined || !born(n)) return null;
@@ -153,7 +219,16 @@ export function GraphView({ data, showNotes, showAnnotations = false, showSugges
               const label = n.label.length > 26 ? `${n.label.slice(0, 25)}…` : n.label;
               const w = label.length * 6.6 + 22;
               return (
-                <g key={n.id} data-node={n.id} className="g-node g-book" transform={`translate(${n.x} ${n.y})`} data-dim={dim || undefined} data-hit={hit || undefined} onPointerEnter={() => setHover(n.id)} onPointerLeave={() => setHover(null)}>
+                <g
+                  key={n.id}
+                  data-node={n.id}
+                  className="g-node g-book"
+                  transform={`translate(${n.x} ${n.y})`}
+                  data-dim={dim || undefined}
+                  data-hit={hit || undefined}
+                  onPointerEnter={() => setHover(n.id)}
+                  onPointerLeave={() => setHover(null)}
+                >
                   <rect x={-w / 2} y={-13} width={w} height={26} rx={3} />
                   <text textAnchor="middle" y={4}>
                     {label}
@@ -164,10 +239,32 @@ export function GraphView({ data, showNotes, showAnnotations = false, showSugges
             const r = radius(n);
             const m = n.mastery;
             const arc = m === null ? "" : describeArc(r + 3.2, Math.max(0.001, Math.min(0.9999, m)));
-            const showLabel = (n.kind === "concept" && (fewConcepts || n.size > 1.3)) || (n.kind === "note" && fewNotes) || hover === n.id || hit || (focus && focus.has(n.id)) || view.k > 1.6;
+            const showLabel =
+              (n.kind === "concept" && (fewConcepts || n.size > 1.3)) ||
+              (n.kind === "note" && fewNotes) ||
+              hover === n.id ||
+              hit ||
+              focus?.has(n.id) ||
+              view.k > 1.6;
             return (
-              <g key={n.id} data-node={n.id} className={`g-node g-${n.kind}`} transform={`translate(${n.x} ${n.y})`} data-dim={dim || undefined} data-hit={hit || undefined} data-level={m === null ? "none" : m >= 0.8 ? "strong" : m >= 0.55 ? "ok" : "weak"} onPointerEnter={() => setHover(n.id)} onPointerLeave={() => setHover(null)}>
-                {n.kind === "note" ? <rect x={-r} y={-r} width={r * 2} height={r * 2} /> : n.kind === "annotation" ? <rect x={-r} y={-r} width={r * 2} height={r * 2} transform="rotate(45)" /> : <circle r={r} />}
+              <g
+                key={n.id}
+                data-node={n.id}
+                className={`g-node g-${n.kind}`}
+                transform={`translate(${n.x} ${n.y})`}
+                data-dim={dim || undefined}
+                data-hit={hit || undefined}
+                data-level={m === null ? "none" : m >= 0.8 ? "strong" : m >= 0.55 ? "ok" : "weak"}
+                onPointerEnter={() => setHover(n.id)}
+                onPointerLeave={() => setHover(null)}
+              >
+                {n.kind === "note" ? (
+                  <rect x={-r} y={-r} width={r * 2} height={r * 2} />
+                ) : n.kind === "annotation" ? (
+                  <rect x={-r} y={-r} width={r * 2} height={r * 2} transform="rotate(45)" />
+                ) : (
+                  <circle r={r} />
+                )}
                 {n.kind === "concept" && m !== null && <path d={arc} className="g-ring" />}
                 {showLabel && (
                   <text x={r + 7} y={4}>
@@ -181,9 +278,33 @@ export function GraphView({ data, showNotes, showAnnotations = false, showSugges
       </svg>
       {hover && <GraphTip node={nodes.find((n) => n.id === hover)!} />}
       <div className="graph-tools">
-        <button className="icon-button" onClick={() => setView((v) => ({ ...v, k: Math.min(4, v.k * 1.3) }))} aria-label="Zoom in" title="Zoom in"><Plus aria-hidden="true" /></button>
-        <button className="icon-button" onClick={() => setView((v) => ({ ...v, k: Math.max(0.3, v.k / 1.3) }))} aria-label="Zoom out" title="Zoom out"><Minus aria-hidden="true" /></button>
-        <button className="icon-button" onClick={() => setView({ k: 1, x: 0, y: 0 })} aria-label="Reset view" title="Reset view"><Maximize2 aria-hidden="true" /></button>
+        <button
+          type="button"
+          className="icon-button"
+          onClick={() => setView((v) => ({ ...v, k: Math.min(4, v.k * 1.3) }))}
+          aria-label="Zoom in"
+          title="Zoom in"
+        >
+          <Plus aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="icon-button"
+          onClick={() => setView((v) => ({ ...v, k: Math.max(0.3, v.k / 1.3) }))}
+          aria-label="Zoom out"
+          title="Zoom out"
+        >
+          <Minus aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="icon-button"
+          onClick={() => setView({ k: 1, x: 0, y: 0 })}
+          aria-label="Reset view"
+          title="Reset view"
+        >
+          <Maximize2 aria-hidden="true" />
+        </button>
       </div>
     </div>
   );
@@ -195,7 +316,11 @@ function GraphTip({ node }: { node: N }) {
       <span className="eyebrow">{node.kind}</span>
       <b>{node.label}</b>
       {node.detail && <span className="fine">{node.detail}</span>}
-      {node.kind === "concept" && <span className="fine">{node.mastery === null ? "Not studied yet" : `${Math.round(node.mastery * 100)}% recall`}</span>}
+      {node.kind === "concept" && (
+        <span className="fine">
+          {node.mastery === null ? "Not studied yet" : `${Math.round(node.mastery * 100)}% recall`}
+        </span>
+      )}
     </div>
   );
 }

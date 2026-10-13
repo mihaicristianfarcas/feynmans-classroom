@@ -10,8 +10,26 @@
  *
  * Framework-free, so the same figure lives in the reader, a note, a flashcard or a bare page.
  * Buttons that don't apply to a figure are shown disabled, never hidden: the frame is always the same. */
-import { buildScope, defaults, fillTemplate, initialView, renderScene, stepAt, stepParamTargets, timelineOf, visibilityAt, zoomsByTransform, type FrameState, type Param, type RenderOut, type Scene, type Timeline, type View } from "../../../shared/scene/index.ts";
+
 import { compile } from "../../../shared/scene/expr.ts";
+import {
+  buildScope,
+  defaults,
+  type FrameState,
+  fillTemplate,
+  initialView,
+  type Param,
+  type RenderOut,
+  renderScene,
+  type Scene,
+  stepAt,
+  stepParamTargets,
+  type Timeline,
+  timelineOf,
+  type View,
+  visibilityAt,
+  zoomsByTransform,
+} from "../../../shared/scene/index.ts";
 import { HEIGHT, WIDTH } from "../../../shared/scene/types.ts";
 
 export interface PlayerOptions {
@@ -21,7 +39,9 @@ export interface PlayerOptions {
   /** Ask the predict-first question before playing. */
   predict?: boolean;
   compact?: boolean;
-  onEvent?: (event: { type: "predict"; correct: boolean } | { type: "interact" } | { type: "error"; message: string }) => void;
+  onEvent?: (
+    event: { type: "predict"; correct: boolean } | { type: "interact" } | { type: "error"; message: string },
+  ) => void;
 }
 
 const ICONS = {
@@ -35,7 +55,11 @@ const ICONS = {
   fit: '<svg viewBox="0 0 12 12"><path d="M1.8 4.4V1.8h2.6M10.2 4.4V1.8H7.6M1.8 7.6v2.6h2.6M10.2 7.6v2.6H7.6"/></svg>',
 };
 
-const h = <K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string | boolean | undefined> = {}, children: (Node | string | null | undefined)[] = []) => {
+const h = <K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  attrs: Record<string, string | boolean | undefined> = {},
+  children: (Node | string | null | undefined)[] = [],
+) => {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
     if (v === undefined || v === false) continue;
@@ -76,20 +100,20 @@ function infoMap(spec: Scene): Map<string, { label: string; info: string }> {
   const add = (id: string, label: string, info: string) => (label || info) && out.set(id, { label, info });
   switch (spec.kind) {
     case "plot":
-      spec.layers.forEach((l) => add(l.id, "label" in l ? l.label.replace(/\{[^}]*\}/g, "").trim() : "", l.info));
+      for (const l of spec.layers) add(l.id, "label" in l ? l.label.replace(/\{[^}]*\}/g, "").trim() : "", l.info);
       break;
     case "sequence":
-      spec.actors.forEach((a) => add(a.id, a.label, a.info));
+      for (const a of spec.actors) add(a.id, a.label, a.info);
       break;
     case "graph":
-      spec.nodes.forEach((n) => add(n.id, n.label, n.info));
-      spec.edges.forEach((e) => add(e.id, e.label, e.info));
+      for (const n of spec.nodes) add(n.id, n.label, n.info);
+      for (const e of spec.edges) add(e.id, e.label, e.info);
       break;
     case "object3d":
-      spec.parts.forEach((p) => add(p.id, p.label, p.info));
+      for (const p of spec.parts) add(p.id, p.label, p.info);
       break;
     case "diagram":
-      spec.shapes.forEach((sh) => add(sh.id, sh.label.replace(/\{[^}]*\}/g, "").trim(), sh.info));
+      for (const sh of spec.shapes) add(sh.id, sh.label.replace(/\{[^}]*\}/g, "").trim(), sh.info);
       break;
   }
   return out;
@@ -98,7 +122,8 @@ function infoMap(spec: Scene): Map<string, { label: string; info: string }> {
 function swatch(tone: string, style: string) {
   const color = `var(--sc-${tone === "lit" ? "lit" : tone})`;
   if (style === "dot") return `<svg viewBox="0 0 18 10"><circle cx="9" cy="5" r="3.4" fill="${color}"/></svg>`;
-  if (style === "fill") return `<svg viewBox="0 0 18 10"><rect x="2" y="1.5" width="14" height="7" rx="1" fill="color-mix(in srgb, ${color} 18%, var(--sc-card))" stroke="${color}" stroke-width="1"/></svg>`;
+  if (style === "fill")
+    return `<svg viewBox="0 0 18 10"><rect x="2" y="1.5" width="14" height="7" rx="1" fill="color-mix(in srgb, ${color} 18%, var(--sc-card))" stroke="${color}" stroke-width="1"/></svg>`;
   return `<svg viewBox="0 0 18 10"><path d="M1 5h16" stroke="${color}" stroke-width="${tone === "lit" ? 2 : 1.5}" ${style === "dashed" ? 'stroke-dasharray="3 3"' : ""} fill="none"/></svg>`;
 }
 
@@ -133,7 +158,14 @@ export class ScenePlayer {
   private picked: string | null = null;
   private lastSvg = "";
   private lastOut: RenderOut | null = null;
-  private drag: { kind: "point" | "node" | "pan" | "orbit"; id?: string; x: number; y: number; moved: boolean; view: View } | null = null;
+  private drag: {
+    kind: "point" | "node" | "pan" | "orbit";
+    id?: string;
+    x: number;
+    y: number;
+    moved: boolean;
+    view: View;
+  } | null = null;
   private infos: Map<string, { label: string; info: string }>;
   private observer: IntersectionObserver | null = null;
   private dead = false;
@@ -167,31 +199,82 @@ export class ScenePlayer {
     this.root.dataset.theme = this.opts.theme;
     if (this.opts.compact) this.root.dataset.compact = "";
     const corner = (name: string, text: string) => h("span", { class: "sc-corner", "data-corner": name, text });
-    const stage = h("div", { class: "sc-stage", tabindex: "0", role: "img", "aria-label": `${spec.title}. ${spec.caption}` });
+    const stage = h("div", {
+      class: "sc-stage",
+      tabindex: "0",
+      role: "img",
+      "aria-label": `${spec.title}. ${spec.caption}`,
+    });
     stage.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="sc-svg" viewBox="0 0 ${WIDTH} ${HEIGHT}" aria-hidden="true"></svg>`;
     const info = h("div", { class: "sc-info", "aria-live": "polite" });
-    const plate = h("div", { class: "sc-plate" }, [corner("fig", this.opts.fig || "Fig"), corner("title", spec.title), stage, corner("hint", spec.hint), corner("readout", ""), info]);
-    const legend = spec.keys.length ? h("figcaption", { class: "sc-legend" }, spec.keys.map((k) => h("span", { class: "sc-key", html: `${swatch(k.tone, k.style)}<span></span>` }))) : null;
-    legend?.querySelectorAll(".sc-key span:last-child").forEach((node, i) => (node.textContent = spec.keys[i].label));
+    const plate = h("div", { class: "sc-plate" }, [
+      corner("fig", this.opts.fig || "Fig"),
+      corner("title", spec.title),
+      stage,
+      corner("hint", spec.hint),
+      corner("readout", ""),
+      info,
+    ]);
+    const legend = spec.keys.length
+      ? h(
+          "figcaption",
+          { class: "sc-legend" },
+          spec.keys.map((k) => h("span", { class: "sc-key", html: `${swatch(k.tone, k.style)}<span></span>` })),
+        )
+      : null;
+    for (const [i, node] of (legend?.querySelectorAll(".sc-key span:last-child") ?? []).entries())
+      node.textContent = spec.keys[i].label;
     const card = h("figure", { class: "sc-card" }, [plate, legend]);
     const narration = h("div", { class: "sc-narration", "aria-live": "polite" });
 
-    const btn = (name: string, icon: string, title: string) => h("button", { class: "sc-btn", type: "button", "data-action": name, title, "aria-label": title, html: icon });
+    const btn = (name: string, icon: string, title: string) =>
+      h("button", { class: "sc-btn", type: "button", "data-action": name, title, "aria-label": title, html: icon });
     const play = btn("play", ICONS.play, "Play (space)");
     const restart = btn("restart", ICONS.restart, "Restart");
     const prev = btn("prev", ICONS.prev, "Previous step (←)");
     const next = btn("next", ICONS.next, "Next step (→)");
-    const progress = h("input", { class: "sc-range", type: "range", min: "0", max: "1000", step: "1", value: "0", "aria-label": "Progress" }) as HTMLInputElement;
+    const progress = h("input", {
+      class: "sc-range",
+      type: "range",
+      min: "0",
+      max: "1000",
+      step: "1",
+      value: "0",
+      "aria-label": "Progress",
+    }) as HTMLInputElement;
     const time = h("span", { class: "sc-time", text: "" });
     const zoomOut = btn("zoom-out", ICONS.minus, "Zoom out");
-    const zoom = h("input", { class: "sc-range", type: "range", min: "-100", max: "200", step: "1", value: "0", "aria-label": "Zoom" }) as HTMLInputElement;
+    const zoom = h("input", {
+      class: "sc-range",
+      type: "range",
+      min: "-100",
+      max: "200",
+      step: "1",
+      value: "0",
+      "aria-label": "Zoom",
+    }) as HTMLInputElement;
     const zoomIn = btn("zoom-in", ICONS.plus, "Zoom in");
     const fit = btn("fit", ICONS.fit, "Reset the view");
-    const transport = h("div", { class: "sc-transport" }, [play, restart, prev, next, h("div", { class: "sc-progress" }, [progress, time]), h("span", { class: "sc-sep" }), h("div", { class: "sc-zoom" }, [zoomOut, zoom, zoomIn]), fit]);
+    const transport = h("div", { class: "sc-transport" }, [
+      play,
+      restart,
+      prev,
+      next,
+      h("div", { class: "sc-progress" }, [progress, time]),
+      h("span", { class: "sc-sep" }),
+      h("div", { class: "sc-zoom" }, [zoomOut, zoom, zoomIn]),
+      fit,
+    ]);
 
     const params = h("div", { class: "sc-params" });
     for (const p of spec.params) params.append(this.paramNode(p));
-    const reset = h("button", { class: "sc-btn", type: "button", "data-action": "reset", text: "Back to text values", disabled: true });
+    const reset = h("button", {
+      class: "sc-btn",
+      type: "button",
+      "data-action": "reset",
+      text: "Back to text values",
+      disabled: true,
+    });
     if (spec.params.length) params.append(reset);
     const stats = h("div", { class: "sc-stats" });
     this.stats = spec.stats.map((s) => {
@@ -201,7 +284,24 @@ export class ScenePlayer {
     });
     this.root.append(card, narration, transport, params, stats);
     this.svg = stage.querySelector("svg")!;
-    this.el = { plate, stage, info, narration, play, restart, prev, next, progress, time, zoom, zoomOut, zoomIn, fit, reset, readout: plate.querySelector('[data-corner="readout"]') as HTMLElement };
+    this.el = {
+      plate,
+      stage,
+      info,
+      narration,
+      play,
+      restart,
+      prev,
+      next,
+      progress,
+      time,
+      zoom,
+      zoomOut,
+      zoomIn,
+      fit,
+      reset,
+      readout: plate.querySelector('[data-corner="readout"]') as HTMLElement,
+    };
 
     play.addEventListener("click", () => this.setPlaying(!this.playing));
     restart.addEventListener("click", () => this.restart());
@@ -239,19 +339,39 @@ export class ScenePlayer {
     }
     if (p.kind === "choice") {
       const buttons = p.options.map((o, i) => {
-        const b = h("button", { type: "button", class: "sc-choice", "aria-pressed": String(i === p.value), text: o }) as HTMLButtonElement;
+        const b = h("button", {
+          type: "button",
+          class: "sc-choice",
+          "aria-pressed": String(i === p.value),
+          text: o,
+        }) as HTMLButtonElement;
         b.addEventListener("click", () => this.setParam(p.id, i, true));
         return b;
       });
       this.controls.set(p.id, { buttons });
-      return h("div", { class: "sc-param", "data-kind": "choice" }, [h("span", { class: "sc-param-label", text: p.label }), h("span", { class: "sc-choices", role: "group" }, buttons)]);
+      return h("div", { class: "sc-param", "data-kind": "choice" }, [
+        h("span", { class: "sc-param-label", text: p.label }),
+        h("span", { class: "sc-choices", role: "group" }, buttons),
+      ]);
     }
-    const input = h("input", { class: "sc-range", type: "range", min: String(p.min), max: String(p.max), step: String(p.step), value: String(p.value), "aria-label": p.label }) as HTMLInputElement;
+    const input = h("input", {
+      class: "sc-range",
+      type: "range",
+      min: String(p.min),
+      max: String(p.max),
+      step: String(p.step),
+      value: String(p.value),
+      "aria-label": p.label,
+    }) as HTMLInputElement;
     const out = h("output", { class: "sc-param-value", text: fmt(p.value) });
     input.addEventListener("input", () => this.setParam(p.id, Number(input.value), true));
     this.controls.set(p.id, { input, out });
     (out as HTMLElement & { fmt?: (v: number) => string }).fmt = fmt;
-    return h("label", { class: "sc-param", "data-kind": "slider" }, [h("span", { class: "sc-param-label", text: p.label }), input, out]);
+    return h("label", { class: "sc-param", "data-kind": "slider" }, [
+      h("span", { class: "sc-param-label", text: p.label }),
+      input,
+      out,
+    ]);
   }
 
   /* ---------------- state ---------------- */
@@ -283,12 +403,21 @@ export class ScenePlayer {
     this.setDisabled(this.el.next, stops.length < 2 || this.t >= stops[stops.length - 1] - 1e-3);
     if (tl.length > 0) {
       (this.el.progress as HTMLInputElement).value = String(Math.round((this.t / tl.length) * 1000));
-      this.el.time.textContent = tl.mode === "steps" ? `step ${step + 1} / ${this.spec.steps.length}` : `${this.t.toFixed(1)} / ${tl.length.toFixed(1)} s`;
+      this.el.time.textContent =
+        tl.mode === "steps"
+          ? `step ${step + 1} / ${this.spec.steps.length}`
+          : `${this.t.toFixed(1)} / ${tl.length.toFixed(1)} s`;
     } else this.el.time.textContent = this.animated ? `${this.clock.toFixed(0)} s` : "";
     const z = Math.round(Math.log2(this.view.zoom || 1) * 100);
     (this.el.zoom as HTMLInputElement).value = String(clamp(z, -100, 200));
     const initial = initialView(this.spec);
-    const dirty = Math.abs((this.view.zoom || 1) - 1) > 1e-3 || this.view.panX || this.view.panY || Math.abs(this.view.azimuth - initial.azimuth) > 0.5 || Math.abs(this.view.elevation - initial.elevation) > 0.5 || Object.keys(this.view.moved).length;
+    const dirty =
+      Math.abs((this.view.zoom || 1) - 1) > 1e-3 ||
+      this.view.panX ||
+      this.view.panY ||
+      Math.abs(this.view.azimuth - initial.azimuth) > 0.5 ||
+      Math.abs(this.view.elevation - initial.elevation) > 0.5 ||
+      Object.keys(this.view.moved).length;
     this.setDisabled(this.el.fit, !dirty);
     const paramsDirty = this.spec.params.some((p) => Math.abs((this.params[p.id] ?? p.value) - p.value) > 1e-9);
     this.setDisabled(this.el.reset, !paramsDirty);
@@ -325,7 +454,7 @@ export class ScenePlayer {
       else if (Number(c.input.value) !== v) c.input.value = String(v);
     }
     if (c.out) c.out.textContent = (c.out as HTMLElement & { fmt?: (v: number) => string }).fmt?.(v) ?? String(v);
-    c.buttons?.forEach((b, i) => b.setAttribute("aria-pressed", String(i === Math.round(v))));
+    for (const [i, b] of (c.buttons ?? []).entries()) b.setAttribute("aria-pressed", String(i === Math.round(v)));
   }
 
   setPlaying(on: boolean) {
@@ -416,7 +545,11 @@ export class ScenePlayer {
       b.addEventListener("click", () => reveal(i));
       return b;
     });
-    const box = h("div", { class: "sc-predict", role: "dialog", "aria-label": "Predict first" }, [h("div", { class: "sc-predict-head" }, [h("span", { text: "Predict first" }), skip]), h("p", { text: p.question }), h("div", { class: "sc-predict-choices" }, choices)]);
+    const box = h("div", { class: "sc-predict", role: "dialog", "aria-label": "Predict first" }, [
+      h("div", { class: "sc-predict-head" }, [h("span", { text: "Predict first" }), skip]),
+      h("p", { text: p.question }),
+      h("div", { class: "sc-predict-choices" }, choices),
+    ]);
     this.el.plate.append(box);
     const close = () => {
       box.remove();
@@ -433,7 +566,10 @@ export class ScenePlayer {
       });
       const watch = h("button", { class: "sc-btn", type: "button", text: "Watch it" });
       watch.addEventListener("click", close);
-      box.append(h("p", { class: "sc-answer", text: `${right ? "Right." : "Not quite."} ${p.explain}` }), h("div", {}, [watch]));
+      box.append(
+        h("p", { class: "sc-answer", text: `${right ? "Right." : "Not quite."} ${p.explain}` }),
+        h("div", {}, [watch]),
+      );
       this.opts.onEvent?.({ type: "predict", correct: right });
     };
   }
@@ -464,7 +600,8 @@ export class ScenePlayer {
       const target = (event.target as Element).closest("[data-drag]") as Element | null;
       const point = this.stagePoint(event);
       const base = { x: point[0], y: point[1], moved: false, view: { ...this.view, moved: { ...this.view.moved } } };
-      if (target && (kind === "plot" || kind === "graph" || kind === "diagram")) this.drag = { kind: kind === "graph" ? "node" : "point", id: target.getAttribute("data-drag")!, ...base };
+      if (target && (kind === "plot" || kind === "graph" || kind === "diagram"))
+        this.drag = { kind: kind === "graph" ? "node" : "point", id: target.getAttribute("data-drag")!, ...base };
       else this.drag = { kind: kind === "object3d" ? "orbit" : "pan", ...base };
       try {
         stage.setPointerCapture(event.pointerId);
@@ -489,7 +626,10 @@ export class ScenePlayer {
         dy = point[1] - d.y;
       if (Math.hypot(dx, dy) > 2) d.moved = true;
       if (d.kind === "point" && (this.spec.kind === "plot" || this.spec.kind === "diagram")) {
-        const item = this.spec.kind === "plot" ? this.spec.layers.find((l) => l.id === d.id) : this.spec.shapes.find((sh) => sh.id === d.id);
+        const item =
+          this.spec.kind === "plot"
+            ? this.spec.layers.find((l) => l.id === d.id)
+            : this.spec.shapes.find((sh) => sh.id === d.id);
         const drag = item && "drag" in item ? item.drag : null;
         if (drag && this.lastOut?.invert) {
           const [x, y] = this.lastOut.invert(point[0], point[1]);
@@ -498,14 +638,28 @@ export class ScenePlayer {
         }
       } else if (d.kind === "node") {
         const base = this.unzoom(point);
-        this.view = { ...this.view, moved: { ...this.view.moved, [d.id!]: this.lastOut?.invert ? this.lastOut.invert(base[0], base[1]) : base } };
+        this.view = {
+          ...this.view,
+          moved: { ...this.view.moved, [d.id!]: this.lastOut?.invert ? this.lastOut.invert(base[0], base[1]) : base },
+        };
       } else if (d.kind === "orbit") {
-        this.view = { ...this.view, azimuth: d.view.azimuth - dx * 0.45, elevation: clamp(d.view.elevation + dy * 0.35, -85, 85) };
+        this.view = {
+          ...this.view,
+          azimuth: d.view.azimuth - dx * 0.45,
+          elevation: clamp(d.view.elevation + dy * 0.35, -85, 85),
+        };
       } else if (d.kind === "pan" && d.moved) {
         const z = d.view.zoom || 1;
-        if (this.spec.kind === "plot") this.view = { ...this.view, panX: d.view.panX - dx / (WIDTH * 0.87) / z, panY: d.view.panY + dy / (HEIGHT * 0.81) / z };
-        else if (this.spec.kind === "diagram") this.view = { ...this.view, panX: d.view.panX + dx / WIDTH, panY: d.view.panY + dy / HEIGHT };
-        else if ((this.view.zoom || 1) > 1.01) this.view = { ...this.view, panX: d.view.panX + dx / WIDTH, panY: d.view.panY + dy / HEIGHT };
+        if (this.spec.kind === "plot")
+          this.view = {
+            ...this.view,
+            panX: d.view.panX - dx / (WIDTH * 0.87) / z,
+            panY: d.view.panY + dy / (HEIGHT * 0.81) / z,
+          };
+        else if (this.spec.kind === "diagram")
+          this.view = { ...this.view, panX: d.view.panX + dx / WIDTH, panY: d.view.panY + dy / HEIGHT };
+        else if ((this.view.zoom || 1) > 1.01)
+          this.view = { ...this.view, panX: d.view.panX + dx / WIDTH, panY: d.view.panY + dy / HEIGHT };
       }
       this.updateTransport();
       this.wake();
@@ -557,7 +711,7 @@ export class ScenePlayer {
     const id = this.hover || this.picked;
     const entry = id ? this.infos.get(id) : null;
     const box = this.el.info;
-    if (entry && entry.info) {
+    if (entry?.info) {
       box.innerHTML = "";
       if (entry.label) box.append(h("b", { text: entry.label }));
       box.append(h("span", { text: entry.info }));
@@ -606,7 +760,9 @@ export class ScenePlayer {
         const raw = tour.min + (tour.max - tour.min) * (0.5 + 0.5 * Math.cos(this.tourPhase));
         // integer-ish sliders (terms, nodes, counts) step; fine sliders glide
         const coarse = tour.step >= (tour.max - tour.min) / 40;
-        const v = coarse ? Math.min(tour.max, Math.max(tour.min, Math.round((raw - tour.min) / tour.step) * tour.step + tour.min)) : raw;
+        const v = coarse
+          ? Math.min(tour.max, Math.max(tour.min, Math.round((raw - tour.min) / tour.step) * tour.step + tour.min))
+          : raw;
         this.params[tour.id] = v;
         this.shown[tour.id] = v;
         this.syncControl(tour, Math.round((v - tour.min) / tour.step) * tour.step + tour.min);
@@ -665,7 +821,15 @@ export class ScenePlayer {
         return next;
       };
       const focus = new Set([...(spec.steps[step]?.focus || []), ...(this.picked ? [this.picked] : [])]);
-      const state: FrameState = { scope, vis, focus, hover: this.hover, view: this.view, theme: this.opts.theme, uid: this.uid };
+      const state: FrameState = {
+        scope,
+        vis,
+        focus,
+        hover: this.hover,
+        view: this.view,
+        theme: this.opts.theme,
+        uid: this.uid,
+      };
       const out = renderScene(spec, state, this.memo);
       this.lastOut = out;
       let svg = out.svg;
@@ -687,7 +851,9 @@ export class ScenePlayer {
       });
       const narration = spec.steps.length ? spec.steps[step] : null;
       const text = narration ? `${narration.narration}` : out.narration || "";
-      const label = narration ? `${step + 1}/${spec.steps.length}${narration.title ? ` · ${narration.title}` : ""}` : "";
+      const label = narration
+        ? `${step + 1}/${spec.steps.length}${narration.title ? ` · ${narration.title}` : ""}`
+        : "";
       const key = `${label}|${text}`;
       if (this.el.narration.dataset.key !== key) {
         this.el.narration.dataset.key = key;
@@ -709,7 +875,10 @@ export class ScenePlayer {
     const message = error.message || String(error);
     this.errors.push(message);
     this.playing = false;
-    if (!this.el.plate.querySelector(".sc-error")) this.el.plate.append(h("div", { class: "sc-error", role: "alert" }, [h("strong", { text: "This figure stopped" }), message]));
+    if (!this.el.plate.querySelector(".sc-error"))
+      this.el.plate.append(
+        h("div", { class: "sc-error", role: "alert" }, [h("strong", { text: "This figure stopped" }), message]),
+      );
     this.opts.onEvent?.({ type: "error", message });
   }
 }

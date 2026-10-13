@@ -1,7 +1,7 @@
-import { StrictMode, useEffect, useState } from "react";
+import { type ReactNode, StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { learn, openLink, useTheme } from "./api";
 import { Ask } from "./Ask";
+import { learn, openLink, useTheme } from "./api";
 import { Brain } from "./Brain";
 import { Gallery } from "./Gallery";
 import { Journey } from "./Journey";
@@ -19,14 +19,32 @@ import "./app.css";
 import "./reader.css";
 import "./notes.css";
 
-type Route = { name: "book"; id: string } | { name: "today" | "library" | "notes" | "review" | "brain" | "ask" | "journey" | "settings" | "gallery" | "welcome" | "open" };
+type Route =
+  | { name: "book"; id: string }
+  | {
+      name:
+        | "today"
+        | "library"
+        | "notes"
+        | "review"
+        | "brain"
+        | "ask"
+        | "journey"
+        | "settings"
+        | "gallery"
+        | "welcome"
+        | "open";
+    };
 
 function route(): Route {
   const hash = location.hash.split("?")[0];
   const book = hash.match(/^#\/book\/([a-z0-9]+)/i);
   if (book) return { name: "book", id: book[1] };
   const name = hash.replace(/^#\/?/, "").split("/")[0];
-  if (["library", "notes", "review", "brain", "ask", "journey", "settings", "gallery", "welcome", "open"].includes(name)) return { name: name as Route["name"] } as Route;
+  if (
+    ["library", "notes", "review", "brain", "ask", "journey", "settings", "gallery", "welcome", "open"].includes(name)
+  )
+    return { name: name as Route["name"] } as Route;
   return { name: "today" };
 }
 
@@ -37,7 +55,9 @@ function App() {
   useEffect(() => {
     const onHash = () => {
       const next = route();
-      setCurrent((old) => (old.name === next.name && (old as { id?: string }).id === (next as { id?: string }).id ? old : next));
+      setCurrent((old) =>
+        old.name === next.name && (old as { id?: string }).id === (next as { id?: string }).id ? old : next,
+      );
     };
     window.addEventListener("hashchange", onHash);
     learn.profile().then(
@@ -50,13 +70,14 @@ function App() {
     if (onboarded === false && current.name === "today") location.hash = "#/welcome";
   }, [onboarded, current]);
 
-  let page;
-  if (current.name === "book") return (
-    <>
-      <Reader key={current.id} bookId={current.id} theme={theme} setTheme={setTheme} />
-      <Palette />
-    </>
-  );
+  let page: ReactNode;
+  if (current.name === "book")
+    return (
+      <>
+        <Reader key={current.id} bookId={current.id} theme={theme} setTheme={setTheme} />
+        <Palette />
+      </>
+    );
   if (current.name === "welcome") page = <Welcome />;
   else if (current.name === "library") page = <Library />;
   else if (current.name === "notes") page = <Notes theme={theme} />;

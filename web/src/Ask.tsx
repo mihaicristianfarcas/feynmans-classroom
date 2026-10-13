@@ -1,7 +1,7 @@
 import { ArrowUp, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
-import { learn } from "./api";
 import { AgentRuns } from "./AgentRuns";
+import { learn } from "./api";
 import { Markdown } from "./Markdown";
 import { Spinner } from "./Shell";
 import { useIndicator } from "./ui";
@@ -16,7 +16,8 @@ interface Answer {
 
 /** Links a vault path to the page that shows it. */
 function pathLink(path: string): string | null {
-  if (/^(notes|concepts)\/.+\.md$/.test(path) || /^library\/[^/]+\/annotations\/.+\.md$/.test(path)) return `#/open?target=${encodeURIComponent(path.replace(/\.md$/, ""))}`;
+  if (/^(notes|concepts)\/.+\.md$/.test(path) || /^library\/[^/]+\/annotations\/.+\.md$/.test(path))
+    return `#/open?target=${encodeURIComponent(path.replace(/\.md$/, ""))}`;
   const book = /^library\/([^/]+)\//.exec(path);
   if (book) return `#/open?target=${encodeURIComponent(`library/${book[1]}`)}`;
   return null;
@@ -24,19 +25,35 @@ function pathLink(path: string): string | null {
 
 /** An agent reads your vault (notes, concepts, cards and the full text of your books) and answers. */
 export function Ask({ theme }: { theme: "light" | "dark" }) {
-  const [mode, setMode] = useState<"ask" | "do">(new URLSearchParams(location.hash.split("?")[1] || "").get("do") ? "do" : "ask");
+  const [mode, setMode] = useState<"ask" | "do">(
+    new URLSearchParams(location.hash.split("?")[1] || "").get("do") ? "do" : "ask",
+  );
   const tabs = useIndicator<HTMLElement>(mode);
   return (
     <div className="ask rise">
       <header className="page-head">
         <h1 className="page-title">{mode === "ask" ? "Ask your library" : "Work on your vault"}</h1>
-        <p className="lede small">{mode === "ask" ? "An agent searches your notes, concepts, cards and the full text of your books with its own shell, then answers with sources." : "An agent reorganises, links and writes notes for you, on its own branch of your vault, inside a sandbox. Its changes land after checks, and every run can be undone."}</p>
+        <p className="lede small">
+          {mode === "ask"
+            ? "An agent searches your notes, concepts, cards and the full text of your books with its own shell, then answers with sources."
+            : "An agent reorganises, links and writes notes for you, on its own branch of your vault, inside a sandbox. Its changes land after checks, and every run can be undone."}
+        </p>
       </header>
       <nav className="tabs" aria-label="Mode" ref={tabs}>
-        <button className="tab" aria-current={mode === "ask" ? "page" : undefined} onClick={() => setMode("ask")}>
+        <button
+          type="button"
+          className="tab"
+          aria-current={mode === "ask" ? "page" : undefined}
+          onClick={() => setMode("ask")}
+        >
           Ask
         </button>
-        <button className="tab" aria-current={mode === "do" ? "page" : undefined} onClick={() => setMode("do")}>
+        <button
+          type="button"
+          className="tab"
+          aria-current={mode === "do" ? "page" : undefined}
+          onClick={() => setMode("do")}
+        >
           Do
         </button>
       </nav>
@@ -65,9 +82,10 @@ function AskPanel({ theme }: { theme: "light" | "dark" }) {
       setBusy(null);
     }
   };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once, for the question the page was opened with
   useEffect(() => {
     if (initial) ask(initial);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div>
       <form
@@ -78,7 +96,13 @@ function AskPanel({ theme }: { theme: "light" | "dark" }) {
         }}
       >
         <Sparkles className="ask-icon" aria-hidden="true" />
-        <input autoFocus value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="e.g. How do Tanenbaum and Kleppmann differ on consistency models?" disabled={!!busy} />
+        <input
+          autoFocus
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="e.g. How do Tanenbaum and Kleppmann differ on consistency models?"
+          disabled={!!busy}
+        />
         <button className="icon-button ask-send" type="submit" disabled={!!busy || !question.trim()} aria-label="Ask">
           <ArrowUp aria-hidden="true" />
         </button>
@@ -86,7 +110,11 @@ function AskPanel({ theme }: { theme: "light" | "dark" }) {
       {busy && <Spinner label="Reading your vault" since={busy} />}
       {error && <p className="form-error">{error}</p>}
       {answers.map((a, i) => (
-        <article key={i} className="answer">
+        <article
+          // biome-ignore lint/suspicious/noArrayIndexKey: answers are only appended, and hold no state
+          key={i}
+          className="answer"
+        >
           <h2 className="answer-q">{a.question}</h2>
           <Markdown text={a.answer} theme={theme} />
           {a.sources.length > 0 && (
@@ -94,7 +122,10 @@ function AskPanel({ theme }: { theme: "light" | "dark" }) {
               {a.sources.map((s, k) => {
                 const link = pathLink(s.path);
                 return (
-                  <li key={k}>
+                  <li
+                    // biome-ignore lint/suspicious/noArrayIndexKey: sources are fixed for an answer
+                    key={k}
+                  >
                     {link ? <a href={link}>{s.path}</a> : <code>{s.path}</code>}
                     {s.quote && <span className="fine"> — “{s.quote.slice(0, 200)}”</span>}
                   </li>
@@ -105,6 +136,7 @@ function AskPanel({ theme }: { theme: "light" | "dark" }) {
           <div className="row gap">
             <span className="fine">{(a.ms / 1000).toFixed(0)} s</span>
             <button
+              type="button"
               className="button"
               disabled={a.saved}
               onClick={async () => {

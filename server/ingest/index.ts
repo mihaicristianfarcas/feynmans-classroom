@@ -1,7 +1,16 @@
 import { createHash } from "node:crypto";
 import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { extname, join } from "node:path";
-import { bookDir, createBookDir, getBlocks, getMarkdown, getPages, newId, renameBookDir, saveBook, writeJson } from "../store.ts";
+import {
+  createBookDir,
+  getBlocks,
+  getMarkdown,
+  getPages,
+  newId,
+  renameBookDir,
+  saveBook,
+  writeJson,
+} from "../store.ts";
 import type { Book, BookFormat, TocEntry } from "../types.ts";
 import { ingestEpub } from "./epub.ts";
 import { ingestPdf, pagesText } from "./pdf.ts";
@@ -16,12 +25,20 @@ export function formatOf(name: string): BookFormat | null {
 }
 
 /** Stores an uploaded file and extracts text, outline and anchors-ready lines or blocks. */
-export async function ingestBook(input: { name: string; data: Buffer } | { path: string; name?: string }): Promise<Book> {
+export async function ingestBook(
+  input: { name: string; data: Buffer } | { path: string; name?: string },
+): Promise<Book> {
   const name = "data" in input ? input.name : input.name || input.path;
   const format = formatOf(name);
   if (!format) throw new Error("Unsupported file. Upload a PDF, EPUB, Markdown or plain-text book.");
   const id = newId("b");
-  const title = name.split(/[\\/]/).pop()!.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "Untitled";
+  const title =
+    name
+      .split(/[\\/]/)
+      .pop()!
+      .replace(/\.[^.]+$/, "")
+      .replace(/[_-]+/g, " ")
+      .trim() || "Untitled";
   const dir = createBookDir(id, title);
   const ext = extname(name).toLowerCase();
   const file = `source${ext}`;
@@ -38,18 +55,37 @@ export async function ingestBook(input: { name: string; data: Buffer } | { path:
   if ("data" in input) writeFileSync(join(dir, file), input.data);
   else copyFileSync(input.path, join(dir, file));
   // which edition this is: annotations record it, so a different file of the same book can be told apart
-  book.sha256 = createHash("sha256").update(readFileSync(join(dir, file))).digest("hex").slice(0, 16);
+  book.sha256 = createHash("sha256")
+    .update(readFileSync(join(dir, file)))
+    .digest("hex")
+    .slice(0, 16);
 
   try {
     if (format === "pdf") {
       const out = await ingestPdf(join(dir, file));
       writeJson(join(dir, "pages.json"), out.pages);
       writeJson(join(dir, "markdown.json"), out.markdown);
-      Object.assign(book, { title: out.title || book.title, author: out.author, pageCount: out.pageCount, toc: out.toc, extractor: out.extractor, tocSource: out.tocSource });
+      Object.assign(book, {
+        title: out.title || book.title,
+        author: out.author,
+        pageCount: out.pageCount,
+        toc: out.toc,
+        extractor: out.extractor,
+        tocSource: out.tocSource,
+      });
     } else {
-      const out = format === "epub" ? await ingestEpub(join(dir, file), join(dir, "assets"), (asset) => `/api/books/${id}/assets/${asset}`) : ingestText(join(dir, file), ext !== ".txt" && ext !== ".text");
+      const out =
+        format === "epub"
+          ? await ingestEpub(join(dir, file), join(dir, "assets"), (asset) => `/api/books/${id}/assets/${asset}`)
+          : ingestText(join(dir, file), ext !== ".txt" && ext !== ".text");
       writeJson(join(dir, "blocks.json"), out.blocks);
-      Object.assign(book, { title: out.title || book.title, author: out.author, blockCount: out.blocks.length, toc: out.toc, tocSource: format === "epub" ? "nav" : "headings" });
+      Object.assign(book, {
+        title: out.title || book.title,
+        author: out.author,
+        blockCount: out.blocks.length,
+        toc: out.toc,
+        tocSource: format === "epub" ? "nav" : "headings",
+      });
     }
     book.status = "ready";
   } catch (error) {
@@ -67,7 +103,14 @@ export function chapterText(book: Book, entry: TocEntry, maxChars: number): stri
   if (book.format === "pdf") {
     const pages = getPages(book.id);
     const markdown = getMarkdown(book.id);
-    return pagesText(pages, entry.start.page ?? 1, Math.max(entry.start.page ?? 1, entry.end.page ?? entry.start.page ?? 1), maxChars, markdown, { fromY: entry.start.y, toY: entry.end.y });
+    return pagesText(
+      pages,
+      entry.start.page ?? 1,
+      Math.max(entry.start.page ?? 1, entry.end.page ?? entry.start.page ?? 1),
+      maxChars,
+      markdown,
+      { fromY: entry.start.y, toY: entry.end.y },
+    );
   }
   const blocks = getBlocks(book.id).slice(entry.start.block ?? 0, entry.end.block ?? undefined);
   let out = "";

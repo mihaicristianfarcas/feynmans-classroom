@@ -2,7 +2,14 @@ import { CornerDownLeft, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { bookLink, go, learn, type SearchHit } from "./api";
 
-const KIND_TONE: Record<string, string> = { concept: "sage", note: "sky", annotation: "lavender", card: "butter", book: "peach", passage: "peach" };
+const KIND_TONE: Record<string, string> = {
+  concept: "sage",
+  note: "sky",
+  annotation: "lavender",
+  card: "butter",
+  book: "peach",
+  passage: "peach",
+};
 
 /** ⌘K: search everything (concepts, notes, cards, the books' text) and jump. */
 export function Palette() {
@@ -31,7 +38,14 @@ export function Palette() {
   }, [open]);
   useEffect(() => {
     if (!q.trim()) return setHits([]);
-    const t = setTimeout(() => learn.search(q).then((h) => (setHits(h), setIndex(0))), 140);
+    const t = setTimeout(
+      () =>
+        learn.search(q).then((h) => {
+          setHits(h);
+          setIndex(0);
+        }),
+      140,
+    );
     return () => clearTimeout(t);
   }, [q]);
   if (!open) return null;
@@ -68,7 +82,12 @@ export function Palette() {
         {(hits.length > 0 || q.trim()) && (
           <ul className="palette-hits">
             {hits.map((h, i) => (
-              <li key={`${h.kind}-${h.id}`} data-on={i === index || undefined} onMouseEnter={() => setIndex(i)} onClick={() => pick(h)}>
+              <li
+                key={`${h.kind}-${h.id}`}
+                data-on={i === index || undefined}
+                onMouseEnter={() => setIndex(i)}
+                onClick={() => pick(h)}
+              >
                 <span className="tag-pill" data-tone={KIND_TONE[h.kind] || undefined}>
                   {h.kind}
                 </span>

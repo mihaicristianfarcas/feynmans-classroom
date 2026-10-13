@@ -15,7 +15,13 @@ const DEMO = resolve(arg("--demo", join(HERE, "demo.js")));
 const RUNTIME = resolve(arg("--runtime", join(HERE, "runtime")));
 const JSON_OUT = arg("--json", null);
 const LINKEDOM = process.env.CLASSROOM_LINKEDOM || "__LINKEDOM__";
-const { parseHTML } = await import(LINKEDOM.startsWith("file:") || LINKEDOM.startsWith("/") ? (LINKEDOM.startsWith("/") ? pathToFileURL(LINKEDOM).href : LINKEDOM) : LINKEDOM);
+const { parseHTML } = await import(
+  LINKEDOM.startsWith("file:") || LINKEDOM.startsWith("/")
+    ? LINKEDOM.startsWith("/")
+      ? pathToFileURL(LINKEDOM).href
+      : LINKEDOM
+    : LINKEDOM
+);
 
 const errors = [];
 const warnings = [];
@@ -38,26 +44,44 @@ const source = readFileSync(DEMO, "utf8");
 
 /* ---------- static checks on the source ---------- */
 if (/^\s*(import|export)\s/m.test(source)) errors.push("demo.js must be a plain script: no import/export statements");
-if (/\bfetch\s*\(|XMLHttpRequest|WebSocket|importScripts|\beval\s*\(|new Function\s*\(/.test(source)) errors.push("demo.js may not use fetch, XMLHttpRequest, WebSocket, eval or new Function");
-if (/localStorage|sessionStorage|indexedDB|document\.cookie/.test(source)) warnings.push("storage APIs are unavailable in the sandboxed iframe; remove them");
+if (/\bfetch\s*\(|XMLHttpRequest|WebSocket|importScripts|\beval\s*\(|new Function\s*\(/.test(source))
+  errors.push("demo.js may not use fetch, XMLHttpRequest, WebSocket, eval or new Function");
+if (/localStorage|sessionStorage|indexedDB|document\.cookie/.test(source))
+  warnings.push("storage APIs are unavailable in the sandboxed iframe; remove them");
 const hex = source.match(/["'`(:\s](#[0-9a-fA-F]{3,8})\b/g);
-if (hex) warnings.push(`hard-coded colours ${[...new Set(hex.map((h) => h.trim().replace(/^[^#]+/, "")))].slice(0, 4).join(", ")}: use tones (hi, mid, lo, faint, lit) so both themes work`);
+if (hex)
+  warnings.push(
+    `hard-coded colours ${[...new Set(hex.map((h) => h.trim().replace(/^[^#]+/, "")))].slice(0, 4).join(", ")}: use tones (hi, mid, lo, faint, lit) so both themes work`,
+  );
 if (/rgba?\(|hsla?\(/.test(source)) warnings.push("rgb()/hsl() colours found: use tones so both themes work");
 const calls = source.match(/Classroom\.demo\s*\(/g) || [];
 if (calls.length !== 1) errors.push(`demo.js must call Classroom.demo(...) exactly once (found ${calls.length})`);
 
 /* ---------- the simulated browser ---------- */
-const { window, document } = parseHTML('<!doctype html><html><head></head><body class="iso" data-theme="light"><div id="classroom"></div></body></html>');
+const { window, document } = parseHTML(
+  '<!doctype html><html><head></head><body class="iso" data-theme="light"><div id="classroom"></div></body></html>',
+);
 let now = 0;
 let rafId = 0;
 const rafQueue = new Map();
 const logs = [];
-const quiet = (kind) => (...args) => logs.push(`${kind}: ${args.map(String).join(" ")}`);
+const quiet =
+  (kind) =>
+  (...args) =>
+    logs.push(`${kind}: ${args.map(String).join(" ")}`);
 const sandbox = {
   window,
   document,
   navigator: window.navigator || { userAgent: "check" },
-  console: { log: quiet("log"), info: quiet("info"), warn: quiet("warn"), error: (...a) => { quiet("error")(...a); }, debug: quiet("debug") },
+  console: {
+    log: quiet("log"),
+    info: quiet("info"),
+    warn: quiet("warn"),
+    error: (...a) => {
+      quiet("error")(...a);
+    },
+    debug: quiet("debug"),
+  },
   requestAnimationFrame: (fn) => {
     rafQueue.set(++rafId, fn);
     return rafId;
@@ -85,19 +109,26 @@ function run(file, code) {
     new vm.Script(code, { filename: file }).runInContext(sandbox, { timeout: 5000 });
     return true;
   } catch (error) {
-    const where = String(error.stack || "").split("\n").find((line) => line.includes(file)) || "";
+    const where =
+      String(error.stack || "")
+        .split("\n")
+        .find((line) => line.includes(file)) || "";
     errors.push(`${file}: ${error.name}: ${error.message}${where ? ` (${where.trim()})` : ""}`);
     return false;
   }
 }
 const kitPath = join(RUNTIME, "dist", "kit.js");
-for (const [file, path] of [["kit.js", kitPath], ["draw2d.js", join(RUNTIME, "draw2d.js")], ["classroom.js", join(RUNTIME, "classroom.js")]]) {
+for (const [file, path] of [
+  ["kit.js", kitPath],
+  ["draw2d.js", join(RUNTIME, "draw2d.js")],
+  ["classroom.js", join(RUNTIME, "classroom.js")],
+]) {
   if (!run(file, readFileSync(path, "utf8"))) report();
 }
 if (!run("demo.js", source)) report();
 
 const S = sandbox.__classroom;
-if (!S || !S.def) {
+if (!S?.def) {
   errors.push("Classroom.demo(...) was never called");
   report();
 }
@@ -132,7 +163,9 @@ function step(seconds) {
   }
 }
 const bad = (html) => {
-  const m = html.match(/(?:d|x|y|cx|cy|r|width|height|points|transform|x1|y1|x2|y2)="[^"]*(NaN|undefined|Infinity|null)[^"]*"/);
+  const m = html.match(
+    /(?:d|x|y|cx|cy|r|width|height|points|transform|x1|y1|x2|y2)="[^"]*(NaN|undefined|Infinity|null)[^"]*"/,
+  );
   return m ? m[0].slice(0, 120) : null;
 };
 const checkHealth = (when) => {
@@ -158,21 +191,25 @@ if (controls.length > 4) warnings.push(`${controls.length} controls: keep it to 
 for (const c of controls) {
   if (!c.id) errors.push("every control needs an id");
   const type = c.type || "range";
-  if (type === "range" && !(Number(c.max) > Number(c.min))) errors.push(`control ${c.id}: max must be greater than min`);
-  if (type === "range" && (c.value < c.min || c.value > c.max)) errors.push(`control ${c.id}: default value ${c.value} is outside [${c.min}, ${c.max}]`);
+  if (type === "range" && !(Number(c.max) > Number(c.min)))
+    errors.push(`control ${c.id}: max must be greater than min`);
+  if (type === "range" && (c.value < c.min || c.value > c.max))
+    errors.push(`control ${c.id}: default value ${c.value} is outside [${c.min}, ${c.max}]`);
   if (type === "select" && !(c.options || []).length) errors.push(`control ${c.id}: a select needs options`);
 }
 if (def.predict) {
   const p = def.predict;
   if (!Array.isArray(p.choices) || p.choices.length < 2) errors.push("predict needs at least two choices");
-  else if (!(p.answer >= 0 && p.answer < p.choices.length)) errors.push(`predict.answer ${p.answer} is not an index into choices`);
+  else if (!(p.answer >= 0 && p.answer < p.choices.length))
+    errors.push(`predict.answer ${p.answer} is not an index into choices`);
 }
 
 /* ---------- run it ---------- */
 step(0.2);
 if (!checkHealth("setup")) report();
 const first = markup();
-if (!/<(path|circle|rect|line|polyline|polygon|ellipse|text|g)\b/.test(first)) errors.push("the drawing is empty after setup: call ctx.draw(...) with the picture");
+if (!/<(path|circle|rect|line|polyline|polygon|ellipse|text|g)\b/.test(first))
+  errors.push("the drawing is empty after setup: call ctx.draw(...) with the picture");
 const texts = (first.match(/<text\b/g) || []).length;
 stats.texts = texts;
 if (texts > 18) warnings.push(`${texts} text labels in the drawing: keep words few (axis names, a symbol or two)`);
@@ -186,7 +223,10 @@ const readoutText = readout();
 stats.readout = readoutText;
 stats.animates = later !== first;
 if (!readoutText) warnings.push("the card readout is empty: call ctx.readout(...) with the key live value");
-if (!stats.animates) warnings.push("nothing moved in the first 3 seconds: the demo should play on its own (an idle loop) so the idea is visible without touching it");
+if (!stats.animates)
+  warnings.push(
+    "nothing moved in the first 3 seconds: the demo should play on its own (an idle loop) so the idea is visible without touching it",
+  );
 const statNodes = [...root.querySelectorAll("[data-stat]")];
 const empty = statNodes.filter((n) => (n.textContent || "").trim() === "—").map((n) => n.getAttribute("data-stat"));
 if (empty.length) warnings.push(`stats never written: ${empty.join(", ")}`);
@@ -202,15 +242,21 @@ for (const c of controls) {
     checkHealth(`after pressing "${c.label || c.id}"`);
     continue;
   }
-  const values = type === "toggle" ? [!c.value, !!c.value] : type === "select" ? (c.options || []).map((o) => (Array.isArray(o) ? o[0] : typeof o === "object" ? o.value : o)) : [c.min, c.max, c.value];
+  const values =
+    type === "toggle"
+      ? [!c.value, !!c.value]
+      : type === "select"
+        ? (c.options || []).map((o) => (Array.isArray(o) ? o[0] : typeof o === "object" ? o.value : o))
+        : [c.min, c.max, c.value];
   const seen = new Set();
   for (const value of values) {
     Classroom.set(c.id, value);
     step(1.2);
     if (!checkHealth(`${c.id} = ${value}`)) break;
-    seen.add(markup() + "|" + readout() + "|" + statsText());
+    seen.add(`${markup()}|${readout()}|${statsText()}`);
   }
-  if (seen.size < 2 && !c.restart) warnings.push(`changing "${c.label || c.id}" did not change the picture, the readout or the stats`);
+  if (seen.size < 2 && !c.restart)
+    warnings.push(`changing "${c.label || c.id}" did not change the picture, the readout or the stats`);
   else if (seen.size < 2 && c.restart) {
     /* restart controls rebuild; fine */
   }
@@ -224,7 +270,8 @@ step(1);
 checkHealth("after Back to text values");
 
 stats.frameMs = frameCount ? Math.round((frameMs / frameCount) * 100) / 100 : 0;
-if (stats.frameMs > 6) warnings.push(`frames take ${stats.frameMs} ms in the check: simplify per-frame work (rebuild only what moves)`);
+if (stats.frameMs > 6)
+  warnings.push(`frames take ${stats.frameMs} ms in the check: simplify per-frame work (rebuild only what moves)`);
 const consoleErrors = logs.filter((l) => l.startsWith("error:"));
 if (consoleErrors.length) warnings.push(`console errors: ${consoleErrors.slice(0, 3).join(" | ")}`);
 report();

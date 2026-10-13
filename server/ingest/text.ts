@@ -25,7 +25,8 @@ export function ingestText(path: string, markdown: boolean): ReflowIngest {
 
   const blocks: Block[] = [];
   // block text is what anchors match and what the planner reads: the rendered words, without Markdown marks
-  const push = (tag: string, html: string, _source?: string) => blocks.push({ id: blocks.length, chapter: 0, tag, html, text: textOfHtml(html) });
+  const push = (tag: string, html: string, _source?: string) =>
+    blocks.push({ id: blocks.length, chapter: 0, tag, html, text: textOfHtml(html) });
   let title: string | undefined;
   for (const chunk of source.split(/\n\s*\n/)) {
     const raw = chunk.trim();
@@ -43,7 +44,9 @@ export function ingestText(path: string, markdown: boolean): ReflowIngest {
       continue;
     }
     if (markdown && /^(\s*[-*+]|\s*\d+\.)\s+/.test(raw)) {
-      for (const item of raw.split(/\n(?=\s*([-*+]|\d+\.)\s+)/)) if (item && !/^([-*+]|\d+\.)$/.test(item.trim())) push("li", inline(item.replace(/^\s*([-*+]|\d+\.)\s+/, "")), item);
+      for (const item of raw.split(/\n(?=\s*([-*+]|\d+\.)\s+)/))
+        if (item && !/^([-*+]|\d+\.)$/.test(item.trim()))
+          push("li", inline(item.replace(/^\s*([-*+]|\d+\.)\s+/, "")), item);
       continue;
     }
     if (markdown && /^```/.test(raw)) {
@@ -59,7 +62,8 @@ export function ingestText(path: string, markdown: boolean): ReflowIngest {
     push("p", markdown ? inline(text) : esc(text), text);
   }
   let toc: TocEntry[] = headingToc(blocks);
-  if (!toc.length) toc = [{ id: "", title: title || "Text", start: { block: 0 }, end: { block: blocks.length }, sections: [] }];
+  if (!toc.length)
+    toc = [{ id: "", title: title || "Text", start: { block: 0 }, end: { block: blocks.length }, sections: [] }];
   finishBlockToc(toc, blocks);
   return { title, blocks, toc };
 }

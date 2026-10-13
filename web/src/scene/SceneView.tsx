@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { normalize, type Scene } from "../../../shared/scene/index.ts";
-import { ScenePlayer, type PlayerOptions } from "./player";
+import { type PlayerOptions, ScenePlayer } from "./player";
 import "./scene.css";
 
 interface Props {
@@ -21,6 +21,7 @@ export function SceneView({ spec, theme, fig, predict = true, compact, autoplay,
   const handler = useRef(onEvent);
   handler.current = onEvent;
   const key = JSON.stringify(spec);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the player is rebuilt only when the spec's content (key) changes; the theme reaches it below, and autoplay applies to a new player only
   useEffect(() => {
     if (!ref.current) return;
     let scene: Scene;
@@ -30,14 +31,26 @@ export function SceneView({ spec, theme, fig, predict = true, compact, autoplay,
       ref.current.textContent = `This figure could not be read: ${(error as Error).message}`;
       return;
     }
-    const p = new ScenePlayer(ref.current, scene, { theme, fig, predict, compact, autoplay, onEvent: (e) => handler.current?.(e) });
+    const p = new ScenePlayer(ref.current, scene, {
+      theme,
+      fig,
+      predict,
+      compact,
+      autoplay,
+      onEvent: (e) => handler.current?.(e),
+    });
     player.current = p;
-    if (import.meta.env.DEV) ((window as unknown as { __players?: ScenePlayer[] }).__players ||= []).push(p);
+    if (import.meta.env.DEV) {
+      // expose players to browser tests and the console in development
+      const w = window as unknown as { __players?: ScenePlayer[] };
+      w.__players ??= [];
+      w.__players.push(p);
+    }
     return () => {
       p.destroy();
       player.current = null;
     };
-  }, [key, fig, predict, compact]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key, fig, predict, compact]);
   useEffect(() => {
     player.current?.setTheme(theme);
   }, [theme]);

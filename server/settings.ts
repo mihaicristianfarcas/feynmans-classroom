@@ -4,8 +4,8 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { CODEX, DATA_DIR } from "./config.ts";
 import { codexStatus } from "./codex.ts";
+import { CODEX, DATA_DIR } from "./config.ts";
 import { readJson, writeJson } from "./store.ts";
 
 export type Provider = "codex" | "claude";
@@ -27,9 +27,14 @@ const FILE = () => join(DATA_DIR, "settings.json");
 function fastCodexModel(): string {
   try {
     const cache = JSON.parse(readFileSync(join(homedir(), ".codex", "models_cache.json"), "utf8"));
-    const list: { slug?: string; visibility?: string; description?: string }[] = Array.isArray(cache) ? cache : cache.models || cache.data || [];
+    const list: { slug?: string; visibility?: string; description?: string }[] = Array.isArray(cache)
+      ? cache
+      : cache.models || cache.data || [];
     const visible = list.filter((m) => m.slug && m.visibility !== "hide");
-    return visible.find((m) => /luna|mini|fast/i.test(m.slug!) || /fast and affordable/i.test(m.description || ""))?.slug || "";
+    return (
+      visible.find((m) => /luna|mini|fast/i.test(m.slug!) || /fast and affordable/i.test(m.description || ""))?.slug ||
+      ""
+    );
   } catch {
     return "";
   }
@@ -38,8 +43,18 @@ function fastCodexModel(): string {
 export const DEFAULT_SETTINGS: Settings = {
   provider: (process.env.LLM_PROVIDER as Provider) || "auto",
   // empty model: whatever ~/.codex/config.toml says
-  codex: { fastModel: process.env.CODEX_FAST_MODEL || fastCodexModel() || CODEX.model || "", fastEffort: process.env.CODEX_FAST_EFFORT || "low", smartModel: CODEX.model || "", smartEffort: CODEX.planEffort || "medium" },
-  claude: { fastModel: process.env.CLAUDE_FAST_MODEL || "sonnet", fastEffort: "low", smartModel: process.env.CLAUDE_SMART_MODEL || "opus", smartEffort: "medium" },
+  codex: {
+    fastModel: process.env.CODEX_FAST_MODEL || fastCodexModel() || CODEX.model || "",
+    fastEffort: process.env.CODEX_FAST_EFFORT || "low",
+    smartModel: CODEX.model || "",
+    smartEffort: CODEX.planEffort || "medium",
+  },
+  claude: {
+    fastModel: process.env.CLAUDE_FAST_MODEL || "sonnet",
+    fastEffort: "low",
+    smartModel: process.env.CLAUDE_SMART_MODEL || "opus",
+    smartEffort: "medium",
+  },
   concurrency: Number(process.env.LLM_CONCURRENCY) || 3,
   connections: "suggest",
 };

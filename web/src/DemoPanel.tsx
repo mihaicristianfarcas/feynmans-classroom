@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronUp, Shapes } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, learn, type Book, type Demo, type Job, type TocEntry } from "./api";
+import { api, type Book, type Demo, type Job, learn, type TocEntry } from "./api";
 import { SceneView } from "./scene/SceneView";
 import { CardDrafter } from "./tools";
 
@@ -40,26 +40,63 @@ interface Props {
   canStep: { prev: boolean; next: boolean };
 }
 
-export function DemoPanel({ book, demo, chapter, chapterDemos, allDemos, jobs, theme, held, onJump, onStep, canStep }: Props) {
+export function DemoPanel({
+  book,
+  demo,
+  chapter,
+  chapterDemos,
+  allDemos,
+  jobs,
+  theme,
+  held,
+  onJump,
+  onStep,
+  canStep,
+}: Props) {
   const planning = jobs.find((job) => job.kind === "plan" && job.status === "running" && job.chapterId === chapter?.id);
   return (
     <div className="demo-panel">
       {demo ? (
         <DemoView book={book} demo={demo} theme={theme} held={held} />
       ) : (
-        <ChapterCard book={book} chapter={chapter} demos={chapterDemos} planning={planning} onJump={onJump} total={allDemos.length} />
+        <ChapterCard
+          book={book}
+          chapter={chapter}
+          demos={chapterDemos}
+          planning={planning}
+          onJump={onJump}
+          total={allDemos.length}
+        />
       )}
       <footer className="demo-foot">
         <div className="demo-steps">
-          <button className="icon-button" onClick={() => onStep(-1)} disabled={!canStep.prev} aria-label="Previous figure" title="Previous figure ( [ )">
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => onStep(-1)}
+            disabled={!canStep.prev}
+            aria-label="Previous figure"
+            title="Previous figure ( [ )"
+          >
             <ChevronUp aria-hidden="true" />
           </button>
-          <button className="icon-button" onClick={() => onStep(1)} disabled={!canStep.next} aria-label="Next figure" title="Next figure ( ] )">
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => onStep(1)}
+            disabled={!canStep.next}
+            aria-label="Next figure"
+            title="Next figure ( ] )"
+          >
             <ChevronDown aria-hidden="true" />
           </button>
         </div>
         <span className="demo-count">
-          {demo ? `${demo.fig} · ${chapterDemos.indexOf(chapterDemos.find((d) => d.id === demo.id)!) + 1} of ${chapterDemos.length} in this chapter` : chapterDemos.length ? `${chapterDemos.length} figure${chapterDemos.length === 1 ? "" : "s"} in this chapter` : ""}
+          {demo
+            ? `${demo.fig} · ${chapterDemos.indexOf(chapterDemos.find((d) => d.id === demo.id)!) + 1} of ${chapterDemos.length} in this chapter`
+            : chapterDemos.length
+              ? `${chapterDemos.length} figure${chapterDemos.length === 1 ? "" : "s"} in this chapter`
+              : ""}
         </span>
         {demo && <DemoMenu book={book} demo={demo} />}
       </footer>
@@ -82,11 +119,16 @@ function DemoView({ book, demo, theme, held }: { book: Book; demo: Demo; theme: 
       return false;
     }
   })();
-  const src = useMemo(() => (ready ? api.pageUrl(book.id, demo.id, theme, demo.updatedAt, !asked) : ""), [ready, book.id, demo.id, demo.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the URL is fixed per demo version; a loaded page gets theme changes by message, and the predict question only on first load
+  const src = useMemo(
+    () => (ready ? api.pageUrl(book.id, demo.id, theme, demo.updatedAt, !asked) : ""),
+    [ready, book.id, demo.id, demo.updatedAt],
+  );
 
   useEffect(() => {
     frame.current?.contentWindow?.postMessage({ source: "classroom-host", type: "theme", theme }, "*");
   }, [theme]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: listens afresh (and clears the error) whenever the frame loads another demo or version
   useEffect(() => {
     setError(null);
     const onMessage = (event: MessageEvent) => {
@@ -120,7 +162,9 @@ function DemoView({ book, demo, theme, held }: { book: Book; demo: Demo; theme: 
           title={demo.brief.title}
           src={src}
           sandbox="allow-scripts"
-          onLoad={() => frame.current?.contentWindow?.postMessage({ source: "classroom-host", type: "theme", theme }, "*")}
+          onLoad={() =>
+            frame.current?.contentWindow?.postMessage({ source: "classroom-host", type: "theme", theme }, "*")
+          }
         />
       ) : (
         <div className="demo-pending" data-status={demo.status}>
@@ -134,7 +178,7 @@ function DemoView({ book, demo, theme, held }: { book: Book; demo: Demo; theme: 
             </div>
             <div className="pending-activity">{demo.status === "failed" ? demo.error : demo.activity || "…"}</div>
             {demo.status === "failed" && (
-              <button className="button" onClick={() => api.regenerate(book.id, demo.id)}>
+              <button type="button" className="button" onClick={() => api.regenerate(book.id, demo.id)}>
                 Try again
               </button>
             )}
@@ -164,7 +208,11 @@ function SceneDemo({ book, demo, theme, held }: { book: Book; demo: Demo; theme:
         <div className="eyebrow">
           {demo.brief.eyebrow || demo.brief.title}
           {held && <span className="held-tag">held</span>}
-          {demo.request && <span className="request-tag" title={demo.request}>asked</span>}
+          {demo.request && (
+            <span className="request-tag" title={demo.request}>
+              asked
+            </span>
+          )}
         </div>
         {demo.brief.caption && <p className="caption">{demo.brief.caption}</p>}
       </header>
@@ -192,12 +240,17 @@ function SceneDemo({ book, demo, theme, held }: { book: Book; demo: Demo; theme:
           <div className="pending-text">
             <div className="pending-title">
               {STATUS_WORDS[demo.status] || demo.status}
-              {demo.status !== "failed" && <span className="pending-time"> · {since(demo.status === "building" && demo.startedAt ? demo.startedAt : demo.createdAt)}</span>}
+              {demo.status !== "failed" && (
+                <span className="pending-time">
+                  {" "}
+                  · {since(demo.status === "building" && demo.startedAt ? demo.startedAt : demo.createdAt)}
+                </span>
+              )}
             </div>
             <div className="pending-activity">{demo.status === "failed" ? demo.error : demo.activity || "…"}</div>
             {demo.request && demo.status !== "failed" && <div className="fine">“{demo.request}”</div>}
             {demo.status === "failed" && (
-              <button className="button" onClick={() => api.regenerate(book.id, demo.id)}>
+              <button type="button" className="button" onClick={() => api.regenerate(book.id, demo.id)}>
                 Try again
               </button>
             )}
@@ -224,7 +277,7 @@ function DemoMenu({ book, demo }: { book: Book; demo: Demo }) {
   const working = !["ready", "failed"].includes(demo.status);
   return (
     <div className="demo-menu" ref={box}>
-      <button className="button" onClick={() => setOpen(!open)} aria-expanded={open}>
+      <button type="button" className="button" onClick={() => setOpen(!open)} aria-expanded={open}>
         Improve
         <ChevronDown aria-hidden="true" />
       </button>
@@ -233,9 +286,20 @@ function DemoMenu({ book, demo }: { book: Book; demo: Demo }) {
           <label className="menu-label" htmlFor="feedback">
             {demo.type === "scene" ? "Redraw it with your notes" : "Ask Codex to rebuild it"}
           </label>
-          <textarea id="feedback" rows={3} placeholder={demo.type === "scene" ? "e.g. add a slider for the timeout, show a lost message, make it 3D" : "e.g. show the forces as arrows, slow the motion down"} value={feedback} onChange={(e) => setFeedback(e.target.value)} />
+          <textarea
+            id="feedback"
+            rows={3}
+            placeholder={
+              demo.type === "scene"
+                ? "e.g. add a slider for the timeout, show a lost message, make it 3D"
+                : "e.g. show the forces as arrows, slow the motion down"
+            }
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+          />
           <div className="menu-row">
             <button
+              type="button"
               className="button primary"
               disabled={busy || working}
               onClick={async () => {
@@ -255,6 +319,7 @@ function DemoMenu({ book, demo }: { book: Book; demo: Demo }) {
             </button>
             {demo.type === "scene" && (
               <button
+                type="button"
                 className="button"
                 disabled={busy || working}
                 title="Use the stronger model: slower, more thorough"
@@ -275,26 +340,43 @@ function DemoMenu({ book, demo }: { book: Book; demo: Demo }) {
               </button>
             )}
             {demo.status === "ready" && demo.type !== "scene" && (
-              <a className="button" href={api.pageUrl(book.id, demo.id, "light", demo.updatedAt)} target="_blank" rel="noreferrer">
+              <a
+                className="button"
+                href={api.pageUrl(book.id, demo.id, "light", demo.updatedAt)}
+                target="_blank"
+                rel="noreferrer"
+              >
                 Open alone
               </a>
             )}
             {demo.status === "ready" && demo.type === "scene" && (
               <>
                 <button
+                  type="button"
                   className="button"
                   disabled={kept}
                   onClick={async () => {
-                    await learn.keepFigure({ scene: demo.scene, source: { bookId: book.id, chapterId: demo.chapterId, page: demo.anchor.page, y: demo.anchor.y, block: demo.anchor.block, quote: demo.anchor.quote } });
+                    await learn.keepFigure({
+                      scene: demo.scene,
+                      source: {
+                        bookId: book.id,
+                        chapterId: demo.chapterId,
+                        page: demo.anchor.page,
+                        y: demo.anchor.y,
+                        block: demo.anchor.block,
+                        quote: demo.anchor.quote,
+                      },
+                    });
                     setKept(true);
                   }}
                 >
                   {kept ? "Kept" : "Keep in brain"}
                 </button>
-                <button className="button" onClick={() => setCards(true)}>
+                <button type="button" className="button" onClick={() => setCards(true)}>
                   Make cards
                 </button>
                 <button
+                  type="button"
                   className="button"
                   title="Have Codex hand-build a custom version (minutes): for what the figure kinds can't show"
                   onClick={async () => {
@@ -311,6 +393,7 @@ function DemoMenu({ book, demo }: { book: Book; demo: Demo }) {
               </>
             )}
             <button
+              type="button"
               className="button danger"
               onClick={async () => {
                 if (!confirm(`Delete "${demo.brief.title}"?`)) return;
@@ -327,12 +410,39 @@ function DemoMenu({ book, demo }: { book: Book; demo: Demo }) {
           </p>
         </div>
       )}
-      {cards && <CardDrafter passage={`${demo.brief.title}: ${demo.brief.caption}\n\n${demo.anchor.quote}\n\n${demo.brief.idea}`} source={{ bookId: book.id, chapterId: demo.chapterId, page: demo.anchor.page, block: demo.anchor.block, quote: demo.anchor.quote }} deck={book.title} onClose={() => setCards(false)} />}
+      {cards && (
+        <CardDrafter
+          passage={`${demo.brief.title}: ${demo.brief.caption}\n\n${demo.anchor.quote}\n\n${demo.brief.idea}`}
+          source={{
+            bookId: book.id,
+            chapterId: demo.chapterId,
+            page: demo.anchor.page,
+            block: demo.anchor.block,
+            quote: demo.anchor.quote,
+          }}
+          deck={book.title}
+          onClose={() => setCards(false)}
+        />
+      )}
     </div>
   );
 }
 
-function ChapterCard({ book, chapter, demos, planning, onJump, total }: { book: Book; chapter: TocEntry | null; demos: Demo[]; planning?: Job; onJump: (d: Demo) => void; total: number }) {
+function ChapterCard({
+  book,
+  chapter,
+  demos,
+  planning,
+  onJump,
+  total,
+}: {
+  book: Book;
+  chapter: TocEntry | null;
+  demos: Demo[];
+  planning?: Job;
+  onJump: (d: Demo) => void;
+  total: number;
+}) {
   const [count, setCount] = useState(3);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -358,7 +468,7 @@ function ChapterCard({ book, chapter, demos, planning, onJump, total }: { book: 
           <ol className="demo-list">
             {demos.map((demo) => (
               <li key={demo.id}>
-                <button className="demo-link" onClick={() => onJump(demo)}>
+                <button type="button" className="demo-link" onClick={() => onJump(demo)}>
                   <span className="demo-link-fig">{demo.fig}</span>
                   <span className="demo-link-title">{demo.brief.eyebrow || demo.brief.title}</span>
                   <span className="demo-link-status" data-status={demo.status}>
@@ -368,7 +478,7 @@ function ChapterCard({ book, chapter, demos, planning, onJump, total }: { book: 
               </li>
             ))}
           </ol>
-          <button className="button" onClick={generate} disabled={busy || !!planning}>
+          <button type="button" className="button" onClick={generate} disabled={busy || !!planning}>
             {planning ? "Planning more…" : "Add more figures"}
           </button>
         </>
@@ -380,7 +490,9 @@ function ChapterCard({ book, chapter, demos, planning, onJump, total }: { book: 
       ) : (
         <>
           <p className="caption">
-            No figures for this chapter yet. The tutor will read it, pick the ideas worth seeing move, and draw an interactive figure for each, anchored to the passage it explains. Or select any passage and choose Visualize.
+            No figures for this chapter yet. The tutor will read it, pick the ideas worth seeing move, and draw an
+            interactive figure for each, anchored to the passage it explains. Or select any passage and choose
+            Visualize.
           </p>
           <div className="generate-row">
             <label className="count-select">
@@ -393,7 +505,7 @@ function ChapterCard({ book, chapter, demos, planning, onJump, total }: { book: 
                 ))}
               </select>
             </label>
-            <button className="button primary" onClick={generate} disabled={busy}>
+            <button type="button" className="button primary" onClick={generate} disabled={busy}>
               Visualize this chapter
             </button>
           </div>
@@ -401,7 +513,11 @@ function ChapterCard({ book, chapter, demos, planning, onJump, total }: { book: 
         </>
       )}
       {message && <p className="form-error">{message}</p>}
-      {total === 0 && <p className="fine">Tip: select any passage in the book and choose Visualize, with your own request if you like.</p>}
+      {total === 0 && (
+        <p className="fine">
+          Tip: select any passage in the book and choose Visualize, with your own request if you like.
+        </p>
+      )}
     </div>
   );
 }

@@ -6,17 +6,27 @@
  * Positions follow the book's scroll without React re-rendering: the reader announces each scroll
  * frame on `bus`, and the margin moves its cards directly. */
 import { ArrowUp, Copy, Ellipsis, FileText, Link2, Maximize2, Quote, SquarePlus, Trash2, X } from "lucide-react";
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { learn, type Annotation, type Book, type Demo } from "./api";
+import { memo, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type Annotation, type Book, type Demo, learn } from "./api";
 import { Markdown } from "./Markdown";
 import type { ReaderHandle } from "./readers";
-import { SceneView } from "./scene/SceneView";
 import { Spinner, timeAgo } from "./Shell";
+import { SceneView } from "./scene/SceneView";
 
-export type MarginItem = { id: string; annotation: Annotation; demo?: undefined } | { id: string; demo: Demo; annotation?: undefined };
+export type MarginItem =
+  | { id: string; annotation: Annotation; demo?: undefined }
+  | { id: string; demo: Demo; annotation?: undefined };
 
 const GAP = 8;
-const KIND: Record<string, string> = { explain: "Explain", define: "Define", ask: "Ask", visualize: "Figure", resources: "Resources", highlight: "Highlight", comment: "Comment" };
+const KIND: Record<string, string> = {
+  explain: "Explain",
+  define: "Define",
+  ask: "Ask",
+  visualize: "Figure",
+  resources: "Resources",
+  highlight: "Highlight",
+  comment: "Comment",
+};
 const COLORS = ["yellow", "green", "blue", "pink", "purple"];
 
 interface Props {
@@ -35,7 +45,21 @@ interface Props {
   toast: (text: string) => void;
 }
 
-export function Margin({ book, items, reader, bus, focused, setFocused, hovered, setHovered, leader, theme, onToNote, onOpenDemo, toast }: Props) {
+export function Margin({
+  book,
+  items,
+  reader,
+  bus,
+  focused,
+  setFocused,
+  hovered,
+  setHovered,
+  leader,
+  theme,
+  onToNote,
+  onOpenDemo,
+  toast,
+}: Props) {
   const box = useRef<HTMLDivElement>(null);
   const cards = useRef(new Map<string, HTMLDivElement>());
   const [shown, setShown] = useState<string[]>([]);
@@ -63,10 +87,19 @@ export function Margin({ book, items, reader, bus, focused, setFocused, hovered,
     const host = box.current;
     if (!host) return;
     const frame = host.getBoundingClientRect();
-    const placed = items.map((item) => ({ item, y: anchorY(item) })).filter((p): p is { item: MarginItem; y: number } => p.y !== null);
+    const placed = items
+      .map((item) => ({ item, y: anchorY(item) }))
+      .filter((p): p is { item: MarginItem; y: number } => p.y !== null);
     placed.sort((a, b) => a.y - b.y);
     // which cards to render: those whose passage is near the screen (a screen above and below)
-    const near = placed.filter((p) => p.y > frame.top - frame.height * 1.2 && p.y < frame.bottom + frame.height * 1.2 && (p.item.annotation?.kind !== "highlight" || p.item.id === focused)).map((p) => p.item.id);
+    const near = placed
+      .filter(
+        (p) =>
+          p.y > frame.top - frame.height * 1.2 &&
+          p.y < frame.bottom + frame.height * 1.2 &&
+          (p.item.annotation?.kind !== "highlight" || p.item.id === focused),
+      )
+      .map((p) => p.item.id);
     if (near.join() !== shownRef.current.join()) {
       shownRef.current = near;
       setShown(near);
@@ -125,6 +158,7 @@ export function Margin({ book, items, reader, bus, focused, setFocused, hovered,
     layout();
   });
   // cards change height as answers arrive and figures render
+  // biome-ignore lint/correctness/useExhaustiveDependencies: observes the cards again whenever the set of shown cards changes
   useEffect(() => {
     const ro = new ResizeObserver(() => layout());
     for (const el of cards.current.values()) ro.observe(el);
@@ -148,16 +182,35 @@ export function Margin({ book, items, reader, bus, focused, setFocused, hovered,
           onMouseLeave={() => setHovered(null)}
         >
           {item.annotation ? (
-            <AnnotationCard a={item.annotation} book={book} open={item.id === focused} theme={theme} onOpen={() => setFocused(item.id)} onClose={() => setFocused(null)} onToNote={onToNote} toast={toast} />
+            <AnnotationCard
+              a={item.annotation}
+              book={book}
+              open={item.id === focused}
+              theme={theme}
+              onOpen={() => setFocused(item.id)}
+              onClose={() => setFocused(null)}
+              onToNote={onToNote}
+              toast={toast}
+            />
           ) : (
-            <DemoCard demo={item.demo!} open={item.id === focused} theme={theme} onOpen={() => setFocused(item.id)} onClose={() => setFocused(null)} onOpenDemo={onOpenDemo} />
+            <DemoCard
+              demo={item.demo!}
+              open={item.id === focused}
+              theme={theme}
+              onOpen={() => setFocused(item.id)}
+              onClose={() => setFocused(null)}
+              onOpenDemo={onOpenDemo}
+            />
           )}
         </div>
       ))}
       {!items.some((i) => i.annotation && i.annotation.kind !== "highlight") && !items.some((i) => i.demo) && (
         <div className="margin-empty rise">
           <p className="margin-empty-title">The margin</p>
-          <p className="fine">Select a passage in the book and choose Explain, Visualize, Ask or Define. The answer appears here, beside the passage, and is saved with the book in your vault.</p>
+          <p className="fine">
+            Select a passage in the book and choose Explain, Visualize, Ask or Define. The answer appears here, beside
+            the passage, and is saved with the book in your vault.
+          </p>
         </div>
       )}
     </div>
@@ -176,7 +229,25 @@ const plain = (md: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-const AnnotationCard = memo(function AnnotationCard({ a, book, open, theme, onOpen, onClose, onToNote, toast }: { a: Annotation; book: Book; open: boolean; theme: "light" | "dark"; onOpen: () => void; onClose: () => void; onToNote: Props["onToNote"]; toast: (t: string) => void }) {
+const AnnotationCard = memo(function AnnotationCard({
+  a,
+  book,
+  open,
+  theme,
+  onOpen,
+  onClose,
+  onToNote,
+  toast,
+}: {
+  a: Annotation;
+  book: Book;
+  open: boolean;
+  theme: "light" | "dark";
+  onOpen: () => void;
+  onClose: () => void;
+  onToNote: Props["onToNote"];
+  toast: (t: string) => void;
+}) {
   const [ask, setAsk] = useState("");
   const [asking, setAsking] = useState<number | null>(null);
   const [menu, setMenu] = useState(false);
@@ -189,56 +260,120 @@ const AnnotationCard = memo(function AnnotationCard({ a, book, open, theme, onOp
 
   if (!open)
     return (
-      <button className="mcard collapsed" data-kind={a.kind} data-status={a.status} data-color={a.color} onClick={onOpen} title="Open">
+      <button
+        type="button"
+        className="mcard collapsed"
+        data-kind={a.kind}
+        data-status={a.status}
+        data-color={a.color}
+        onClick={onOpen}
+        title="Open"
+      >
         <span className="mcard-label">
           <b>{label}</b>
-          {a.kind === "visualize" && a.title ? ` · ${a.title}` : a.request ? ` “${a.request.length > 60 ? `${a.request.slice(0, 58)}…` : a.request}”` : ` “${a.anchor.quote.slice(0, 42)}${a.anchor.quote.length > 42 ? "…" : ""}”`}
+          {a.kind === "visualize" && a.title
+            ? ` · ${a.title}`
+            : a.request
+              ? ` “${a.request.length > 60 ? `${a.request.slice(0, 58)}…` : a.request}”`
+              : ` “${a.anchor.quote.slice(0, 42)}${a.anchor.quote.length > 42 ? "…" : ""}”`}
           <span className="where">{where}</span>
         </span>
-        {pending ? <span className="skeleton short" /> : a.status === "failed" ? <span className="mcard-excerpt error">Couldn’t finish: {a.error}</span> : a.kind === "comment" || a.body ? <span className="mcard-excerpt">{plain(a.kind === "visualize" ? a.body.split("```")[0].replace(/^##[^\n]*\n/, "") : a.body).slice(0, 180) || "(figure)"}</span> : null}
+        {pending ? (
+          <span className="skeleton short" />
+        ) : a.status === "failed" ? (
+          <span className="mcard-excerpt error">Couldn’t finish: {a.error}</span>
+        ) : a.kind === "comment" || a.body ? (
+          <span className="mcard-excerpt">
+            {plain(a.kind === "visualize" ? a.body.split("```")[0].replace(/^##[^\n]*\n/, "") : a.body).slice(0, 180) ||
+              "(figure)"}
+          </span>
+        ) : null}
       </button>
     );
 
   return (
-    <article className="mcard open" data-kind={a.kind} data-status={a.status} data-color={a.color} onClick={(e) => e.stopPropagation()}>
+    <article
+      className="mcard open"
+      data-kind={a.kind}
+      data-status={a.status}
+      data-color={a.color}
+      onClick={(e) => e.stopPropagation()}
+    >
       <header className="mcard-head">
         <span className="mcard-kind">{label}</span>
         {where && <span className="chip-where">{where}</span>}
         <span className="spacer" />
         <div className="menu-host">
-          <button className="mcard-icon" aria-label="More" title="More" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
+          <button
+            type="button"
+            className="mcard-icon"
+            aria-label="More"
+            title="More"
+            aria-expanded={menu}
+            onClick={() => setMenu((m) => !m)}
+          >
             <Ellipsis aria-hidden="true" />
           </button>
           {menu && (
             <div className="menu" role="menu" onMouseLeave={() => setMenu(false)}>
-              <button role="menuitem" onClick={() => (setMenu(false), onToNote(a, "embed"))}>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenu(false);
+                  onToNote(a, "embed");
+                }}
+              >
                 <SquarePlus aria-hidden="true" />
                 Add to note{a.kind === "highlight" ? "" : " (with the answer)"}
               </button>
-              <button role="menuitem" onClick={() => (setMenu(false), onToNote(a, "passage"))}>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenu(false);
+                  onToNote(a, "passage");
+                }}
+              >
                 <Quote aria-hidden="true" />
                 Add the passage to note
               </button>
-              <button role="menuitem" onClick={() => (setMenu(false), onToNote(a, "reference"))}>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenu(false);
+                  onToNote(a, "reference");
+                }}
+              >
                 <Link2 aria-hidden="true" />
                 Add a reference to note
               </button>
               <div className="menu-sep" />
               <button
+                type="button"
                 role="menuitem"
                 onClick={() => {
                   setMenu(false);
-                  void navigator.clipboard?.writeText(`${a.anchor.quote}\n\n${a.body}`.trim()).then(() => toast("Copied."));
+                  void navigator.clipboard
+                    ?.writeText(`${a.anchor.quote}\n\n${a.body}`.trim())
+                    .then(() => toast("Copied."));
                 }}
               >
                 <Copy aria-hidden="true" />
                 Copy
               </button>
-              <a role="menuitem" href={`#/open?target=${encodeURIComponent(a.path.replace(/\.md$/, ""))}`} onClick={() => setMenu(false)} title={a.path}>
+              <a
+                role="menuitem"
+                href={`#/open?target=${encodeURIComponent(a.path.replace(/\.md$/, ""))}`}
+                onClick={() => setMenu(false)}
+                title={a.path}
+              >
                 <FileText aria-hidden="true" />
                 Show the file
               </a>
               <button
+                type="button"
                 role="menuitem"
                 className="danger"
                 onClick={async () => {
@@ -252,32 +387,58 @@ const AnnotationCard = memo(function AnnotationCard({ a, book, open, theme, onOp
             </div>
           )}
         </div>
-        <button className="mcard-icon" aria-label="Collapse" title="Collapse (Esc)" onClick={onClose}>
+        <button type="button" className="mcard-icon" aria-label="Collapse" title="Collapse (Esc)" onClick={onClose}>
           <X aria-hidden="true" />
         </button>
       </header>
-      <blockquote className="mcard-quote">{a.anchor.quote.length > 420 ? `${a.anchor.quote.slice(0, 420)}…` : a.anchor.quote}</blockquote>
+      <blockquote className="mcard-quote">
+        {a.anchor.quote.length > 420 ? `${a.anchor.quote.slice(0, 420)}…` : a.anchor.quote}
+      </blockquote>
       {a.request && a.kind !== "comment" && <p className="mcard-request">{a.request}</p>}
       {a.kind === "highlight" || a.kind === "comment" ? (
         <div className="mcard-comment">
           <div className="colors" role="group" aria-label="Colour">
             {COLORS.map((c) => (
-              <button key={c} className="color-dot" data-color={c} aria-pressed={(a.color || "yellow") === c} aria-label={c} onClick={() => learn.updateAnnotation(a.id, { color: c })} />
+              <button
+                type="button"
+                key={c}
+                className="color-dot"
+                data-color={c}
+                aria-pressed={(a.color || "yellow") === c}
+                aria-label={c}
+                onClick={() => learn.updateAnnotation(a.id, { color: c })}
+              />
             ))}
           </div>
-          <textarea rows={2} value={comment} placeholder="Add a comment…" onChange={(e) => setComment(e.target.value)} onBlur={() => comment !== a.body && learn.updateAnnotation(a.id, { body: comment, kind: comment.trim() ? "comment" : "highlight" })} />
+          <textarea
+            rows={2}
+            value={comment}
+            placeholder="Add a comment…"
+            onChange={(e) => setComment(e.target.value)}
+            onBlur={() =>
+              comment !== a.body &&
+              learn.updateAnnotation(a.id, { body: comment, kind: comment.trim() ? "comment" : "highlight" })
+            }
+          />
         </div>
       ) : pending ? (
         <div className="mcard-body">
           <span className="skeleton" />
           <span className="skeleton" />
           <span className="skeleton short" />
-          <Spinner label={a.kind === "visualize" ? "Drawing" : a.kind === "resources" ? "Searching" : "Thinking"} since={since} />
+          <Spinner
+            label={a.kind === "visualize" ? "Drawing" : a.kind === "resources" ? "Searching" : "Thinking"}
+            since={since}
+          />
         </div>
       ) : a.status === "failed" ? (
         <div className="mcard-body">
           <p className="form-error">{a.error}</p>
-          <button className="button" onClick={() => (a.kind === "visualize" ? learn.redraw(a.id) : learn.retryAnnotation(a.id))}>
+          <button
+            type="button"
+            className="button"
+            onClick={() => (a.kind === "visualize" ? learn.redraw(a.id) : learn.retryAnnotation(a.id))}
+          >
             Try again
           </button>
         </div>
@@ -288,12 +449,14 @@ const AnnotationCard = memo(function AnnotationCard({ a, book, open, theme, onOp
       )}
       <footer className="mcard-foot">
         <span className="fine">
-          {a.model ? `${a.model.name || a.model.provider}${a.model.ms ? ` · ${Math.round(a.model.ms / 1000)} s` : ""} · ` : ""}
+          {a.model
+            ? `${a.model.name || a.model.provider}${a.model.ms ? ` · ${Math.round(a.model.ms / 1000)} s` : ""} · `
+            : ""}
           {timeAgo(a.created)}
         </span>
         <span className="spacer" />
         {a.kind === "visualize" && !pending && (
-          <button className="link" onClick={() => setRedrawing((r) => !r)}>
+          <button type="button" className="link" onClick={() => setRedrawing((r) => !r)}>
             Redraw
           </button>
         )}
@@ -319,7 +482,12 @@ const AnnotationCard = memo(function AnnotationCard({ a, book, open, theme, onOp
             }
           }}
         >
-          <input value={ask} onChange={(e) => setAsk(e.target.value)} placeholder={a.kind === "visualize" ? "What should change? (redraws it)" : "Ask a follow-up…"} disabled={!!asking} />
+          <input
+            value={ask}
+            onChange={(e) => setAsk(e.target.value)}
+            placeholder={a.kind === "visualize" ? "What should change? (redraws it)" : "Ask a follow-up…"}
+            disabled={!!asking}
+          />
           <button className="mcard-send" type="submit" disabled={!ask.trim() || !!asking} aria-label="Send">
             {asking ? <span className="spinner-mark" aria-hidden="true" /> : <ArrowUp aria-hidden="true" />}
           </button>
@@ -334,14 +502,38 @@ const GENERATED = ["explain", "define", "ask", "visualize", "resources"];
 
 /* ---------------- a figure from the chapter's figures ---------------- */
 
-const DemoCard = memo(function DemoCard({ demo, open, theme, onOpen, onClose, onOpenDemo }: { demo: Demo; open: boolean; theme: "light" | "dark"; onOpen: () => void; onClose: () => void; onOpenDemo: (d: Demo) => void }) {
+const DemoCard = memo(function DemoCard({
+  demo,
+  open,
+  theme,
+  onOpen,
+  onClose,
+  onOpenDemo,
+}: {
+  demo: Demo;
+  open: boolean;
+  theme: "light" | "dark";
+  onOpen: () => void;
+  onClose: () => void;
+  onOpenDemo: (d: Demo) => void;
+}) {
   if (!open)
     return (
-      <button className="mcard collapsed" data-kind="figure" data-status={demo.status === "ready" ? "ready" : demo.status === "failed" ? "failed" : "pending"} onClick={onOpen}>
+      <button
+        type="button"
+        className="mcard collapsed"
+        data-kind="figure"
+        data-status={demo.status === "ready" ? "ready" : demo.status === "failed" ? "failed" : "pending"}
+        onClick={onOpen}
+      >
         <span className="mcard-label">
           <b>{demo.fig}</b> · {demo.brief.title}
         </span>
-        {demo.status !== "ready" && <span className="mcard-excerpt">{demo.status === "failed" ? `Couldn’t finish: ${demo.error}` : demo.activity || "drawing…"}</span>}
+        {demo.status !== "ready" && (
+          <span className="mcard-excerpt">
+            {demo.status === "failed" ? `Couldn’t finish: ${demo.error}` : demo.activity || "drawing…"}
+          </span>
+        )}
       </button>
     );
   return (
@@ -349,15 +541,21 @@ const DemoCard = memo(function DemoCard({ demo, open, theme, onOpen, onClose, on
       <header className="mcard-head">
         <span className="mcard-kind">{demo.fig}</span>
         <span className="spacer" />
-        <button className="link" onClick={() => onOpenDemo(demo)}>
+        <button type="button" className="link" onClick={() => onOpenDemo(demo)}>
           <Maximize2 aria-hidden="true" />
           Open large
         </button>
-        <button className="mcard-icon" aria-label="Collapse" onClick={onClose}>
+        <button type="button" className="mcard-icon" aria-label="Collapse" onClick={onClose}>
           <X aria-hidden="true" />
         </button>
       </header>
-      {demo.type === "scene" && demo.scene && demo.status === "ready" ? <SceneView spec={demo.scene} theme={theme} compact predict={false} /> : <p className="fine">{demo.status === "ready" ? "A hand-built demo: open it large to play with it." : demo.activity || demo.status}</p>}
+      {demo.type === "scene" && demo.scene && demo.status === "ready" ? (
+        <SceneView spec={demo.scene} theme={theme} compact predict={false} />
+      ) : (
+        <p className="fine">
+          {demo.status === "ready" ? "A hand-built demo: open it large to play with it." : demo.activity || demo.status}
+        </p>
+      )}
     </article>
   );
 });

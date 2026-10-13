@@ -2,13 +2,28 @@
  * byte for byte, with a light live preview: headings sized, emphasis shown, and Markdown marks hidden
  * except on the line being edited; [[ completes to notes, concepts and books; pictures pasted or
  * dropped go to attachments/ and in as ![[picture.png]]. ⌘/Ctrl-click a link to follow it. */
-import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
+import {
+  autocompletion,
+  type CompletionContext,
+  type CompletionResult,
+  closeBrackets,
+  closeBracketsKeymap,
+  completionKeymap,
+} from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
-import { EditorState, RangeSetBuilder, type Extension } from "@codemirror/state";
-import { Decoration, EditorView, keymap, placeholder as placeholderExt, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import { EditorState, type Extension, RangeSetBuilder } from "@codemirror/state";
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  keymap,
+  placeholder as placeholderExt,
+  ViewPlugin,
+  type ViewUpdate,
+} from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import { useEffect, useRef } from "react";
 import { learn, openLink } from "./api";
@@ -17,7 +32,8 @@ import { learn, openLink } from "./api";
 
 let targetsCache: { at: number; list: { title: string; kind: string; detail?: string }[] } | null = null;
 async function targets() {
-  if (!targetsCache || Date.now() - targetsCache.at > 15000) targetsCache = { at: Date.now(), list: await learn.linkTargets().catch(() => []) };
+  if (!targetsCache || Date.now() - targetsCache.at > 15000)
+    targetsCache = { at: Date.now(), list: await learn.linkTargets().catch(() => []) };
   return targetsCache.list;
 }
 
@@ -29,7 +45,13 @@ async function completeLinks(ctx: CompletionContext): Promise<CompletionResult |
   const after = ctx.state.sliceDoc(ctx.pos, ctx.pos + 2);
   return {
     from: before.from + open,
-    options: list.map((x) => ({ label: x.title, detail: x.kind, info: x.detail, apply: after === "]]" ? x.title : `${x.title}]]`, boost: x.kind === "note" ? 1 : x.kind === "concept" ? 0.5 : 0 })),
+    options: list.map((x) => ({
+      label: x.title,
+      detail: x.kind,
+      info: x.detail,
+      apply: after === "]]" ? x.title : `${x.title}]]`,
+      boost: x.kind === "note" ? 1 : x.kind === "concept" ? 0.5 : 0,
+    })),
     validFor: /^[^\]|#\n]*$/,
   };
 }
@@ -60,13 +82,18 @@ function preview(view: EditorView): DecorationSet {
         const line = state.doc.lineAt(node.from).number;
         if (node.name.startsWith("ATXHeading")) {
           const level = Number(node.name.slice(-1)) || 1;
-          builder.push({ from: state.doc.line(line).from, to: state.doc.line(line).from, deco: Decoration.line({ class: `cm-h cm-h${level}` }) });
+          builder.push({
+            from: state.doc.line(line).from,
+            to: state.doc.line(line).from,
+            deco: Decoration.line({ class: `cm-h cm-h${level}` }),
+          });
         }
         if (cursorLines.has(line) || !HIDE.has(node.name)) return;
         if (node.name === "URL" || node.name === "LinkMark") return; // keep [text](url) visible: links are edited often
         let end = node.to;
         // a heading's "# " or a quote's "> ": hide the space after the mark too
-        if ((node.name === "HeaderMark" || node.name === "QuoteMark") && state.doc.sliceString(end, end + 1) === " ") end++;
+        if ((node.name === "HeaderMark" || node.name === "QuoteMark") && state.doc.sliceString(end, end + 1) === " ")
+          end++;
         if (end > node.from) builder.push({ from: node.from, to: end, deco: hidden });
       },
     });
@@ -85,11 +112,13 @@ function preview(view: EditorView): DecorationSet {
       const a = from + m.index! + 2;
       builder.push({ from: a, to: a + m[0].length - 2, deco: calloutMark });
     }
-    for (const m of text.matchAll(/==[^=\n]+==/g)) builder.push({ from: from + m.index!, to: from + m.index! + m[0].length, deco: highlight });
+    for (const m of text.matchAll(/==[^=\n]+==/g))
+      builder.push({ from: from + m.index!, to: from + m.index! + m[0].length, deco: highlight });
     for (const m of text.matchAll(/(^|\s)(#[\p{L}\p{N}_][\p{L}\p{N}_/-]*)/gu)) {
       const at = from + m.index! + m[1].length;
       const line = state.doc.lineAt(at);
-      if (!/^#{1,6} /.test(line.text) || at > line.from) builder.push({ from: at, to: at + m[2].length, deco: tagMark });
+      if (!/^#{1,6} /.test(line.text) || at > line.from)
+        builder.push({ from: at, to: at + m[2].length, deco: tagMark });
     }
   }
   builder.sort((a, b) => a.from - b.from || (a.deco.startSide ?? 0) - (b.deco.startSide ?? 0));
@@ -139,12 +168,28 @@ const theme = EditorView.theme({
   ".cm-line": { padding: "0 32px" },
   "&.cm-focused": { outline: "none" },
   ".cm-cursor": { borderLeftColor: "var(--ink)", borderLeftWidth: "1.5px" },
-  ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection": { background: "color-mix(in srgb, var(--lavender) 50%, transparent) !important" },
+  ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection": {
+    background: "color-mix(in srgb, var(--lavender) 50%, transparent) !important",
+  },
   ".cm-placeholder": { color: "var(--ink-4)", fontStyle: "italic" },
-  ".cm-tooltip.cm-tooltip-autocomplete": { background: "var(--raised)", border: "0", boxShadow: "var(--shadow-lg)", borderRadius: "10px", padding: "4px", fontFamily: "var(--sans)", fontSize: "13px" },
+  ".cm-tooltip.cm-tooltip-autocomplete": {
+    background: "var(--raised)",
+    border: "0",
+    boxShadow: "var(--shadow-lg)",
+    borderRadius: "10px",
+    padding: "4px",
+    fontFamily: "var(--sans)",
+    fontSize: "13px",
+  },
   ".cm-tooltip-autocomplete ul li": { borderRadius: "6px", padding: "4px 8px !important" },
   ".cm-tooltip-autocomplete ul li[aria-selected]": { background: "var(--hover)", color: "var(--ink)" },
-  ".cm-completionDetail": { fontFamily: "var(--sans)", fontSize: "11px", color: "var(--ink-3)", marginLeft: "10px", fontStyle: "normal" },
+  ".cm-completionDetail": {
+    fontFamily: "var(--sans)",
+    fontSize: "11px",
+    color: "var(--ink-3)",
+    marginLeft: "10px",
+    fontStyle: "normal",
+  },
 });
 
 /* ---------------- pictures ---------------- */
@@ -193,16 +238,35 @@ const pictures = EditorView.domEventHandlers({
 
 async function insertPicture(view: EditorView, file: File, at: number) {
   try {
-    const saved = await learn.attach(await readAsDataUrl(file), file.name && file.name !== "image.png" ? file.name : undefined);
+    const saved = await learn.attach(
+      await readAsDataUrl(file),
+      file.name && file.name !== "image.png" ? file.name : undefined,
+    );
     view.dispatch({ changes: { from: at, insert: `![[${saved.name}]]` } });
   } catch (error) {
-    view.dispatch({ changes: { from: at, insert: `<!-- could not attach the picture: ${(error as Error).message} -->` } });
+    view.dispatch({
+      changes: { from: at, insert: `<!-- could not attach the picture: ${(error as Error).message} -->` },
+    });
   }
 }
 
 /* ---------------- the component ---------------- */
 
-export function NoteEditor({ value, onChange, placeholder = "Write…", autoFocus = false, onBlur, extensions = [] }: { value: string; onChange: (text: string) => void; placeholder?: string; autoFocus?: boolean; onBlur?: () => void; extensions?: Extension[] }) {
+export function NoteEditor({
+  value,
+  onChange,
+  placeholder = "Write…",
+  autoFocus = false,
+  onBlur,
+  extensions = [],
+}: {
+  value: string;
+  onChange: (text: string) => void;
+  placeholder?: string;
+  autoFocus?: boolean;
+  onBlur?: () => void;
+  extensions?: Extension[];
+}) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const change = useRef(onChange);
@@ -210,6 +274,7 @@ export function NoteEditor({ value, onChange, placeholder = "Write…", autoFocu
   const blur = useRef(onBlur);
   blur.current = onBlur;
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the editor is made once; new values arrive through the effect below, as transactions
   useEffect(() => {
     if (!host.current) return;
     const v = new EditorView({
@@ -219,7 +284,14 @@ export function NoteEditor({ value, onChange, placeholder = "Write…", autoFocu
         extensions: [
           history(),
           closeBrackets(),
-          keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...searchKeymap, ...completionKeymap, indentWithTab]),
+          keymap.of([
+            ...closeBracketsKeymap,
+            ...defaultKeymap,
+            ...historyKeymap,
+            ...searchKeymap,
+            ...completionKeymap,
+            indentWithTab,
+          ]),
           markdown({ base: markdownLanguage }),
           syntaxHighlighting(style),
           autocompletion({ override: [completeLinks], icons: false }),
@@ -243,7 +315,7 @@ export function NoteEditor({ value, onChange, placeholder = "Write…", autoFocu
       v.destroy();
       view.current = null;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // a new value from outside (another note, an agent's edit): replace the text, keep the cursor where it can stay
   useEffect(() => {

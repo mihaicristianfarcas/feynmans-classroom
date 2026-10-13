@@ -5,16 +5,26 @@
  * The file records where the passage is (page, boxes, quote with context, the place in the book's
  * Markdown), what was asked, which model answered and how long it took, and the answer itself, so a
  * person, Obsidian or an agent can read, edit, link or write one. */
-import type { Annotation, AnnotationKind, Anchor } from "../../shared/vault-types.ts";
+
 import type { Scene } from "../../shared/scene/types.ts";
+import type { Anchor, Annotation, AnnotationKind } from "../../shared/vault-types.ts";
 import { publish } from "../events.ts";
 import { passageAround } from "../ingest/index.ts";
-import { structured, text, type CallResult } from "../llm.ts";
+import { learnerSummary, relatedInVault, sourceLine } from "../learn/context.ts";
+import { type CallResult, structured, text } from "../llm.ts";
+import { generateScene } from "../scene/generate.ts";
 import { bookFolder, getBook, listBooks } from "../store.ts";
 import type { Book } from "../types.ts";
-import { annotations, changed, logActivity, notes, now, onVaultChange, setAnnotationBookInfo, shortId } from "../vault/index.ts";
-import { learnerSummary, relatedInVault, sourceLine } from "../learn/context.ts";
-import { generateScene } from "../scene/generate.ts";
+import {
+  annotations,
+  changed,
+  logActivity,
+  notes,
+  now,
+  onVaultChange,
+  setAnnotationBookInfo,
+  shortId,
+} from "../vault/index.ts";
 import { chapterAt, completeAnchor } from "./anchor.ts";
 
 export const KINDS: AnnotationKind[] = ["highlight", "explain", "define", "ask", "visualize", "resources", "comment"];
@@ -23,7 +33,14 @@ const GENERATED: AnnotationKind[] = ["explain", "define", "ask", "visualize", "r
 setAnnotationBookInfo((bookId) => {
   const book = getBook(bookId);
   if (!book) return {};
-  return { folder: bookFolder(bookId) || undefined, pdf: { file: book.file, sha256: book.sha256, ...(book.format === "pdf" ? { pages: book.pageCount } : { blocks: book.blockCount }) } };
+  return {
+    folder: bookFolder(bookId) || undefined,
+    pdf: {
+      file: book.file,
+      sha256: book.sha256,
+      ...(book.format === "pdf" ? { pages: book.pageCount } : { blocks: book.blockCount }),
+    },
+  };
 });
 
 /* ---------------- live updates ---------------- */
@@ -114,7 +131,11 @@ export function createAnnotation(bookId: string, input: NewAnnotation): Annotati
   };
   annotations.save(a);
   changed(`${a.kind} ${anchor.quote.slice(0, 40)}`);
-  logActivity({ type: input.kind === "highlight" ? "highlight" : input.kind === "visualize" ? "figure" : "note", bookId, text: `${label(a.kind)}: “${anchor.quote.slice(0, 60)}${anchor.quote.length > 60 ? "…" : ""}”` });
+  logActivity({
+    type: input.kind === "highlight" ? "highlight" : input.kind === "visualize" ? "figure" : "note",
+    bookId,
+    text: `${label(a.kind)}: “${anchor.quote.slice(0, 60)}${anchor.quote.length > 60 ? "…" : ""}”`,
+  });
   announce(a);
   if (generated) void generate(a, book, { quality: input.quality, sceneKind: input.sceneKind });
   return a;
@@ -133,14 +154,28 @@ export function retryAnnotation(id: string): Annotation {
   return a;
 }
 
-const label = (k: AnnotationKind) => ({ highlight: "Highlighted", explain: "Explained", define: "Defined", ask: "Asked", visualize: "Visualized", resources: "Resources for", comment: "Commented" })[k];
+const label = (k: AnnotationKind) =>
+  ({
+    highlight: "Highlighted",
+    explain: "Explained",
+    define: "Defined",
+    ask: "Asked",
+    visualize: "Visualized",
+    resources: "Resources for",
+    comment: "Commented",
+  })[k];
 
-export function updateAnnotation(id: string, patch: Partial<Pick<Annotation, "color" | "body" | "request" | "tags" | "title" | "kind">>): Annotation {
+export function updateAnnotation(
+  id: string,
+  patch: Partial<Pick<Annotation, "color" | "body" | "request" | "tags" | "title" | "kind">>,
+): Annotation {
   const a = annotations.get(id);
   if (!a) throw new Error("annotation not found");
-  for (const key of ["color", "body", "request", "tags", "title"] as const) if (patch[key] !== undefined) (a as unknown as Record<string, unknown>)[key] = patch[key];
+  for (const key of ["color", "body", "request", "tags", "title"] as const)
+    if (patch[key] !== undefined) (a as unknown as Record<string, unknown>)[key] = patch[key];
   // a highlight can become a comment (and back) when the reader writes on it
-  if (patch.kind && ["highlight", "comment"].includes(patch.kind) && ["highlight", "comment"].includes(a.kind)) a.kind = patch.kind;
+  if (patch.kind && ["highlight", "comment"].includes(patch.kind) && ["highlight", "comment"].includes(a.kind))
+    a.kind = patch.kind;
   a.updated = now();
   annotations.save(a);
   changed(`annotation ${a.id}`);
@@ -161,15 +196,29 @@ export function deleteAnnotation(id: string) {
 /* ---------------- what the model writes ---------------- */
 
 function passageContext(book: Book, a: Annotation) {
-  const around = passageAround(book, a.anchor.page !== undefined ? { page: a.anchor.page } : { block: a.anchor.block ?? 0 }, 1);
+  const around = passageAround(
+    book,
+    a.anchor.page !== undefined ? { page: a.anchor.page } : { block: a.anchor.block ?? 0 },
+    1,
+  );
   const chapter = a.chapterId ? book.toc.find((c) => c.id === a.chapterId) : undefined;
   const where = a.anchor.page !== undefined ? `page ${a.anchor.page}` : `block ${a.anchor.block}`;
-  return { around: around.slice(0, 7000), source: { title: book.title, author: book.author, chapter: chapter ? `${chapter.title}${chapter.subtitle ? ` — ${chapter.subtitle}` : ""}` : undefined }, where };
+  return {
+    around: around.slice(0, 7000),
+    source: {
+      title: book.title,
+      author: book.author,
+      chapter: chapter ? `${chapter.title}${chapter.subtitle ? ` — ${chapter.subtitle}` : ""}` : undefined,
+    },
+    where,
+  };
 }
 
 function relatedLine(a: Annotation) {
   const related = relatedInVault(`${a.anchor.quote} ${a.request || ""}`, 8);
-  return related.length ? `\nAlready in the learner's notes (link one as [[exact title]] only where it truly helps them connect ideas; never invent links):\n${related.map((r) => `- [[${r.title}]] (${r.kind})${r.summary ? `: ${r.summary}` : ""}`).join("\n")}\n` : "";
+  return related.length
+    ? `\nAlready in the learner's notes (link one as [[exact title]] only where it truly helps them connect ideas; never invent links):\n${related.map((r) => `- [[${r.title}]] (${r.kind})${r.summary ? `: ${r.summary}` : ""}`).join("\n")}\n`
+    : "";
 }
 
 const INSTRUCTIONS: Record<"explain" | "define" | "ask", string> = {
@@ -251,29 +300,65 @@ Return JSON.`;
 
 const SCENE_KINDS = ["plot", "sequence", "graph", "diagram", "object3d"];
 
-async function generate(a: Annotation, book: Book, options: { quality?: "quick" | "careful"; sceneKind?: string } = {}) {
+async function generate(
+  a: Annotation,
+  book: Book,
+  options: { quality?: "quick" | "careful"; sceneKind?: string } = {},
+) {
   const started = Date.now();
   try {
     let body = "";
     let result: CallResult<unknown>;
     if (a.kind === "explain" || a.kind === "define" || a.kind === "ask") {
-      result = await text({ prompt: writtenPrompt(a.kind, book, a), tier: options.quality === "careful" ? "smart" : "fast" });
+      result = await text({
+        prompt: writtenPrompt(a.kind, book, a),
+        tier: options.quality === "careful" ? "smart" : "fast",
+      });
       body = clean(String(result.data));
     } else if (a.kind === "resources") {
-      result = await structured<{ resources: { title: string; url: string; kind: string; why: string }[] }>({ prompt: resourcesPrompt(book, a), schema: RESOURCES_SCHEMA, tier: "fast", search: true });
-      const list = (result.data as { resources: { title: string; url: string; kind: string; why: string }[] }).resources.filter((r) => /^https?:\/\//.test(r.url));
-      body = list.map((r) => `- [${r.title.replace(/[[\]]/g, "")}](${r.url}) — ${r.why} *(${r.kind})*`).join("\n") || "_Nothing reliable found._";
+      result = await structured<{ resources: { title: string; url: string; kind: string; why: string }[] }>({
+        prompt: resourcesPrompt(book, a),
+        schema: RESOURCES_SCHEMA,
+        tier: "fast",
+        search: true,
+      });
+      const list = (
+        result.data as { resources: { title: string; url: string; kind: string; why: string }[] }
+      ).resources.filter((r) => /^https?:\/\//.test(r.url));
+      body =
+        list.map((r) => `- [${r.title.replace(/[[\]]/g, "")}](${r.url}) — ${r.why} *(${r.kind})*`).join("\n") ||
+        "_Nothing reliable found._";
     } else {
       const ctx = passageContext(book, a);
       const kind = SCENE_KINDS.includes(options.sceneKind || "") ? (options.sceneKind as "plot") : "auto";
-      const scene = await generateScene({ passage: a.anchor.quote, context: ctx.around, source: ctx.source, request: a.request, kind, learner: learnerSummary(), tier: options.quality === "careful" ? "smart" : "fast" });
-      result = { data: scene.scene, ms: scene.ms, provider: scene.provider as CallResult["provider"], model: scene.model };
+      const scene = await generateScene({
+        passage: a.anchor.quote,
+        context: ctx.around,
+        source: ctx.source,
+        request: a.request,
+        kind,
+        learner: learnerSummary(),
+        tier: options.quality === "careful" ? "smart" : "fast",
+      });
+      result = {
+        data: scene.scene,
+        ms: scene.ms,
+        provider: scene.provider as CallResult["provider"],
+        model: scene.model,
+      };
       body = figureBody(scene.scene);
       a.title = scene.scene.title;
     }
     const fresh = annotations.get(a.id);
     if (!fresh) return; // deleted while it was being written
-    Object.assign(fresh, { body, title: a.title, status: "ready", error: undefined, model: { provider: result.provider, name: result.model, ms: Date.now() - started }, updated: now() });
+    Object.assign(fresh, {
+      body,
+      title: a.title,
+      status: "ready",
+      error: undefined,
+      model: { provider: result.provider, name: result.model, ms: Date.now() - started },
+      updated: now(),
+    });
     annotations.save(fresh);
     changed(`${fresh.kind} ${fresh.id}`);
     announce(fresh);
@@ -288,7 +373,10 @@ async function generate(a: Annotation, book: Book, options: { quality?: "quick" 
 
 /** A figure inside an annotation: its title, caption, and the spec as a ```figure block. */
 export function figureBody(scene: Scene) {
-  return `## ${scene.title}\n\n${scene.caption || ""}\n\n\`\`\`figure\n${JSON.stringify(scene, null, 1)}\n\`\`\``.replace(/\n{3,}/g, "\n\n");
+  return `## ${scene.title}\n\n${scene.caption || ""}\n\n\`\`\`figure\n${JSON.stringify(scene, null, 1)}\n\`\`\``.replace(
+    /\n{3,}/g,
+    "\n\n",
+  );
 }
 export function figureOf(a: Annotation): Scene | null {
   const m = /```figure\s*\n([\s\S]*?)\n```/.exec(a.body);
@@ -353,7 +441,7 @@ Reply with the Markdown only.`;
 /** Draws a figure annotation again, with the reader's notes on the current one. */
 export function redraw(id: string, input: { notes?: string; quality?: "quick" | "careful" }) {
   const a = annotations.get(id);
-  if (!a || a.kind !== "visualize") throw new Error("figure not found");
+  if (a?.kind !== "visualize") throw new Error("figure not found");
   const book = getBook(a.bookId);
   if (!book) throw new Error("book not found");
   const previous = figureOf(a);
@@ -365,11 +453,28 @@ export function redraw(id: string, input: { notes?: string; quality?: "quick" | 
     const started = Date.now();
     try {
       const ctx = passageContext(book, a);
-      const request = input.notes?.trim() ? `${a.request ? `${a.request}\n` : ""}The reader's notes on the current version: ${input.notes.trim()}` : a.request;
-      const scene = await generateScene({ passage: a.anchor.quote, context: ctx.around, source: ctx.source, request, kind: "auto", learner: learnerSummary(), previous: input.notes?.trim() && previous ? previous : undefined, tier: input.quality === "careful" ? "smart" : "fast" });
+      const request = input.notes?.trim()
+        ? `${a.request ? `${a.request}\n` : ""}The reader's notes on the current version: ${input.notes.trim()}`
+        : a.request;
+      const scene = await generateScene({
+        passage: a.anchor.quote,
+        context: ctx.around,
+        source: ctx.source,
+        request,
+        kind: "auto",
+        learner: learnerSummary(),
+        previous: input.notes?.trim() && previous ? previous : undefined,
+        tier: input.quality === "careful" ? "smart" : "fast",
+      });
       const fresh = annotations.get(id);
       if (!fresh) return;
-      Object.assign(fresh, { body: figureBody(scene.scene), title: scene.scene.title, status: "ready", model: { provider: scene.provider, name: scene.model, ms: Date.now() - started }, updated: now() });
+      Object.assign(fresh, {
+        body: figureBody(scene.scene),
+        title: scene.scene.title,
+        status: "ready",
+        model: { provider: scene.provider, name: scene.model, ms: Date.now() - started },
+        updated: now(),
+      });
       annotations.save(fresh);
       changed(`figure ${fresh.id}`);
       announce(fresh);
@@ -404,7 +509,20 @@ export function migrateHighlightNotes() {
     // the highlight's note held the whole passage as a blockquote; its source kept the first words
     const quote = n.body.replace(/^>\s?/gm, "").trim() || n.source.quote || n.title;
     const raw: Anchor = { quote, page: n.source.page, y: n.source.y, block: n.source.block };
-    const a: Annotation = { id: shortId("a"), kind: "highlight", bookId: book.id, path: "", chapterId: n.source.chapterId, anchor: completeAnchor(book, raw), color: "yellow", status: "ready", body: "", tags: n.tags, created: n.created, updated: n.updated };
+    const a: Annotation = {
+      id: shortId("a"),
+      kind: "highlight",
+      bookId: book.id,
+      path: "",
+      chapterId: n.source.chapterId,
+      anchor: completeAnchor(book, raw),
+      color: "yellow",
+      status: "ready",
+      body: "",
+      tags: n.tags,
+      created: n.created,
+      updated: n.updated,
+    };
     annotations.save(a);
     notes.remove(n.id);
   }

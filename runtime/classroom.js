@@ -7,8 +7,10 @@
  * RUNTIME.md documents the contract for demo authors.
  */
 (() => {
-  "use strict";
-  const OPTS = Object.assign({ theme: "light", fig: "Fig 1", predict: true, autoplay: true }, globalThis.__CLASSROOM_OPTS || {});
+  const OPTS = Object.assign(
+    { theme: "light", fig: "Fig 1", predict: true, autoplay: true },
+    globalThis.__CLASSROOM_OPTS || {},
+  );
   const S = {
     def: null,
     ctx: null,
@@ -28,7 +30,9 @@
   };
   globalThis.__classroom = S;
 
-  const raf = globalThis.requestAnimationFrame ? (fn) => globalThis.requestAnimationFrame(fn) : (fn) => setTimeout(() => fn(Date.now()), 16);
+  const raf = globalThis.requestAnimationFrame
+    ? (fn) => globalThis.requestAnimationFrame(fn)
+    : (fn) => setTimeout(() => fn(Date.now()), 16);
   const caf = globalThis.cancelAnimationFrame ? (id) => globalThis.cancelAnimationFrame(id) : (id) => clearTimeout(id);
   const now = () => (globalThis.performance ? performance.now() : Date.now()) / 1000;
   const reduced = () => {
@@ -40,10 +44,12 @@
   };
   const post = (message) => {
     try {
-      if (globalThis.parent && globalThis.parent !== globalThis) globalThis.parent.postMessage({ source: "classroom", ...message }, "*");
+      if (globalThis.parent && globalThis.parent !== globalThis)
+        globalThis.parent.postMessage({ source: "classroom", ...message }, "*");
     } catch {}
   };
-  const esc = (text) => String(text ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const esc = (text) =>
+    String(text ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const h = (tag, attrs = {}, children = []) => {
     const node = document.createElement(tag);
     for (const [key, value] of Object.entries(attrs)) {
@@ -59,7 +65,12 @@
   /* ---------- small motion helpers (also exposed on ctx) ---------- */
   const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
   const lerp = (a, b, t) => a + (b - a) * t;
-  const follow = (x, target, dt, tau = 0.25) => (reduced() ? target : Math.abs(target - x) < 1e-4 ? target : x + (target - x) * (1 - Math.exp(-dt / Math.max(1e-3, tau))));
+  const follow = (x, target, dt, tau = 0.25) =>
+    reduced()
+      ? target
+      : Math.abs(target - x) < 1e-4
+        ? target
+        : x + (target - x) * (1 - Math.exp(-dt / Math.max(1e-3, tau)));
   // Sub-stepped spring on { x, v }. Returns true while still moving.
   const spring = (s, target, dt, stiffness = 120, damping = 2 * Math.sqrt(stiffness)) => {
     if (reduced()) {
@@ -90,12 +101,17 @@
 
   /* ---------- errors ---------- */
   function fail(error, where = "demo") {
-    const message = error && error.message ? error.message : String(error);
-    const stack = error && error.stack ? String(error.stack).split("\n").slice(0, 6).join("\n") : "";
+    const message = error?.message ? error.message : String(error);
+    const stack = error?.stack ? String(error.stack).split("\n").slice(0, 6).join("\n") : "";
     S.errors.push({ where, message, stack });
     stop();
     if (S.el.plate && !S.el.plate.querySelector(".cr-error")) {
-      S.el.plate.appendChild(h("div", { class: "cr-error", role: "alert" }, [h("strong", { text: "This visualization stopped" }), h("span", { text: message })]));
+      S.el.plate.appendChild(
+        h("div", { class: "cr-error", role: "alert" }, [
+          h("strong", { text: "This visualization stopped" }),
+          h("span", { text: message }),
+        ]),
+      );
     }
     post({ type: "error", message, stack, where });
     try {
@@ -142,7 +158,12 @@
     const id = `cr-${control.id}`;
     const type = control.type || "range";
     if (type === "button") {
-      const button = h("button", { type: "button", class: "cr-button", "data-control": control.id, text: control.label || control.id });
+      const button = h("button", {
+        type: "button",
+        class: "cr-button",
+        "data-control": control.id,
+        text: control.label || control.id,
+      });
       button.addEventListener("click", () => {
         S.lastInput = now();
         emit("press", control.id);
@@ -153,16 +174,26 @@
     if (type === "toggle") {
       const input = h("input", { type: "checkbox", id, "data-control": control.id, checked: !!ctx.params[control.id] });
       input.addEventListener("change", () => setValue(control.id, input.checked, "user"));
-      return h("label", { class: "cr-control", "data-type": "toggle", for: id }, [input, h("span", { text: control.label || control.id })]);
+      return h("label", { class: "cr-control", "data-type": "toggle", for: id }, [
+        input,
+        h("span", { text: control.label || control.id }),
+      ]);
     }
     if (type === "select") {
       const options = (control.options || []).map((option) => {
-        const [value, label] = Array.isArray(option) ? option : typeof option === "object" ? [option.value, option.label] : [option, option];
+        const [value, label] = Array.isArray(option)
+          ? option
+          : typeof option === "object"
+            ? [option.value, option.label]
+            : [option, option];
         return h("option", { value, text: label ?? value, selected: String(value) === String(ctx.params[control.id]) });
       });
       const select = h("select", { id, "data-control": control.id }, options);
       select.addEventListener("change", () => setValue(control.id, select.value, "user"));
-      return h("label", { class: "cr-control", "data-type": "select", for: id }, [h("span", { class: "cr-label", text: control.label || control.id }), select]);
+      return h("label", { class: "cr-control", "data-type": "select", for: id }, [
+        h("span", { class: "cr-label", text: control.label || control.id }),
+        select,
+      ]);
     }
     const input = h("input", {
       type: "range",
@@ -175,7 +206,11 @@
     });
     const out = h("output", { for: id, class: "cr-value", text: formatControl(control, ctx.params[control.id]) });
     input.addEventListener("input", () => setValue(control.id, Number(input.value), "user"));
-    return h("label", { class: "cr-control", "data-type": "range", for: id }, [h("span", { class: "cr-label", text: control.label || control.id }), input, out]);
+    return h("label", { class: "cr-control", "data-type": "range", for: id }, [
+      h("span", { class: "cr-label", text: control.label || control.id }),
+      input,
+      out,
+    ]);
   }
   function formatControl(control, value) {
     if (control.format && typeof control.format === "function") {
@@ -184,7 +219,9 @@
       } catch {}
     }
     const step = Number(control.step);
-    const digits = control.digits ?? (Number.isFinite(step) && step > 0 ? Math.max(0, Math.min(4, Math.ceil(-Math.log10(step) - 1e-9))) : 2);
+    const digits =
+      control.digits ??
+      (Number.isFinite(step) && step > 0 ? Math.max(0, Math.min(4, Math.ceil(-Math.log10(step) - 1e-9))) : 2);
     return `${typeof value === "number" ? value.toFixed(digits) : value}${control.unit ? ` ${control.unit}` : ""}`;
   }
   function controlOf(id) {
@@ -194,13 +231,19 @@
     const type = control.type || "range";
     if (type === "toggle") return !!value;
     if (type === "select") {
-      const options = (control.options || []).map((option) => (Array.isArray(option) ? option[0] : typeof option === "object" ? option.value : option));
+      const options = (control.options || []).map((option) =>
+        Array.isArray(option) ? option[0] : typeof option === "object" ? option.value : option,
+      );
       const match = options.find((option) => String(option) === String(value));
       return match === undefined ? options[0] : match;
     }
     if (type === "button") return undefined;
     const number = Number(value);
-    return clamp(Number.isFinite(number) ? number : Number(control.value ?? control.min ?? 0), Number(control.min ?? -Infinity), Number(control.max ?? Infinity));
+    return clamp(
+      Number.isFinite(number) ? number : Number(control.value ?? control.min ?? 0),
+      Number(control.min ?? -Infinity),
+      Number(control.max ?? Infinity),
+    );
   }
   function setValue(id, value, source = "program") {
     const control = controlOf(id);
@@ -209,11 +252,11 @@
     if (next === S.ctx.params[id] && source !== "user") return;
     S.ctx.params[id] = next;
     if (source === "user") S.lastInput = now();
-    const input = S.el.controls && S.el.controls.querySelector(`[data-control="${id}"]`);
+    const input = S.el.controls?.querySelector(`[data-control="${id}"]`);
     if (input) {
       if (input.type === "checkbox") input.checked = !!next;
       else if (String(input.value) !== String(next)) input.value = String(next);
-      const out = input.parentNode && input.parentNode.querySelector("output");
+      const out = input.parentNode?.querySelector("output");
       if (out) out.textContent = formatControl(control, next);
     }
     refreshReset();
@@ -240,7 +283,7 @@
 
   /* ---------- events ---------- */
   function emit(name, ...args) {
-    const list = (S.ctx && S.ctx._handlers[name]) || [];
+    const list = S.ctx?._handlers[name] || [];
     for (const fn of list) {
       try {
         fn(...args);
@@ -259,7 +302,7 @@
       const box = svg.getBoundingClientRect();
       fx = box.width ? (event.clientX - box.left) / box.width : 0;
       fy = box.height ? (event.clientY - box.top) / box.height : 0;
-      const ctm = svg.getScreenCTM && svg.getScreenCTM();
+      const ctm = svg.getScreenCTM?.();
       if (ctm && svg.createSVGPoint) {
         const point = svg.createSVGPoint();
         point.x = event.clientX;
@@ -286,7 +329,12 @@
       def.hint ? h("span", { class: "iso-plate-corner", "data-corner": "hint", text: def.hint }) : null,
       h("span", { class: "iso-plate-corner", "data-corner": "readout", "data-readout": "", text: "" }),
     ]);
-    const stage = h("div", { class: "iso-stage cr-stage", tabindex: "0", role: "group", "aria-label": def.label || def.title || "Interactive figure" });
+    const stage = h("div", {
+      class: "iso-stage cr-stage",
+      tabindex: "0",
+      role: "group",
+      "aria-label": def.label || def.title || "Interactive figure",
+    });
     stage.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="iso-svg" viewBox="0 0 ${def.width} ${def.height}" role="img" aria-label="${esc(def.label || def.title || "")}"></svg>`;
     const plate = h("div", { class: "iso-plate cr-plate" }, [corners, stage]);
     const keys = (def.keys || []).length
@@ -301,9 +349,22 @@
         )
       : null;
     const figure = h("figure", { class: "iso-figure cr-figure" }, [plate, keys]);
-    const pause = h("button", { type: "button", class: "cr-button", "data-action": "pause", text: S.playing ? "Pause" : "Play" });
+    const pause = h("button", {
+      type: "button",
+      class: "cr-button",
+      "data-action": "pause",
+      text: S.playing ? "Pause" : "Play",
+    });
     const again = h("button", { type: "button", class: "cr-button", "data-action": "restart", text: "Restart" });
-    const reset = (def.controls || []).some((c) => c.type !== "button") ? h("button", { type: "button", class: "cr-button", "data-action": "reset", text: "Back to text values", disabled: true }) : null;
+    const reset = (def.controls || []).some((c) => c.type !== "button")
+      ? h("button", {
+          type: "button",
+          class: "cr-button",
+          "data-action": "reset",
+          text: "Back to text values",
+          disabled: true,
+        })
+      : null;
     pause.addEventListener("click", () => setPlaying(!S.playing));
     again.addEventListener("click", () => restart());
     if (reset) reset.addEventListener("click", () => resetValues());
@@ -313,17 +374,32 @@
       ? h(
           "div",
           { class: "cr-stats", "aria-live": "off" },
-          def.stats.map((stat) => h("span", { class: "cr-stat" }, [h("span", { class: "cr-stat-label", text: stat.label || stat.id }), h("b", { "data-stat": stat.id, text: "—" })])),
+          def.stats.map((stat) =>
+            h("span", { class: "cr-stat" }, [
+              h("span", { class: "cr-stat-label", text: stat.label || stat.id }),
+              h("b", { "data-stat": stat.id, text: "—" }),
+            ]),
+          ),
         )
       : null;
     root.append(figure, bar, controls);
     if (stats) root.appendChild(stats);
-    Object.assign(S.el, { root, plate, stage, svg: stage.querySelector("svg"), readout: corners.querySelector("[data-readout]"), controls, stats, pause, reset });
+    Object.assign(S.el, {
+      root,
+      plate,
+      stage,
+      svg: stage.querySelector("svg"),
+      readout: corners.querySelector("[data-readout]"),
+      controls,
+      stats,
+      pause,
+      reset,
+    });
 
     stage.addEventListener("pointerdown", (event) => {
       S.lastInput = now();
       try {
-        stage.setPointerCapture && stage.setPointerCapture(event.pointerId);
+        stage.setPointerCapture?.(event.pointerId);
       } catch {}
       emit("pointerdown", pointerOf(event));
       wake();
@@ -343,23 +419,30 @@
     });
     stage.addEventListener("keydown", (event) => {
       S.lastInput = now();
-      const handled = (S.ctx && S.ctx._handlers.key || []).length;
+      const handled = (S.ctx?._handlers.key || []).length;
       emit("key", event);
       if (!handled && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
         const first = (def.controls || []).find((c) => (c.type || "range") === "range");
         if (first) {
           event.preventDefault();
           const step = Number(first.step) || (first.max - first.min) / 50;
-          setValue(first.id, S.ctx.params[first.id] + (event.key === "ArrowRight" ? 1 : -1) * step * (event.shiftKey ? 10 : 1), "user");
+          setValue(
+            first.id,
+            S.ctx.params[first.id] + (event.key === "ArrowRight" ? 1 : -1) * step * (event.shiftKey ? 10 : 1),
+            "user",
+          );
         }
       }
       wake();
     });
     if (globalThis.IntersectionObserver) {
-      new IntersectionObserver((entries) => {
-        S.visible = entries[entries.length - 1].isIntersecting;
-        if (S.visible) wake();
-      }, { rootMargin: "120px 0px" }).observe(stage);
+      new IntersectionObserver(
+        (entries) => {
+          S.visible = entries[entries.length - 1].isIntersecting;
+          if (S.visible) wake();
+        },
+        { rootMargin: "120px 0px" },
+      ).observe(stage);
     }
     if (globalThis.document && document.addEventListener) {
       document.addEventListener("visibilitychange", () => {
@@ -411,7 +494,9 @@
       });
       const watch = h("button", { type: "button", class: "cr-button", text: "Watch it" });
       watch.addEventListener("click", () => close(index));
-      box.appendChild(h("p", { class: "cr-predict-a", text: `${right ? "Right." : "Not quite."} ${p.explain || ""}`.trim() }));
+      box.appendChild(
+        h("p", { class: "cr-predict-a", text: `${right ? "Right." : "Not quite."} ${p.explain || ""}`.trim() }),
+      );
       box.appendChild(watch);
     }
     function close(index) {
@@ -461,7 +546,7 @@
         if (S.el.readout.textContent !== value) S.el.readout.textContent = value;
       },
       stat(id, value, digits) {
-        const node = S.el.stats && S.el.stats.querySelector(`[data-stat="${id}"]`);
+        const node = S.el.stats?.querySelector(`[data-stat="${id}"]`);
         if (!node) return;
         const text = typeof value === "number" ? fmt(value, digits ?? 2) : String(value ?? "—");
         if (node.textContent !== text) node.textContent = text;
@@ -470,7 +555,8 @@
         setValue(id, value, "program");
       },
       on(name, fn) {
-        (ctx._handlers[name] = ctx._handlers[name] || []).push(fn);
+        ctx._handlers[name] ??= [];
+        ctx._handlers[name].push(fn);
         return ctx;
       },
       idle() {
@@ -496,12 +582,14 @@
     S.starts++;
     S.t = 0;
     S.last = 0;
-    const params = S.ctx ? S.ctx.params : Object.fromEntries((S.def.controls || []).filter((c) => c.type !== "button").map((c) => [c.id, defaultOf(c)]));
+    const params = S.ctx
+      ? S.ctx.params
+      : Object.fromEntries((S.def.controls || []).filter((c) => c.type !== "button").map((c) => [c.id, defaultOf(c)]));
     S.ctx = makeCtx(params);
     S.el.svg.innerHTML = "";
     S.el.readout.textContent = "";
-    if (S.el.stats) S.el.stats.querySelectorAll("[data-stat]").forEach((node) => (node.textContent = "—"));
-    S.el.plate.querySelectorAll(".cr-error").forEach((node) => node.remove());
+    if (S.el.stats) for (const node of S.el.stats.querySelectorAll("[data-stat]")) node.textContent = "—";
+    for (const node of S.el.plate.querySelectorAll(".cr-error")) node.remove();
     if (S.starts === 1) buildControls(S.ctx);
     let api;
     try {
@@ -522,7 +610,7 @@
   function restart() {
     stop();
     try {
-      S.api && S.api.dispose && S.api.dispose();
+      S.api?.dispose?.();
     } catch {}
     S.api = null;
     start();
@@ -583,5 +671,13 @@
     });
   }
 
-  globalThis.Classroom = { demo, version: 1, options: OPTS, restart, setPlaying, setTheme, set: (id, value) => setValue(id, value, "user") };
+  globalThis.Classroom = {
+    demo,
+    version: 1,
+    options: OPTS,
+    restart,
+    setPlaying,
+    setTheme,
+    set: (id, value) => setValue(id, value, "user"),
+  };
 })();

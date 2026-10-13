@@ -9,7 +9,8 @@ export interface Box {
   h: number;
 }
 
-const overlaps = (a: Box, b: Box, pad = 1.5) => a.x < b.x + b.w + pad && b.x < a.x + a.w + pad && a.y < b.y + b.h + pad && b.y < a.y + a.h + pad;
+const overlaps = (a: Box, b: Box, pad = 1.5) =>
+  a.x < b.x + b.w + pad && b.x < a.x + a.w + pad && a.y < b.y + b.h + pad && b.y < a.y + a.h + pad;
 
 export class Labels {
   boxes: Box[] = [];
@@ -29,19 +30,46 @@ export class Labels {
    * Places a text label near (x, y). Candidates are [dx, dy, anchor] offsets for the text's
    * baseline point. Returns the chosen point and anchor (the last candidate when none is free).
    */
-  place(x: number, y: number, label: string, size: number, candidates: [number, number, "start" | "middle" | "end"][], mono = false): { x: number; y: number; anchor: "start" | "middle" | "end" } {
+  place(
+    x: number,
+    y: number,
+    label: string,
+    size: number,
+    candidates: [number, number, "start" | "middle" | "end"][],
+    mono = false,
+  ): { x: number; y: number; anchor: "start" | "middle" | "end" } {
     return this.tryPlace(x, y, label, size, candidates, mono, false)!;
   }
 
   /** Like place(), but gives up (null) when every spot is taken. */
-  placeOptional(x: number, y: number, label: string, size: number, candidates: [number, number, "start" | "middle" | "end"][], mono = false) {
+  placeOptional(
+    x: number,
+    y: number,
+    label: string,
+    size: number,
+    candidates: [number, number, "start" | "middle" | "end"][],
+    mono = false,
+  ) {
     return this.tryPlace(x, y, label, size, candidates, mono, true);
   }
 
-  private tryPlace(x: number, y: number, label: string, size: number, candidates: [number, number, "start" | "middle" | "end"][], mono: boolean, optional: boolean): { x: number; y: number; anchor: "start" | "middle" | "end" } | null {
+  private tryPlace(
+    x: number,
+    y: number,
+    label: string,
+    size: number,
+    candidates: [number, number, "start" | "middle" | "end"][],
+    mono: boolean,
+    optional: boolean,
+  ): { x: number; y: number; anchor: "start" | "middle" | "end" } | null {
     const w = textWidth(label, size, mono) + 2;
     const h = size * 1.05;
-    const boxOf = (px: number, py: number, anchor: string): Box => ({ x: anchor === "start" ? px : anchor === "end" ? px - w : px - w / 2, y: py - size * 0.82, w, h });
+    const boxOf = (px: number, py: number, anchor: string): Box => ({
+      x: anchor === "start" ? px : anchor === "end" ? px - w : px - w / 2,
+      y: py - size * 0.82,
+      w,
+      h,
+    });
     for (const [dx, dy, anchor] of candidates) {
       const box = boxOf(x + dx, y + dy, anchor);
       if (this.free(box)) {

@@ -6,7 +6,7 @@
  * a book (its title, folder, or "library/<folder>/source.pdf#page=12"), or figure:<id>. */
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { linksInValue, linkKey, pageOf, parseWikiLinks, rewriteLinks, type WikiLink } from "../../shared/links.ts";
+import { linkKey, linksInValue, pageOf, parseWikiLinks, rewriteLinks, type WikiLink } from "../../shared/links.ts";
 import type { Annotation, Concept, Note } from "../../shared/vault-types.ts";
 import { bookFolder, listBooks } from "../store.ts";
 import type { Book } from "../types.ts";
@@ -54,10 +54,37 @@ export function invalidateLinks() {
 }
 onVaultChange(() => invalidateLinks());
 
-const noteNode = (n: Note): Resolved => ({ node: `note:${n.id}`, kind: "note", id: n.id, path: n.path, title: n.title });
-const conceptNode = (c: Concept & { path?: string }): Resolved => ({ node: `concept:${c.id}`, kind: "concept", id: c.id, path: c.path || concepts.fileOf(c.id) || undefined, title: c.name });
-const bookNode = (b: Book): Resolved => ({ node: `book:${b.id}`, kind: "book", id: b.id, path: `library/${bookFolder(b.id)}/README.md`, title: b.title, bookId: b.id });
-const annotationNode = (a: Annotation): Resolved => ({ node: `annotation:${a.id}`, kind: "annotation", id: a.id, path: a.path, title: a.title || `${a.kind}: ${a.anchor.quote.split(/\s+/).slice(0, 8).join(" ")}…`, bookId: a.bookId, page: a.anchor.page });
+const noteNode = (n: Note): Resolved => ({
+  node: `note:${n.id}`,
+  kind: "note",
+  id: n.id,
+  path: n.path,
+  title: n.title,
+});
+const conceptNode = (c: Concept & { path?: string }): Resolved => ({
+  node: `concept:${c.id}`,
+  kind: "concept",
+  id: c.id,
+  path: c.path || concepts.fileOf(c.id) || undefined,
+  title: c.name,
+});
+const bookNode = (b: Book): Resolved => ({
+  node: `book:${b.id}`,
+  kind: "book",
+  id: b.id,
+  path: `library/${bookFolder(b.id)}/README.md`,
+  title: b.title,
+  bookId: b.id,
+});
+const annotationNode = (a: Annotation): Resolved => ({
+  node: `annotation:${a.id}`,
+  kind: "annotation",
+  id: a.id,
+  path: a.path,
+  title: a.title || `${a.kind}: ${a.anchor.quote.split(/\s+/).slice(0, 8).join(" ")}…`,
+  bookId: a.bookId,
+  page: a.anchor.page,
+});
 
 function buildNames(): Names {
   const byKey = new Map<string, Resolved[]>();
@@ -115,11 +142,15 @@ export function resolveLink(target: string, sub?: string): Resolved | null {
   if (/^figure:/i.test(t)) {
     const id = t.slice(7).trim();
     const f = figures.get(id);
-    return f ? { node: `figure:${id}`, kind: "figure", id, path: figures.fileOf(id) || undefined, title: f.title } : null;
+    return f
+      ? { node: `figure:${id}`, kind: "figure", id, path: figures.fileOf(id) || undefined, title: f.title }
+      : null;
   }
   if (/\.(png|jpe?g|gif|webp|svg)$/i.test(t)) {
     const path = t.includes("/") ? t : `attachments/${t}`;
-    return existsSync(join(VAULT, path)) ? { node: `attachment:${path}`, kind: "attachment", id: path, path, title: basename(path) } : null;
+    return existsSync(join(VAULT, path))
+      ? { node: `attachment:${path}`, kind: "attachment", id: path, path, title: basename(path) }
+      : null;
   }
   names ||= buildNames();
   let found = names.byKey.get(linkKey(t))?.[0];
@@ -141,15 +172,33 @@ export function resolveLink(target: string, sub?: string): Resolved | null {
 /** Everything a [[ can complete to, for the editor. */
 export function linkTargets(): { title: string; kind: NodeKind; path?: string; detail?: string }[] {
   const out: { title: string; kind: NodeKind; path?: string; detail?: string }[] = [];
-  for (const n of notes.list()) out.push({ title: n.title, kind: "note", path: n.path, detail: n.path.split("/").slice(1, -1).join("/") || undefined });
-  for (const c of concepts.list()) out.push({ title: c.name, kind: "concept", path: concepts.fileOf(c.id) || undefined, detail: c.summary.slice(0, 80) });
-  for (const b of listBooks().filter((x) => x.status === "ready")) out.push({ title: b.title, kind: "book", path: `library/${bookFolder(b.id)}`, detail: b.author });
+  for (const n of notes.list())
+    out.push({
+      title: n.title,
+      kind: "note",
+      path: n.path,
+      detail: n.path.split("/").slice(1, -1).join("/") || undefined,
+    });
+  for (const c of concepts.list())
+    out.push({
+      title: c.name,
+      kind: "concept",
+      path: concepts.fileOf(c.id) || undefined,
+      detail: c.summary.slice(0, 80),
+    });
+  for (const b of listBooks().filter((x) => x.status === "ready"))
+    out.push({ title: b.title, kind: "book", path: `library/${bookFolder(b.id)}`, detail: b.author });
   return out;
 }
 
 /* ---------------- the edges ---------------- */
 
-function linkEdges(from: string, fromPath: string, text: string, kindOf: (l: WikiLink) => Edge["kind"] = (l) => (l.embed ? "embed" : "link")): Edge[] {
+function linkEdges(
+  from: string,
+  fromPath: string,
+  text: string,
+  kindOf: (l: WikiLink) => Edge["kind"] = (l) => (l.embed ? "embed" : "link"),
+): Edge[] {
   return parseWikiLinks(text).map((l) => {
     const r = resolveLink(l.target, l.sub);
     return { from, fromPath, to: r?.node ?? null, toPath: r?.path, target: l.target, kind: kindOf(l), line: l.line };
@@ -159,7 +208,11 @@ function linkEdges(from: string, fromPath: string, text: string, kindOf: (l: Wik
 export function allEdges(): Edge[] {
   if (edgesCache) return edgesCache;
   const edges: Edge[] = [];
-  const accepted = new Set(listConnections().filter((c) => c.status === "accepted").map((c) => `${c.from}\u0000${linkKey(c.to)}`));
+  const accepted = new Set(
+    listConnections()
+      .filter((c) => c.status === "accepted")
+      .map((c) => `${c.from}\u0000${linkKey(c.to)}`),
+  );
   for (const n of notes.list()) {
     const from = `note:${n.id}`;
     // the body starts after the frontmatter: count its lines so line numbers point into the file
@@ -167,13 +220,38 @@ export function allEdges(): Edge[] {
     for (const e of linkEdges(from, n.path, n.body)) edges.push({ ...e, line: e.line + offset });
     for (const target of linksInValue(n.related)) {
       const r = resolveLink(target);
-      edges.push({ from, fromPath: n.path, to: r?.node ?? null, toPath: r?.path, target, kind: accepted.has(`${n.path}\u0000${linkKey(target)}`) ? "ai" : "related", line: 1 });
+      edges.push({
+        from,
+        fromPath: n.path,
+        to: r?.node ?? null,
+        toPath: r?.path,
+        target,
+        kind: accepted.has(`${n.path}\u0000${linkKey(target)}`) ? "ai" : "related",
+        line: 1,
+      });
     }
     for (const c of n.concepts) {
       const concept = concepts.get(c);
-      if (concept) edges.push({ from, fromPath: n.path, to: `concept:${concept.id}`, toPath: concepts.fileOf(concept.id) || undefined, target: c, kind: "mentions", line: 1 });
+      if (concept)
+        edges.push({
+          from,
+          fromPath: n.path,
+          to: `concept:${concept.id}`,
+          toPath: concepts.fileOf(concept.id) || undefined,
+          target: c,
+          kind: "mentions",
+          line: 1,
+        });
     }
-    if (n.source?.bookId && !edges.some((e) => e.from === from && e.to === `book:${n.source!.bookId}`)) edges.push({ from, fromPath: n.path, to: `book:${n.source.bookId}`, target: n.source.bookId, kind: "source", line: 1 });
+    if (n.source?.bookId && !edges.some((e) => e.from === from && e.to === `book:${n.source!.bookId}`))
+      edges.push({
+        from,
+        fromPath: n.path,
+        to: `book:${n.source.bookId}`,
+        target: n.source.bookId,
+        kind: "source",
+        line: 1,
+      });
   }
   for (const c of concepts.list()) {
     const from = `concept:${c.id}`;
@@ -181,20 +259,26 @@ export function allEdges(): Edge[] {
     edges.push(...linkEdges(from, path, c.body));
     for (const id of c.related) {
       const r = concepts.get(id) ? conceptNode(concepts.get(id)!) : resolveLink(id);
-      if (r && r.node !== from) edges.push({ from, fromPath: path, to: r.node, toPath: r.path, target: id, kind: "concept", line: 1 });
+      if (r && r.node !== from)
+        edges.push({ from, fromPath: path, to: r.node, toPath: r.path, target: id, kind: "concept", line: 1 });
     }
-    for (const book of new Set(c.sources.map((s) => s.bookId))) edges.push({ from, fromPath: path, to: `book:${book}`, target: book, kind: "source", line: 1 });
+    for (const book of new Set(c.sources.map((s) => s.bookId)))
+      edges.push({ from, fromPath: path, to: `book:${book}`, target: book, kind: "source", line: 1 });
   }
   for (const a of annotations.list()) {
     const from = `annotation:${a.id}`;
     edges.push(...linkEdges(from, a.path, a.body));
-    if (a.bookId) edges.push({ from, fromPath: a.path, to: `book:${a.bookId}`, target: a.bookId, kind: "source", line: 1 });
+    if (a.bookId)
+      edges.push({ from, fromPath: a.path, to: `book:${a.bookId}`, target: a.bookId, kind: "source", line: 1 });
   }
   const seen = new Set<string>();
-  return (edgesCache = edges.filter((e) => {
+  edgesCache = edges.filter((e) => {
     const key = `${e.from}|${e.to ?? `?${e.target}`}|${e.kind}|${e.line}`;
-    return seen.has(key) ? false : (seen.add(key), true);
-  }));
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return edgesCache;
 }
 
 /** Lines taken by a file's frontmatter (and the blank lines after it), so body lines map to file lines. */
@@ -208,7 +292,9 @@ function frontmatterLines(rel: string): number {
 }
 
 /** Links into a node, each with the line it sits on (for the backlinks panel). */
-export function backlinks(node: string): { from: string; path: string; title: string; kind: Edge["kind"]; line: number; context: string }[] {
+export function backlinks(
+  node: string,
+): { from: string; path: string; title: string; kind: Edge["kind"]; line: number; context: string }[] {
   const out: { from: string; path: string; title: string; kind: Edge["kind"]; line: number; context: string }[] = [];
   const files = new Map<string, string[]>();
   for (const e of allEdges()) {
@@ -221,7 +307,14 @@ export function backlinks(node: string): { from: string; path: string; title: st
       }
     }
     const lines = files.get(e.fromPath)!;
-    out.push({ from: e.from, path: e.fromPath, title: titleOf(e.from, e.fromPath), kind: e.kind, line: e.line, context: (lines[e.line - 1] || "").trim().slice(0, 240) });
+    out.push({
+      from: e.from,
+      path: e.fromPath,
+      title: titleOf(e.from, e.fromPath),
+      kind: e.kind,
+      line: e.line,
+      context: (lines[e.line - 1] || "").trim().slice(0, 240),
+    });
   }
   return out;
 }
@@ -242,8 +335,15 @@ export function titleOf(node: string, path?: string): string {
 export function unlinkedMentions(note: Note): { path: string; title: string; context: string }[] {
   const names_ = [note.title, ...note.aliases].filter((n) => n.length >= 3);
   if (!names_.length) return [];
-  const pattern = new RegExp(`(^|[^\\p{L}\\p{N}\\[|])(${names_.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?=$|[^\\p{L}\\p{N}\\]|])`, "iu");
-  const linked = new Set(allEdges().filter((e) => e.to === `note:${note.id}`).map((e) => e.fromPath));
+  const pattern = new RegExp(
+    `(^|[^\\p{L}\\p{N}\\[|])(${names_.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?=$|[^\\p{L}\\p{N}\\]|])`,
+    "iu",
+  );
+  const linked = new Set(
+    allEdges()
+      .filter((e) => e.to === `note:${note.id}`)
+      .map((e) => e.fromPath),
+  );
   const out: { path: string; title: string; context: string }[] = [];
   for (const other of notes.list()) {
     if (other.id === note.id || linked.has(other.path)) continue;
@@ -262,7 +362,8 @@ export function unlinkedMentions(note: Note): { path: string; title: string; con
  */
 export function carryLinks(oldKeys: string[], next: { name: string; path: string }): number {
   const keys = new Set(oldKeys.map(linkKey));
-  const rename = (target: string) => (keys.has(linkKey(target)) ? (target.includes("/") ? next.path.replace(/\.md$/, "") : next.name) : null);
+  const rename = (target: string) =>
+    keys.has(linkKey(target)) ? (target.includes("/") ? next.path.replace(/\.md$/, "") : next.name) : null;
   let count = 0;
   for (const n of notes.list()) {
     const body = rewriteLinks(n.body, rename);

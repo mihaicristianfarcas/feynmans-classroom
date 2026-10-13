@@ -122,19 +122,49 @@ export function meshOf(part: Part): Mesh {
     case "cylinder": {
       const r = g(0, 0.5),
         h = g(1, 1);
-      return revolve([[0, -h / 2], [r, -h / 2], [r, h / 2], [0, h / 2]], 32, false, true);
+      return revolve(
+        [
+          [0, -h / 2],
+          [r, -h / 2],
+          [r, h / 2],
+          [0, h / 2],
+        ],
+        32,
+        false,
+        true,
+      );
     }
     case "cone": {
       const r = g(0, 0.5),
         h = g(1, 1),
         top = Math.max(0, s[2] || 0);
-      return revolve([[0, -h / 2], [r, -h / 2], [top, h / 2], [0, h / 2]], 32, false, true);
+      return revolve(
+        [
+          [0, -h / 2],
+          [r, -h / 2],
+          [top, h / 2],
+          [0, h / 2],
+        ],
+        32,
+        false,
+        true,
+      );
     }
     case "prism": {
       const r = g(0, 0.5),
         h = g(1, 1),
         sides = Math.max(3, Math.min(12, Math.round(s[2] || 6)));
-      return revolve([[0, -h / 2], [r, -h / 2], [r, h / 2], [0, h / 2]], sides, false, true);
+      return revolve(
+        [
+          [0, -h / 2],
+          [r, -h / 2],
+          [r, h / 2],
+          [0, h / 2],
+        ],
+        sides,
+        false,
+        true,
+      );
     }
     case "sphere": {
       const r = g(0, 0.5);
@@ -155,7 +185,17 @@ export function meshOf(part: Part): Mesh {
       const r = g(0, 0.5),
         h = g(1, 1),
         wall = Math.min(g(2, r * 0.2), r * 0.95);
-      return revolve([[r - wall, -h / 2], [r, -h / 2], [r, h / 2], [r - wall, h / 2]], 32, true, false);
+      return revolve(
+        [
+          [r - wall, -h / 2],
+          [r, -h / 2],
+          [r, h / 2],
+          [r - wall, h / 2],
+        ],
+        32,
+        true,
+        false,
+      );
     }
   }
   return box(1, 1, 1);
@@ -173,9 +213,9 @@ function rotation(rx: number, ry: number, rz: number): (p: V3) => V3 {
     sc = Math.sin(c);
   return ([x, y, z]) => {
     // about x, then y, then z
-    let y1 = y * ca - z * sa,
+    const y1 = y * ca - z * sa,
       z1 = y * sa + z * ca;
-    let x2 = x * cb + z1 * sb,
+    const x2 = x * cb + z1 * sb,
       z2 = -x * sb + z1 * cb;
     return [x2 * cc - y1 * sc, x2 * sc + y1 * cc, z2];
   };
@@ -204,7 +244,11 @@ interface Placed {
 }
 
 function place(part: Part, mesh: Mesh, scope: FrameState["scope"], explode: number): Placed {
-  const rot = rotation(evalNum(part.rotation[0], scope, 0), evalNum(part.rotation[1], scope, 0), evalNum(part.rotation[2], scope, 0));
+  const rot = rotation(
+    evalNum(part.rotation[0], scope, 0),
+    evalNum(part.rotation[1], scope, 0),
+    evalNum(part.rotation[2], scope, 0),
+  );
   const pos: V3 = [0, 1, 2].map((i) => evalNum(part.position[i], scope, 0) + part.explode[i] * explode) as V3;
   const world = mesh.v.map((p) => {
     const q = rot(p);
@@ -225,9 +269,15 @@ function paintOrder(parts: Placed[], cam: Camera, screen: (p: V3) => Pt): Placed
   const depth = (p: Placed) => dot3(p.center, cam.D);
   const boxes = parts.map((p) => {
     const corners: V3[] = [];
-    for (let i = 0; i < 8; i++) corners.push([i & 1 ? p.max[0] : p.min[0], i & 2 ? p.max[1] : p.min[1], i & 4 ? p.max[2] : p.min[2]]);
+    for (let i = 0; i < 8; i++)
+      corners.push([i & 1 ? p.max[0] : p.min[0], i & 2 ? p.max[1] : p.min[1], i & 4 ? p.max[2] : p.min[2]]);
     const s = corners.map(screen);
-    return { x0: Math.min(...s.map((q) => q[0])), x1: Math.max(...s.map((q) => q[0])), y0: Math.min(...s.map((q) => q[1])), y1: Math.max(...s.map((q) => q[1])) };
+    return {
+      x0: Math.min(...s.map((q) => q[0])),
+      x1: Math.max(...s.map((q) => q[0])),
+      y0: Math.min(...s.map((q) => q[1])),
+      y1: Math.max(...s.map((q) => q[1])),
+    };
   });
   const n = parts.length;
   const after = parts.map(() => [] as number[]);
@@ -290,7 +340,8 @@ const BRIGHT: Partial<Record<Tone, number>> = { hi: 0, mid: -0.08, lo: -0.2, fai
 
 export function renderObject3D(spec: Object3DScene, state: FrameState, memo: Record<string, unknown>): RenderOut {
   const { scope, vis, focus } = state;
-  const meshes = (memo.meshes as Map<string, Mesh>) || (memo.meshes = new Map(spec.parts.map((p) => [p.id, meshOf(p)])));
+  memo.meshes ??= new Map(spec.parts.map((p) => [p.id, meshOf(p)]));
+  const meshes = memo.meshes as Map<string, Mesh>;
   const cam = camera(state.view.azimuth, state.view.elevation);
   const explode = spec.explodable ? Math.max(0, Math.min(1, evalNum("explode", scope, 0))) : 0;
   const cut = !!evalNum("cutaway", scope, 0);
@@ -302,14 +353,19 @@ export function renderObject3D(spec: Object3DScene, state: FrameState, memo: Rec
       const all = spec.parts.map((p) => place(p, meshes.get(p.id)!, scope, amount));
       const min = [0, 1, 2].map((i) => Math.min(...all.map((a) => a.min[i])));
       const max = [0, 1, 2].map((i) => Math.max(...all.map((a) => a.max[i])));
-      return { center: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2] as V3, radius: Math.max(1e-3, Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2) };
+      return {
+        center: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2] as V3,
+        radius: Math.max(1e-3, Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2),
+      };
     };
     const rest = bounds(0);
     memo.frame = { rest, apart: spec.explodable ? bounds(1) : rest };
   }
   const frame = memo.frame as { rest: { center: V3; radius: number }; apart: { center: V3; radius: number } };
   const k = explode * explode * (3 - 2 * explode);
-  const center: V3 = [0, 1, 2].map((i) => frame.rest.center[i] + (frame.apart.center[i] - frame.rest.center[i]) * k) as V3;
+  const center: V3 = [0, 1, 2].map(
+    (i) => frame.rest.center[i] + (frame.apart.center[i] - frame.rest.center[i]) * k,
+  ) as V3;
   const radius = frame.rest.radius + (frame.apart.radius - frame.rest.radius) * k;
   const labelRoom = spec.labels ? 0.84 : 1;
   const scale = ((HEIGHT * 0.47) / radius) * labelRoom * Math.max(0.2, state.view.zoom || 1);
@@ -329,7 +385,11 @@ export function renderObject3D(spec: Object3DScene, state: FrameState, memo: Rec
     placed.push(place(part, meshes.get(part.id)!, scope, explode));
   }
 
-  const L = norm([-0.45 * cam.R[0] + 0.8 * cam.U[0] + 0.55 * cam.D[0], -0.45 * cam.R[1] + 0.8 * cam.U[1] + 0.55 * cam.D[1], -0.45 * cam.R[2] + 0.8 * cam.U[2] + 0.55 * cam.D[2]]);
+  const L = norm([
+    -0.45 * cam.R[0] + 0.8 * cam.U[0] + 0.55 * cam.D[0],
+    -0.45 * cam.R[1] + 0.8 * cam.U[1] + 0.55 * cam.D[1],
+    -0.45 * cam.R[2] + 0.8 * cam.U[2] + 0.55 * cam.D[2],
+  ]);
   const out: string[] = [];
 
   // the halo: a soft shadow under the lowest point of what is drawn
@@ -347,7 +407,9 @@ export function renderObject3D(spec: Object3DScene, state: FrameState, memo: Rec
     const hx = (Math.min(...s.map((p) => p[0])) + Math.max(...s.map((p) => p[0]))) / 2;
     const hy = Math.max(...s.map((p) => p[1]));
     const hw = (Math.max(...s.map((p) => p[0])) - Math.min(...s.map((p) => p[0]))) * 0.42;
-    out.push(`<ellipse class="sc-halo" cx="${r1(hx)}" cy="${r1(hy - 2)}" rx="${r1(Math.max(10, hw))}" ry="${r1(Math.max(4, hw * 0.14))}"/>`);
+    out.push(
+      `<ellipse class="sc-halo" cx="${r1(hx)}" cy="${r1(hy - 2)}" rx="${r1(Math.max(10, hw))}" ry="${r1(Math.max(4, hw * 0.14))}"/>`,
+    );
   }
 
   for (const p of paintOrder(placed, cam, screen)) {
@@ -355,7 +417,8 @@ export function renderObject3D(spec: Object3DScene, state: FrameState, memo: Rec
     const proj = world.map(screen);
     const normals = mesh.f.map((face) => faceNormal(world, face));
     const front = normals.map((nrm) => dot3(nrm, cam.D) > 1e-4);
-    const lit = focus.has(part.id) || (!!part.group && focus.has(part.group)) || state.hover === part.id || part.tone === "lit";
+    const lit =
+      focus.has(part.id) || (!!part.group && focus.has(part.group)) || state.hover === part.id || part.tone === "lit";
     const tone: Tone = lit ? "lit" : part.tone;
     const lift = BRIGHT[tone] ?? -0.04;
     // features: silhouettes (one face front, one back), creases (sharp angle), open boundaries
@@ -372,7 +435,7 @@ export function renderObject3D(spec: Object3DScene, state: FrameState, memo: Rec
         feature.set(owner, list);
       }
     }
-    let faces = mesh.f.map((face, i) => i).filter((i) => front[i]);
+    const faces = mesh.f.map((_, i) => i).filter((i) => front[i]);
     if (!mesh.convex) faces.sort((a, b) => avgDepth(world, mesh.f[a], cam) - avgDepth(world, mesh.f[b], cam));
     const parts: string[] = [];
     for (const i of faces) {
@@ -385,14 +448,21 @@ export function renderObject3D(spec: Object3DScene, state: FrameState, memo: Rec
       const d = `M${mesh.f[i].map((vi) => `${r1(proj[vi][0])} ${r1(proj[vi][1])}`).join("L")}Z`;
       parts.push(`<path d="${d}" class="sc-face" data-tone="${tone}" style="--b:${k}%"/>`);
       const edges = feature.get(i);
-      if (edges) parts.push(`<path d="${edges.map(([a, c]) => `M${r1(proj[a][0])} ${r1(proj[a][1])}L${r1(proj[c][0])} ${r1(proj[c][1])}`).join("")}" class="sc-edge" data-tone="${tone}"/>`);
+      if (edges)
+        parts.push(
+          `<path d="${edges.map(([a, c]) => `M${r1(proj[a][0])} ${r1(proj[a][1])}L${r1(proj[c][0])} ${r1(proj[c][1])}`).join("")}" class="sc-edge" data-tone="${tone}"/>`,
+        );
     }
     const o = vis(part.id) * (part.group ? vis(part.group) : 1);
-    out.push(`<g data-id="${part.id}"${o < 0.999 ? ` style="opacity:${r1(o * 100) / 100}"` : ""}>${parts.join("")}</g>`);
+    out.push(
+      `<g data-id="${part.id}"${o < 0.999 ? ` style="opacity:${r1(o * 100) / 100}"` : ""}>${parts.join("")}</g>`,
+    );
   }
 
   /* labels with leader lines, in two columns beside the object */
-  const wantLabels = spec.labels ? placed.filter((p) => p.part.label) : placed.filter((p) => p.part.label && (state.hover === p.part.id || focus.has(p.part.id)));
+  const wantLabels = spec.labels
+    ? placed.filter((p) => p.part.label)
+    : placed.filter((p) => p.part.label && (state.hover === p.part.id || focus.has(p.part.id)));
   if (wantLabels.length) {
     let x0 = Infinity,
       x1 = -Infinity;
@@ -403,12 +473,24 @@ export function renderObject3D(spec: Object3DScene, state: FrameState, memo: Rec
         x1 = Math.max(x1, q[0]);
       }
     // at most nine names: the watched and main parts first, then the biggest
-    const rank = (p: Placed) => (focus.has(p.part.id) || state.hover === p.part.id ? 0 : p.part.tone === "lit" ? 1 : p.part.tone === "hi" ? 2 : 3) * 1e9 - (p.max[0] - p.min[0]) * (p.max[1] - p.min[1]) * (p.max[2] - p.min[2]);
-    const items = [...wantLabels].sort((a, b) => rank(a) - rank(b)).slice(0, 9).map((p) => ({ p, at: screen(p.center), label: p.part.label }));
+    const rank = (p: Placed) =>
+      (focus.has(p.part.id) || state.hover === p.part.id
+        ? 0
+        : p.part.tone === "lit"
+          ? 1
+          : p.part.tone === "hi"
+            ? 2
+            : 3) *
+        1e9 -
+      (p.max[0] - p.min[0]) * (p.max[1] - p.min[1]) * (p.max[2] - p.min[2]);
+    const items = [...wantLabels]
+      .sort((a, b) => rank(a) - rank(b))
+      .slice(0, 9)
+      .map((p) => ({ p, at: screen(p.center), label: p.part.label }));
     // split by screen x, then even the sides out
     items.sort((a, b) => a.at[0] - b.at[0]);
     const mid = (x0 + x1) / 2;
-    let left = items.filter((i) => i.at[0] < mid),
+    const left = items.filter((i) => i.at[0] < mid),
       right = items.filter((i) => i.at[0] >= mid);
     while (left.length > right.length + 1) right.unshift(left.pop()!);
     while (right.length > left.length + 1) left.push(right.shift()!);
@@ -431,8 +513,20 @@ export function renderObject3D(spec: Object3DScene, state: FrameState, memo: Rec
         const y = ys[k];
         const lit = state.hover === i.p.part.id || focus.has(i.p.part.id);
         const end: Pt = [x + side * -4, y - 4];
-        out.push(line([end, i.at], { tone: lit ? "lit" : "lo" }) + circle(i.at[0], i.at[1], 1.8, "solid", { tone: lit ? "lit" : "mid" }));
-        out.push(text(x, y, i.label, { size: 11, anchor: side < 0 ? "end" : "start", tone: lit ? "lit" : "mid", id: i.p.part.id, halo: true, italic: false }));
+        out.push(
+          line([end, i.at], { tone: lit ? "lit" : "lo" }) +
+            circle(i.at[0], i.at[1], 1.8, "solid", { tone: lit ? "lit" : "mid" }),
+        );
+        out.push(
+          text(x, y, i.label, {
+            size: 11,
+            anchor: side < 0 ? "end" : "start",
+            tone: lit ? "lit" : "mid",
+            id: i.p.part.id,
+            halo: true,
+            italic: false,
+          }),
+        );
       });
     };
     if (left.length) column(left, -1);

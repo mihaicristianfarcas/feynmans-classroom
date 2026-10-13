@@ -40,7 +40,11 @@ describe.skipIf(!hasCodex)("an agent's shell under the Codex profile", () => {
   writeFileSync(join(folder, "note.md"), "hello\n");
   const run = (command: string, write = true) => {
     const flags = codexProfile({ cwd: folder, write }).flatMap((c) => ["-c", c]);
-    return spawnSync(process.env.CODEX_BIN || "codex", ["sandbox", ...flags, "--", "sh", "-c", command], { cwd: folder, encoding: "utf8", timeout: 30000 });
+    return spawnSync(process.env.CODEX_BIN || "codex", ["sandbox", ...flags, "--", "sh", "-c", command], {
+      cwd: folder,
+      encoding: "utf8",
+      timeout: 30000,
+    });
   };
   it("can read and write its own folder", () => {
     const r = run("cat note.md && echo ok > written.md && cat written.md");

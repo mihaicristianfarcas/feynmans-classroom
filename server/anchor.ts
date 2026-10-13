@@ -14,7 +14,12 @@ interface Hit {
 }
 
 /** Finds where a quote sits in a PDF: the page and the top of the line it starts on. */
-export function locateInPages(pages: PageText[], quote: string, range?: { from: number; to: number; fromY?: number; toY?: number }, hintPage?: number): Hit | null {
+export function locateInPages(
+  pages: PageText[],
+  quote: string,
+  range?: { from: number; to: number; fromY?: number; toY?: number },
+  hintPage?: number,
+): Hit | null {
   const needle = squash(quote);
   if (needle.length < 6) return null;
   const from = Math.max(1, range?.from ?? 1);
@@ -117,6 +122,12 @@ function fuzzyFind(hay: string, needle: string): { index: number; score: number 
 
 /** Where a chapter starts and ends, as page or block ranges. */
 export function chapterRange(entry: TocEntry) {
-  if (entry.start.page !== undefined) return { from: entry.start.page, to: Math.max(entry.start.page, entry.end.page ?? entry.start.page), fromY: entry.start.y, toY: entry.end.y };
+  if (entry.start.page !== undefined)
+    return {
+      from: entry.start.page,
+      to: Math.max(entry.start.page, entry.end.page ?? entry.start.page),
+      fromY: entry.start.y,
+      toY: entry.end.y,
+    };
   return { from: entry.start.block ?? 0, to: entry.end.block ?? (entry.start.block ?? 0) + 1 };
 }

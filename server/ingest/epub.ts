@@ -31,7 +31,9 @@ function inflate(file: JSZip.JSZipObject, budget: { left: number }): Promise<Buf
     const chunks: Uint8Array[] = [];
     let size = 0;
     // JSZip's streaming reader (present at runtime, missing from its type definitions)
-    const stream = (file as unknown as { internalStream(type: "uint8array"): InflateStream }).internalStream("uint8array");
+    const stream = (file as unknown as { internalStream(type: "uint8array"): InflateStream }).internalStream(
+      "uint8array",
+    );
     stream
       .on("data", (chunk: Uint8Array) => {
         size += chunk.length;
@@ -49,12 +51,20 @@ function inflate(file: JSZip.JSZipObject, budget: { left: number }): Promise<Buf
   });
 }
 
-export async function ingestEpub(path: string, assetsDir: string, assetUrl: (name: string) => string): Promise<ReflowIngest> {
+export async function ingestEpub(
+  path: string,
+  assetsDir: string,
+  assetUrl: (name: string) => string,
+): Promise<ReflowIngest> {
   const zip = await JSZip.loadAsync(readFileSync(path));
   // a small archive can unpack into gigabytes: refuse before inflating anything
   const entries = Object.values(zip.files);
-  const inflated = entries.reduce((sum, f) => sum + (((f as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize) || 0), 0);
-  if (entries.length > 20000 || inflated > 600 * 1024 * 1024) throw new Error("this EPUB unpacks to more than 600 MB or 20,000 files");
+  const inflated = entries.reduce(
+    (sum, f) => sum + ((f as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize || 0),
+    0,
+  );
+  if (entries.length > 20000 || inflated > 600 * 1024 * 1024)
+    throw new Error("this EPUB unpacks to more than 600 MB or 20,000 files");
   const budget = { left: TOTAL_LIMIT };
   const read = async (name: string) => {
     const file = zip.file(decodeURIComponent(name)) || zip.file(name);
@@ -73,7 +83,11 @@ export async function ingestEpub(path: string, assetsDir: string, assetUrl: (nam
 
   const manifest = new Map<string, { href: string; type: string; props: string }>();
   for (const item of Array.from(opfDoc.querySelectorAll("item"))) {
-    manifest.set(item.getAttribute("id") || "", { href: at(item.getAttribute("href") || ""), type: item.getAttribute("media-type") || "", props: item.getAttribute("properties") || "" });
+    manifest.set(item.getAttribute("id") || "", {
+      href: at(item.getAttribute("href") || ""),
+      type: item.getAttribute("media-type") || "",
+      props: item.getAttribute("properties") || "",
+    });
   }
   const spine = Array.from(opfDoc.querySelectorAll("itemref"))
     .map((ref) => manifest.get(ref.getAttribute("idref") || ""))
@@ -113,13 +127,21 @@ export async function ingestEpub(path: string, assetsDir: string, assetUrl: (nam
   if (navItem) {
     const nav = (await read(navItem.href)) || "";
     const { document } = parseHTML(nav.replace(/<\?xml[^>]*>/, ""));
-    const toc = Array.from(document.querySelectorAll("nav")).find((n) => /toc/.test(n.getAttribute("epub:type") || n.getAttribute("type") || "toc")) || document.querySelector("nav");
+    const toc =
+      Array.from(document.querySelectorAll("nav")).find((n) =>
+        /toc/.test(n.getAttribute("epub:type") || n.getAttribute("type") || "toc"),
+      ) || document.querySelector("nav");
     const navDir = posix.dirname(navItem.href);
     const walk = (list: Element | null, depth: number) => {
       if (!list) return;
       for (const li of Array.from(list.children).filter((c) => c.tagName.toLowerCase() === "li")) {
         const a = li.querySelector("a");
-        if (a) points.push({ title: (a.textContent || "").replace(/\s+/g, " ").trim(), href: posix.normalize(`${navDir}/${a.getAttribute("href") || ""}`), depth });
+        if (a)
+          points.push({
+            title: (a.textContent || "").replace(/\s+/g, " ").trim(),
+            href: posix.normalize(`${navDir}/${a.getAttribute("href") || ""}`),
+            depth,
+          });
         walk(li.querySelector("ol, ul"), depth + 1);
       }
     };
@@ -143,7 +165,8 @@ export async function ingestEpub(path: string, assetsDir: string, assetUrl: (nam
   if (!blocks.some((b) => b.text.length > 0)) throw new Error("no readable text found in this EPUB");
   const resolve = (href: string) => anchors.get(href) ?? anchors.get(href.split("#")[0]);
   points = points.filter((p) => resolve(p.href) !== undefined && p.title);
-  const skip = /^(cover|title ?page|contents|table of contents|the full project gutenberg license|copyright|colophon)$/i;
+  const skip =
+    /^(cover|title ?page|contents|table of contents|the full project gutenberg license|copyright|colophon)$/i;
 
   const top = points.filter((p) => p.depth === Math.min(...points.map((q) => q.depth)));
   let toc: TocEntry[] = [];
@@ -151,10 +174,17 @@ export async function ingestEpub(path: string, assetsDir: string, assetUrl: (nam
   for (const point of chapterPoints) {
     if (skip.test(point.title)) continue;
     const block = resolve(point.href)!;
-    const entry: TocEntry = { id: "", title: point.title, start: { block }, end: { block: blocks.length }, sections: [] };
+    const entry: TocEntry = {
+      id: "",
+      title: point.title,
+      start: { block },
+      end: { block: blocks.length },
+      sections: [],
+    };
     const idx = points.indexOf(point);
     for (let j = idx + 1; j < points.length && points[j].depth > point.depth; j++) {
-      if (points[j].depth === point.depth + 1) entry.sections.push({ id: "", title: points[j].title, start: { block: resolve(points[j].href)! } });
+      if (points[j].depth === point.depth + 1)
+        entry.sections.push({ id: "", title: points[j].title, start: { block: resolve(points[j].href)! } });
     }
     toc.push(entry);
   }
@@ -170,11 +200,25 @@ export function headingToc(blocks: Block[]): TocEntry[] {
   const levels = ["h1", "h2", "h3"];
   for (const level of levels) {
     const heads = blocks.filter((b) => b.tag === level && b.text.length < 120);
-    if (heads.length >= 2) return heads.map((b) => ({ id: "", title: b.text, start: { block: b.id }, end: { block: blocks.length }, sections: [] }));
+    if (heads.length >= 2)
+      return heads.map((b) => ({
+        id: "",
+        title: b.text,
+        start: { block: b.id },
+        end: { block: blocks.length },
+        sections: [],
+      }));
   }
   const size = 60;
   const out: TocEntry[] = [];
-  for (let i = 0; i < blocks.length; i += size) out.push({ id: "", title: `Part ${out.length + 1}`, start: { block: i }, end: { block: Math.min(blocks.length, i + size) }, sections: [] });
+  for (let i = 0; i < blocks.length; i += size)
+    out.push({
+      id: "",
+      title: `Part ${out.length + 1}`,
+      start: { block: i },
+      end: { block: Math.min(blocks.length, i + size) },
+      sections: [],
+    });
   return out;
 }
 
@@ -185,14 +229,16 @@ export function finishBlockToc(toc: TocEntry[], blocks: Block[]) {
     if (generic.test(entry.title)) {
       // the real title is usually the next heading after "LECTURE II."
       const start = entry.start.block ?? 0;
-      const next = blocks.slice(start, start + 4).find((b) => /^h[1-6]$/.test(b.tag) && !generic.test(b.text.trim()) && b.text.length < 160);
+      const next = blocks
+        .slice(start, start + 4)
+        .find((b) => /^h[1-6]$/.test(b.tag) && !generic.test(b.text.trim()) && b.text.length < 160);
       if (next) entry.subtitle = titleCase(next.text.replace(/\.$/, ""));
     }
   }
   toc.forEach((entry, i) => {
     entry.id = `c${i + 1}`;
     entry.end = { block: toc[i + 1] ? toc[i + 1].start.block! : blocks.length };
-    entry.sections.forEach((s, j) => (s.id = `${entry.id}s${j + 1}`));
+    for (const [j, s] of entry.sections.entries()) s.id = `${entry.id}s${j + 1}`;
   });
   // tag every block with the chapter it falls in, so the reader can group them
   for (const block of blocks) {

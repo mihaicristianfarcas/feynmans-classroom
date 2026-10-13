@@ -103,14 +103,51 @@ export const FUNCTIONS: Record<string, (...args: number[]) => number> = {
 
 /** Functions that take any values (strings too). */
 const SPECIAL = new Set(["if", "pick", "fmt", "str"]);
-export const CONSTANTS: Record<string, number> = { pi: Math.PI, tau: Math.PI * 2, e: Math.E, inf: Infinity, PI: Math.PI };
-export const BUILTIN_NAMES = new Set([...Object.keys(FUNCTIONS), ...SPECIAL, ...Object.keys(CONSTANTS), "true", "false"]);
+export const CONSTANTS: Record<string, number> = {
+  pi: Math.PI,
+  tau: Math.PI * 2,
+  e: Math.E,
+  inf: Infinity,
+  PI: Math.PI,
+};
+export const BUILTIN_NAMES = new Set([
+  ...Object.keys(FUNCTIONS),
+  ...SPECIAL,
+  ...Object.keys(CONSTANTS),
+  "true",
+  "false",
+]);
 
 export class ExprError extends Error {}
 
 /* ---------- tokenizer ---------- */
 type Tok = { t: "num" | "str" | "id" | "op" | "end"; v: string; at: number };
-const OPS = ["**", "<=", ">=", "==", "!=", "&&", "||", "+", "-", "*", "/", "%", "^", "(", ")", ",", "<", ">", "!", "?", ":", "×", "·", "−"];
+const OPS = [
+  "**",
+  "<=",
+  ">=",
+  "==",
+  "!=",
+  "&&",
+  "||",
+  "+",
+  "-",
+  "*",
+  "/",
+  "%",
+  "^",
+  "(",
+  ")",
+  ",",
+  "<",
+  ">",
+  "!",
+  "?",
+  ":",
+  "×",
+  "·",
+  "−",
+];
 
 function tokenize(src: string): Tok[] {
   const out: Tok[] = [];
@@ -281,7 +318,8 @@ function parse(src: string): Node {
 export function formatNumber(value: number, digits = 2): string {
   if (!Number.isFinite(value)) return value > 0 ? "∞" : value < 0 ? "−∞" : "—";
   const abs = Math.abs(value);
-  if (abs !== 0 && (abs >= 1e6 || abs < 10 ** -Math.max(digits, 3))) return value.toExponential(Math.max(1, digits)).replace("e+", "e");
+  if (abs !== 0 && (abs >= 1e6 || abs < 10 ** -Math.max(digits, 3)))
+    return value.toExponential(Math.max(1, digits)).replace("e+", "e");
   return value.toFixed(Math.max(0, Math.min(8, digits))).replace("-", "−");
 }
 
@@ -335,7 +373,7 @@ function build(node: Node, names: Set<string>): (s: Scope) => Value {
         case "%":
           return (s) => mod(num(a(s)), num(b(s)));
         case "^":
-          return (s) => Math.pow(num(a(s)), num(b(s)));
+          return (s) => num(a(s)) ** num(b(s));
         case "<":
           return (s) => (num(a(s)) < num(b(s)) ? 1 : 0);
         case "<=":
@@ -348,13 +386,25 @@ function build(node: Node, names: Set<string>): (s: Scope) => Value {
           return (s) => {
             const x = a(s),
               y = b(s);
-            return (typeof x === "string" || typeof y === "string" ? String(x) === String(y) : Math.abs(num(x) - num(y)) < 1e-9) ? 1 : 0;
+            return (
+              typeof x === "string" || typeof y === "string"
+                ? String(x) === String(y)
+                : Math.abs(num(x) - num(y)) < 1e-9
+            )
+              ? 1
+              : 0;
           };
         case "!=":
           return (s) => {
             const x = a(s),
               y = b(s);
-            return (typeof x === "string" || typeof y === "string" ? String(x) !== String(y) : Math.abs(num(x) - num(y)) >= 1e-9) ? 1 : 0;
+            return (
+              typeof x === "string" || typeof y === "string"
+                ? String(x) !== String(y)
+                : Math.abs(num(x) - num(y)) >= 1e-9
+            )
+              ? 1
+              : 0;
           };
         case "&&":
           return (s) => (truthy(a(s)) ? b(s) : a(s));
@@ -445,7 +495,7 @@ export const toNumber = num;
  * ternary is told apart from the digits suffix by requiring the suffix to be a bare integer.
  */
 export function fillTemplate(template: string, scope: Scope): string {
-  if (!template || !template.includes("{")) return template || "";
+  if (!template?.includes("{")) return template || "";
   return template.replace(/\{([^{}]+)\}/g, (_, inner: string) => {
     const m = /^(.*?):(\d)$/.exec(inner.trim());
     const src = m ? m[1] : inner;
@@ -462,7 +512,7 @@ export function fillTemplate(template: string, scope: Scope): string {
 
 /** Names a template refers to (for validation). */
 export function templateExprs(template: string): string[] {
-  if (!template || !template.includes("{")) return [];
+  if (!template?.includes("{")) return [];
   return [...template.matchAll(/\{([^{}]+)\}/g)].map((m) => {
     const inner = m[1].trim();
     const d = /^(.*?):(\d)$/.exec(inner);

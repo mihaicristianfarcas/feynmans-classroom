@@ -16,13 +16,20 @@ beforeAll(async () => {
 
 describe("the vault", () => {
   it("round-trips frontmatter", () => {
-    const text = V.stringifyFrontmatter({ id: "n1", tags: ["a", "b"], source: { bookId: "b1", page: 3 } }, "# Body\n\nText.");
+    const text = V.stringifyFrontmatter(
+      { id: "n1", tags: ["a", "b"], source: { bookId: "b1", page: 3 } },
+      "# Body\n\nText.",
+    );
     const back = V.parseFrontmatter(text);
     expect(back.data).toMatchObject({ id: "n1", tags: ["a", "b"], source: { bookId: "b1", page: 3 } });
     expect(back.body.trim()).toBe("# Body\n\nText.");
   });
   it("writes cards as readable Markdown and reads them back", () => {
-    const card = C.saveCard({ front: "What is replication lag?", back: "The delay before a follower reflects a write.", deck: "DDIA" });
+    const card = C.saveCard({
+      front: "What is replication lag?",
+      back: "The delay before a follower reflects a write.",
+      deck: "DDIA",
+    });
     const file = V.cards.fileOf(card.id)!;
     const text = readFileSync(join(V.VAULT, file), "utf8");
     expect(text).toMatch(/## Front\s+What is replication lag\?/);
@@ -35,7 +42,9 @@ describe("the vault", () => {
     const state = C.cardState(card.id)!;
     expect(state.reps).toBe(1);
     expect(state.phase).toBe("learning");
-    const lines = readFileSync(join(V.VAULT, "log", "reviews.jsonl"), "utf8").trim().split("\n");
+    const lines = readFileSync(join(V.VAULT, "log", "reviews.jsonl"), "utf8")
+      .trim()
+      .split("\n");
     expect(lines.filter((l) => l.includes(card.id))).toHaveLength(1);
   });
   it("keeps the learner's profile in profile.md", () => {

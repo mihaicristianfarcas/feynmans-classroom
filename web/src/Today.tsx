@@ -1,4 +1,16 @@
-import { ArrowRight, ArrowUp, BookOpen, Layers, type LucideIcon, MessageCircleQuestion, PencilLine, Plus, Shuffle, Sparkles, Waypoints } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowUp,
+  BookOpen,
+  Layers,
+  type LucideIcon,
+  MessageCircleQuestion,
+  PencilLine,
+  Plus,
+  Shuffle,
+  Sparkles,
+  Waypoints,
+} from "lucide-react";
 import { useState } from "react";
 import { go, learn } from "./api";
 import { Spinner, timeAgo, useLoad } from "./Shell";
@@ -18,7 +30,12 @@ export function Today() {
   const { data: journey } = useLoad(() => learn.journey());
   const [question, setQuestion] = useState("");
   if (error) return <div className="center-note">Could not load today: {error}</div>;
-  if (!data) return <div className="center-note"><Spinner label="Opening" /></div>;
+  if (!data)
+    return (
+      <div className="center-note">
+        <Spinner label="Opening" />
+      </div>
+    );
   const hour = new Date().getHours();
   const greeting = hour < 5 ? "Up late" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   const waiting = data.queue.due + data.queue.learning + data.queue.fresh;
@@ -32,7 +49,8 @@ export function Today() {
         {journey && (
           <p className="lede small">
             {journey.streak > 0 ? `${journey.streak}-day streak. ` : ""}
-            {plural(journey.totals.concepts, "concept")} in your graph, {plural(journey.totals.cards, "card")}, {plural(journey.totals.notes, "note")}.
+            {plural(journey.totals.concepts, "concept")} in your graph, {plural(journey.totals.cards, "card")},{" "}
+            {plural(journey.totals.notes, "note")}.
           </p>
         )}
       </header>
@@ -45,7 +63,12 @@ export function Today() {
         }}
       >
         <Sparkles className="ask-icon" aria-hidden="true" />
-        <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Ask your library anything…" aria-label="Ask your library" />
+        <input
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="Ask your library anything…"
+          aria-label="Ask your library"
+        />
         <button className="icon-button ask-send" type="submit" aria-label="Ask" disabled={!question.trim()}>
           <ArrowUp aria-hidden="true" />
         </button>
@@ -54,16 +77,26 @@ export function Today() {
       <section className="tiles stagger">
         <a className="tile big" href="#/review" data-empty={waiting === 0 || undefined}>
           <span className="tile-label">
-            <span className="well" data-tone="butter"><Layers aria-hidden="true" /></span>
+            <span className="well" data-tone="butter">
+              <Layers aria-hidden="true" />
+            </span>
             Review
           </span>
           <span className="tile-number">{waiting}</span>
-          <span className="tile-detail">{waiting ? `${data.queue.due} due · ${data.queue.learning} learning · ${data.queue.fresh} new` : data.queue.total ? "All caught up. Come back later." : "Make cards while you read: select a passage → Cards."}</span>
+          <span className="tile-detail">
+            {waiting
+              ? `${data.queue.due} due · ${data.queue.learning} learning · ${data.queue.fresh} new`
+              : data.queue.total
+                ? "All caught up. Come back later."
+                : "Make cards while you read: select a passage → Cards."}
+          </span>
         </a>
         {!data.books.length && (
           <a className="tile" href="#/library">
             <span className="tile-label">
-              <span className="well" data-tone="sage"><Plus aria-hidden="true" /></span>
+              <span className="well" data-tone="sage">
+                <Plus aria-hidden="true" />
+              </span>
               Start here
             </span>
             <span className="tile-title">Add your first book</span>
@@ -73,16 +106,23 @@ export function Today() {
         {data.books[0] && (
           <a className="tile" href={`#/book/${data.books[0].id}`}>
             <span className="tile-label">
-              <span className="well" data-tone="peach"><BookOpen aria-hidden="true" /></span>
+              <span className="well" data-tone="peach">
+                <BookOpen aria-hidden="true" />
+              </span>
               Continue reading
             </span>
             <span className="tile-title">{data.books[0].title}</span>
-            <span className="tile-detail">{data.books[0].chapter ? `${data.books[0].chapter} · ` : ""}{timeAgo(data.books[0].lastTs)}</span>
+            <span className="tile-detail">
+              {data.books[0].chapter ? `${data.books[0].chapter} · ` : ""}
+              {timeAgo(data.books[0].lastTs)}
+            </span>
           </a>
         )}
         <a className="tile" href="#/brain">
           <span className="tile-label">
-            <span className="well" data-tone="lavender"><Waypoints aria-hidden="true" /></span>
+            <span className="well" data-tone="lavender">
+              <Waypoints aria-hidden="true" />
+            </span>
             Your brain
           </span>
           <span className="tile-title">Knowledge graph</span>
@@ -97,18 +137,24 @@ export function Today() {
             {data.suggestions.map((s, i) => {
               const kind = KIND[s.kind] || { icon: Sparkles, tone: "lavender" };
               return (
-              <li key={i}>
-                <a className="suggestion" href={`${s.action.route}${Object.keys(s.action).length > 1 ? `?${new URLSearchParams(Object.fromEntries(Object.entries(s.action).filter(([k]) => k !== "route")))}` : ""}`}>
-                  <span className="well" data-tone={kind.tone} aria-hidden="true">
-                    <kind.icon />
-                  </span>
-                  <span className="suggestion-text">
-                    <span className="suggestion-title">{s.title}</span>
-                    <span className="suggestion-detail">{s.detail}</span>
-                  </span>
-                  <ArrowRight className="suggestion-go" aria-hidden="true" />
-                </a>
-              </li>
+                <li
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a read-only list, replaced whole when it reloads
+                  key={i}
+                >
+                  <a
+                    className="suggestion"
+                    href={`${s.action.route}${Object.keys(s.action).length > 1 ? `?${new URLSearchParams(Object.fromEntries(Object.entries(s.action).filter(([k]) => k !== "route")))}` : ""}`}
+                  >
+                    <span className="well" data-tone={kind.tone} aria-hidden="true">
+                      <kind.icon />
+                    </span>
+                    <span className="suggestion-text">
+                      <span className="suggestion-title">{s.title}</span>
+                      <span className="suggestion-detail">{s.detail}</span>
+                    </span>
+                    <ArrowRight className="suggestion-go" aria-hidden="true" />
+                  </a>
+                </li>
               );
             })}
           </ul>
@@ -139,7 +185,10 @@ export function Today() {
           <h2 className="section-title">Recently</h2>
           <ul className="activity">
             {journey.recent.slice(0, 8).map((a, i) => (
-              <li key={i}>
+              <li
+                // biome-ignore lint/suspicious/noArrayIndexKey: a read-only list, replaced whole when it reloads
+                key={i}
+              >
                 <span className="activity-type">{a.type}</span>
                 <span className="activity-text">{a.text}</span>
                 <span className="activity-when">{timeAgo(a.ts)}</span>

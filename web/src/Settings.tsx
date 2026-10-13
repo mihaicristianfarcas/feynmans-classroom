@@ -9,7 +9,12 @@ export function Settings() {
   const { data: vault } = useLoad(() => learn.vault());
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
-  if (!info || !profile) return <div className="center-note"><Spinner label="Opening settings" /></div>;
+  if (!info || !profile)
+    return (
+      <div className="center-note">
+        <Spinner label="Opening settings" />
+      </div>
+    );
   const s = info.settings;
   const save = async (patch: Partial<SettingsInfo["settings"]>) => {
     await learn.saveSettings(patch);
@@ -22,7 +27,14 @@ export function Settings() {
     const field = (key: keyof typeof t, label: string, placeholder: string) => (
       <label className="field">
         <span>{label}</span>
-        <input defaultValue={t[key]} placeholder={placeholder} onBlur={(e) => e.target.value !== t[key] && save({ [provider]: { ...t, [key]: e.target.value } } as Partial<SettingsInfo["settings"]>)} />
+        <input
+          defaultValue={t[key]}
+          placeholder={placeholder}
+          onBlur={(e) =>
+            e.target.value !== t[key] &&
+            save({ [provider]: { ...t, [key]: e.target.value } } as Partial<SettingsInfo["settings"]>)
+          }
+        />
       </label>
     );
     return (
@@ -43,16 +55,28 @@ export function Settings() {
 
       <section className="panel">
         <h2 className="section-title">Who does the thinking</h2>
-        <p className="fine">Feynman’s Classroom runs on your own subscription through its command-line tool. No API keys.</p>
+        <p className="fine">
+          Feynman’s Classroom runs on your own subscription through its command-line tool. No API keys.
+        </p>
         <div className="providers">
           {(["auto", "codex", "claude"] as const).map((p) => (
             <label key={p} className="provider" data-on={s.provider === p || undefined}>
               <input type="radio" name="provider" checked={s.provider === p} onChange={() => save({ provider: p })} />
-              <span className="provider-name">{p === "auto" ? "Automatic" : p === "codex" ? "Codex" : "Claude Code"}</span>
+              <span className="provider-name">
+                {p === "auto" ? "Automatic" : p === "codex" ? "Codex" : "Claude Code"}
+              </span>
               <span className="provider-status">
                 {p === "auto" && `uses ${info.active === "codex" ? "Codex" : "Claude Code"} now`}
-                {p === "codex" && (info.codex.installed ? (info.codex.loggedIn ? `${info.codex.version} · logged in` : "installed, not logged in: run codex login") : "not installed: npm i -g @openai/codex")}
-                {p === "claude" && (info.claude.installed ? `${info.claude.version}` : "not installed: npm i -g @anthropic-ai/claude-code")}
+                {p === "codex" &&
+                  (info.codex.installed
+                    ? info.codex.loggedIn
+                      ? `${info.codex.version} · logged in`
+                      : "installed, not logged in: run codex login"
+                    : "not installed: npm i -g @openai/codex")}
+                {p === "claude" &&
+                  (info.claude.installed
+                    ? `${info.claude.version}`
+                    : "not installed: npm i -g @anthropic-ai/claude-code")}
               </span>
             </label>
           ))}
@@ -64,22 +88,45 @@ export function Settings() {
         <div className="form-row two">
           <label className="field">
             <span>Model calls at once</span>
-            <input type="number" min={1} max={8} defaultValue={s.concurrency} onBlur={(e) => save({ concurrency: Number(e.target.value) })} />
+            <input
+              type="number"
+              min={1}
+              max={8}
+              defaultValue={s.concurrency}
+              onBlur={(e) => save({ concurrency: Number(e.target.value) })}
+            />
           </label>
-          <p className="fine">Quick: figures, cards, quizzes, grading (seconds). Careful: chapter planning, asking the vault, “careful” figures. Now running {info.load.running}, waiting {info.load.waiting}.</p>
+          <p className="fine">
+            Quick: figures, cards, quizzes, grading (seconds). Careful: chapter planning, asking the vault, “careful”
+            figures. Now running {info.load.running}, waiting {info.load.waiting}.
+          </p>
         </div>
       </section>
 
       <section className="panel">
         <h2 className="section-title">Agents in your vault</h2>
-        <p className="fine">Agents work with your files using their own shell, inside the CLI's sandbox: they can read only your vault, write only where they're allowed (agents that change things work on their own git branch and land as one commit you can undo), never touch .git, and have no network.</p>
+        <p className="fine">
+          Agents work with your files using their own shell, inside the CLI's sandbox: they can read only your vault,
+          write only where they're allowed (agents that change things work on their own git branch and land as one
+          commit you can undo), never touch .git, and have no network.
+        </p>
         <div className="radio-row" role="radiogroup" aria-label="Connections between notes">
           <label className="check">
-            <input type="radio" name="connections" checked={(s.connections || "suggest") === "suggest"} onChange={() => save({ connections: "suggest" })} />
+            <input
+              type="radio"
+              name="connections"
+              checked={(s.connections || "suggest") === "suggest"}
+              onChange={() => save({ connections: "suggest" })}
+            />
             Suggest connections between notes; I accept or reject each
           </label>
           <label className="check">
-            <input type="radio" name="connections" checked={s.connections === "auto"} onChange={() => save({ connections: "auto" })} />
+            <input
+              type="radio"
+              name="connections"
+              checked={s.connections === "auto"}
+              onChange={() => save({ connections: "auto" })}
+            />
             Add them straight away (marked AI); I remove the ones I don't want
           </label>
         </div>
@@ -104,7 +151,11 @@ export function Settings() {
         <section className="panel">
           <h2 className="section-title">Your vault</h2>
           <p>
-            Everything you make lives as plain Markdown in <code>{vault.path}</code>: {vault.notes} notes, {vault.concepts} concepts, {vault.annotations} annotations, {vault.cards} cards, {vault.figures} figures, {vault.reviews} reviews. Open it in any editor or Obsidian; point an AI agent at it (it has an <code>AGENTS.md</code>). {vault.git ? "Every change is committed to git." : "Install git to keep a history of every change."}
+            Everything you make lives as plain Markdown in <code>{vault.path}</code>: {vault.notes} notes,{" "}
+            {vault.concepts} concepts, {vault.annotations} annotations, {vault.cards} cards, {vault.figures} figures,{" "}
+            {vault.reviews} reviews. Open it in any editor or Obsidian; point an AI agent at it (it has an{" "}
+            <code>AGENTS.md</code>).{" "}
+            {vault.git ? "Every change is committed to git." : "Install git to keep a history of every change."}
           </p>
           {vault.history.length > 0 && (
             <ul className="history">

@@ -9,7 +9,10 @@ describe("ingestText", () => {
   it("turns Markdown headings into chapters and paragraphs into blocks", () => {
     const dir = mkdtempSync(join(tmpdir(), "classroom-test-"));
     const path = join(dir, "book.md");
-    writeFileSync(path, "# A Small Book\n\n## One\n\nFirst *idea* here.\n\nMore text.\n\n## Two\n\n- a list item\n- another\n\nThe end.");
+    writeFileSync(
+      path,
+      "# A Small Book\n\n## One\n\nFirst *idea* here.\n\nMore text.\n\n## Two\n\n- a list item\n- another\n\nThe end.",
+    );
     const book = ingestText(path, true);
     expect(book.title).toBe("A Small Book");
     expect(book.toc.map((c) => c.title)).toEqual(["One", "Two"]);
@@ -21,7 +24,10 @@ describe("ingestText", () => {
   it("detects CHAPTER lines in plain text and strips Gutenberg boilerplate", () => {
     const dir = mkdtempSync(join(tmpdir(), "classroom-test-"));
     const path = join(dir, "book.txt");
-    writeFileSync(path, "Header junk\n\n*** START OF THE PROJECT GUTENBERG EBOOK X ***\n\nCHAPTER I.\n\nIt was a dark night.\n\nCHAPTER II.\n\nMorning came.\n\n*** END OF THE PROJECT GUTENBERG EBOOK X ***\n\nLicense text");
+    writeFileSync(
+      path,
+      "Header junk\n\n*** START OF THE PROJECT GUTENBERG EBOOK X ***\n\nCHAPTER I.\n\nIt was a dark night.\n\nCHAPTER II.\n\nMorning came.\n\n*** END OF THE PROJECT GUTENBERG EBOOK X ***\n\nLicense text",
+    );
     const book = ingestText(path, false);
     expect(book.blocks.some((b) => b.text.includes("Header junk"))).toBe(false);
     expect(book.blocks.some((b) => b.text.includes("License"))).toBe(false);
@@ -33,7 +39,9 @@ describe("titleCase", () => {
   it("title-cases shouting headings but keeps roman numerals", () => {
     expect(titleCase("LECTURE III.")).toBe("Lecture III");
     expect(titleCase("ON DIFFERENT DEGREES OF SMALLNESS.")).toBe("On Different Degrees of Smallness");
-    expect(titleCase("PRODUCTS: WATER FROM THE COMBUSTION—NATURE OF WATER")).toBe("Products: Water from the Combustion—Nature of Water");
+    expect(titleCase("PRODUCTS: WATER FROM THE COMBUSTION—NATURE OF WATER")).toBe(
+      "Products: Water from the Combustion—Nature of Water",
+    );
   });
   it("leaves mixed-case titles alone", () => {
     expect(titleCase("Chapter One")).toBe("Chapter One");
@@ -48,7 +56,16 @@ describe("joinLines", () => {
 
 describe("pagesText", () => {
   const pages = [
-    { n: 1, w: 400, h: 600, lines: [{ y: 0.1, x: 0, s: 10, t: "end of the previous chapter" }, { y: 0.5, x: 0, s: 14, t: "CHAPTER TWO" }, { y: 0.6, x: 0, s: 10, t: "its first line" }] },
+    {
+      n: 1,
+      w: 400,
+      h: 600,
+      lines: [
+        { y: 0.1, x: 0, s: 10, t: "end of the previous chapter" },
+        { y: 0.5, x: 0, s: 14, t: "CHAPTER TWO" },
+        { y: 0.6, x: 0, s: 10, t: "its first line" },
+      ],
+    },
     { n: 2, w: 400, h: 600, lines: [{ y: 0.1, x: 0, s: 10, t: "second page" }] },
   ];
   it("prefers the Markdown of whole pages", () => {
@@ -64,11 +81,18 @@ describe("pagesText", () => {
 
 import JSZip from "jszip";
 import { ingestEpub } from "../server/ingest/epub.ts";
+
 describe("ingestEpub", () => {
   const epub = async (chapter: string) => {
     const zip = new JSZip();
-    zip.file("META-INF/container.xml", '<container><rootfiles><rootfile full-path="OEBPS/book.opf"/></rootfiles></container>');
-    zip.file("OEBPS/book.opf", '<package><metadata><dc:title>Bomb</dc:title></metadata><manifest><item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="c1"/></spine></package>');
+    zip.file(
+      "META-INF/container.xml",
+      '<container><rootfiles><rootfile full-path="OEBPS/book.opf"/></rootfiles></container>',
+    );
+    zip.file(
+      "OEBPS/book.opf",
+      '<package><metadata><dc:title>Bomb</dc:title></metadata><manifest><item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="c1"/></spine></package>',
+    );
     zip.file("OEBPS/c1.xhtml", chapter);
     const dir = mkdtempSync(join(tmpdir(), "classroom-epub-"));
     const path = join(dir, "book.epub");
@@ -76,7 +100,9 @@ describe("ingestEpub", () => {
     return { path, dir };
   };
   it("reads a minimal EPUB", async () => {
-    const { path, dir } = await epub("<html><body><h1>One</h1><p>A candle burns.</p><h1>Two</h1><p>Water forms.</p></body></html>");
+    const { path, dir } = await epub(
+      "<html><body><h1>One</h1><p>A candle burns.</p><h1>Two</h1><p>Water forms.</p></body></html>",
+    );
     const book = await ingestEpub(path, join(dir, "assets"), (a) => a);
     expect(book.blocks.map((b) => b.text)).toContain("A candle burns.");
   });
