@@ -1,7 +1,9 @@
 /* The knowledge graph as a force-directed picture that fills its box: concepts, notes, books (and, if
- * shown, annotations) as nodes, links as lines, recall as a ring. Hovering or focusing an item lights it
- * and its links; clicking it (or Enter) selects it, double-clicking opens its page. Arrow keys move
- * between items, dragging moves one, dragging the background pans, ⌘-scroll or the buttons zoom. */
+ * shown, annotations) as circles with their kind's icon inside and their name beside them, links as
+ * lines. A concept's circle shows how well it's known (NodeMark, which the Brain's legend draws too).
+ * Hovering or focusing an item lights it and its links; clicking it (or Enter) selects it,
+ * double-clicking opens its page. Arrow keys move between items, dragging moves one, dragging the
+ * background pans, ⌘-scroll or the buttons zoom. */
 import {
   forceCollide,
   forceLink,
@@ -13,7 +15,7 @@ import {
   type SimulationLinkDatum,
   type SimulationNodeDatum,
 } from "d3-force";
-import { Maximize2, Minus, Plus } from "lucide-react";
+import { Book, FileText, Lightbulb, type LucideIcon, Maximize2, MessageSquareText, Minus, Plus } from "lucide-react";
 import { type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { GraphData } from "../api";
 import { go, openLink } from "../app/navigation";
@@ -24,17 +26,31 @@ type N = GraphNode;
 type L = SimulationLinkDatum<N> & { kind: string };
 type View = { k: number; x: number; y: number };
 
-const radius = (n: N) =>
-  n.kind === "book" ? 0 : n.kind === "concept" ? 5 + n.size * 3 : n.kind === "annotation" ? 2.6 : 3.2;
+type Kind = N["kind"];
 
-/** The box an item and its label take up (labels run to the right; a book's sits on it). */
+/** Each kind of item's icon, drawn inside its circle. */
+export const ICONS: Record<Kind, LucideIcon> = {
+  concept: Lightbulb,
+  note: FileText,
+  book: Book,
+  annotation: MessageSquareText,
+};
+/** The icons are drawn a little heavier than in the app's buttons: they're small, and they scale with the zoom. */
+export const ICON_STROKE = 2.25;
+
+/** An item's circle: books largest, concepts by how much is built on them, notes, then annotations. */
+const radius = (n: Pick<N, "kind" | "size">) =>
+  n.kind === "book" ? 15 : n.kind === "concept" ? 8 + n.size * 2.4 : n.kind === "annotation" ? 7.5 : 9.5;
+/** How big the icon inside a circle of radius `r` is. */
+export const iconSize = (r: number) => Math.max(9, r * 1.1);
+
+/** A name as the graph shows it: a long book title is cut short. */
+const labelOf = (n: N) => (n.kind === "book" && n.label.length > 30 ? `${n.label.slice(0, 29)}…` : n.label);
+
+/** The box an item and its label take up (labels run to the right of the circle). */
 const box = (n: N) => {
-  if (n.kind === "book") {
-    const w = Math.min(26, n.label.length) * 6.6 + 22;
-    return { x0: -w / 2, x1: w / 2, h: 26 };
-  }
   const r = radius(n);
-  return { x0: -r - 2, x1: r + 9 + n.label.length * 6.3, h: 16 };
+  return { x0: -r - 2, x1: r + 8 + labelOf(n).length * (n.kind === "book" ? 6.9 : 6.3), h: Math.max(16, r * 2 + 2) };
 };
 
 /**
@@ -75,6 +91,35 @@ function forceLabels(labeled: (n: N) => boolean) {
 /** How well a concept is known, as a word the styles key on. */
 export const levelOf = (m: number | null) => (m === null ? "none" : m >= 0.8 ? "strong" : m >= 0.55 ? "ok" : "weak");
 
+/**
+ * An item's mark, centred on (0, 0): its circle with its kind's `icon` inside. Books are filled coal, notes
+ * sky and annotations lavender, with the icon in the opposite tone. A concept's circle is dotted until
+ * you study it, then a ring of how much you'd recall (rose while it fades, butter while it grows), and
+ * filled sage once you know it. Styled by `.g-<kind>` and `data-level` on a parent.
+ */
+export function NodeMark({
+  kind,
+  mastery,
+  r,
+  icon,
+}: {
+  kind: Kind;
+  mastery: number | null;
+  r: number;
+  icon: ReactNode;
+}) {
+  const level = kind === "concept" ? levelOf(mastery) : null;
+  return (
+    <>
+      <circle className="g-disc" r={r} />
+      {(level === "weak" || level === "ok") && (
+        <path className="g-ring" d={describeArc(r, Math.max(0.001, Math.min(0.9999, mastery ?? 0)))} />
+      )}
+      {icon}
+    </>
+  );
+}
+
 /** Opens an item's own page: a book in the reader, a concept's page, a note, an annotation in its book. */
 export function openNode(n: Pick<N, "kind" | "id" | "bookId" | "path">) {
   if (n.kind === "book") go(`#/book/${n.bookId}`);
@@ -99,6 +144,7 @@ export function GraphView({
   selected = null,
   onSelect,
   inset = 0,
+  insetLeft = 0,
   tools,
 }: {
   data: GraphData;
@@ -107,7 +153,7 @@ export function GraphView({
   showSuggestions?: boolean;
   /** Text to find: matching items are marked and the rest fade. */
   highlight?: string;
-  /** Shows the graph as it was at this time (a replay of how it grew). */
+  /** Shows the graph as it was at this time (a replay of how it grew: each item and link fades in as it's made). */
   until?: number;
   /** The selected item's id: ringed, its links lit, kept in view. */
   selected?: string | null;
@@ -115,6 +161,8 @@ export function GraphView({
   onSelect?: (node: N | null, byKeyboard: boolean) => void;
   /** Pixels at the right covered by a card: the selected item is kept clear of them. */
   inset?: number;
+  /** Pixels at the left covered by a card, kept clear the same way. */
+  insetLeft?: number;
   /** More buttons for the cluster in the corner. */
   tools?: ReactNode;
 }) {
@@ -151,6 +199,8 @@ export function GraphView({
   const svg = useRef<SVGSVGElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const helpId = useId();
+  // the icons are drawn once, as symbols every item uses
+  const icons = `g-icons${useId().replace(/[^\w-]/g, "")}`;
 
   // the drawing is as big as its box, one unit a pixel, with (0, 0) in the middle
   const [size, setSize] = useState({ w: 1000, h: 640 });
@@ -170,9 +220,15 @@ export function GraphView({
     return () => ro.disconnect();
   }, []);
 
-  /** The view that shows every item, beside the card if one is open. */
-  const fit = (list: N[], cover: number): View => {
+  // the cards over either side, read when the view moves
+  const covered = useRef({ left: 0, right: 0 });
+  covered.current = { left: insetLeft, right: inset };
+
+  /** The view that shows every item, between the cards if any are open. */
+  const fit = (list: N[]): View => {
     const { w, h } = sizeRef.current;
+    const { left, right } = covered.current;
+    const mid = (left - right) / 2;
     let x0 = Number.POSITIVE_INFINITY,
       y0 = Number.POSITIVE_INFINITY,
       x1 = Number.NEGATIVE_INFINITY,
@@ -180,13 +236,13 @@ export function GraphView({
     for (const n of list) {
       if (n.x === undefined || n.y === undefined) continue;
       x0 = Math.min(x0, n.x - 30);
-      x1 = Math.max(x1, n.x + (n.kind === "book" ? 90 : 110)); // labels run to the right
+      x1 = Math.max(x1, n.x + Math.min(140, box(n).x1)); // labels run to the right
       y0 = Math.min(y0, n.y - 24);
       y1 = Math.max(y1, n.y + 24);
     }
-    if (!Number.isFinite(x0)) return { k: 1, x: -cover / 2, y: 0 };
-    const k = Math.min(1.25, Math.max(0.3, Math.min((w - cover - 48) / (x1 - x0), (h - 48) / (y1 - y0))));
-    return { k, x: -((x0 + x1) / 2) * k - cover / 2, y: -((y0 + y1) / 2) * k };
+    if (!Number.isFinite(x0)) return { k: 1, x: mid, y: 0 };
+    const k = Math.min(1.25, Math.max(0.3, Math.min((w - left - right - 48) / (x1 - x0), (h - 48) / (y1 - y0))));
+    return { k, x: -((x0 + x1) / 2) * k + mid, y: -((y0 + y1) / 2) * k };
   };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: lays out again only when the graph changes (fit reads the size from a ref)
@@ -211,7 +267,7 @@ export function GraphView({
       .force(
         "collide",
         forceCollide<N>()
-          .radius((d) => (d.kind === "book" ? 90 : d.kind === "concept" ? radius(d) + 40 : radius(d) + 8))
+          .radius((d) => (d.kind === "book" ? radius(d) + 45 : d.kind === "concept" ? radius(d) + 36 : radius(d) + 8))
           .strength(0.9),
       )
       .force(
@@ -226,7 +282,7 @@ export function GraphView({
     s.alpha(fresh ? 1 : 0.3).tick(fresh ? (nodes.length > 600 ? 60 : 160) : 30);
     if (fresh) {
       setGlide(false);
-      setView(fit(nodes, 0));
+      setView(fit(nodes));
     }
     let frame = 0;
     s.on("tick", () => {
@@ -258,24 +314,25 @@ export function GraphView({
   }, [links]);
 
   /**
-   * Keeps an item clear of the card and the edges: if it isn't, the view centres it, gliding unless the
-   * move came from the arrow keys (what the keyboard does, often, happens at once).
+   * Keeps an item clear of the cards and the edges: if it isn't, the view centres it between them, gliding
+   * unless the move came from the arrow keys (what the keyboard does, often, happens at once).
    */
-  const reveal = (n: N, cover: number, glided = true) => {
+  const reveal = (n: N, glided = true) => {
     if (n.x === undefined || n.y === undefined) return;
     const { w, h } = sizeRef.current;
+    const { left, right } = covered.current;
     const v = viewRef.current;
     const sx = n.x * v.k + v.x,
       sy = n.y * v.k + v.y;
-    if (sx > -w / 2 + 40 && sx < w / 2 - cover - 40 && sy > -h / 2 + 40 && sy < h / 2 - 40) return;
+    if (sx > -w / 2 + left + 40 && sx < w / 2 - right - 40 && sy > -h / 2 + 40 && sy < h / 2 - 40) return;
     setGlide(glided);
-    setView({ ...v, x: -cover / 2 - n.x * v.k, y: -n.y * v.k });
+    setView({ ...v, x: (left - right) / 2 - n.x * v.k, y: -n.y * v.k });
   };
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the selection or the card changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the selection or a card changes
   useEffect(() => {
     const n = selected ? nodes.find((x) => x.id === selected) : null;
-    if (n) reveal(n, inset);
-  }, [selected, inset]);
+    if (n) reveal(n);
+  }, [selected, inset, insetLeft]);
 
   /** Pointer position in drawing units, from the middle of the box. */
   const toScreen = (event: { clientX: number; clientY: number }) => {
@@ -289,7 +346,7 @@ export function GraphView({
   const zoom = (factor: number) =>
     moveTo((v) => {
       const k = Math.min(4, Math.max(0.3, v.k * factor));
-      const cx = -inset / 2;
+      const cx = (insetLeft - inset) / 2;
       return { k, x: cx - (cx - v.x) * (k / v.k), y: v.y * (k / v.k) };
     });
 
@@ -313,7 +370,7 @@ export function GraphView({
     "aria-pressed": n.id === selected,
     onFocus: () => {
       setHover(n.id);
-      reveal(n, inset, false);
+      reveal(n, false);
     },
     onBlur: () => setHover(null),
     onKeyDown: (e: React.KeyboardEvent) => {
@@ -342,6 +399,7 @@ export function GraphView({
       <svg
         ref={svg}
         className="graph"
+        data-replay={until !== undefined || undefined}
         viewBox={`${-w / 2} ${-h / 2} ${w} ${h}`}
         role="group"
         aria-label={`Knowledge graph: ${counts || "empty"}`}
@@ -403,6 +461,16 @@ export function GraphView({
         }}
       >
         <title>Knowledge graph</title>
+        <defs>
+          {(Object.keys(ICONS) as Kind[]).map((kind) => {
+            const Icon = ICONS[kind];
+            return (
+              <symbol key={kind} id={`${icons}-${kind}`} viewBox="0 0 24 24">
+                <Icon width={24} height={24} strokeWidth={ICON_STROKE} aria-hidden="true" />
+              </symbol>
+            );
+          })}
+        </defs>
         <g
           className="g-view"
           data-glide={glide || undefined}
@@ -442,45 +510,36 @@ export function GraphView({
               onPointerLeave: () => setHover(null),
               ...keys(n),
             };
-            if (n.kind === "book") {
-              const label = n.label.length > 26 ? `${n.label.slice(0, 25)}…` : n.label;
-              const bw = label.length * 6.6 + 22;
-              return (
-                <g key={n.id} className="g-node g-book" {...common}>
-                  <g className="g-shape">
-                    <rect x={-bw / 2} y={-13} width={bw} height={26} rx={13} />
-                    <text textAnchor="middle" y={4}>
-                      {label}
-                    </text>
-                  </g>
-                </g>
-              );
-            }
             const r = radius(n);
-            const m = n.mastery;
-            const arc = m === null ? "" : describeArc(r + 3.2, Math.max(0.001, Math.min(0.9999, m)));
+            const s = iconSize(r);
             const showLabel =
+              n.kind === "book" ||
               (n.kind === "concept" && (fewConcepts || n.size > 1.3)) ||
               (n.kind === "note" && fewNotes) ||
               hit ||
               focus?.has(n.id) ||
               view.k > 1.6;
             return (
-              <g key={n.id} className={`g-node g-${n.kind}`} data-level={levelOf(m)} {...common}>
+              <g
+                key={n.id}
+                className={`g-node g-${n.kind}`}
+                data-level={n.kind === "concept" ? levelOf(n.mastery) : undefined}
+                {...common}
+              >
                 <g className="g-shape">
-                  <circle className="g-halo" r={r + 7} />
-                  {n.kind === "note" ? (
-                    <rect x={-r} y={-r} width={r * 2} height={r * 2} rx={1} />
-                  ) : n.kind === "annotation" ? (
-                    <rect x={-r} y={-r} width={r * 2} height={r * 2} transform="rotate(45)" />
-                  ) : (
-                    <circle r={r} />
-                  )}
-                  {n.kind === "concept" && m !== null && <path d={arc} className="g-ring" />}
+                  <circle className="g-halo" r={r + 6} />
+                  <NodeMark
+                    kind={n.kind}
+                    mastery={n.mastery}
+                    r={r}
+                    icon={
+                      <use href={`#${icons}-${n.kind}`} className="g-icon" x={-s / 2} y={-s / 2} width={s} height={s} />
+                    }
+                  />
                 </g>
                 {showLabel && (
-                  <text x={r + 7} y={4}>
-                    {n.label}
+                  <text x={r + 6} y={4}>
+                    {labelOf(n)}
                   </text>
                 )}
               </g>
@@ -490,9 +549,6 @@ export function GraphView({
       </svg>
       <div className="graph-tools">
         {tools}
-        <button type="button" className="icon-button" onClick={() => zoom(1.3)} aria-label="Zoom in" title="Zoom in">
-          <Plus aria-hidden="true" />
-        </button>
         <button
           type="button"
           className="icon-button"
@@ -502,10 +558,13 @@ export function GraphView({
         >
           <Minus aria-hidden="true" />
         </button>
+        <button type="button" className="icon-button" onClick={() => zoom(1.3)} aria-label="Zoom in" title="Zoom in">
+          <Plus aria-hidden="true" />
+        </button>
         <button
           type="button"
           className="icon-button"
-          onClick={() => moveTo(fit(nodes.filter(born), inset))}
+          onClick={() => moveTo(fit(nodes.filter(born)))}
           aria-label="Fit the graph"
           title="Fit the graph"
         >

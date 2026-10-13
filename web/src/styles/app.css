@@ -1081,11 +1081,15 @@
   }
 }
 
-/* ---------- brain: the graph fills the page, and a card opens at its side ---------- */
+/* ---------- brain: the graph fills the page, the card for what you pick opens over its left side, the legend over its right ---------- */
 .brain {
   position: relative;
   height: 100%;
   overflow: hidden;
+}
+.brain-stage {
+  position: relative;
+  height: 100%;
 }
 .graph-wrap {
   position: absolute;
@@ -1113,16 +1117,18 @@
     opacity 180ms ease,
     stroke 180ms ease;
 }
+/* each kind of line looks different enough for the legend to tell them apart */
 .g-edge[data-kind="related"] {
-  stroke: color-mix(in srgb, var(--line-strong), var(--ink) 18%);
-  stroke-width: 1.1;
+  stroke: color-mix(in srgb, var(--line-strong), var(--ink) 40%);
+  stroke-width: 1.4;
 }
 .g-edge[data-kind="source"] {
   stroke-dasharray: 3 4;
 }
 .g-edge[data-kind="link"],
 .g-edge[data-kind="embed"] {
-  stroke: color-mix(in srgb, var(--sky-ink) 45%, var(--line-strong));
+  stroke: color-mix(in srgb, var(--sky-ink) 75%, var(--line-strong));
+  stroke-width: 1.2;
 }
 .g-edge[data-kind="ai"] {
   stroke: var(--lavender-ink);
@@ -1164,7 +1170,7 @@
 .g-node[data-selected] text {
   font-weight: 650;
 }
-/* hovering grows the shape a little; picking (or focusing) an item rings it */
+/* hovering grows the mark a little; picking (or focusing) an item rings it */
 .g-shape {
   transition: transform 160ms var(--ease-out);
 }
@@ -1186,82 +1192,137 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .g-node:hover .g-shape {
-    transform: scale(1.15);
-  }
-  .g-book:hover .g-shape {
-    transform: scale(1.04);
+    transform: scale(1.12);
   }
   .g-node:hover .g-halo {
     opacity: 0.8;
   }
 }
-.g-book rect {
-  fill: var(--ink);
+/* every item is a circle with its kind's icon inside: filled ones carry the icon in the opposite tone */
+.g-disc {
+  stroke-width: 1;
 }
-.g-book[data-selected] rect,
-.g-book:focus-visible rect {
-  stroke: var(--accent);
-  stroke-width: 3;
+.g-icon {
+  color: var(--ink-2);
+  pointer-events: none;
+}
+.g-book .g-disc {
+  fill: var(--ink);
+  stroke: none;
+}
+.g-book .g-icon {
+  color: var(--on-ink);
 }
 .g-book text {
-  fill: var(--on-ink);
-  stroke: none;
-  font: 600 10.5px var(--sans);
+  font: 650 12px var(--sans);
 }
-.g-concept circle:not(.g-halo) {
+.g-note .g-disc {
+  fill: var(--sky);
+  stroke: var(--sky-ink);
+}
+.g-annotation .g-disc {
+  fill: var(--lavender);
+  stroke: var(--lavender-ink);
+}
+.g-note .g-icon,
+.g-annotation .g-icon {
+  color: var(--on-pastel);
+}
+/* a concept: dotted until studied, then a ring of how much you'd recall (rose fading, butter growing),
+   filled sage once known */
+.g-concept .g-disc {
   fill: var(--surface);
-  stroke: var(--ink-3);
-  stroke-width: 1.3;
-}
-.g-concept[data-level="none"] circle:not(.g-halo) {
   stroke: var(--ink-4);
-  stroke-dasharray: 2 2;
+  stroke-width: 1.3;
+  stroke-dasharray: 2 2.2;
 }
-.g-concept[data-level="strong"] circle:not(.g-halo) {
-  fill: var(--sage-soft);
-  stroke: var(--sage-ink);
+.g-concept .g-icon {
+  color: var(--ink-3);
 }
-.g-concept[data-level="ok"] circle:not(.g-halo) {
+.g-concept:is([data-level="weak"], [data-level="ok"]) .g-disc {
+  stroke: var(--line-strong);
+  stroke-width: 2.2;
+  stroke-dasharray: none;
+}
+.g-concept[data-level="weak"] .g-disc {
+  fill: var(--rose-soft);
+}
+.g-concept[data-level="ok"] .g-disc {
   fill: var(--butter-soft);
 }
-.g-concept[data-level="weak"] circle:not(.g-halo) {
-  fill: var(--rose-soft);
+.g-concept[data-level="weak"] :is(.g-icon, .g-ring) {
+  color: var(--rose-ink);
+}
+.g-concept[data-level="ok"] :is(.g-icon, .g-ring) {
+  color: var(--butter-ink);
 }
 .g-ring {
   fill: none;
-  stroke: var(--sage);
-  stroke-width: 2.4;
+  stroke: currentColor;
+  stroke-width: 2.2;
   stroke-linecap: round;
 }
-.g-concept[data-level="ok"] .g-ring {
-  stroke: var(--butter);
+.g-concept[data-level="strong"] .g-disc {
+  fill: var(--sage);
+  stroke: var(--sage-ink);
+  stroke-dasharray: none;
 }
-.g-concept[data-level="weak"] .g-ring {
-  stroke: var(--rose);
+.g-concept[data-level="strong"] .g-icon {
+  color: var(--on-pastel);
 }
-.g-note rect {
-  fill: var(--sky);
-  stroke: var(--sky-ink);
-  stroke-width: 0.8;
+/* replaying how the graph grew: each item and link fades in as it's made, and the item's mark grows into place */
+.graph[data-replay] :is(.g-node, .g-edge) {
+  animation: fade 600ms var(--ease-out) backwards;
 }
-.g-annotation rect {
-  fill: var(--lavender);
-  stroke: none;
+.graph[data-replay] .g-shape {
+  animation: g-grow 600ms var(--ease-out) backwards;
 }
-.g-node[data-hit] :is(circle:not(.g-halo), rect) {
+@keyframes g-grow {
+  from {
+    transform: scale(0.7);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .graph[data-replay] .g-shape {
+    animation: none;
+  }
+}
+/* what the find field matches */
+.g-node[data-hit] .g-disc {
   stroke: var(--accent-ink);
-  stroke-width: 3;
+  stroke-width: 2.6;
+  stroke-dasharray: none;
 }
-/* floating over the graph: find (top left), the tools (bottom right), the replay's date (bottom left) */
+/* floating over the graph: find (at the top, in the middle: it stays there, and only narrows if a card
+   would reach it), the tools (bottom right, with the legend above them), the replay's date (bottom
+   left, moving aside for the card) */
 .graph-find {
   position: absolute;
   top: 14px;
   left: 16px;
+  right: 16px;
   z-index: 2;
+  display: flex;
+  justify-content: center;
+  padding-inline: max(var(--find-left, 0px), var(--find-right, 0px));
+  pointer-events: none;
+  transition: padding 260ms var(--ease-drawer);
+}
+.brain[data-card] .graph-find {
+  --find-left: calc(var(--brain-card-w, 380px) + 8px);
+}
+.brain[data-legend] .graph-find {
+  --find-right: calc(var(--brain-legend-w, 300px) + 8px);
+}
+.graph-find-field {
+  position: relative;
+  width: min(380px, 100%);
+  pointer-events: auto;
 }
 .graph-find input.search {
-  width: 200px;
-  height: 32px;
+  width: 100%;
+  height: 36px;
+  padding-right: 52px;
   border-radius: 999px;
 }
 .graph-find input.search:not(:focus) {
@@ -1269,6 +1330,24 @@
   box-shadow:
     inset 0 0 0 1px var(--line),
     var(--shadow-sm);
+}
+/* the shortcut, until you're in the field or have typed */
+.graph-find-key {
+  position: absolute;
+  display: flex;
+  top: 50%;
+  right: 10px;
+  translate: 0 -50%;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.graph-find input:is(:focus, :not(:placeholder-shown)) + .graph-find-key {
+  opacity: 0;
+}
+@media (pointer: coarse) {
+  .graph-find-key {
+    display: none;
+  }
 }
 .graph-tools {
   position: absolute;
@@ -1284,10 +1363,13 @@
   box-shadow:
     var(--shadow-md),
     0 0 0 1px var(--line);
-  transition: transform 260ms var(--ease-drawer);
 }
-.brain[data-card] .graph-tools {
-  transform: translateX(-392px);
+:root[data-resizing] :is(.graph-find, .graph-when) {
+  transition: none;
+}
+.graph-tools .icon-button[aria-expanded="true"] {
+  background: var(--press);
+  color: var(--ink);
 }
 .graph-tools .icon-button {
   position: relative;
@@ -1321,6 +1403,7 @@
   position: absolute;
   left: 16px;
   bottom: 16px;
+  z-index: 2;
   margin: 0;
   padding: 6px 12px;
   border-radius: 999px;
@@ -1331,15 +1414,19 @@
   font: 500 12.5px var(--sans);
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
+  transition: transform 260ms var(--ease-drawer);
 }
-/* the card: slides in from the right edge, scrolls inside, with its actions along the bottom */
-.node-card {
+.brain[data-card] .graph-when {
+  transform: translateX(calc(var(--brain-card-w, 380px) + 12px));
+}
+/* the cards over the graph: the one for what you pick slides in from the left edge, the legend from the
+   right; each scrolls inside (the item card has its actions along the bottom) */
+:is(.node-card, .legend-card) {
   position: absolute;
   top: 12px;
-  right: 12px;
   bottom: 12px;
   z-index: 3;
-  width: 380px;
+  max-width: calc(100% - 24px);
   display: flex;
   flex-direction: column;
   border-radius: var(--r-xl);
@@ -1350,17 +1437,49 @@
     opacity 200ms var(--ease-out),
     transform 260ms var(--ease-drawer);
 }
+.node-card {
+  left: 12px;
+  width: var(--brain-card-w, 380px);
+}
+/* the legend ends above the tools in the corner (16 px from the edge, 36 px tall), so they stay where they are */
+.legend-card {
+  right: 12px;
+  bottom: 64px;
+  width: var(--brain-legend-w, 300px);
+}
 @starting-style {
   .node-card {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  .legend-card {
     opacity: 0;
     transform: translateX(16px);
   }
 }
-.node-card[data-leaving] {
+:is(.node-card, .legend-card)[data-leaving] {
   opacity: 0;
-  transform: translateX(12px);
   transition-duration: 150ms;
   pointer-events: none;
+}
+.node-card[data-leaving] {
+  transform: translateX(-12px);
+}
+.legend-card[data-leaving] {
+  transform: translateX(12px);
+}
+/* each card's edge runs along its inner side, clear of the rounded corners */
+:is(.node-card-edge, .legend-card-edge).panel-edge {
+  position: absolute;
+  top: 32px;
+  bottom: 32px;
+}
+.node-card-edge.panel-edge {
+  left: calc(min(var(--brain-card-w, 380px), 100% - 24px) + 12px);
+}
+.legend-card-edge.panel-edge {
+  right: calc(min(var(--brain-legend-w, 300px), 100% - 24px) + 12px);
+  bottom: 84px;
 }
 .node-card-body {
   flex: 1;
@@ -1426,13 +1545,12 @@
   border-radius: 50%;
   border: 1.5px solid var(--ink-4);
 }
+/* the same colours as the graph's circles */
 .node-chip[data-kind="note"]::before {
-  border-radius: 2px;
   background: var(--sky);
   border-color: var(--sky-ink);
 }
 .node-chip[data-kind="book"]::before {
-  border-radius: 2px;
   background: var(--ink);
   border-color: var(--ink);
 }
@@ -1467,11 +1585,8 @@
   margin: 0;
 }
 @media (max-width: 760px) {
-  .graph-find input.search {
-    width: 150px;
-  }
-  /* on a phone the card is a sheet along the bottom */
-  .node-card {
+  /* on a phone each card is a sheet along the bottom (one at a time) */
+  :is(.node-card, .legend-card) {
     top: auto;
     left: 8px;
     right: 8px;
@@ -1480,13 +1595,62 @@
     max-height: 62%;
   }
   @starting-style {
-    .node-card {
+    :is(.node-card, .legend-card) {
       transform: translateY(16px);
     }
   }
-  .node-card[data-leaving] {
+  :is(.node-card, .legend-card)[data-leaving] {
     transform: translateY(12px);
   }
+}
+/* the legend's rows: a mark as the graph draws it, its name, what it means */
+.legend-sub {
+  margin: 18px 0 6px;
+  font: 500 12px / 1.3 var(--sans);
+  color: var(--ink-3);
+}
+.legend-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.legend-row {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.legend-swatch {
+  display: grid;
+  place-items: center;
+}
+.legend-mark {
+  display: block;
+  overflow: visible;
+}
+.legend-mark .g-node {
+  cursor: default;
+}
+.legend-name {
+  display: block;
+  font: 500 13px / 1.35 var(--sans);
+  color: var(--ink);
+}
+.legend-what {
+  display: block;
+  font: 12.5px / 1.4 var(--sans);
+  color: var(--ink-3);
+}
+.legend-hints {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0 0 0 16px;
+}
+.legend-hints li::marker {
+  color: var(--ink-4);
 }
 /* a concept's own page */
 .concept-page {

@@ -20,11 +20,13 @@ Every page shows only what it is for. A slim bar along the top holds the pages (
 on Review), the agent (a sparkle, with a dot while it works), search, the theme and settings; the
 reader keeps its own bar of the same height. The agent is one field over any page (⌘J), never a
 page or a form of its own: a request, a short reply, the change shown where it lands. The
-Brain is the graph alone, filling the window, with the item you pick in a card at its side; Today is
+Brain is the graph alone, filling the window, with Find at the top (⌘K there), the item you pick in a
+card at its left and, if you open it, the legend in a card like it at its right; each item is its kind's
+icon in a circle, with its name beside it. Today is
 a greeting, a field for the agent and what's next; Review is the card. Secondary controls stay quiet
 (subtle buttons, a disclosure for advanced settings) and explanations are one line.
 
-Side panels (the notes' list and links, the reader's study panel) are as
+Side panels (the notes' list and links, the reader's study panel, the Brain's legend and card) are as
 wide as you drag their inner edge, within a default, a narrowest and a widest width (`usePanel` and
 `PanelEdge`); there is no handle, just a line that lights when you rest on the edge. Dragging well past
 the narrowest width closes the panel, and a button (`PanelToggle`) opens it again at its default width.

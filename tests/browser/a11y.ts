@@ -391,7 +391,7 @@ try {
       check(`axe: ${route} (${theme})`, violations.length === 0, describe(violations));
     }
   }
-  // the agent's panel and a note's versions, open, in both themes
+  // the agent's panel, a note's versions and the Brain's legend and card, open, in both themes
   const quizNote = ((await fetch(`${BASE}api/notes?type=quiz`).then((r) => r.json())) as { id: string }[])[0];
   const note = quizNote ? `#/notes/${quizNote.id}` : list.find((r) => r.startsWith("#/notes/"));
   for (const theme of ["light", "dark"] as const) {
@@ -414,6 +414,21 @@ try {
         describe(await axe(page)),
       );
     }
+    await open(page, "#/brain", theme);
+    await page.click('.graph-tools [aria-label="Legend"]');
+    await page.evaluate(() =>
+      document.querySelector("[data-node] .g-disc")?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })),
+    );
+    await page.evaluate(() =>
+      document.querySelector("[data-node] .g-disc")?.dispatchEvent(new PointerEvent("pointerup", { bubbles: true })),
+    );
+    await wait(500);
+    check(
+      `axe: the Brain's legend and a card (${theme})`,
+      !!(await page.$(".legend-card")) && !!(await page.$(".node-card-edge")) && (await axe(page)).length === 0,
+      describe(await axe(page)),
+    );
+    await page.click('.graph-tools [aria-label="Legend"]');
   }
   if (!arg("only"))
     await keyboard(
