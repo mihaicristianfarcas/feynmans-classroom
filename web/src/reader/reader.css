@@ -67,19 +67,26 @@
   }
 }
 
-/* ---------- the two panes ---------- */
+/* ---------- the two panes: the study panel as wide as you drag it (the book keeps 360 px), then the book ---------- */
 .split {
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(360px, 42%) 1fr;
+  display: flex;
   min-height: 0;
 }
 .demo-pane {
+  flex: none;
+  width: var(--reader-panel-w, 560px);
+  max-width: calc(100% - 360px);
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--bg);
   border-right: 1px solid var(--line);
+}
+.demo-pane[hidden] {
+  display: none;
 }
 .pane-head {
   flex: none;
@@ -113,6 +120,8 @@
 }
 .book-pane {
   position: relative;
+  flex: 1;
+  min-width: 0;
   min-height: 0;
   display: flex;
   background: var(--sunken);
@@ -1521,11 +1530,16 @@
 /* ---------- narrow screens: book on top, panel docked below ---------- */
 @media (max-width: 900px) {
   .split {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr minmax(300px, 52%);
+    flex-direction: column;
+  }
+  .split > .panel-edge {
+    display: none;
   }
   .demo-pane {
     order: 2;
+    width: auto;
+    max-width: none;
+    height: max(300px, 52%);
     border-right: 0;
     border-top: 1px solid var(--line);
   }

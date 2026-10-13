@@ -1,10 +1,12 @@
-/* The reader's top bar: back to the library, the book's title, chapter and section pickers, "Find
- * chapters" for a PDF without bookmarks, Capture, the page, Review, Hold (on the Figures pane), the
- * agent, the theme and Help. */
+/* The reader's top bar: back to the library, the button that hides and shows the study panel, the
+ * book's title, chapter and section pickers, "Find chapters" for a PDF without bookmarks, Capture, the
+ * page, Review, Hold (on the Figures pane), the agent, the theme and Help. */
 import { ArrowLeft, CircleHelp, Crop, Layers, Pin, PinOff } from "lucide-react";
 import { AgentButton } from "../agent/AgentButton";
 import { api, type Book, type Job, type Loc, posOf, type TocEntry } from "../api";
 import { ThemeButton, useDueCount } from "../app/Shell";
+import { PanelToggle } from "../components/Panel";
+import type { Panel } from "../lib/usePanel";
 
 export function ReaderTopbar({
   book,
@@ -14,6 +16,7 @@ export function ReaderTopbar({
   onJump,
   capturing,
   onCapture,
+  panel,
   hold,
   help,
   onHelp,
@@ -28,6 +31,8 @@ export function ReaderTopbar({
   onJump: (loc: Loc) => void;
   capturing: boolean;
   onCapture: () => void;
+  /** The study panel beside the book. */
+  panel: Panel;
   /** Shown on the Figures pane: keeps the figure while you scroll. */
   hold: { held: boolean; disabled: boolean; toggle: () => void } | null;
   help: boolean;
@@ -49,6 +54,7 @@ export function ReaderTopbar({
       <a className="icon-button" href="#/library" title="Library" aria-label="Back to the library">
         <ArrowLeft aria-hidden="true" />
       </a>
+      <PanelToggle panel={panel} side="left" label="study panel" />
       <h1 className="book-name" title={book.title}>
         {book.title}
       </h1>

@@ -7,6 +7,7 @@ import { learn } from "../api";
 import { go } from "../app/navigation";
 import { Spinner } from "../components/feedback";
 import { announce, useArrowKeys } from "../lib/a11y";
+import type { Panel } from "../lib/usePanel";
 
 export type Tree = Awaited<ReturnType<typeof learn.tree>>;
 
@@ -50,7 +51,18 @@ function buildTree(tree: Tree): Folder {
   return root;
 }
 
-export function FileTree({ tree, current, reload }: { tree: Tree | null; current: string | null; reload: () => void }) {
+export function FileTree({
+  tree,
+  current,
+  reload,
+  panel,
+}: {
+  tree: Tree | null;
+  current: string | null;
+  reload: () => void;
+  /** Its width (the page resizes and closes it). */
+  panel: Panel;
+}) {
   const [filter, setFilter] = useState("");
   const [closed, setClosed] = useState<Set<string>>(() => {
     try {
@@ -115,7 +127,7 @@ export function FileTree({ tree, current, reload }: { tree: Tree | null; current
     </>
   );
   return (
-    <aside className="file-tree" aria-label="Notes">
+    <aside className="file-tree" aria-label="Notes" id={panel.id} ref={panel.ref} style={panel.style}>
       <div className="tree-head">
         <input
           className="search"

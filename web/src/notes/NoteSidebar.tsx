@@ -5,8 +5,9 @@ import { useState } from "react";
 import { learn, type NoteDetail, type SuggestedLink } from "../api";
 import { openLink } from "../app/navigation";
 import { Spinner } from "../components/feedback";
+import type { Panel } from "../lib/usePanel";
 
-export function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => void }) {
+export function NoteSidebar({ note, reload, panel }: { note: NoteDetail; reload: () => void; panel: Panel }) {
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const suggested = note.connections.filter((c) => c.status === "suggested");
@@ -16,7 +17,7 @@ export function NoteSidebar({ note, reload }: { note: NoteDetail; reload: () => 
     reload();
   };
   return (
-    <aside className="note-side" aria-label="Links">
+    <aside className="note-side" aria-label="Links" id={panel.id} ref={panel.ref} style={panel.style}>
       <section>
         <h2 className="side-title">
           Linked here <span className="count">{note.backlinks.length}</span>

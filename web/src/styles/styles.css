@@ -1271,6 +1271,61 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   animation-timing-function: ease;
 }
 
+/* ---------- side panels: a width you drag from their inner edge (components/Panel.tsx) ---------- */
+/* the edge takes no room: a wider strip to grab, and a line that lights once you rest on it (or focus it) */
+.panel-edge {
+  position: relative;
+  z-index: 4;
+  flex: none;
+  width: 0;
+  align-self: stretch;
+  outline: none;
+  touch-action: none;
+}
+.panel-edge::before {
+  content: "";
+  position: absolute;
+  inset: 0 -5px;
+  cursor: col-resize;
+}
+.panel-edge::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1px;
+  width: 2px;
+  background: var(--accent-ink);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .panel-edge:hover::after {
+    opacity: 0.55;
+    transition-delay: 150ms;
+  }
+}
+:root[data-resizing] .panel-edge:active::after {
+  opacity: 1;
+  transition-delay: 0ms;
+}
+.panel-edge:focus-visible::after {
+  left: -1.5px;
+  width: 3px;
+  opacity: 1;
+  transition: none;
+}
+/* while dragging, the whole page keeps the resize cursor and nothing gets selected */
+:root[data-resizing],
+:root[data-resizing] * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+:root[data-resizing] iframe {
+  pointer-events: none;
+}
+
 /* ---------- popovers: grow from where they were opened ---------- */
 .menu {
   position: absolute;

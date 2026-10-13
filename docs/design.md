@@ -24,6 +24,12 @@ Brain is the graph alone, filling the window, with the item you pick in a card a
 a greeting, a field for the agent and what's next; Review is the card. Secondary controls stay quiet
 (subtle buttons, a disclosure for advanced settings) and explanations are one line.
 
+Side panels (the notes' list and links, the reader's study panel) are as
+wide as you drag their inner edge, within a default, a narrowest and a widest width (`usePanel` and
+`PanelEdge`); there is no handle, just a line that lights when you rest on the edge. Dragging well past
+the narrowest width closes the panel, and a button (`PanelToggle`) opens it again at its default width.
+Each panel's width is kept in localStorage (0 while closed).
+
 Motion is quick and quiet: popovers and menus grow from where they open, presses scale slightly,
 tab and nav indicators slide, new content rises a few pixels, and the theme switch crossfades.
 What you do from the keyboard (the ⌘K palette, the agent's ⌘J panel, revealing a card, the reader's
@@ -56,5 +62,7 @@ page in both themes, plus keyboard checks) on every pull request.
   reading line and opens the selection menu with focus in it; capture places its box with the arrow
   keys; the knowledge graph is navigated with the arrow keys, Enter reads an item in the card beside
   it and Escape gives focus back to the item; a figure's parts are picked and read
-  with the up and down arrows, and Shift + arrows drag the picked one (or pan, or turn the view).
+  with the up and down arrows, and Shift + arrows drag the picked one (or pan, or turn the view); a
+  side panel's edge is a separator you can Tab to: the arrow keys resize it, Home and End go to its
+  narrowest and widest, Enter closes it (its button opens it again).
 - **Motion.** Keyboard actions don't animate; `prefers-reduced-motion` keeps only fades.

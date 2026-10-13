@@ -1,6 +1,7 @@
 /* The reader (#/book/<id>): the book on the right and, on the left, its panes (the margin, figures,
- * your note, the tutor, the study tools). It keeps your place, follows the reading line, and has
- * keyboard shortcuts for everything (press ? to see them). */
+ * your note, the tutor, the study tools) in a panel you resize from its edge or hide from the top bar
+ * (it opens again by itself when something lands in it). It keeps your place, follows the reading line,
+ * and has keyboard shortcuts for everything (press ? to see them). */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Anchor,
@@ -18,10 +19,12 @@ import {
   withFigs,
 } from "../api";
 import { SkipLink } from "../app/Shell";
+import { PanelEdge } from "../components/Panel";
 import { Toast, useToast } from "../components/Toast";
 import { CardDrafter, Connector, ExplainBack } from "../components/tools";
 import { useIndicator } from "../components/ui";
 import { useArrowKeys } from "../lib/a11y";
+import { usePanel } from "../lib/usePanel";
 import { under, useVaultEvents } from "../lib/useVaultEvents";
 import { CaptureLayer } from "./Capture";
 import { DemoPanel } from "./DemoPanel";
@@ -74,6 +77,16 @@ export function Reader({
   const [selection, setSelection] = useState<Selection | null>(null);
   const query = new URLSearchParams(location.hash.split("?")[1] || "");
   const [tab, setTab] = useState<Tab>(query.get("quiz") ? "study" : "margin");
+  const study = usePanel("reader-panel", { initial: 560, min: 360, max: 960 });
+  const { expand } = study;
+  /** Shows a pane, opening the panel if it was hidden. */
+  const show = useCallback(
+    (t: Tab) => {
+      setTab(t);
+      expand();
+    },
+    [expand],
+  );
   const [autoQuiz] = useState<"check" | null>(query.get("quiz") ? "check" : null);
   const [focused, setFocused] = useState<string | null>(query.get("focus"));
   const [hovered, setHovered] = useState<string | null>(null);
@@ -199,9 +212,9 @@ export function Reader({
     const a = annotations.find((x) => x.id === focused);
     if (!a) return;
     focusJumped.current = true;
-    setTab("margin");
+    show("margin");
     setTimeout(() => jumpTo(locOfAnchor(a.anchor), false), 200);
-  }, [annotations, focused, jumpTo, pos]);
+  }, [annotations, focused, jumpTo, pos, show]);
 
   const index = active ? demos.findIndex((d) => d.id === active.id) : -1;
   const nextAfterPos = demos.find((d) => posOf(d.anchor) > pos + 0.02);
@@ -289,7 +302,7 @@ export function Reader({
                 ),
             );
             if (hit) {
-              setTab("margin");
+              show("margin");
               setFocused(hit.id);
             }
           }
@@ -302,7 +315,7 @@ export function Reader({
       document.removeEventListener("mouseup", onUp);
       document.removeEventListener("keyup", onKeyUp);
     };
-  }, [menuForSelection]);
+  }, [menuForSelection, show]);
 
   const toNote = useCallback(
     async (input: { annotationId?: string; anchor?: Anchor }, mode: "embed" | "passage" | "reference") => {
@@ -331,7 +344,7 @@ export function Reader({
         try {
           const a = await learn.annotate(book.id, input);
           if (focus) {
-            setTab("margin");
+            show("margin");
             setFocused(a.id);
           }
           return a;
@@ -377,14 +390,14 @@ export function Reader({
         case "tutor":
           setPinned({ text: sel.text, source });
           setTutorMessages([]);
-          setTab("tutor");
+          show("tutor");
           break;
         case "copy":
           void navigator.clipboard?.writeText(sel.text).then(() => say("Copied."));
           break;
       }
     },
-    [selection, book, pos, chapter, toNote, say],
+    [selection, book, pos, chapter, toNote, say, show],
   );
 
   const marks = useMemo(() => ({ annotations, focused, hovered }), [annotations, focused, hovered]);
@@ -410,8 +423,9 @@ export function Reader({
           setCapturing((v) => !v);
           setSelection(null);
         }}
+        panel={study}
         hold={
-          tab === "figures"
+          tab === "figures" && study.open
             ? {
                 held: !!heldId,
                 disabled: !active && !heldId,
@@ -427,7 +441,14 @@ export function Reader({
       />
 
       <main className="split" ref={split}>
-        <section className="demo-pane" aria-label="Study panel">
+        <section
+          className="demo-pane"
+          aria-label="Study panel"
+          id={study.id}
+          ref={study.ref}
+          style={study.style}
+          hidden={!study.open}
+        >
           <div className="pane-head">
             <div className="pane-tabs segmented" role="tablist" aria-label="Study panel" ref={tabs}>
               {TABS.map(({ id: t, label }) => (
@@ -453,7 +474,8 @@ export function Reader({
             </div>
           </div>
           <div className="pane-body" role="tabpanel" id="pane-panel" aria-labelledby={`pane-tab-${tab}`}>
-            {tab === "margin" && (
+            {/* a hidden panel keeps its tabs but not its panes (the margin's line to the page goes with it) */}
+            {!study.open ? null : tab === "margin" ? (
               <Margin
                 book={book}
                 items={marginItems}
@@ -467,13 +489,12 @@ export function Reader({
                 theme={theme}
                 onToNote={(a: Annotation, mode) => toNote({ annotationId: a.id }, mode)}
                 onOpenDemo={(d) => {
-                  setTab("figures");
+                  show("figures");
                   jumpToDemo(d);
                 }}
                 toast={say}
               />
-            )}
-            {tab === "figures" && (
+            ) : tab === "figures" ? (
               <DemoPanel
                 book={book}
                 demo={active || null}
@@ -490,8 +511,7 @@ export function Reader({
                   next: index >= 0 ? index < demos.length - 1 : !!nextAfterPos,
                 }}
               />
-            )}
-            {tab === "note" && (
+            ) : tab === "note" ? (
               <ReaderNote
                 book={book}
                 note={workingNote}
@@ -502,8 +522,7 @@ export function Reader({
                 onJump={(loc) => jumpTo(loc)}
                 reload={loadNotes}
               />
-            )}
-            {tab === "tutor" && (
+            ) : tab === "tutor" ? (
               <TutorTab
                 book={book}
                 chapter={chapter}
@@ -513,19 +532,22 @@ export function Reader({
                 messages={tutorMessages}
                 setMessages={setTutorMessages}
               />
+            ) : (
+              <StudyTab book={book} chapter={chapter} theme={theme} autoQuiz={autoQuiz} />
             )}
-            {tab === "study" && <StudyTab book={book} chapter={chapter} theme={theme} autoQuiz={autoQuiz} />}
           </div>
         </section>
+        <PanelEdge panel={study} side="left" label="study panel" />
         <section className="book-pane" ref={pane} aria-label="Book">
           <Gutter
             demos={markers}
             notes={noteMarks}
             activeId={active?.id}
-            onNote={() => setTab("note")}
+            onNote={() => show("note")}
             onDemo={(id) => {
               const demo = demos.find((d) => d.id === id);
               if (demo) {
+                expand();
                 setFocused(demo.id);
                 jumpToDemo(demo);
               }

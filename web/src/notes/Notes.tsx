@@ -1,11 +1,14 @@
 /* The notes page (#/notes[/<id>]), like Obsidian: the file tree on the left and the open note beside
- * it (or a welcome when none is open). It reopens the last note and reloads when the vault changes.
- * The tree, the note and its sidebar live beside this file. */
+ * it (or a welcome when none is open), with its links on the right. Both sides can be resized from their
+ * edge, or closed and opened again with the buttons above the note. It reopens the last note and reloads
+ * when the vault changes. The tree, the note and its sidebar live beside this file. */
 import { SquarePen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { learn } from "../api";
 import { go } from "../app/navigation";
+import { PanelEdge, PanelToggle } from "../components/Panel";
 import { useLoad } from "../lib/useLoad";
+import { type Panel, usePanel } from "../lib/usePanel";
 import { under, useVaultEvents } from "../lib/useVaultEvents";
 import { FileTree, newNote, type Tree } from "./FileTree";
 import { NotePane } from "./NotePane";
@@ -31,17 +34,25 @@ export function Notes({ theme }: { theme: "light" | "dark" }) {
     } catch {}
   }, [id, route]);
   useVaultEvents(reload, under("notes/"));
+  const list = usePanel("notes-list", { initial: 260, min: 180, max: 480 });
+  const links = usePanel("notes-links", { initial: 300, min: 220, max: 520 });
   return (
     <div className="notes-page">
-      <FileTree tree={tree} current={id} reload={reload} />
-      {id ? <NotePane key={id} id={id} theme={theme} onChanged={reload} /> : <EmptyNotes tree={tree} />}
+      {list.open && <FileTree tree={tree} current={id} reload={reload} panel={list} />}
+      <PanelEdge panel={list} side="left" label="note list" />
+      {id ? (
+        <NotePane key={id} id={id} theme={theme} onChanged={reload} list={list} links={links} />
+      ) : (
+        <EmptyNotes tree={tree} list={list} />
+      )}
     </div>
   );
 }
 
-function EmptyNotes({ tree }: { tree: Tree | null }) {
+function EmptyNotes({ tree, list }: { tree: Tree | null; list: Panel }) {
   return (
     <div className="note-pane empty-pane">
+      <PanelToggle panel={list} side="left" label="note list" className="icon-button small pane-corner" />
       <div className="empty-state rise">
         <h1 className="empty-title">Notes</h1>
         <p className="fine">
@@ -52,7 +63,7 @@ function EmptyNotes({ tree }: { tree: Tree | null }) {
           <SquarePen aria-hidden="true" />
           New note
         </button>
-        {tree && tree.notes.length > 0 && <p className="fine">Or pick one on the left.</p>}
+        {tree && tree.notes.length > 0 && list.open && <p className="fine">Or pick one on the left.</p>}
       </div>
     </div>
   );
