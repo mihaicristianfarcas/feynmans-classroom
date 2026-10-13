@@ -1,0 +1,148 @@
+/* The reader's Note tab: the note you write in while reading (the book's own note unless you pick
+ * another). Passages and answers you send from the book land at its end; you write around them. */
+import { useCallback, useEffect, useRef, useState } from "react";
+import { learn, type Book, type Loc, type Note } from "./api";
+import { Markdown } from "./Markdown";
+import { NoteEditor } from "./NoteEditor";
+import { useVaultEvents } from "./Notes";
+import { timeAgo } from "./Shell";
+
+export function ReaderNote({ book, note, onChoose, ensureNote, bookNotes, theme, onJump, reload }: { book: Book; note: Note | null; onChoose: (n: Note | null) => void; ensureNote: () => Promise<Note>; bookNotes: Note[]; theme: "light" | "dark"; onJump: (loc: Loc) => void; reload: () => void }) {
+  const [recent, setRecent] = useState<Note[]>([]);
+  const [body, setBody] = useState(note?.body ?? "");
+  const [mode, setMode] = useState<"edit" | "read">("edit");
+  const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
+  const dirty = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const current = useRef(note);
+  current.current = note;
+
+  useEffect(() => {
+    learn.notes().then((list) => setRecent(list.slice(0, 20)), () => {});
+  }, [note?.id]);
+  const refresh = useCallback(async () => {
+    const n = current.current;
+    if (!n) return;
+    try {
+      const fresh = await learn.note(n.id);
+      if (!dirty.current) setBody(fresh.body);
+      if (fresh.updated !== n.updated || fresh.title !== n.title) onChoose(fresh);
+    } catch {
+      onChoose(null);
+    }
+  }, [onChoose]);
+  useEffect(() => {
+    dirty.current = false;
+    setBody(note?.body ?? "");
+    // the copy we were handed may be older than the file (a passage added while this tab was closed)
+    refresh();
+  }, [note?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // a passage sent from the book (or an agent's edit) changes the file: show it
+  useEffect(() => {
+    if (note && !dirty.current && note.body !== body) setBody(note.body);
+  }, [note?.updated]); // eslint-disable-line react-hooks/exhaustive-deps
+  useVaultEvents((path) => {
+    if (current.current && path === current.current.path) refresh();
+  });
+
+  const onBody = (text: string) => {
+    setBody(text);
+    dirty.current = true;
+    setState("idle");
+    clearTimeout(timer.current);
+    timer.current = setTimeout(async () => {
+      const n = current.current;
+      if (!n) return;
+      setState("saving");
+      const saved = await learn.updateNote(n.id, { body: text });
+      dirty.current = false;
+      setState("saved");
+      onChoose(saved);
+    }, 700);
+  };
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  const choices = [...new Map([...bookNotes, ...recent].map((n) => [n.id, n])).values()];
+  return (
+    <div className="reader-note">
+      <div className="reader-note-head">
+        <select
+          value={note?.id || ""}
+          onChange={async (e) => {
+            const v = e.target.value;
+            if (v === "__new") {
+              const title = prompt("Title of the new note:", `${book.title} — `);
+              if (!title?.trim()) return;
+              const created = await learn.createNote({ title: title.trim(), body: "", source: { bookId: book.id } });
+              onChoose(created);
+              reload();
+            } else if (v) onChoose(await learn.note(v));
+          }}
+          aria-label="Which note to write in"
+        >
+          {!note && <option value="">Choose a note…</option>}
+          {choices.map((n) => (
+            <option key={n.id} value={n.id}>
+              {n.title}
+            </option>
+          ))}
+          <option value="__new">New note…</option>
+        </select>
+        {note && (
+          <>
+            <div className="chips" role="group" aria-label="Mode">
+              <button className="chip" aria-pressed={mode === "edit"} onClick={() => setMode("edit")}>
+                Edit
+              </button>
+              <button className="chip" aria-pressed={mode === "read"} onClick={() => setMode("read")}>
+                Read
+              </button>
+            </div>
+            <span className="fine">{state === "saving" ? "Saving…" : state === "saved" ? "Saved" : `Edited ${timeAgo(note.updated)}`}</span>
+            <span className="spacer" />
+            <a className="link" href={`#/notes/${note.id}`} title={note.path}>
+              Open ↗
+            </a>
+          </>
+        )}
+      </div>
+      {note ? (
+        <div className="reader-note-body">{mode === "edit" ? <NoteEditor key={note.id} value={body} onChange={onBody} placeholder="Your thoughts as you read… Select a passage and press N to add it here." /> : <Markdown text={body} theme={theme} className="note-read" base={note.path} />}</div>
+      ) : (
+        <div className="margin-empty">
+          <p className="eyebrow">Your note for this book</p>
+          <p className="fine">Write while you read. Passages, explanations and figures you add from the book land here, linked back to where they came from. It’s a Markdown file in your vault’s notes/ folder.</p>
+          <button className="button primary" onClick={() => ensureNote()}>
+            Start “{book.title} — notes”
+          </button>
+        </div>
+      )}
+      {bookNotes.some((n) => n.source && n.id !== note?.id) && (
+        <details className="reader-note-others">
+          <summary className="fine">Other notes from this book</summary>
+          <ul className="link-list compact">
+            {bookNotes
+              .filter((n) => n.id !== note?.id)
+              .map((n) => (
+                <li key={n.id}>
+                  <button className="link" onClick={() => onChoose(n)}>
+                    {n.title}
+                  </button>
+                  {n.source?.page !== undefined && (
+                    <button className="link fine" onClick={() => onJump({ page: n.source!.page, y: n.source!.y })}>
+                      p. {n.source.page}
+                    </button>
+                  )}
+                </li>
+              ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}

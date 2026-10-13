@@ -1,10 +1,10 @@
-/* The reader's left pane, beyond figures: the tutor, this book's notes, and the chapter's study
- * tools (pretest, quiz, concept map, explain it back). */
+/* The reader's left pane, beyond the margin: the tutor and the chapter's study tools (pretest, quiz,
+ * concept map, explain it back). */
 import { useEffect, useRef, useState } from "react";
-import { learn, posOf, type Book, type Concept, type Loc, type Note, type Quiz, type SourceRef, type TocEntry } from "./api";
+import { learn, type Book, type Concept, type Quiz, type SourceRef, type TocEntry } from "./api";
 import { Markdown } from "./Markdown";
 import { QuizRunner } from "./Quiz";
-import { Mastery, Spinner, timeAgo } from "./Shell";
+import { Mastery, Spinner } from "./Shell";
 import { ExplainBack } from "./tools";
 
 /* ---------------- tutor ---------------- */
@@ -109,68 +109,6 @@ export function TutorTab({ book, chapter, pinned, onUnpin, theme, messages, setM
           </button>
         </div>
       </form>
-    </div>
-  );
-}
-
-/* ---------------- notes ---------------- */
-
-const locOfNote = (n: Note): Loc | null => (n.source ? (n.source.page !== undefined ? { page: n.source.page, y: n.source.y } : n.source.block !== undefined ? { block: n.source.block } : null) : null);
-
-export function NotesTab({ book, notes, onJump, onAdd, theme, reload }: { book: Book; notes: Note[]; onJump: (loc: Loc) => void; onAdd: (body: string) => Promise<void>; theme: "light" | "dark"; reload: () => void }) {
-  const [text, setText] = useState("");
-  const sorted = [...notes].sort((a, b) => posOf(locOfNote(a) || undefined) - posOf(locOfNote(b) || undefined));
-  return (
-    <div className="notes-tab">
-      <form
-        className="note-add"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!text.trim()) return;
-          await onAdd(text.trim());
-          setText("");
-        }}
-      >
-        <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} placeholder="A note at this spot in the book… ([[links]] work)" />
-        <button className="button" type="submit" disabled={!text.trim()}>
-          Add note
-        </button>
-      </form>
-      {sorted.length === 0 && <p className="fine">Select a passage and choose Highlight, or write a note above. Notes land in your vault, linked to this spot.</p>}
-      <ul className="book-notes">
-        {sorted.map((n) => {
-          const loc = locOfNote(n);
-          return (
-            <li key={n.id} className="book-note" data-type={n.type}>
-              <div className="row gap">
-                <span className="eyebrow">{n.type}</span>
-                <span className="fine">{loc ? (book.format === "pdf" ? `p. ${loc.page}` : "") : ""} · {timeAgo(n.updated)}</span>
-                <span className="spacer" />
-                {loc && (
-                  <button className="link" onClick={() => onJump(loc)}>
-                    Go to
-                  </button>
-                )}
-                <a className="link" href={`#/brain/note/${n.id}`}>
-                  Open
-                </a>
-                <button
-                  className="link danger"
-                  onClick={async () => {
-                    if (!confirm("Delete this note?")) return;
-                    await learn.deleteNote(n.id);
-                    reload();
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-              {n.type === "highlight" && n.source?.quote ? <blockquote className="quote">{n.source.quote}</blockquote> : null}
-              {n.body && !(n.type === "highlight" && n.body.trim() === `> ${n.source?.quote}`.trim()) && <Markdown text={n.type === "highlight" ? n.body.replace(/^>.*$/m, "").trim() : n.body} theme={theme} className="note-snippet" />}
-            </li>
-          );
-        })}
-      </ul>
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { deleteCard, draftCards, rateCard, reviewQueue, saveCard, saveDrafts, vi
 import { deleteConcept, extractConcepts, saveConcept, upsertConcept } from "./learn/concepts.ts";
 import { conceptMastery } from "./learn/context.ts";
 import { connect, gradeExplanation, gradeShortAnswers, makeQuiz, recordQuiz, saveExplanation, tutor } from "./learn/study.ts";
-import { llmLoad } from "./llm.ts";
+import { llmLoad, text } from "./llm.ts";
 import { standaloneFigure } from "./scene/figures.ts";
 import { activeProvider, claudeStatus, getSettings, saveSettings } from "./settings.ts";
 import { getBook, listBooks } from "./store.ts";
@@ -163,6 +163,23 @@ export function registerRoutes(app: Hono) {
     const type = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml" }[extname(path).slice(1).toLowerCase()];
     if (!type) return c.json({ error: "not a picture" }, 400);
     return new Response(readFileSync(path), { headers: { "content-type": type, "cache-control": "private, max-age=3600", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox", "x-content-type-options": "nosniff" } });
+  });
+  /** Reads a picture: LaTeX for a formula, a Markdown table, or a description of a figure. */
+  app.post("/api/transcribe", async (c) => {
+    const rel = ((await body<{ path: string }>(c)).path || "").replace(/\\/g, "/");
+    const path = rel.startsWith("attachments/") ? safeVaultPath(rel) : null;
+    if (!path || !existsSync(path)) return c.json({ error: "picture not found" }, 404);
+    const result = await text({
+      prompt: `This picture is a region cut from a page of a book. Transcribe it into Markdown for the learner's notes:
+- a formula or equation: LaTeX, $$…$$ for display math, $…$ inline; keep the book's symbols
+- a table: a Markdown table
+- a figure, diagram or chart: one short paragraph saying what it shows and what it's for, then any labels, axes or text in it
+- running text: the text itself
+Reply with the Markdown only, no preamble.`,
+      images: [path],
+      tier: "fast",
+    });
+    return c.json({ markdown: result.data.trim().replace(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/, "$1"), ms: result.ms });
   });
   /** Saves a picture (pasted into a note, or captured from a book) under attachments/. */
   app.post("/api/attachments", async (c) => {

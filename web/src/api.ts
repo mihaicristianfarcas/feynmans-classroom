@@ -16,6 +16,9 @@ export interface TocEntry {
 export interface Book {
   id: string;
   title: string;
+  /** Its folder in the vault (library/<folder>) and its file there. */
+  folder?: string;
+  file?: string;
   author?: string;
   format: "pdf" | "epub" | "text";
   pageCount?: number;
@@ -139,9 +142,10 @@ export function withFigs(book: Book, demos: Demo[]): Demo[] {
   return out.sort((a, b) => posOf(a.anchor) - posOf(b.anchor) || a.createdAt.localeCompare(b.createdAt));
 }
 
-/** Demos and jobs for a book, kept live over server-sent events. */
+/** Demos, annotations and jobs for a book, kept live over server-sent events. */
 export function useBookLive(bookId: string) {
   const [demos, setDemos] = useState<Demo[]>([]);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [connected, setConnected] = useState(false);
   const [book, setBook] = useState<Book | null>(null);
@@ -159,6 +163,13 @@ export function useBookLive(bookId: string) {
         return mine ? list.map((d) => (d.id === demo.id ? demo : d)) : [...list, demo];
       });
     const removeDemo = (id: string) => setDemos((list) => list.filter((d) => d.id !== id));
+    const applyAnnotation = (a: Annotation) =>
+      setAnnotations((list) => {
+        const mine = list.find((x) => x.id === a.id);
+        if (mine && mine.updated > a.updated) return list;
+        return mine ? list.map((x) => (x.id === a.id ? a : x)) : [...list, a];
+      });
+    const removeAnnotation = (id: string) => setAnnotations((list) => list.filter((x) => x.id !== id));
     const applyJob = (job: Job) => setJobs((list) => [job, ...list.filter((j) => j.id !== job.id)].slice(0, 40));
     const event = (apply: () => void) => {
       apply();
@@ -168,10 +179,11 @@ export function useBookLive(bookId: string) {
       clearTimeout(retry);
       inflight++;
       try {
-        const [demoList, jobList] = await Promise.all([api.demos(bookId), api.jobs(bookId)]);
+        const [demoList, jobList, annotationList] = await Promise.all([api.demos(bookId), api.jobs(bookId), learn.annotations(bookId)]);
         if (!alive) return;
         setDemos(demoList);
         setJobs(jobList);
+        setAnnotations(annotationList);
         for (const apply of buffered) apply();
       } catch {
         if (alive) retry = setTimeout(refresh, 3000);
@@ -198,6 +210,14 @@ export function useBookLive(bookId: string) {
       const { id } = JSON.parse((e as MessageEvent).data) as { id: string };
       event(() => removeDemo(id));
     });
+    source.addEventListener("annotation", (e) => {
+      const a = JSON.parse((e as MessageEvent).data) as Annotation;
+      event(() => applyAnnotation(a));
+    });
+    source.addEventListener("annotation-removed", (e) => {
+      const { id } = JSON.parse((e as MessageEvent).data) as { id: string };
+      event(() => removeAnnotation(id));
+    });
     source.addEventListener("book", (e) => setBook(JSON.parse((e as MessageEvent).data) as Book));
     source.addEventListener("job", (e) => {
       const job = JSON.parse((e as MessageEvent).data) as Job;
@@ -209,7 +229,7 @@ export function useBookLive(bookId: string) {
       source.close();
     };
   }, [bookId]);
-  return { demos, setDemos, jobs, connected, book };
+  return { demos, setDemos, annotations, setAnnotations, jobs, connected, book };
 }
 
 export function useTheme(): ["light" | "dark", (t: "light" | "dark") => void] {
@@ -484,12 +504,23 @@ export const learn = {
   note: (id: string) => call<NoteDetail>(`/api/notes/${id}`),
   createNote: (n: Partial<Note> & { folder?: string }) => post<Note>("/api/notes", n),
   updateNote: (id: string, n: Partial<Note> & { folder?: string }) => put<Note>(`/api/notes/${id}`, n),
+  appendToNote: (id: string, markdown: string) => post<Note>(`/api/notes/${id}/append`, { markdown }),
   deleteNote: (id: string) => del(`/api/notes/${id}`),
+  bookNote: (bookId: string) => post<Note>(`/api/books/${bookId}/note`),
   tree: () => call<{ notes: { id: string; path: string; title: string; type: string; updated: string }[]; folders: string[] }>("/api/vault/tree"),
   linkTargets: () => call<{ title: string; kind: string; path?: string; detail?: string }[]>("/api/links/targets"),
   resolve: (target: string, sub?: string) => call<Resolved>(`/api/links/resolve?target=${encodeURIComponent(target)}${sub ? `&sub=${encodeURIComponent(sub)}` : ""}`),
   attach: (data: string, name?: string) => post<{ path: string; name: string }>("/api/attachments", { data, name }),
+  transcribe: (path: string) => post<{ markdown: string; ms: number }>("/api/transcribe", { path }),
+  annotations: (bookId: string) => call<Annotation[]>(`/api/books/${bookId}/annotations`),
   annotation: (id: string) => call<Annotation>(`/api/annotations/${id}`),
+  annotate: (bookId: string, input: { kind: AnnotationKind; anchor: Anchor; request?: string; color?: string; body?: string; quality?: "quick" | "careful"; sceneKind?: string }) => post<Annotation>(`/api/books/${bookId}/annotations`, input),
+  retryAnnotation: (id: string) => post<Annotation>(`/api/annotations/${id}/retry`),
+  updateAnnotation: (id: string, patch: Partial<Pick<Annotation, "color" | "body" | "request" | "tags" | "title" | "kind">>) => call<Annotation>(`/api/annotations/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) }),
+  deleteAnnotation: (id: string) => del(`/api/annotations/${id}`),
+  followUp: (id: string, question: string) => post<Annotation>(`/api/annotations/${id}/followup`, { question }),
+  redraw: (id: string, notes?: string, quality?: "quick" | "careful") => post<Annotation>(`/api/annotations/${id}/redraw`, { notes, quality }),
+  toNote: (bookId: string, input: { annotationId?: string; anchor?: Anchor; noteId?: string; mode?: "reference" | "passage" | "embed"; comment?: string }) => post<{ note: Note; annotation: Annotation; markdown: string }>(`/api/books/${bookId}/to-note`, input),
   concepts: () => call<Concept[]>("/api/concepts"),
   concept: (id: string) => call<ConceptDetail>(`/api/concepts/${id}`),
   createConcept: (c: { name: string; summary?: string }) => post<Concept>("/api/concepts", c),
