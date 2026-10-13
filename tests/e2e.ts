@@ -52,7 +52,7 @@ const demoFrame = async (p: Page): Promise<Frame | null> => {
 
 try {
   // library
-  await page.goto(`${BASE}#/`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${BASE}#/library`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".book-card", { timeout: 10000 });
   check("library lists books", (await page.$$(".book-card")).length >= 1);
 
@@ -118,11 +118,25 @@ try {
     document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
   });
   await wait(300);
-  check("selecting a passage offers Visualize this", !!(await page.$(".visualize-pop")), `selected ${selected} chars`);
-  if (process.argv.includes("--generate") && (await page.$(".visualize-pop"))) {
-    await page.click(".visualize-pop");
-    await page.waitForSelector(".toast", { timeout: 10000 });
-    check("Visualize this starts a Codex job", true, await page.$eval(".toast", (el) => el.textContent || ""));
+  check("selecting a passage offers the study actions", (await page.$$(".select-pop .select-action")).length === 6, `selected ${selected} chars`);
+  if (await page.$(".select-pop")) {
+    await page.click(".select-action.primary");
+    await wait(200);
+    check("Visualize opens the request composer", !!(await page.$(".select-pop .figure-request input")));
+    if (process.argv.includes("--generate")) {
+      await page.type(".select-pop .figure-request input", "the simplest picture of this idea");
+      await page.click(".select-pop .figure-request button[type=submit]");
+      await page.waitForSelector(".scene-demo", { timeout: 15000 });
+      const started = Date.now();
+      await page.waitForSelector(".scene-demo .scene .sc-svg", { timeout: 180000 });
+      check("the figure is drawn", true, `${((Date.now() - started) / 1000).toFixed(1)} s`);
+    }
+  }
+  for (const tab of ["Tutor", "Notes", "Study"]) {
+    const buttons = await page.$$(".pane-tab");
+    for (const b of buttons) if ((await b.evaluate((el) => el.textContent || "")).startsWith(tab)) await b.click();
+    await wait(300);
+    check(`the ${tab} tab opens`, !!(await page.$(tab === "Tutor" ? ".tutor" : tab === "Notes" ? ".notes-tab" : ".study-tab")));
   }
 
   check("no page errors", pageErrors.length === 0, pageErrors.join(" | "));

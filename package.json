@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Upload a book, read it, and watch Codex-generated animated visualizations of its ideas side by side.",
+  "description": "A local-first learning platform: read hard books beside interactive figures, spaced repetition, quizzes, the Feynman technique and a Markdown second brain, on your own Codex or Claude Code subscription.",
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:server": "tsx watch --clear-screen=false server/index.ts",
@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:e2e": "tsx tests/e2e.ts",
     "typecheck": "tsc --noEmit -p .",
-    "postinstall": "node scripts/sync-kit.mjs"
+    "postinstall": "node scripts/sync-kit.mjs",
+    "test:flow": "tsx tests/reader-flow.ts"
   },
   "engines": {
     "node": ">=20"
