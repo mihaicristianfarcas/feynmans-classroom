@@ -107,7 +107,7 @@ export const api = {
   deleteBook: (id: string) => call(`/api/books/${id}`, { method: "DELETE" }),
   generate: (id: string, chapterId: string, count?: number, mode: "scene" | "code" = "scene") => post<Job>(`/api/books/${id}/chapters/${chapterId}/generate`, { count, mode }),
   detectChapters: (id: string) => post<Job>(`/api/books/${id}/detect-chapters`),
-  visualize: (id: string, chapterId: string, text: string) => post<Job>(`/api/books/${id}/visualize`, { chapterId, text }),
+  visualize: (id: string, input: { chapterId: string; text: string; request?: string; kind?: string; quality?: "quick" | "careful"; page?: number; block?: number }) => post<Demo>(`/api/books/${id}/visualize`, input),
   regenerate: (id: string, demoId: string, feedback?: string, quality?: "quick" | "careful") => post<Job>(`/api/books/${id}/demos/${demoId}/regenerate`, { feedback, quality }),
   craft: (id: string, demoId: string, feedback?: string) => post<Job>(`/api/books/${id}/demos/${demoId}/craft`, { feedback }),
   deleteDemo: (id: string, demoId: string) => call(`/api/books/${id}/demos/${demoId}`, { method: "DELETE" }),
