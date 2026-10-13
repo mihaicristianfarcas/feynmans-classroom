@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type Book, type Status } from "./api";
 
-export function Library({ theme, setTheme }: { theme: "light" | "dark"; setTheme: (t: "light" | "dark") => void }) {
+export function Library() {
   const [books, setBooks] = useState<Book[] | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
@@ -32,17 +32,10 @@ export function Library({ theme, setTheme }: { theme: "light" | "dark"; setTheme
 
   return (
     <div className="library">
-      <header className="library-head">
-        <div className="brand big">
-          <span className="brand-mark" aria-hidden="true" />
-          <span>Feynman’s Classroom</span>
-        </div>
-        <span className="spacer" />
-        <button className="icon-button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label="Switch theme">
-          {theme === "light" ? "◐" : "◑"}
-        </button>
+      <header className="page-head">
+        <h1 className="page-title">Library</h1>
       </header>
-      <p className="lede">Read a book beside small, animated demos of its ideas. Upload a book; Codex reads each chapter and builds an interactive figure for every idea worth seeing move, anchored to the passage it explains.</p>
+      <p className="lede small">Bring in a hard book: a PDF with selectable text, an EPUB, Markdown or plain text. Read it beside figures you can play with; select any passage to draw a figure, make flashcards, ask the tutor or explain it back.</p>
 
       <div
         className={`dropzone ${drag ? "drag" : ""}`}
@@ -86,7 +79,7 @@ export function Library({ theme, setTheme }: { theme: "light" | "dark"; setTheme
                 <span className="book-title">{book.title}</span>
                 {book.author && <span className="book-author">{book.author}</span>}
                 <span className="book-meta">
-                  {book.format === "pdf" ? `${book.pageCount} pages` : `${book.toc.length} chapters`} · {book.demoCount || 0} demo{book.demoCount === 1 ? "" : "s"}
+                  {book.format === "pdf" ? `${book.pageCount} pages` : `${book.toc.length} chapters`} · {book.demoCount || 0} figure{book.demoCount === 1 ? "" : "s"}
                   {book.building ? ` · ${book.building} building` : ""}
                 </span>
                 {book.status === "error" && <span className="form-error">{book.error}</span>}
@@ -111,7 +104,7 @@ export function Library({ theme, setTheme }: { theme: "light" | "dark"; setTheme
         {status ? (
           <>
             <span data-ok={status.codex.installed && status.codex.loggedIn}>
-              Codex {status.codex.installed ? (status.codex.loggedIn ? `ready · ${status.codex.detail || "logged in"}` : "installed but not logged in: run codex login") : "not installed"}
+              Codex {status.codex.installed ? (status.codex.loggedIn ? `ready · ${status.codex.detail || "logged in"}` : "installed but not logged in: run codex login") : "not installed"} · <a href="#/settings">settings</a>
             </span>
             <span data-ok={status.chrome}>Browser check {status.chrome ? "ready" : "unavailable (set CHROME_PATH)"}</span>
             <span>

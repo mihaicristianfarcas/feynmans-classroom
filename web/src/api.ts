@@ -40,6 +40,13 @@ export interface Brief {
 }
 export type DemoStatus = "queued" | "planning" | "building" | "checking" | "ready" | "failed";
 export interface Demo {
+  type?: "scene" | "code";
+  scene?: unknown;
+  request?: string;
+  kind?: string;
+  quality?: "quick" | "careful";
+  ms?: number;
+  startedAt?: string;
   id: string;
   bookId: string;
   chapterId: string;
@@ -57,7 +64,7 @@ export interface Demo {
 export interface Job {
   id: string;
   bookId: string;
-  kind: "plan" | "build";
+  kind: "plan" | "build" | "figure";
   chapterId?: string;
   demoId?: string;
   status: "queued" | "running" | "done" | "failed";
@@ -98,10 +105,11 @@ export const api = {
     return call<Book>("/api/books", { method: "POST", body: form });
   },
   deleteBook: (id: string) => call(`/api/books/${id}`, { method: "DELETE" }),
-  generate: (id: string, chapterId: string, count?: number) => post<Job>(`/api/books/${id}/chapters/${chapterId}/generate`, { count }),
+  generate: (id: string, chapterId: string, count?: number, mode: "scene" | "code" = "scene") => post<Job>(`/api/books/${id}/chapters/${chapterId}/generate`, { count, mode }),
   detectChapters: (id: string) => post<Job>(`/api/books/${id}/detect-chapters`),
   visualize: (id: string, chapterId: string, text: string) => post<Job>(`/api/books/${id}/visualize`, { chapterId, text }),
-  regenerate: (id: string, demoId: string, feedback?: string) => post<Job>(`/api/books/${id}/demos/${demoId}/regenerate`, { feedback }),
+  regenerate: (id: string, demoId: string, feedback?: string, quality?: "quick" | "careful") => post<Job>(`/api/books/${id}/demos/${demoId}/regenerate`, { feedback, quality }),
+  craft: (id: string, demoId: string, feedback?: string) => post<Job>(`/api/books/${id}/demos/${demoId}/craft`, { feedback }),
   deleteDemo: (id: string, demoId: string) => call(`/api/books/${id}/demos/${demoId}`, { method: "DELETE" }),
   fileUrl: (id: string) => `/api/books/${id}/file`,
   pageUrl: (id: string, demoId: string, theme: string, version: string, predict = true) => `/api/books/${id}/demos/${demoId}/page?theme=${theme}&v=${encodeURIComponent(version)}${predict ? "" : "&predict=0"}`,
@@ -221,3 +229,240 @@ export function useTheme(): ["light" | "dark", (t: "light" | "dark") => void] {
   }, [theme]);
   return [theme, setTheme];
 }
+
+/* ---------------- the learning platform ---------------- */
+
+export interface SourceRef {
+  bookId: string;
+  chapterId?: string;
+  page?: number;
+  y?: number;
+  block?: number;
+  quote?: string;
+}
+export type NoteType = "note" | "highlight" | "explanation" | "connection" | "answer" | "summary";
+export interface Note {
+  id: string;
+  type: NoteType;
+  title: string;
+  body: string;
+  tags: string[];
+  concepts: string[];
+  source?: SourceRef;
+  score?: number;
+  created: string;
+  updated: string;
+  backlinks?: { id: string; title: string; type: string }[];
+}
+export interface Concept {
+  id: string;
+  name: string;
+  aliases: string[];
+  summary: string;
+  body: string;
+  related: string[];
+  sources: (SourceRef & { title?: string })[];
+  created: string;
+  updated: string;
+  mastery: number | null;
+  cards?: number;
+}
+export interface ConceptDetail extends Omit<Concept, "cards" | "related"> {
+  cards: CardView[];
+  notes: Note[];
+  related: { id: string; name: string; mastery: number | null }[];
+  backlinks: { id: string; name: string; mastery: number | null }[];
+}
+export interface MemoryState {
+  s: number;
+  d: number;
+  last: number;
+  due: number;
+  phase: "learning" | "review" | "relearning";
+  reps: number;
+  lapses: number;
+}
+export interface CardView {
+  id: string;
+  front: string;
+  back: string;
+  kind: "basic" | "cloze";
+  deck: string;
+  concepts: string[];
+  tags: string[];
+  source?: SourceRef;
+  figure?: string;
+  suspended: boolean;
+  created: string;
+  state: MemoryState | null;
+  next?: Record<1 | 2 | 3 | 4, number>;
+}
+export interface DraftCard {
+  front: string;
+  back: string;
+  kind: "basic" | "cloze";
+  concept: string;
+}
+export interface Profile {
+  name: string;
+  role: "student" | "professor" | "professional" | "curious";
+  goals: string;
+  background: string;
+  level: "beginner" | "intermediate" | "advanced" | "expert";
+  styles: { visual: number; reader: number; doer: number };
+  interests: string[];
+  dailyNew: number;
+  retention: number;
+  notes: string;
+  onboarded: boolean;
+}
+export interface Question {
+  kind: "mcq" | "short";
+  question: string;
+  choices: string[];
+  answer: number;
+  ideal: string;
+  explanation: string;
+  concept: string;
+  quote: string;
+}
+export interface Quiz {
+  id: string;
+  title: string;
+  mode: "check" | "pretest" | "review";
+  questions: Question[];
+  source: { bookId?: string; chapterId?: string };
+}
+export interface ExplainFeedback {
+  score: number;
+  verdict: string;
+  strengths: string[];
+  gaps: string[];
+  jargon: string[];
+  misconceptions: string[];
+  followUp: string;
+  simpler: string;
+  quote: string;
+}
+export interface Connection {
+  kind: "today" | "your-work" | "across";
+  title: string;
+  body: string;
+  concepts: string[];
+}
+export interface SavedFigure {
+  id: string;
+  title: string;
+  scene: unknown;
+  source?: SourceRef;
+  request?: string;
+  created: string;
+}
+export interface GraphData {
+  nodes: { id: string; kind: "book" | "concept" | "note"; label: string; mastery: number | null; size: number; detail?: string; bookId?: string; created: number }[];
+  edges: { from: string; to: string; kind: string }[];
+}
+export interface SearchHit {
+  kind: "note" | "concept" | "card" | "book";
+  id: string;
+  title: string;
+  snippet: string;
+  score: number;
+  bookId?: string;
+  loc?: { page?: number; block?: number };
+}
+export interface Activity {
+  ts: number;
+  type: string;
+  bookId?: string;
+  concepts?: string[];
+  text: string;
+  data?: Record<string, unknown>;
+}
+export interface Journey {
+  days: Record<string, { reviews: number; minutes: number; events: number; correct: number }>;
+  streak: number;
+  totals: { reviews: number; cards: number; concepts: number; notes: number; figures: number; books: number };
+  retention: { now: number | null; month: number | null; mature: number; learning: number; unseen: number };
+  mastery: { id: string; name: string; mastery: number | null }[];
+  recent: Activity[];
+}
+export interface Today {
+  queue: { due: number; learning: number; fresh: number; total: number };
+  books: { id: string; title: string; author?: string; format: string; lastTs: number; position: number | null; chapter: string | null }[];
+  suggestions: { kind: string; title: string; detail: string; action: Record<string, string> }[];
+  profile: Profile;
+  summary: string;
+}
+export interface SettingsInfo {
+  settings: { provider: "auto" | "codex" | "claude"; codex: Tier; claude: Tier; concurrency: number };
+  active: "codex" | "claude";
+  codex: { installed: boolean; version?: string; loggedIn: boolean; detail?: string };
+  claude: { installed: boolean; version?: string };
+  load: { running: number; waiting: number };
+}
+interface Tier {
+  fastModel: string;
+  fastEffort: string;
+  smartModel: string;
+  smartEffort: string;
+}
+
+const put = <T,>(path: string, body?: unknown) => call<T>(path, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body ?? {}) });
+const del = (path: string) => call(path, { method: "DELETE" });
+
+export const learn = {
+  profile: () => call<Profile>("/api/profile"),
+  saveProfile: (p: Partial<Profile>) => put<Profile>("/api/profile", p),
+  settings: () => call<SettingsInfo>("/api/settings"),
+  saveSettings: (s: Partial<SettingsInfo["settings"]>) => put<{ settings: SettingsInfo["settings"]; active: string }>("/api/settings", s),
+  vault: () => call<{ notes: number; concepts: number; cards: number; figures: number; reviews: number; git: boolean; path: string; history: { hash: string; when: string; subject: string }[] }>("/api/vault"),
+  today: () => call<Today>("/api/today"),
+  journey: () => call<Journey>("/api/journey"),
+  graph: () => call<GraphData>("/api/graph"),
+  search: (q: string) => call<SearchHit[]>(`/api/search?q=${encodeURIComponent(q)}`),
+  readPing: (body: { bookId: string; chapter?: string; chapterId?: string; position?: number; page?: number }) => post("/api/activity", { type: "read", ...body }),
+  notes: (filter: { type?: string; book?: string; concept?: string } = {}) => call<Note[]>(`/api/notes?${new URLSearchParams(filter as Record<string, string>)}`),
+  note: (id: string) => call<Note>(`/api/notes/${id}`),
+  createNote: (n: Partial<Note>) => post<Note>("/api/notes", n),
+  updateNote: (id: string, n: Partial<Note>) => put<Note>(`/api/notes/${id}`, n),
+  deleteNote: (id: string) => del(`/api/notes/${id}`),
+  concepts: () => call<Concept[]>("/api/concepts"),
+  concept: (id: string) => call<ConceptDetail>(`/api/concepts/${id}`),
+  createConcept: (c: { name: string; summary?: string }) => post<Concept>("/api/concepts", c),
+  updateConcept: (id: string, c: Partial<Concept>) => put<Concept>(`/api/concepts/${id}`, c),
+  deleteConcept: (id: string) => del(`/api/concepts/${id}`),
+  extractConcepts: (bookId: string, chapterId: string) => post<Concept[]>(`/api/books/${bookId}/chapters/${chapterId}/concepts`),
+  cards: (filter: { deck?: string; concept?: string } = {}) => call<CardView[]>(`/api/cards?${new URLSearchParams(filter as Record<string, string>)}`),
+  saveCards: (cards: Partial<CardView>[]) => post<CardView[]>("/api/cards", { cards }),
+  updateCard: (id: string, c: Partial<CardView>) => put<CardView>(`/api/cards/${id}`, c),
+  deleteCard: (id: string) => del(`/api/cards/${id}`),
+  draftCards: (input: { passage: string; source?: SourceRef; focus?: string; count?: number }) => post<{ cards: DraftCard[]; concepts: { name: string; summary: string }[] }>("/api/cards/draft", input),
+  saveDrafts: (input: { drafts: DraftCard[]; deck?: string; source?: SourceRef; concepts?: { name: string; summary: string }[] }) => post<CardView[]>("/api/cards/save-drafts", input),
+  decks: () => call<{ name: string; count: number }[]>("/api/decks"),
+  queue: (deck?: string) => call<{ cards: CardView[]; due: number; fresh: number; learning: number; total: number }>(`/api/review${deck ? `?deck=${encodeURIComponent(deck)}` : ""}`),
+  rate: (id: string, rating: 1 | 2 | 3 | 4, took?: number) => post<CardView>(`/api/review/${id}`, { rating, took }),
+  quiz: (input: { bookId?: string; chapterId?: string; passage?: string; source?: SourceRef; mode: "check" | "pretest" | "review"; count?: number }) => post<Quiz>("/api/quiz", input),
+  gradeShort: (items: { question: string; ideal: string; answer: string }[]) => post<{ score: number; feedback: string }[]>("/api/quiz/grade", { items }),
+  recordQuiz: (input: { title: string; mode: string; bookId?: string; score: number; total: number; concepts: string[] }) => post("/api/quiz/record", input),
+  explain: (input: { concept: string; explanation: string; passage?: string; source?: SourceRef }) => post<ExplainFeedback>("/api/explain", input),
+  saveExplanation: (input: { concept: string; explanation: string; score: number; feedback: string; source?: SourceRef }) => post<Note>("/api/explain/save", input),
+  connect: (input: { passage: string; source?: SourceRef; question?: string }) => post<Connection[]>("/api/connect", input),
+  tutor: (input: { messages: { role: "user" | "tutor"; text: string }[]; passage?: string; source?: SourceRef; mode?: "answer" | "socratic" }) => post<{ reply: string }>("/api/tutor", input),
+  ask: (question: string) => post<{ answer: string; sources: { path: string; quote: string }[]; ms: number }>("/api/ask", { question }),
+  saveAnswer: (input: { question: string; answer: string; sources: { path: string; quote: string }[] }) => post<Note>("/api/ask/save", input),
+  figures: () => call<SavedFigure[]>("/api/figures"),
+  figure: (id: string) => call<SavedFigure>(`/api/figures/${id}`),
+  makeFigure: (input: { passage: string; request?: string; kind?: string; quality?: "quick" | "careful"; source?: SourceRef; save?: boolean }) => post<SavedFigure>("/api/figures", input),
+  deleteFigure: (id: string) => del(`/api/figures/${id}`),
+  keepFigure: (input: { scene: unknown; title?: string; source?: SourceRef }) => post<SavedFigure>("/api/figures", input),
+  booksLite: () => call<{ id: string; title: string; author?: string; toc: { id: string; title: string }[] }[]>("/api/books-lite"),
+};
+
+/** Navigates to a hash route. */
+export const go = (route: string) => {
+  location.hash = route.startsWith("#") ? route : `#${route}`;
+};
+
+/** A book location as a reader link. */
+export const bookLink = (ref: Partial<SourceRef> & { bookId?: string }) => (ref.bookId ? `#/book/${ref.bookId}${ref.page !== undefined ? `?at=${(ref.page + (ref.y ?? 0)).toFixed(3)}` : ref.block !== undefined ? `?at=${ref.block}` : ""}` : "#/library");
