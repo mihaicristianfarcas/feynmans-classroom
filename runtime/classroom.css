@@ -1,50 +1,88 @@
+/* The frame of a hand-built demo, in the app's palette: coal and off-white, the lit element in the
+   lavender accent. These tokens override the anatomy kit's (iso.css comes first on the page). */
+.iso{
+  --anatomy-page:#1d1d20;--anatomy-card:#252529;--anatomy-text:#bebcb7;--anatomy-strong:#edebe6;--anatomy-muted:#8c8b90;
+  --anatomy-paper:#252529;--anatomy-face:#2c2c31;--anatomy-top:#2e2e33;
+  --anatomy-shade-0:#18181b;--anatomy-shade-1:#1c1c1f;--anatomy-shade-2:#202023;--anatomy-shade-3:#242428;
+  --anatomy-lit-top:#3a3a40;--anatomy-lit-shade:#2e2e33;
+  --anatomy-hi:#dedcd6;--anatomy-mid:#8c8b90;--anatomy-lo:#56555b;--anatomy-faint:#35353b;--anatomy-lit:#c8bff3;
+  --anatomy-halo:#000000;--anatomy-halo-opacity:.85;--anatomy-dot:#edebe6;
+  --anatomy-red:#f0a0a8;--anatomy-green:#95d1a9;--anatomy-blue:#9ec2ee;
+  --anatomy-ease:cubic-bezier(.23,1,.32,1);
+  --anatomy-lift:0 0 0 1px #303035;
+  --cr-line:#303035;--cr-line-strong:#3e3e44;--cr-pop:0 0 0 1px rgb(255 255 255 / .06),0 6px 12px -4px rgb(0 0 0 / .4),0 20px 48px -12px rgb(0 0 0 / .65);
+  --cr-sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+}
+.iso[data-theme="light"]{
+  --anatomy-page:#f8f7f4;--anatomy-card:#ffffff;--anatomy-text:#55555b;--anatomy-strong:#2b2b2f;--anatomy-muted:#87868c;
+  --anatomy-paper:#ffffff;--anatomy-face:#ffffff;--anatomy-top:#ffffff;
+  --anatomy-shade-0:#dedad2;--anatomy-shade-1:#e7e4dd;--anatomy-shade-2:#efede7;--anatomy-shade-3:#f6f5f1;
+  --anatomy-lit-top:#ffffff;--anatomy-lit-shade:#efede7;
+  --anatomy-hi:#2b2b2f;--anatomy-mid:#8a898f;--anatomy-lo:#bbb8b2;--anatomy-faint:#dcd9d2;--anatomy-lit:#6a5cc4;
+  --anatomy-halo:#8a8478;--anatomy-halo-opacity:.28;--anatomy-dot:#3a3a3e;
+  --anatomy-red:#d6606c;--anatomy-green:#4b986a;--anatomy-blue:#4c7fc0;
+  --anatomy-lift:0 0 0 1px #e7e4dd,0 1px 2px rgb(40 36 30 / .05);
+  --cr-line:#e7e4dd;--cr-line-strong:#d6d2c9;--cr-pop:0 0 0 1px rgb(40 36 30 / .06),0 4px 8px -2px rgb(40 36 30 / .06),0 18px 40px -10px rgb(40 36 30 / .2);
+}
 *{box-sizing:border-box}
 html,body{height:100%}
 html{color-scheme:light}
 body[data-theme="dark"]{color-scheme:dark}
-body{margin:0;background:var(--anatomy-page);color:var(--anatomy-text);font:13px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--anatomy-page);color:var(--anatomy-text);font:13px/1.5 var(--cr-sans);-webkit-font-smoothing:antialiased}
+.iso-plate{border-radius:12px;box-shadow:var(--anatomy-lift)}
+.iso-plate-corner{font:500 12px/1 var(--cr-sans);letter-spacing:0}
+.iso-plate-corner[data-corner="fig"]{color:var(--anatomy-strong);font-weight:600}
+.iso-plate-corner[data-corner="title"],.iso-plate-corner[data-corner="hint"]{text-transform:none;letter-spacing:0}
+.iso-plate-corner[data-corner="readout"]{color:var(--anatomy-strong)}
 .cr-root{display:flex;flex-direction:column;gap:10px;padding:14px 16px 14px}
 .cr-figure{margin:0;display:flex;flex-direction:column}
 .cr-plate{display:flex;padding:44px 18px 46px}
 .cr-stage{flex:1 1 auto;display:flex;align-items:center;justify-content:center;min-width:0;outline:none;touch-action:pan-y}
-.cr-stage:focus-visible{outline:1px solid var(--anatomy-muted);outline-offset:6px}
+.cr-stage:focus-visible{outline:2px solid color-mix(in srgb,var(--anatomy-lit) 50%,transparent);outline-offset:6px;border-radius:4px}
 .cr-root .iso-svg{width:100%;height:auto;max-height:max(220px,calc(100vh - 260px))}
 .cr-legend{margin-top:8px}
-.cr-bar,.cr-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
-.cr-button{appearance:none;border:0;border-radius:3px;padding:6px 10px;background:var(--anatomy-card);color:var(--anatomy-strong);box-shadow:0 0 0 1px var(--anatomy-mid);font:500 10.5px/1 var(--anatomy-mono);letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:box-shadow .2s var(--anatomy-ease),background .2s var(--anatomy-ease)}
-.cr-button:hover{box-shadow:0 0 0 1px var(--anatomy-hi)}
-.cr-button:focus-visible{outline:1px solid var(--anatomy-hi);outline-offset:2px}
-.cr-button[disabled]{opacity:.45;cursor:default;box-shadow:0 0 0 1px var(--anatomy-lo)}
-.cr-control{display:inline-flex;align-items:center;gap:8px;min-height:28px;color:var(--anatomy-text);font:11px/1.2 var(--anatomy-mono);letter-spacing:.02em}
+.cr-bar,.cr-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+.cr-button{appearance:none;border:0;border-radius:8px;height:30px;padding:0 10px;background:var(--anatomy-card);color:var(--anatomy-strong);box-shadow:inset 0 0 0 1px var(--cr-line-strong);font:500 12.5px/1 var(--cr-sans);cursor:pointer;transition:background-color .15s ease,box-shadow .15s ease,transform .16s var(--anatomy-ease)}
+.cr-button:active:not([disabled]){transform:scale(.95)}
+.cr-button:focus-visible{outline:2px solid color-mix(in srgb,var(--anatomy-lit) 55%,transparent);outline-offset:2px}
+.cr-button[disabled]{opacity:.4;cursor:default}
+@media (hover:hover) and (pointer:fine){.cr-button:hover:not([disabled]){background:color-mix(in srgb,var(--anatomy-card),var(--anatomy-strong) 5%)}}
+.cr-control{display:inline-flex;align-items:center;gap:10px;min-height:28px;color:var(--anatomy-text);font:13px/1.2 var(--cr-sans)}
 .cr-control[data-type="range"]{flex:1 1 260px;max-width:420px}
 .cr-label{white-space:nowrap;color:var(--anatomy-text)}
-.cr-value{min-width:64px;color:var(--anatomy-strong);font-variant-numeric:tabular-nums;text-align:right}
-.cr-control input[type="range"]{flex:1 1 auto;min-width:80px;accent-color:var(--anatomy-hi);height:18px}
+.cr-value{min-width:64px;color:var(--anatomy-strong);font-weight:500;font-variant-numeric:tabular-nums;text-align:right}
+.cr-control input[type="range"]{-webkit-appearance:none;appearance:none;flex:1 1 auto;min-width:80px;height:20px;margin:0;background:transparent;cursor:pointer}
+.cr-control input[type="range"]::-webkit-slider-runnable-track{height:4px;border-radius:4px;background:var(--anatomy-faint)}
+.cr-control input[type="range"]::-moz-range-track{height:4px;border-radius:4px;background:var(--anatomy-faint)}
+.cr-control input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;margin-top:-5.5px;border-radius:50%;background:var(--anatomy-card);box-shadow:0 0 0 1px var(--cr-line-strong),0 1px 2px rgb(0 0 0 / .12);transition:transform .16s var(--anatomy-ease)}
+.cr-control input[type="range"]::-moz-range-thumb{width:14px;height:14px;border:0;border-radius:50%;background:var(--anatomy-card);box-shadow:0 0 0 1px var(--cr-line-strong)}
+.cr-control input[type="range"]:active::-webkit-slider-thumb{transform:scale(1.12);box-shadow:0 0 0 1px var(--anatomy-lit),0 0 0 4px color-mix(in srgb,var(--anatomy-lit) 22%,transparent)}
 .cr-control input[type="checkbox"]{accent-color:var(--anatomy-hi);margin:0}
-.cr-control select{font:11px var(--anatomy-mono);color:var(--anatomy-strong);background:var(--anatomy-card);border:0;border-radius:3px;box-shadow:0 0 0 1px var(--anatomy-mid);padding:5px 6px}
-.cr-stats{display:flex;flex-wrap:wrap;gap:4px 18px;padding-top:8px;border-top:1px solid var(--anatomy-faint);font:11px/1.6 var(--anatomy-mono);font-variant-numeric:tabular-nums}
+.cr-control select{font:13px var(--cr-sans);color:var(--anatomy-strong);background:var(--anatomy-card);border:0;border-radius:8px;box-shadow:inset 0 0 0 1px var(--cr-line-strong);padding:6px 8px}
+.cr-stats{display:flex;flex-wrap:wrap;gap:4px 18px;padding-top:8px;border-top:1px solid var(--cr-line);font:12.5px/1.6 var(--cr-sans);font-variant-numeric:tabular-nums}
 .cr-stat{display:inline-flex;gap:6px;white-space:nowrap}
 .cr-stat-label{color:var(--anatomy-muted)}
-.cr-stat b{font-weight:500;color:var(--anatomy-strong)}
-.cr-eyebrow{font:500 10.5px/1 var(--anatomy-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--anatomy-muted)}
-.cr-predict{position:absolute;left:18px;right:18px;bottom:52px;z-index:3;display:grid;gap:10px;padding:14px 16px;background:var(--anatomy-card);box-shadow:0 0 0 1px var(--anatomy-hi),var(--anatomy-lift);border-radius:2px}
+.cr-stat b{font-weight:600;color:var(--anatomy-strong)}
+.cr-eyebrow{font:600 12px/1 var(--cr-sans);color:var(--anatomy-lit)}
+.cr-predict{position:absolute;left:18px;right:18px;bottom:52px;z-index:3;display:grid;gap:10px;padding:16px 18px;background:var(--anatomy-card);box-shadow:var(--cr-pop);border-radius:12px}
 .cr-predict-head{display:flex;justify-content:space-between;align-items:center}
-.cr-predict-q{margin:0;color:var(--anatomy-strong);font-size:14px;line-height:1.45}
+.cr-predict-q{margin:0;color:var(--anatomy-strong);font:15.5px/1.5 "Iowan Old Style",Charter,Cambria,Georgia,serif}
 .cr-predict-a{margin:0;color:var(--anatomy-text)}
 .cr-choices{display:flex;flex-wrap:wrap;gap:8px}
-.cr-choice{text-transform:none;letter-spacing:0;font:12px/1.2 ui-sans-serif,system-ui,sans-serif;padding:7px 10px}
-.cr-choice[data-right]{box-shadow:0 0 0 1.5px var(--anatomy-green);opacity:1}
-.cr-choice[data-wrong]{box-shadow:0 0 0 1.5px var(--anatomy-red);opacity:1}
-.cr-skip{appearance:none;border:0;background:none;color:var(--anatomy-muted);font:10.5px var(--anatomy-mono);text-transform:uppercase;letter-spacing:.08em;cursor:pointer}
-.cr-error{position:absolute;inset:auto 18px 52px 18px;z-index:4;display:grid;gap:4px;padding:10px 12px;background:var(--anatomy-card);box-shadow:0 0 0 1px var(--anatomy-red);color:var(--anatomy-text);font:12px/1.4 var(--anatomy-mono)}
-.cr-error strong{color:var(--anatomy-red);font-weight:500}
+.cr-choice{height:auto;padding:8px 12px;font:13px/1.3 var(--cr-sans);text-align:left}
+.cr-choice[data-right]{background:color-mix(in srgb,var(--anatomy-green) 14%,var(--anatomy-card));box-shadow:inset 0 0 0 1.5px var(--anatomy-green);opacity:1}
+.cr-choice[data-wrong]{background:color-mix(in srgb,var(--anatomy-red) 12%,var(--anatomy-card));box-shadow:inset 0 0 0 1.5px var(--anatomy-red);opacity:1}
+.cr-skip{appearance:none;border:0;background:none;color:var(--anatomy-muted);font:500 12.5px var(--cr-sans);cursor:pointer}
+.cr-skip:hover{color:var(--anatomy-strong)}
+.cr-error{position:absolute;inset:auto 18px 52px 18px;z-index:4;display:grid;gap:4px;padding:10px 12px;background:var(--anatomy-card);border-radius:10px;box-shadow:inset 0 0 0 1px var(--anatomy-red);color:var(--anatomy-text);font:12.5px/1.45 var(--cr-sans)}
+.cr-error strong{color:var(--anatomy-red);font-weight:600}
 @media (max-width:560px){.cr-root{padding:10px}.cr-plate{padding:40px 8px 44px}.cr-control[data-type="range"]{flex-basis:100%;max-width:none}}
-@media (prefers-reduced-motion:reduce){.cr-button{transition:none}}
-/* d2: simple 2D figures in the anatomy finish */
+@media (prefers-reduced-motion:reduce){.cr-button,.cr-control input[type="range"]::-webkit-slider-thumb{transition:none}}
+/* d2: simple 2D figures */
 .d2-line{fill:none;stroke:var(--anatomy-mid);stroke-width:1.1px;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
 .d2-shape{stroke:var(--anatomy-mid);stroke-width:1.1px;stroke-linejoin:round;vector-effect:non-scaling-stroke;color:var(--anatomy-mid)}
 .d2-dot{stroke:none;fill:currentColor;color:var(--anatomy-hi)}
-.d2-text{fill:currentColor;color:var(--anatomy-mid);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.d2-text{fill:currentColor;color:var(--anatomy-mid);font-family:var(--cr-sans)}
 .d2-text[data-mono]{font-family:var(--anatomy-mono);letter-spacing:.02em}
 .d2-text[data-italic]{font-style:italic;font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif}
 [data-tone="hi"]:is(.d2-line,.d2-shape){stroke:var(--anatomy-hi);stroke-width:1.5px}
