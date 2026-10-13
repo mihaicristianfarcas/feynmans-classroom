@@ -7,7 +7,7 @@ import { Markdown } from "../components/Markdown";
 import { useIndicator } from "../components/ui";
 import { timeAgo } from "../lib/time";
 import { NoteEditor } from "../notes/NoteEditor";
-import { useVaultEvents } from "../notes/Notes";
+import { useVaultEvents } from "../notes/useVaultEvents";
 
 export function ReaderNote({
   book,

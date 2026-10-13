@@ -36,9 +36,9 @@ shared/            code the server and the browser both run
   fsrs.ts links.ts textmatch.ts vault-types.ts
 web/src/           the React app (Vite)
   app/             the shell: routing, navigation, theme, the ⌘K palette
-  pages/           Today, Library, Review, Brain, Journey, Ask, Settings, Welcome, Gallery
-  reader/          the reader: book views, margin, selection menu, figures pane, note, tutor, capture
-  notes/           notes: the file tree, the CodeMirror editor
+  pages/           Today, Library, Review, Journey, Ask, Settings, Welcome, Gallery; brain/: graph, lists, concept
+  reader/          the reader: book views, margin, selection menu, figures pane, note, tutor, capture, gutter
+  notes/           notes: the file tree, the note pane and its links sidebar, the CodeMirror editor
   components/      shared pieces: Markdown, dialogs and study tools, quiz, graph, profile form
   scene/           the figure player (the universal frame around every figure)
   api/             typed calls to the server, and the live book hook
