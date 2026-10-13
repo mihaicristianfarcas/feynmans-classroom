@@ -15,10 +15,11 @@ import { registerRoutes } from "./routes.ts";
 import { figureFromSelection, figuresForChapter, regenerateFigure, resumeFigures } from "./scene/figures.ts";
 import { activeProvider } from "./settings.ts";
 import { initVault, logActivity } from "./vault/index.ts";
-import { exportBook, exportMissingBooks, removeBookExport } from "./vault/library.ts";
+import { startIndexing } from "./vault/indexes.ts";
+import { exportBook, exportMissingBooks } from "./vault/library.ts";
 import { formatOf, ingestBook } from "./ingest/index.ts";
 import { queue } from "./jobs.ts";
-import { bookDir, deleteBook, deleteDemo, demoDir, demoSource, getBlocks, getBook, getDemo, listBooks, listDemos, newId, saveDemo } from "./store.ts";
+import { bookDir, bookFolder, deleteBook, deleteDemo, demoDir, demoSource, getBlocks, getBook, getDemo, listBooks, listDemos, migrateLegacyBooks, newId, saveDemo } from "./store.ts";
 
 const app = new Hono();
 const MAX_UPLOAD = 200 * 1024 * 1024;
@@ -89,14 +90,12 @@ app.post("/api/books", bodyLimit({ maxSize: MAX_UPLOAD + 1024 * 1024, onError: (
 
 app.get("/api/books/:id", (c) => {
   const book = getBook(c.req.param("id"));
-  return book ? c.json(book) : c.json({ error: "not found" }, 404);
+  return book ? c.json({ ...book, folder: bookFolder(book.id) }) : c.json({ error: "not found" }, 404);
 });
 
 app.delete("/api/books/:id", (c) => {
   const id = c.req.param("id");
   queue.cancelBook(id);
-  const book = getBook(id);
-  if (book) removeBookExport(book);
   deleteBook(id);
   return c.json({ ok: true });
 });
@@ -245,7 +244,10 @@ if (PROD && existsSync(WEB_DIST)) {
 }
 
 initVault();
+const moved = migrateLegacyBooks();
+if (moved.length) console.log(`[vault] moved ${moved.length} book${moved.length === 1 ? "" : "s"} into the vault: ${moved.join(", ")}`);
 exportMissingBooks();
+startIndexing();
 resumeInterrupted();
 resumeFigures();
 serve({ fetch: app.fetch, port: PORT, hostname: process.env.HOST || "127.0.0.1" }, (info) => {

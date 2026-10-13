@@ -5,7 +5,10 @@ import type { Concept, SourceRef } from "../../shared/vault-types.ts";
 import { locateInBlocks, locateInPages } from "../anchor.ts";
 import { structured } from "../llm.ts";
 import { getBlocks, getBook, getPages } from "../store.ts";
+import { basename } from "node:path";
+import { fileNameOf } from "../../shared/links.ts";
 import { changed, concepts, logActivity, now, slugify } from "../vault/index.ts";
+import { carryLinks } from "../vault/links.ts";
 import { chapterContext, learnerSummary, sourceLine } from "./context.ts";
 
 /** Finds a concept by name or alias (case-insensitive). */
@@ -41,7 +44,7 @@ export function upsertConcept(input: { name: string; summary?: string; body?: st
     return existing;
   }
   const concept: Concept = { id: slugify(input.name), name: input.name.trim(), aliases: input.aliases || [], summary: input.summary || "", body: input.body || "", related, sources: input.source ? [input.source] : [], created: now(), updated: now() };
-  concepts.save(concept, concept.id);
+  concepts.save(concept);
   changed(`concept ${concept.name}`);
   return concept;
 }
@@ -49,8 +52,15 @@ export function upsertConcept(input: { name: string; summary?: string; body?: st
 export function saveConcept(id: string, patch: Partial<Concept>): Concept {
   const c = concepts.get(id);
   if (!c) throw new Error("concept not found");
+  const oldName = c.name;
   Object.assign(c, { ...patch, id: c.id, updated: now() });
   concepts.save(c);
+  // a new name renames the page, and links written with the old name follow it (the id stays)
+  if (patch.name && patch.name.trim() !== oldName) {
+    const oldPath = concepts.fileOf(c.id)!;
+    const moved = concepts.move(c.id, `concepts/${fileNameOf(c.name)}`);
+    if (moved && moved !== oldPath) carryLinks([oldName, basename(oldPath), oldPath], { name: c.name, path: moved });
+  }
   changed(`concept ${c.name}`);
   return c;
 }

@@ -143,7 +143,7 @@ export async function standaloneFigure(input: { passage: string; request?: strin
   const result = await generateScene({ passage: input.passage, context: ctx.context, source: ctx.source, request: input.request, kind: kindOf(input.kind), learner: learnerSummary(), tier: input.quality === "careful" ? "smart" : "fast" });
   const figure: SavedFigure = { id: shortId("f"), title: result.scene.title, scene: result.scene, source: input.source, request: input.request, created: now() };
   if (input.save !== false) {
-    figures.save(figure, figure.title);
+    figures.save(figure);
     logActivity({ type: "figure", bookId: input.source?.bookId, text: `Figure: ${figure.title}`, data: { figureId: figure.id, kind: result.scene.kind, ms: result.ms } });
   }
   return figure;

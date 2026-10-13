@@ -23,6 +23,8 @@ export interface Book {
   author?: string;
   format: BookFormat;
   file: string;
+  /** First 16 hex digits of the file's SHA-256: which edition annotations were made on. */
+  sha256?: string;
   pageCount?: number;
   blockCount?: number;
   extractor?: string;

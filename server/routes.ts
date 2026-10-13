@@ -13,8 +13,12 @@ import { llmLoad } from "./llm.ts";
 import { standaloneFigure } from "./scene/figures.ts";
 import { activeProvider, claudeStatus, getSettings, saveSettings } from "./settings.ts";
 import { getBook, listBooks } from "./store.ts";
-import { cards, changed, concepts, figures, getProfile, logActivity, notes, now, saveProfile, shortId, vaultHistory, vaultStats } from "./vault/index.ts";
-import { writeSourcePage } from "./vault/library.ts";
+import { annotations, cards, changed, concepts, figures, getProfile, logActivity, notes, now, onVaultChange, saveProfile, shortId, VAULT, vaultHistory, vaultStats } from "./vault/index.ts";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { extname, join, resolve } from "node:path";
+import { fileNameOf } from "../shared/links.ts";
+import { appendToNote, bookNote, createNote, deleteNote, linkMention, updateNote } from "./learn/notes.ts";
+import { allEdges, backlinks, linkTargets, resolveLink, titleOf, unlinkedMentions } from "./vault/links.ts";
 import { validateScene } from "../shared/scene/validate.ts";
 import type { Note } from "../shared/vault-types.ts";
 
@@ -33,7 +37,30 @@ function flushSession(bookId: string) {
 }
 process.on("exit", () => [...sessions.keys()].forEach(flushSession));
 
+/** An absolute path inside the vault for a vault-relative one, or null if it would leave the vault. */
+function safeVaultPath(rel: string) {
+  const full = resolve(VAULT, rel);
+  return full.startsWith(`${resolve(VAULT)}/`) ? full : null;
+}
+
+/** Every folder under notes/ (for the file tree), including empty ones. */
+function noteFolders(): string[] {
+  const out: string[] = [];
+  const walk = (rel: string) => {
+    for (const entry of readdirSync(join(VAULT, rel), { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+      out.push(`${rel}/${entry.name}`.replace(/^notes\//, ""));
+      walk(`${rel}/${entry.name}`);
+    }
+  };
+  if (existsSync(join(VAULT, "notes")) && statSync(join(VAULT, "notes")).isDirectory()) walk("notes");
+  return out.sort();
+}
+
 export function registerRoutes(app: Hono) {
+  // files changing in the vault (from the app, an agent, Obsidian): pages showing them reload
+  onVaultChange((path) => publish("global", { type: "vault", data: { path } }));
+
   /* ---------- profile and settings ---------- */
   app.get("/api/profile", (c) => c.json(getProfile()));
   app.put("/api/profile", async (c) => c.json(saveProfile(await body(c))));
@@ -74,46 +101,84 @@ export function registerRoutes(app: Hono) {
 
   /* ---------- notes ---------- */
   app.get("/api/notes", (c) => {
-    const { type, book, concept } = c.req.query();
+    const { type, book, concept, folder } = c.req.query();
     const list = notes
       .list()
-      .filter((n) => (!type || n.type === type) && (!book || n.source?.bookId === book) && (!concept || n.concepts.includes(concept)))
+      .filter((n) => (!type || n.type === type) && (!book || n.source?.bookId === book) && (!concept || n.concepts.includes(concept)) && (!folder || n.path.startsWith(`notes/${folder}/`)))
       .sort((a, b) => b.updated.localeCompare(a.updated));
     return c.json(list);
   });
   app.get("/api/notes/:id", (c) => {
-    const note = notes.get(c.req.param("id"));
+    const note = notes.get(c.req.param("id")) || notes.byPath(c.req.query("path") || "");
     if (!note) return c.json({ error: "not found" }, 404);
-    const backlinks = notes.list().filter((n) => n.id !== note.id && n.body.toLowerCase().includes(`[[${note.title.toLowerCase()}`));
-    return c.json({ ...note, backlinks: backlinks.map((n) => ({ id: n.id, title: n.title, type: n.type })) });
+    const node = `note:${note.id}`;
+    const outgoing = allEdges()
+      .filter((e) => e.from === node && e.kind !== "source")
+      .map((e) => ({ target: e.target, kind: e.kind, to: e.to, path: e.toPath, title: e.to ? titleOf(e.to, e.toPath) : e.target }));
+    return c.json({ ...note, backlinks: backlinks(node), mentions: unlinkedMentions(note), outgoing });
   });
   app.post("/api/notes", async (c) => {
-    const b = await body<Partial<Note>>(c);
+    const b = await body<Partial<Note> & { folder?: string; concepts?: string[] }>(c);
     const concepts_ = (b.concepts || []).map((name) => upsertConcept({ name, source: b.source }).id);
-    const note: Note = { id: shortId("n"), type: b.type || "note", title: (b.title || "Untitled").trim().slice(0, 140), body: b.body || "", tags: b.tags || [], concepts: concepts_, source: b.source, score: b.score, created: now(), updated: now() };
-    notes.save(note, note.title);
-    changed(`note ${note.title}`);
-    logActivity({ type: note.type === "highlight" ? "highlight" : note.type === "connection" ? "connect" : "note", bookId: note.source?.bookId, concepts: note.concepts, text: `${note.type === "highlight" ? "Highlighted" : "Wrote"}: ${note.title}` });
-    if (note.source?.bookId) {
-      const book = getBook(note.source.bookId);
-      if (book) writeSourcePage(book);
-    }
-    return c.json(note);
+    return c.json(createNote({ ...b, concepts: concepts_ }));
   });
   app.put("/api/notes/:id", async (c) => {
-    const note = notes.get(c.req.param("id"));
-    if (!note) return c.json({ error: "not found" }, 404);
-    const b = await body<Partial<Note>>(c);
-    Object.assign(note, { ...b, id: note.id, created: note.created, updated: now() });
-    if (b.concepts) note.concepts = b.concepts.map((x) => concepts.get(x)?.id || upsertConcept({ name: x }).id);
-    notes.save(note);
-    changed(`note ${note.title}`);
-    return c.json(note);
+    const b = await body<Partial<Note> & { folder?: string }>(c);
+    if (b.concepts) b.concepts = b.concepts.map((x) => concepts.get(x)?.id || upsertConcept({ name: x }).id);
+    return c.json(updateNote(c.req.param("id"), b));
   });
-  app.delete("/api/notes/:id", (c) => {
-    notes.remove(c.req.param("id"));
-    changed("delete note");
-    return c.json({ ok: true });
+  app.post("/api/notes/:id/append", async (c) => {
+    const b = await body<{ markdown: string }>(c);
+    if (!b.markdown?.trim()) return c.json({ error: "nothing to add" }, 400);
+    return c.json(appendToNote(c.req.param("id"), b.markdown));
+  });
+  app.delete("/api/notes/:id", (c) => c.json({ ok: deleteNote(c.req.param("id")) }));
+  app.post("/api/notes/:id/link-mention", async (c) => c.json(linkMention(c.req.param("id"), (await body<{ path: string }>(c)).path)));
+
+  /** The note a book's reading session writes into ("<title> — notes", made on first use). */
+  app.post("/api/books/:id/note", (c) => c.json(bookNote(c.req.param("id"))));
+
+  /* ---------- links and files ---------- */
+  app.get("/api/links/targets", (c) => c.json(linkTargets()));
+  app.get("/api/links/resolve", (c) => {
+    const r = resolveLink(c.req.query("target") || "", c.req.query("sub") || undefined);
+    if (!r) return c.json({ error: "nothing by that name" }, 404);
+    const annotation = r.kind === "annotation" ? annotations.get(r.id) : undefined;
+    return c.json({ ...r, ...(annotation ? { bookId: annotation.bookId, anchor: annotation.anchor } : {}) });
+  });
+  app.get("/api/vault/tree", (c) =>
+    c.json({
+      notes: notes
+        .list()
+        .map((n) => ({ id: n.id, path: n.path, title: n.title, type: n.type, updated: n.updated }))
+        .sort((a, b) => a.path.localeCompare(b.path)),
+      folders: noteFolders(),
+    }),
+  );
+  /** Pictures in notes (attachments/ only). */
+  app.get("/api/vault/attachment", (c) => {
+    const rel = (c.req.query("path") || "").replace(/\\/g, "/");
+    const path = rel.startsWith("attachments/") ? safeVaultPath(rel) : null;
+    if (!path || !existsSync(path)) return c.json({ error: "not found" }, 404);
+    const type = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml" }[extname(path).slice(1).toLowerCase()];
+    if (!type) return c.json({ error: "not a picture" }, 400);
+    return new Response(readFileSync(path), { headers: { "content-type": type, "cache-control": "private, max-age=3600", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox", "x-content-type-options": "nosniff" } });
+  });
+  /** Saves a picture (pasted into a note, or captured from a book) under attachments/. */
+  app.post("/api/attachments", async (c) => {
+    const b = await body<{ data: string; name?: string }>(c);
+    const m = /^data:image\/(png|jpeg|webp|gif);base64,([A-Za-z0-9+/=]+)$/.exec(b.data || "");
+    if (!m) return c.json({ error: "send a PNG, JPEG, WebP or GIF data URL" }, 400);
+    const bytes = Buffer.from(m[2], "base64");
+    if (bytes.length > 12 * 1024 * 1024) return c.json({ error: "picture too large (12 MB max)" }, 413);
+    const ext = m[1] === "jpeg" ? "jpg" : m[1];
+    const base = fileNameOf((b.name || `Pasted ${new Date().toISOString().slice(0, 19).replace("T", " ").replace(/:/g, ".")}`).replace(/\.(png|jpe?g|webp|gif)$/i, ""), 90);
+    let rel = `attachments/${base}.${ext}`;
+    for (let n = 2; existsSync(join(VAULT, rel)); n++) rel = `attachments/${base} ${n}.${ext}`;
+    mkdirSync(join(VAULT, "attachments"), { recursive: true });
+    writeFileSync(join(VAULT, rel), bytes);
+    changed(`attachment ${base}`);
+    return c.json({ path: rel, name: rel.slice("attachments/".length) });
   });
 
   /* ---------- concepts ---------- */
@@ -130,7 +195,8 @@ export function registerRoutes(app: Hono) {
     const concept = concepts.get(c.req.param("id"));
     if (!concept) return c.json({ error: "not found" }, 404);
     const linkedCards = cards.list().filter((k) => k.concepts.includes(concept.id)).map((k) => viewCard(k));
-    const linkedNotes = notes.list().filter((n) => n.concepts.includes(concept.id) || n.body.toLowerCase().includes(`[[${concept.id}`) || n.body.toLowerCase().includes(`[[${concept.name.toLowerCase()}`));
+    const linking = new Set(allEdges().filter((e) => e.to === `concept:${concept.id}` && e.from.startsWith("note:")).map((e) => e.from.slice(5)));
+    const linkedNotes = notes.list().filter((n) => n.concepts.includes(concept.id) || linking.has(n.id));
     const related = concept.related.map((id) => concepts.get(id)).filter(Boolean).map((r) => ({ id: r!.id, name: r!.name, mastery: conceptMastery(r!.id) }));
     const backlinks = concepts.list().filter((x) => x.related.includes(concept.id)).map((r) => ({ id: r.id, name: r.name, mastery: conceptMastery(r.id) }));
     const sources = concept.sources.map((s) => ({ ...s, title: getBook(s.bookId)?.title }));
@@ -148,8 +214,6 @@ export function registerRoutes(app: Hono) {
   });
   app.post("/api/books/:id/chapters/:chapterId/concepts", async (c) => {
     const list = await extractConcepts(c.req.param("id"), c.req.param("chapterId"));
-    const book = getBook(c.req.param("id"));
-    if (book) writeSourcePage(book);
     publish("global", { type: "book", data: { concepts: list.length } });
     return c.json(list);
   });
@@ -234,7 +298,7 @@ export function registerRoutes(app: Hono) {
       const check = validateScene(b.scene);
       if (!check.ok || !check.scene) return c.json({ error: check.errors[0] || "not a figure" }, 400);
       const figure = { id: shortId("f"), title: b.title || check.scene.title, scene: check.scene, source: b.source, request: b.request, created: now() };
-      figures.save(figure, figure.title);
+      figures.save(figure);
       changed(`figure ${figure.title}`);
       return c.json(figure);
     }

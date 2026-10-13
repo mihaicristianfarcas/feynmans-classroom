@@ -1,7 +1,11 @@
+/* Books and their figures, kept in the vault: one folder per book under library/, named after the
+ * book (library/calculus-made-easy/) so people and agents can find it, holding book.json, the
+ * original file, the extracted text and its figures. The book id (used by the API) maps to the
+ * folder through book.json. */
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { BOOKS_DIR } from "./config.ts";
+import { BOOKS_DIR, LEGACY_BOOKS_DIR } from "./config.ts";
 import type { Block, Book, Demo, PageText } from "./types.ts";
 
 mkdirSync(BOOKS_DIR, { recursive: true });
@@ -12,9 +16,94 @@ const safe = (id: string) => {
   return id;
 };
 
-export const bookDir = (bookId: string) => join(BOOKS_DIR, safe(bookId));
+export function folderSlug(text: string, max = 60): string {
+  return (
+    text
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, max)
+      .replace(/-+$/, "") || "book"
+  );
+}
+
+/* ---------- where each book lives ---------- */
+const folders = new Map<string, string>();
+function scanFolders() {
+  folders.clear();
+  if (!existsSync(BOOKS_DIR)) return;
+  for (const name of readdirSync(BOOKS_DIR)) {
+    const book = readJson<Book | null>(join(BOOKS_DIR, name, "book.json"), null);
+    if (book?.id) folders.set(book.id, name);
+  }
+}
+scanFolders();
+
+function freeFolder(hint: string, except?: string) {
+  const base = folderSlug(hint);
+  let name = base;
+  for (let n = 2; existsSync(join(BOOKS_DIR, name)) && name !== except; n++) name = `${base}-${n}`;
+  return name;
+}
+
+/** The folder of a book (library/<name>); an unknown id maps to a path that doesn't exist. */
+export function bookDir(bookId: string) {
+  safe(bookId);
+  if (!folders.has(bookId)) scanFolders();
+  return join(BOOKS_DIR, folders.get(bookId) || `.missing-${bookId}`);
+}
 export const demosDir = (bookId: string) => join(bookDir(bookId), "demos");
 export const demoDir = (bookId: string, demoId: string) => join(demosDir(bookId), safe(demoId));
+/** The book's folder name inside library/ (what agents and links see). */
+export const bookFolder = (bookId: string) => folders.get(bookId) || (scanFolders(), folders.get(bookId)) || null;
+
+/** Makes the folder for a new book, named after `hint` (the file name, until the title is known). */
+export function createBookDir(bookId: string, hint: string) {
+  const name = freeFolder(hint);
+  mkdirSync(join(BOOKS_DIR, name), { recursive: true });
+  folders.set(safe(bookId), name);
+  return join(BOOKS_DIR, name);
+}
+
+/** Renames a book's folder after its title, once ingest has found it. */
+export function renameBookDir(bookId: string, title: string) {
+  const current = folders.get(bookId);
+  if (!current) return;
+  const name = freeFolder(title, current);
+  if (name === current) return;
+  try {
+    renameSync(join(BOOKS_DIR, current), join(BOOKS_DIR, name));
+    folders.set(bookId, name);
+    booksChanged();
+  } catch (error) {
+    console.warn(`[store] could not rename ${current} to ${name}: ${(error as Error).message}`);
+  }
+}
+
+/** Books stored in DATA_DIR/books before they moved into the vault are moved once, at startup. */
+export function migrateLegacyBooks(): string[] {
+  if (!existsSync(LEGACY_BOOKS_DIR)) return [];
+  const moved: string[] = [];
+  for (const id of readdirSync(LEGACY_BOOKS_DIR)) {
+    const from = join(LEGACY_BOOKS_DIR, id);
+    const book = readJson<Book | null>(join(from, "book.json"), null);
+    if (!book?.id || folders.has(book.id)) continue;
+    const name = freeFolder(book.title || id);
+    try {
+      renameSync(from, join(BOOKS_DIR, name));
+      folders.set(book.id, name);
+      moved.push(name);
+    } catch (error) {
+      console.warn(`[store] could not move ${from} into the vault: ${(error as Error).message}`);
+    }
+  }
+  try {
+    if (!readdirSync(LEGACY_BOOKS_DIR).length) rmSync(LEGACY_BOOKS_DIR, { recursive: true, force: true });
+  } catch {}
+  return moved;
+}
 
 export function readJson<T>(path: string, fallback: T): T {
   try {
@@ -30,10 +119,18 @@ export function writeJson(path: string, value: unknown) {
 }
 
 /* ---------- books ---------- */
+const bookListeners = new Set<() => void>();
+/** Called after a book is saved or deleted (the link graph and the indexes follow books). */
+export function onBooksChange(fn: () => void) {
+  bookListeners.add(fn);
+  return () => bookListeners.delete(fn);
+}
+const booksChanged = () => bookListeners.forEach((fn) => fn());
+
 export function listBooks(): Book[] {
-  if (!existsSync(BOOKS_DIR)) return [];
-  return readdirSync(BOOKS_DIR)
-    .map((id) => readJson<Book | null>(join(BOOKS_DIR, id, "book.json"), null))
+  scanFolders();
+  return [...folders.values()]
+    .map((name) => readJson<Book | null>(join(BOOKS_DIR, name, "book.json"), null))
     .filter((book): book is Book => !!book)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
@@ -45,14 +142,21 @@ export function getBook(bookId: string): Book | null {
   }
 }
 export function saveBook(book: Book) {
-  mkdirSync(bookDir(book.id), { recursive: true });
-  writeJson(join(bookDir(book.id), "book.json"), book);
+  if (!folders.has(book.id)) createBookDir(book.id, book.title);
+  const dir = bookDir(book.id);
+  mkdirSync(dir, { recursive: true });
+  writeJson(join(dir, "book.json"), book);
+  booksChanged();
 }
 export function deleteBook(bookId: string) {
-  rmSync(bookDir(bookId), { recursive: true, force: true });
+  const dir = bookDir(bookId);
+  folders.delete(bookId);
+  rmSync(dir, { recursive: true, force: true });
+  booksChanged();
 }
 export const getPages = (bookId: string) => readJson<PageText[]>(join(bookDir(bookId), "pages.json"), []);
 export const getBlocks = (bookId: string) => readJson<Block[]>(join(bookDir(bookId), "blocks.json"), []);
+export const getMarkdown = (bookId: string) => readJson<string[]>(join(bookDir(bookId), "markdown.json"), []);
 
 /* ---------- demos ---------- */
 export function listDemos(bookId: string): Demo[] {

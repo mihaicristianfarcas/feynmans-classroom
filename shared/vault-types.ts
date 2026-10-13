@@ -15,16 +15,24 @@ export interface SourceRef {
 export type NoteType = "note" | "highlight" | "explanation" | "connection" | "answer" | "summary";
 
 export interface Note {
+  /** From the frontmatter, or derived from the path for notes written elsewhere (Obsidian, an agent). */
   id: string;
+  /** Vault-relative path ("notes/Replication lag.md"): the file name is the title, as in Obsidian. */
+  path: string;
   type: NoteType;
   title: string;
   /** Markdown. [[wikilinks]] to notes or concepts; ![[figure:id]] embeds a figure. */
   body: string;
   tags: string[];
+  aliases: string[];
+  /** Links kept in the frontmatter (Obsidian properties), e.g. connections the learner accepted. */
+  related: string[];
   concepts: string[];
   source?: SourceRef;
   /** Feynman explanations: the grade the tutor gave (0–100). */
   score?: number;
+  /** Frontmatter keys the app doesn't know: kept exactly as they were. */
+  props?: Record<string, unknown>;
   created: string;
   updated: string;
 }
@@ -109,4 +117,60 @@ export interface SavedFigure {
   source?: SourceRef;
   request?: string;
   created: string;
+}
+
+/* ---------------- annotations: what was made from a passage, kept beside the book ---------------- */
+
+export type AnnotationKind = "highlight" | "explain" | "define" | "ask" | "visualize" | "resources" | "comment";
+
+/**
+ * Where a passage is, recorded several ways (as the W3C Web Annotation model and Hypothesis do), so it
+ * can be found again quickly (rects) and robustly (the quote and its context), and an agent can find
+ * it in the book's Markdown text (md).
+ */
+export interface Anchor {
+  /** PDF page (1-based) where the passage starts. */
+  page?: number;
+  /** Reflowable books: the block where it starts, and where it ends. */
+  block?: number;
+  blockEnd?: number;
+  /** The selected text, whitespace collapsed. */
+  quote: string;
+  /** Up to 32 characters before and after it in the page (or block) text. */
+  prefix?: string;
+  suffix?: string;
+  /** Character offsets of the quote in the page's text layer (or the block's text). */
+  start?: number;
+  end?: number;
+  /** PDF: the selection's boxes as fractions of the page, [x, y, w, h]; `p` when not on `page`. */
+  rects?: { p?: number; x: number; y: number; w: number; h: number }[];
+  /** Top of the passage as a fraction of the page height (from the rects, or found from the text). */
+  y?: number;
+  /** The same passage in the book's Markdown: the chapter text file and line. */
+  md?: { file: string; line: number; score?: number };
+}
+
+export interface Annotation {
+  id: string;
+  kind: AnnotationKind;
+  bookId: string;
+  /** Vault-relative path of the file. */
+  path: string;
+  chapterId?: string;
+  anchor: Anchor;
+  /** Highlight colour (a theme token: yellow, green, blue, pink, purple). */
+  color?: string;
+  /** What the learner asked for ("why not just back up?"), if anything. */
+  request?: string;
+  status: "pending" | "ready" | "failed";
+  error?: string;
+  /** Who made it and how long it took. */
+  model?: { provider: string; name: string; effort?: string; ms?: number };
+  /** Markdown: the answer, follow-ups as "## Follow-up: …" sections, a figure as a ```figure block. */
+  body: string;
+  title?: string;
+  tags: string[];
+  props?: Record<string, unknown>;
+  created: string;
+  updated: string;
 }

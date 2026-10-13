@@ -5,7 +5,12 @@ import { fileURLToPath } from "node:url";
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const DATA_DIR = resolve(process.env.DATA_DIR || join(ROOT, "data"));
-export const BOOKS_DIR = join(DATA_DIR, "books");
+/** The second brain: plain files a person, Obsidian or an AI agent can work with directly. */
+export const VAULT_DIR = join(DATA_DIR, "vault");
+/** One folder per book inside the vault: the file, its text, annotations and figures. */
+export const BOOKS_DIR = join(VAULT_DIR, "library");
+/** Where books lived before they moved into the vault (migrated at startup). */
+export const LEGACY_BOOKS_DIR = join(DATA_DIR, "books");
 export const RUNTIME_DIR = join(ROOT, "runtime");
 export const VENDOR_DIR = join(ROOT, "vendor", "anatomy");
 export const WEB_DIST = join(ROOT, "web", "dist");

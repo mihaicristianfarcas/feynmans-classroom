@@ -5,8 +5,10 @@ import { join } from "node:path";
 import { retrievability } from "../../shared/fsrs.ts";
 import { agent } from "../llm.ts";
 import { getBook, listBooks, listDemos } from "../store.ts";
-import { activity, cards, concepts, figures, getProfile, logActivity, notes, now, reviews, shortId, VAULT } from "../vault/index.ts";
+import { activity, annotations, cards, concepts, figures, getProfile, logActivity, notes, reviews, VAULT } from "../vault/index.ts";
 import { chapterFile } from "../vault/library.ts";
+import { allEdges, type Edge } from "../vault/links.ts";
+import { createNote } from "./notes.ts";
 import { cardState, reviewQueue } from "./cards.ts";
 import { conceptMastery, learnerSummary } from "./context.ts";
 
@@ -14,56 +16,56 @@ import { conceptMastery, learnerSummary } from "./context.ts";
 
 export interface GraphNode {
   id: string;
-  kind: "book" | "concept" | "note";
+  kind: "book" | "concept" | "note" | "annotation";
   label: string;
   /** 0–1, or null when unknown. */
   mastery: number | null;
   size: number;
   detail?: string;
   bookId?: string;
+  path?: string;
   /** When it entered the brain (ms), for replaying the graph's growth. */
   created: number;
 }
 export interface GraphEdge {
   from: string;
   to: string;
-  kind: "source" | "related" | "mentions" | "link";
+  /** link/embed: written in a note; related: a property link; concept: concept to concept;
+   * mentions: note to concept; source: to its book. */
+  kind: "source" | "related" | "mentions" | "link" | "embed" | "concept";
 }
 
+/** The knowledge graph, from the vault's links (see vault/links.ts). */
 export function knowledgeGraph(): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const nodes: GraphNode[] = [];
-  const edges: GraphEdge[] = [];
   const books = listBooks().filter((b) => b.status === "ready");
   for (const b of books) nodes.push({ id: `book:${b.id}`, kind: "book", label: b.title, mastery: null, size: 3, detail: b.author, bookId: b.id, created: new Date(b.createdAt).getTime() });
-  const conceptList = concepts.list();
-  const ids = new Set(conceptList.map((c) => c.id));
-  for (const c of conceptList) {
+  for (const c of concepts.list()) {
     const linkedCards = cards.list().filter((k) => k.concepts.includes(c.id)).length;
-    nodes.push({ id: `concept:${c.id}`, kind: "concept", label: c.name, mastery: conceptMastery(c.id), size: 1 + Math.min(2, (linkedCards + c.sources.length) / 4), detail: c.summary, created: new Date(c.created).getTime() });
-    for (const book of new Set(c.sources.map((s) => s.bookId))) if (books.some((b) => b.id === book)) edges.push({ from: `book:${book}`, to: `concept:${c.id}`, kind: "source" });
-    for (const r of c.related) if (ids.has(r) && r !== c.id) edges.push({ from: `concept:${c.id}`, to: `concept:${r}`, kind: "related" });
+    nodes.push({ id: `concept:${c.id}`, kind: "concept", label: c.name, mastery: conceptMastery(c.id), size: 1 + Math.min(2, (linkedCards + c.sources.length) / 4), detail: c.summary, path: concepts.fileOf(c.id) || undefined, created: new Date(c.created).getTime() });
   }
-  const titles = new Map(notes.list().map((n) => [n.title.toLowerCase(), n.id]));
-  for (const n of notes.list()) {
-    nodes.push({ id: `note:${n.id}`, kind: "note", label: n.title, mastery: typeof n.score === "number" ? n.score / 100 : null, size: 0.8, detail: n.type, created: new Date(n.created).getTime() });
-    for (const c of n.concepts) if (ids.has(c)) edges.push({ from: `note:${n.id}`, to: `concept:${c}`, kind: "mentions" });
-    if (!n.concepts.length && n.source?.bookId && books.some((b) => b.id === n.source!.bookId)) edges.push({ from: `note:${n.id}`, to: `book:${n.source.bookId}`, kind: "source" });
-    for (const m of n.body.matchAll(/\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g)) {
-      const target = m[1].trim();
-      if (target.startsWith("figure:")) continue;
-      const cid = ids.has(target) ? target : conceptList.find((c) => c.name.toLowerCase() === target.toLowerCase())?.id;
-      if (cid) edges.push({ from: `note:${n.id}`, to: `concept:${cid}`, kind: "link" });
-      else if (titles.has(target.toLowerCase())) edges.push({ from: `note:${n.id}`, to: `note:${titles.get(target.toLowerCase())}`, kind: "link" });
-    }
-  }
+  for (const n of notes.list()) nodes.push({ id: `note:${n.id}`, kind: "note", label: n.title, mastery: typeof n.score === "number" ? n.score / 100 : null, size: 0.8, detail: n.type, path: n.path, created: new Date(n.created).getTime() });
+  for (const a of annotations.list()) nodes.push({ id: `annotation:${a.id}`, kind: "annotation", label: a.title || a.anchor.quote.split(/\s+/).slice(0, 7).join(" ") + "…", mastery: null, size: 0.5, detail: a.kind, bookId: a.bookId, path: a.path, created: new Date(a.created).getTime() });
+  const ids = new Set(nodes.map((n) => n.id));
+  const edges: GraphEdge[] = [];
   const seen = new Set<string>();
-  return { nodes, edges: edges.filter((e) => (seen.has(`${e.from}|${e.to}`) ? false : (seen.add(`${e.from}|${e.to}`), true))) };
+  const add = (e: GraphEdge) => {
+    const key = `${e.from}|${e.to}`;
+    if (e.from === e.to || !ids.has(e.from) || !ids.has(e.to) || seen.has(key)) return;
+    seen.add(key);
+    edges.push(e);
+  };
+  // the strongest kind of link between two things is the one drawn: written links first
+  const order: Edge["kind"][] = ["link", "embed", "related", "concept", "mentions", "source"];
+  const all = allEdges().filter((e) => e.to);
+  for (const kind of order) for (const e of all) if (e.kind === kind) add({ from: e.from, to: e.to!, kind: e.kind });
+  return { nodes, edges };
 }
 
 /* ---------------- search ---------------- */
 
 export interface SearchHit {
-  kind: "note" | "concept" | "card" | "book";
+  kind: "note" | "concept" | "card" | "book" | "annotation";
   id: string;
   title: string;
   snippet: string;
@@ -102,6 +104,10 @@ export function search(q: string, limit = 40): SearchHit[] {
   for (const n of notes.list()) {
     const s = scoreText(`${n.title} ${n.title} ${n.body} ${n.tags.join(" ")}`, terms);
     if (s) hits.push({ kind: "note", id: n.id, title: n.title, snippet: snippet(n.body, terms), score: s * 1.3, bookId: n.source?.bookId });
+  }
+  for (const a of annotations.list()) {
+    const s = scoreText(`${a.anchor.quote} ${a.request || ""} ${a.body}`, terms);
+    if (s) hits.push({ kind: "annotation", id: a.id, title: `${a.kind}: ${a.anchor.quote.slice(0, 80)}`, snippet: snippet(a.body || a.anchor.quote, terms), score: s * 1.2, bookId: a.bookId, loc: a.anchor.page !== undefined ? { page: a.anchor.page } : { block: a.anchor.block } });
   }
   for (const k of cards.list()) {
     const s = scoreText(`${k.front} ${k.back}`, terms);
@@ -156,9 +162,8 @@ Return JSON.`;
 }
 
 export function saveAnswer(question: string, answer: string, sources: { path: string; quote: string }[]) {
-  const note = { id: shortId("n"), type: "answer" as const, title: question.slice(0, 80), body: `${answer}\n\n${sources.length ? `**Sources**\n${sources.map((s, i) => `${i + 1}. \`${s.path}\` — “${s.quote}”`).join("\n")}` : ""}`, tags: ["ask"], concepts: [], created: now(), updated: now() };
-  notes.save(note, note.title);
-  return note;
+  const cite = (path: string) => (path.endsWith(".md") && !path.includes("/text/") ? `[[${path.replace(/\.md$/, "")}]]` : `\`${path}\``);
+  return createNote({ type: "answer", title: question.slice(0, 80), body: `${answer}\n\n${sources.length ? `**Sources**\n${sources.map((s, i) => `${i + 1}. ${cite(s.path)} — “${s.quote}”`).join("\n")}` : ""}`, tags: ["ask"] });
 }
 
 /* ---------------- the journey ---------------- */

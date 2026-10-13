@@ -108,7 +108,7 @@ export function saveCard(input: Partial<Card> & { front: string; back: string })
     created: existing?.created || now(),
     updated: now(),
   };
-  cards.save(card, `${card.deck}-${card.front.slice(0, 40)}`);
+  cards.save(card);
   changed(`card ${card.front.slice(0, 40)}`);
   return card;
 }

@@ -1,6 +1,7 @@
-import { copyFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { extname, join } from "node:path";
-import { bookDir, getBlocks, getPages, newId, readJson, saveBook, writeJson } from "../store.ts";
+import { bookDir, createBookDir, getBlocks, getMarkdown, getPages, newId, renameBookDir, saveBook, writeJson } from "../store.ts";
 import type { Book, BookFormat, TocEntry } from "../types.ts";
 import { ingestEpub } from "./epub.ts";
 import { ingestPdf, pagesText } from "./pdf.ts";
@@ -20,12 +21,13 @@ export async function ingestBook(input: { name: string; data: Buffer } | { path:
   const format = formatOf(name);
   if (!format) throw new Error("Unsupported file. Upload a PDF, EPUB, Markdown or plain-text book.");
   const id = newId("b");
-  const dir = bookDir(id);
+  const title = name.split(/[\\/]/).pop()!.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "Untitled";
+  const dir = createBookDir(id, title);
   const ext = extname(name).toLowerCase();
   const file = `source${ext}`;
   const book: Book = {
     id,
-    title: name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "Untitled",
+    title,
     format,
     file,
     toc: [],
@@ -35,6 +37,8 @@ export async function ingestBook(input: { name: string; data: Buffer } | { path:
   saveBook(book);
   if ("data" in input) writeFileSync(join(dir, file), input.data);
   else copyFileSync(input.path, join(dir, file));
+  // which edition this is: annotations record it, so a different file of the same book can be told apart
+  book.sha256 = createHash("sha256").update(readFileSync(join(dir, file))).digest("hex").slice(0, 16);
 
   try {
     if (format === "pdf") {
@@ -53,6 +57,8 @@ export async function ingestBook(input: { name: string; data: Buffer } | { path:
     book.error = (error as Error).message;
   }
   saveBook(book);
+  // the folder was named after the file; name it after the title the book itself gives
+  renameBookDir(book.id, book.title);
   return book;
 }
 
@@ -60,7 +66,7 @@ export async function ingestBook(input: { name: string; data: Buffer } | { path:
 export function chapterText(book: Book, entry: TocEntry, maxChars: number): string {
   if (book.format === "pdf") {
     const pages = getPages(book.id);
-    const markdown = readJson<string[]>(join(bookDir(book.id), "markdown.json"), []);
+    const markdown = getMarkdown(book.id);
     return pagesText(pages, entry.start.page ?? 1, Math.max(entry.start.page ?? 1, entry.end.page ?? entry.start.page ?? 1), maxChars, markdown, { fromY: entry.start.y, toY: entry.end.y });
   }
   const blocks = getBlocks(book.id).slice(entry.start.block ?? 0, entry.end.block ?? undefined);
@@ -80,7 +86,7 @@ export function chapterText(book: Book, entry: TocEntry, maxChars: number): stri
 export function passageAround(book: Book, loc: { page?: number; block?: number }, span = 1): string {
   if (book.format === "pdf") {
     const pages = getPages(book.id);
-    const markdown = readJson<string[]>(join(bookDir(book.id), "markdown.json"), []);
+    const markdown = getMarkdown(book.id);
     const page = loc.page ?? 1;
     return pagesText(pages, Math.max(1, page - span), Math.min(pages.length, page + span), 24000, markdown);
   }
