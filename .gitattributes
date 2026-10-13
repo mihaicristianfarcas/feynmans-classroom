@@ -1,0 +1,9 @@
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.pdf binary
+*.epub binary
+*.woff2 binary
+package-lock.json linguist-generated=true -diff
+vendor/** linguist-vendored=true
+.agents/skills/** linguist-vendored=true

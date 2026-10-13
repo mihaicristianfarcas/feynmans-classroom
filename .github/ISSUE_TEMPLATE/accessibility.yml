@@ -1,0 +1,20 @@
+name: Accessibility problem
+description: Something you can't use with a keyboard, screen reader, zoom, or other assistive technology
+labels: [accessibility]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you couldn't do
+      description: The page or feature, and what got in the way.
+    validations:
+      required: true
+  - type: input
+    id: tech
+    attributes:
+      label: Assistive technology
+      description: For example VoiceOver on macOS 26 with Safari, NVDA with Firefox, keyboard only, 200% zoom.
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected

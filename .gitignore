@@ -1,6 +1,16 @@
+# dependencies and builds
 node_modules
-data/
 web/dist
 runtime/dist
+
+# your books, vault and settings (DATA_DIR defaults to ./data)
+data/
+
+# local configuration and scratch
+.env
+.env.*
+.claude/settings.local.json
+coverage
 *.log
+*.tmp
 .DS_Store

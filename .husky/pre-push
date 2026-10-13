@@ -1,0 +1,15 @@
+# Runs before every push: main is never pushed to directly, and the unit tests pass.
+# (The repository's rules on GitHub enforce the first part for everyone; this catches it earlier.)
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    echo "✗ Pushing to main is not allowed: open a pull request from a branch instead."
+    echo "  git switch -c <branch-name> && git push -u origin <branch-name>"
+    exit 1
+  fi
+done
+
+npm test --silent || {
+  echo "✗ Unit tests fail (npm test)."
+  exit 1
+}
