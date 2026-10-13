@@ -46,6 +46,6 @@ page in both themes, plus keyboard checks) on every pull request.
   (`announce()`, or `role="status"` / `role="alert"`).
 - **Mouse-only gestures have a keyboard way.** In the reader, `S` selects the passage at the
   reading line and opens the selection menu with focus in it; capture places its box with the arrow
-  keys; the knowledge graph is navigated with the arrow keys; a figure's parts are read with the up
-  and down arrows.
+  keys; the knowledge graph is navigated with the arrow keys; a figure's parts are picked and read
+  with the up and down arrows, and Shift + arrows drag the picked one (or pan, or turn the view).
 - **Motion.** Keyboard actions don't animate; `prefers-reduced-motion` keeps only fades.

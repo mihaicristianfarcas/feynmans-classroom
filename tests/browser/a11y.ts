@@ -262,6 +262,34 @@ async function keyboard(page: Page, bookRoute: string | undefined) {
       check("arrow keys move between the reader's panes", moved, await focused(page));
     }
   }
+
+  // a figure's draggable points move from the keyboard too: the up and down arrows pick one, Shift + arrows drag it
+  // (with reduced motion, so the figures' idle tours can't move a slider for us)
+  await page.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "reduce" }]);
+  await open(page, "#/gallery", "light");
+  const hasPoint = await page.evaluate(() => {
+    const stage = document.querySelector(".sc-draggable")?.closest(".scene")?.querySelector<HTMLElement>(".sc-stage");
+    stage?.focus();
+    return !!stage;
+  });
+  if (hasPoint) {
+    const inScene = <T>(fn: (scene: Element) => T) =>
+      page.evaluate(`(${fn})(document.activeElement.closest(".scene"))`) as Promise<T>;
+    for (let i = 0; i < 12; i++) {
+      if (await inScene((s) => /Shift/.test(s.querySelector(".sc-info")?.textContent ?? ""))) break;
+      await page.keyboard.press("ArrowDown");
+      await wait(50);
+    }
+    const values = (s: Element) => [...s.querySelectorAll<HTMLInputElement>(".sc-range")].map((r) => r.value).join();
+    const before = await inScene(values);
+    await page.keyboard.down("Shift");
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.up("Shift");
+    await wait(100);
+    check("Shift + arrows drag a figure's point", before !== (await inScene(values)), before);
+  } else check("a figure with a draggable point is in the gallery", false);
+  await page.emulateMediaFeatures([]);
 }
 
 /* ---------- run ---------- */
