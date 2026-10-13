@@ -12,6 +12,8 @@ import { publish, subscribe } from "./events.ts";
 import { detectChapters } from "./generate/chapters.ts";
 import { enqueueBuild, figOf, generateChapter, regenerate, resumeInterrupted, withFigs } from "./generate/index.ts";
 import { registerRoutes } from "./routes.ts";
+import { migrateHighlightNotes, resumeAnnotations } from "./annotations/index.ts";
+import { registerAnnotationRoutes } from "./annotations/routes.ts";
 import { figureFromSelection, figuresForChapter, regenerateFigure, resumeFigures } from "./scene/figures.ts";
 import { activeProvider } from "./settings.ts";
 import { initVault, logActivity } from "./vault/index.ts";
@@ -233,6 +235,7 @@ app.get("/api/books/:id/events", (c) =>
 );
 
 registerRoutes(app);
+registerAnnotationRoutes(app);
 
 /* ---------- the web app (production build) ---------- */
 if (PROD && existsSync(WEB_DIST)) {
@@ -247,7 +250,9 @@ initVault();
 const moved = migrateLegacyBooks();
 if (moved.length) console.log(`[vault] moved ${moved.length} book${moved.length === 1 ? "" : "s"} into the vault: ${moved.join(", ")}`);
 exportMissingBooks();
+migrateHighlightNotes();
 startIndexing();
+resumeAnnotations();
 resumeInterrupted();
 resumeFigures();
 serve({ fetch: app.fetch, port: PORT, hostname: process.env.HOST || "127.0.0.1" }, (info) => {

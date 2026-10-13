@@ -83,3 +83,28 @@ export function chapterContext(bookId: string, chapterId: string, chars = 40000)
 export function sourceLine(source: BookContext["source"]): string {
   return source.title ? `${source.title}${source.author ? ` by ${source.author}` : ""}${source.chapter ? `, ${source.chapter}` : ""}` : "";
 }
+
+const STOP = new Set("about above after again against because been before being below between both could does doing down during each few from further have having here hers herself himself into itself just more most myself once only other ought ours ourselves over same should some such than that their theirs them themselves then there these they this those through under until very were what when where which while whom with would your yours yourself yourselves also which therefore thus hence however".split(" "));
+
+/** Notes and concepts in the vault that share words with a passage: what an answer could link to. */
+export function relatedInVault(text: string, limit = 8): { title: string; kind: "note" | "concept"; summary: string }[] {
+  const words = [...new Set(text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 4 && !STOP.has(w)))];
+  if (!words.length) return [];
+  const score = (hay: string) => {
+    const low = hay.toLowerCase();
+    return words.reduce((n, w) => n + (low.includes(w) ? 1 : 0), 0);
+  };
+  const out: { title: string; kind: "note" | "concept"; summary: string; s: number }[] = [];
+  for (const c of concepts.list()) {
+    const s = score(`${c.name} ${c.name} ${c.aliases.join(" ")} ${c.summary}`);
+    if (s >= 2 || (s >= 1 && words.some((w) => c.name.toLowerCase().includes(w)))) out.push({ title: c.name, kind: "concept", summary: c.summary.slice(0, 120), s: s + 1 });
+  }
+  for (const n of notes.list()) {
+    const s = score(`${n.title} ${n.title} ${n.body.slice(0, 1500)}`);
+    if (s >= 2) out.push({ title: n.title, kind: "note", summary: n.body.replace(/\s+/g, " ").slice(0, 120), s });
+  }
+  return out
+    .sort((a, b) => b.s - a.s)
+    .slice(0, limit)
+    .map(({ s: _s, ...rest }) => rest);
+}

@@ -1,5 +1,5 @@
 export interface BookEvent {
-  type: "demo" | "demo-removed" | "job" | "book" | "vault";
+  type: "demo" | "demo-removed" | "job" | "book" | "annotation" | "annotation-removed" | "vault";
   data: unknown;
 }
 type Listener = (event: BookEvent) => void;
