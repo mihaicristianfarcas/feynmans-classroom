@@ -10,9 +10,10 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { type AddressInfo, createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import puppeteer, { type Page } from "puppeteer-core";
+import puppeteer, { type Browser, type Page } from "puppeteer-core";
 import { chromePath } from "../../server/config.ts";
 import { EXAMPLES } from "../../shared/scene/examples.ts";
 
@@ -36,17 +37,39 @@ let server = null as ChildProcess | null;
 let dataDir = null as string | null;
 let BASE = process.env.APP_URL || "http://localhost:5173/";
 
-/** Starts the production server on a fresh vault and gives it something to show. */
+/** A port nothing listens on (the system picks it), so no server left from another run can answer. */
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const { port } = probe.address() as AddressInfo;
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
+/** Starts the production server on a fresh vault and gives it something to show. It runs in a process
+ * group of its own (with the Chrome and jj it starts), which stopServer() ends whole. */
 async function serve() {
   dataDir = mkdtempSync(join(tmpdir(), "classroom-a11y-"));
-  const port = 8800 + Math.floor(Math.random() * 100);
-  server = spawn(process.execPath, ["--import", "tsx", "server/index.ts"], {
+  const port = await freePort();
+  const child = spawn(process.execPath, ["--import", "tsx", "server/index.ts"], {
     env: { ...process.env, NODE_ENV: "production", PORT: String(port), DATA_DIR: dataDir, LLM_PROVIDER: "codex" },
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["ignore", verbose ? "inherit" : "ignore", "pipe"],
+    detached: true,
   });
-  server.stderr?.on("data", (d) => verbose && process.stderr.write(d));
+  server = child;
+  let stderr = "";
+  child.stderr?.on("data", (d) => {
+    stderr = (stderr + d).slice(-4000);
+    if (verbose) process.stderr.write(d);
+  });
   BASE = `http://127.0.0.1:${port}/`;
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; ; i++) {
+    if (child.exitCode !== null || child.signalCode !== null)
+      throw new Error(`the server stopped before it was ready:\n${stderr}`);
+    if (i === 60) throw new Error(`the server wasn't ready after 30 s:\n${stderr}`);
     if (
       await fetch(`${BASE}api/status`).then(
         (r) => r.ok,
@@ -487,9 +510,43 @@ async function readerStates(page: Page, bookRoute: string, theme: "light" | "dar
 
 /* ---------- run ---------- */
 
-if (process.argv.includes("--serve")) await serve();
-const browser = await puppeteer.launch({ executablePath: chromePath()!, headless: true, protocolTimeout: 180000 });
+/** Ends the server and everything it started (its process group): asked first, then made to. */
+async function stopServer() {
+  const child = server;
+  server = null;
+  if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
+  const gone = new Promise((resolve) => child.once("exit", resolve));
+  const signal = (name: NodeJS.Signals) => {
+    try {
+      process.kill(-child.pid!, name);
+    } catch {}
+  };
+  signal("SIGTERM");
+  if (await Promise.race([gone.then(() => true), wait(5000).then(() => false)])) return;
+  signal("SIGKILL");
+  await gone;
+}
+async function cleanUp() {
+  await stopServer();
+  if (dataDir) rmSync(dataDir, { recursive: true, force: true });
+  dataDir = null;
+}
+// stopped from outside (Ctrl-C, a CI timeout): leave nothing running
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const)
+  process.on(signal, () => void cleanUp().finally(() => process.exit(130)));
+
+let browser = null as Browser | null;
 try {
+  if (process.argv.includes("--serve")) await serve();
+  browser = await puppeteer.launch({
+    executablePath: chromePath()!,
+    headless: true,
+    protocolTimeout: 180000,
+    // signals are handled above, so the server is stopped before this exits
+    handleSIGINT: false,
+    handleSIGTERM: false,
+    handleSIGHUP: false,
+  });
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });
   const errors: string[] = [];
@@ -551,9 +608,8 @@ try {
     );
   check("no page errors", errors.length === 0, [...new Set(errors)].join("\n"));
 } finally {
-  await browser.close();
-  server?.kill();
-  if (dataDir) rmSync(dataDir, { recursive: true, force: true });
+  await browser?.close();
+  await cleanUp();
 }
 const failed = results.filter((r) => !r.ok).length;
 console.log(`\n${results.length - failed}/${results.length} passed`);

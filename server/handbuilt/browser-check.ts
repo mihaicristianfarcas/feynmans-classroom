@@ -15,6 +15,11 @@ async function getBrowser(): Promise<Browser> {
     browser = puppeteer.launch({
       executablePath,
       headless: true,
+      // the server stops on a signal itself (server/index.ts); left to puppeteer, SIGTERM would only close
+      // the browser and keep the server running
+      handleSIGINT: false,
+      handleSIGTERM: false,
+      handleSIGHUP: false,
       args: [
         "--no-first-run",
         "--no-default-browser-check",
