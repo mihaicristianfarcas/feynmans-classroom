@@ -56,8 +56,7 @@ describe.skipIf(!hasCodex)("an agent's shell under the Codex profile", () => {
   mkdirSync(cache, { recursive: true });
   const folder = mkdtempSync(join(cache, "classroom-sandbox-"));
   // a jj repository colocated with git, as the vault (and its workspaces) are
-  if (spawnSync("jj", ["git", "init"], { cwd: folder }).status !== 0) spawnSync("git", ["init", "-q"], { cwd: folder });
-  mkdirSync(join(folder, ".jj"), { recursive: true });
+  spawnSync(process.env.JJ_BIN || "jj", ["git", "init"], { cwd: folder });
   writeFileSync(join(folder, "note.md"), "hello\n");
   const run = (command: string, write = true) => {
     const flags = codexProfile({ cwd: folder, write }).flatMap((c) => ["-c", c]);

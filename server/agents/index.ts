@@ -11,9 +11,7 @@
  *      the learner's OK. Everything else lands at once, after whatever the learner did meanwhile, and
  *      only if it doesn't clash with it (vault/jj.ts).
  *   5. Undo: each run is one jj change, taken out again with one click. log/agents.jsonl records
- *      every run: the request, where, the model, the files, the change.
- *
- * Without jj the agent can still read and answer, but not write. */
+ *      every run: the request, where, the model, the files, the change. */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentContext, AgentRun } from "../../shared/vault-types.ts";
@@ -33,7 +31,6 @@ import {
   takeSelfWrite,
   touched,
   VAULT,
-  vaultIsRepo,
   wroteItself,
 } from "../vault/index.ts";
 import { writeIndexes } from "../vault/indexes.ts";
@@ -57,7 +54,7 @@ function load() {
     if (r.status === "running")
       save({ ...r, status: "failed", activity: undefined, error: "the server stopped during the run" });
   }
-  if (vaultIsRepo()) cleanUpWorkingCopies(new Set());
+  cleanUpWorkingCopies(new Set());
 }
 /** Records a run's new state in the log and announces it. */
 function save(run: AgentRun) {
@@ -104,7 +101,6 @@ export function startRun(input: {
     thread: previous ? previous.thread || previous.id : undefined,
     where: where.label || undefined,
     tier: input.tier === "smart" ? "smart" : "fast",
-    mode: vaultIsRepo() ? "write" : "read",
     status: "running",
     started: new Date().toISOString(),
     activity: "getting ready",
@@ -135,26 +131,21 @@ function reporter(id: string) {
 /** The run itself: a working copy, the agent, the checks; then it lands, waits for review, or fails. */
 async function execute(run: AgentRun, where: string[]) {
   const started = Date.now();
-  const write = run.mode === "write";
-  const prompt = agentPrompt({ task: run.task, where, turns: turnsBefore(run), write });
+  const prompt = agentPrompt({ task: run.task, where, turns: turnsBefore(run) });
   const finish = (patch: Partial<AgentRun>) =>
     save({ ...runs.get(run.id)!, activity: undefined, ms: Date.now() - started, ...patch });
   let workspace = false;
   try {
     writeIndexes();
-    let dir = VAULT;
-    let linked: string[] = [];
-    if (write) {
-      const base = checkpoint();
-      if (!base) throw new Error("the vault's history isn't available");
-      ({ dir, linked } = createWorkingCopy(run.id, base));
-      workspace = true;
-    }
+    const start = checkpoint();
+    if (!start) throw new Error("the vault's history isn't available");
+    const { dir, linked } = createWorkingCopy(run.id, start);
+    workspace = true;
     save({ ...runs.get(run.id)!, activity: "reading your vault" });
     const result = await agent({
       cwd: dir,
-      write,
-      readRoots: write ? [VAULT] : undefined,
+      write: true,
+      readRoots: [VAULT],
       prompt,
       schema: REPLY_SCHEMA,
       tier: run.tier,
@@ -171,11 +162,6 @@ async function execute(run: AgentRun, where: string[]) {
       open: open && !open.includes("..") ? open : undefined,
     };
     const existing = base.open && existsSync(join(VAULT, base.open)) ? base.open : undefined;
-    if (!write) {
-      finish({ ...base, open: existing, status: "done", files: [] });
-      return;
-    }
-
     unlinkDerived(dir, linked);
     const change = describeIn(dir, `agent: ${run.task.split("\n")[0].slice(0, 100)}`);
     const files = filesOf("@", dir);

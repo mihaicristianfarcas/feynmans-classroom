@@ -43,11 +43,10 @@ export {
   fileAt,
   fileHistory,
   filesOf,
-  hasJj,
   jj,
+  requireJj,
   type Version,
   vaultHistory,
-  vaultIsRepo,
 } from "./jj.ts";
 export { blankDoc, docFromFile, docToFile, sourceFromYaml, sourceToYaml, whereOf } from "./kinds.ts";
 export { activity, appendLog, logActivity, logReview, readLog, reviews } from "./logs.ts";

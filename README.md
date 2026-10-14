@@ -48,8 +48,8 @@ select a passage.
 Production: `npm run build && npm start` serves the app and the API from one port (8787).
 
 Requirements: Node 22+, the Codex CLI or Claude Code, [Jujutsu](https://www.jj-vcs.dev/) (`brew install
-jj`; for the vault's history and the agent's changes), and Chrome or Chromium only for the optional
-hand-built demos and the screenshot tests.
+jj`; required: it keeps the vault's history and the agent's changes), and Chrome or Chromium only for
+the optional hand-built demos and the screenshot tests.
 
 ## Documentation
 

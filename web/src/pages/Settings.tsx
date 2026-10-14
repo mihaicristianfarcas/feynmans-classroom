@@ -160,12 +160,8 @@ export function Settings() {
           <h2 className="section-title">Your vault</h2>
           <p className="fine">
             Plain Markdown in <code>{vault.path}</code>: {vault.notes} notes, {vault.concepts} concepts, {vault.cards}{" "}
-            cards, {vault.figures} figures. Open it in any editor or Obsidian.{" "}
-            {vault.versioned
-              ? "Jujutsu (jj) keeps every version, and each agent request can be undone."
-              : vault.jj
-                ? "Its history couldn't be started; see the server's log."
-                : "Install Jujutsu (brew install jj, or see jj-vcs.dev) to keep every version and let the agent make changes."}
+            cards, {vault.figures} figures. Open it in any editor or Obsidian. Jujutsu (jj) keeps every version, and
+            each agent request can be undone.
           </p>
           {vault.history.length > 0 && (
             <ul className="history">

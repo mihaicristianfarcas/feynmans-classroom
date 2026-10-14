@@ -1,7 +1,6 @@
 // The documents API (/api/docs): every kind made, listed, read with its links, changed, added to and
 // deleted through the same routes, with the file in the vault as the result; and the history every
 // kind gets from that (a card's versions, as a note's).
-import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,7 +9,6 @@ import { beforeAll, describe, expect, it } from "vitest";
 const dir = mkdtempSync(join(tmpdir(), "classroom-docs-"));
 process.env.DATA_DIR = dir;
 const vault = join(dir, "vault");
-const hasJj = spawnSync(process.env.JJ_BIN || "jj", ["--version"]).status === 0;
 
 let V: typeof import("../server/vault/index.ts");
 let app: ReturnType<typeof import("../server/app.ts").createApp>;
@@ -137,7 +135,7 @@ describe("/api/docs", () => {
   });
 });
 
-describe.skipIf(!hasJj)("/api/docs versions", () => {
+describe("/api/docs versions", () => {
   it("keeps a card's versions as it does a note's, and brings one back", async () => {
     const { json: card } = await post("/api/docs", { kind: "card", front: "First front", back: "Back" });
     V.checkpoint();

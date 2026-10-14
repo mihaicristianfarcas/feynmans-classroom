@@ -47,8 +47,6 @@ export const learn = {
       cards: number;
       figures: number;
       reviews: number;
-      versioned: boolean;
-      jj: boolean;
       path: string;
       history: Version[];
     }>("/api/vault"),
