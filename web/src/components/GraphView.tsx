@@ -47,29 +47,50 @@ export const iconSize = (r: number) => Math.max(9, r * 1.1);
 /** A name as the graph shows it: a long book title is cut short. */
 const labelOf = (n: N) => (n.kind === "book" && n.label.length > 30 ? `${n.label.slice(0, 29)}…` : n.label);
 
-/** The box an item and its label take up (labels run to the right of the circle). */
-const box = (n: N) => {
+/** Which items' names are always shown: books, and concepts and notes unless there are many of them (then
+ * only the concepts much is built on). Others show theirs when lit, found or zoomed in on. */
+function namedIn(nodes: N[]) {
+  const concepts = nodes.filter((n) => n.kind === "concept").length;
+  const notes = nodes.filter((n) => n.kind === "note").length;
+  return (n: N) =>
+    n.kind === "book" ||
+    (n.kind === "concept" && (concepts <= 40 || n.size > 1.3)) ||
+    (n.kind === "note" && notes <= 30);
+}
+
+type Box = { x0: number; x1: number; h: number };
+/** The box an item takes up around its centre: its circle, and its name to the right if `named`. */
+const box = (n: N, named: boolean): Box => {
   const r = radius(n);
-  return { x0: -r - 2, x1: r + 8 + labelOf(n).length * (n.kind === "book" ? 6.9 : 6.3), h: Math.max(16, r * 2 + 2) };
+  const label = named ? 8 + labelOf(n).length * (n.kind === "book" ? 6.9 : 6.3) : 2;
+  return { x0: -r - 2, x1: r + label, h: Math.max(16, r * 2 + 2) };
 };
+/** The room kept between one item's box and the next: across, and above and below. */
+const GAP_X = 20;
+const GAP_Y = 12;
 
 /**
- * Keeps labels from running into each other: two items whose boxes overlap are pushed apart along the
- * shorter way out. Circles alone can't do it, since a label reaches well past its dot.
+ * Keeps names clear of each other and of other items' circles: two items whose boxes (and the gap
+ * between them) overlap are pushed apart along the shorter way out. Circles alone can't do it, since a
+ * name reaches well past its dot.
  */
-function forceLabels(labeled: (n: N) => boolean) {
-  let list: N[] = [];
+function forceLabels(named: (n: N) => boolean) {
+  let list: { n: N; b: Box; named: boolean }[] = [];
+  const left = (e: (typeof list)[number]) => e.n.x! + e.b.x0;
   // like forceCollide, it pushes the same however warm the layout is: links would win as it cools
   const force = () => {
+    // in order from the left, each box only meets the ones that start before it ends
+    list.sort((p, q) => left(p) - left(q));
     for (let i = 0; i < list.length; i++) {
-      const a = list[i];
-      const ba = box(a);
-      for (let j = i + 1; j < list.length; j++) {
-        const b = list[j];
-        const bb = box(b);
-        const ox = Math.min(a.x! + ba.x1, b.x! + bb.x1) - Math.max(a.x! + ba.x0, b.x! + bb.x0);
-        const oy = (ba.h + bb.h) / 2 + 4 - Math.abs(a.y! - b.y!);
-        if (ox <= 0 || oy <= 0) continue;
+      const { n: a, b: ba } = list[i];
+      const end = a.x! + ba.x1 + GAP_X;
+      for (let j = i + 1; j < list.length && left(list[j]) < end; j++) {
+        // two circles without names are forceCollide's to keep apart
+        if (!list[i].named && !list[j].named) continue;
+        const { n: b, b: bb } = list[j];
+        const ox = Math.min(end, b.x! + bb.x1 + GAP_X) - left(list[j]);
+        const oy = (ba.h + bb.h) / 2 + GAP_Y - Math.abs(a.y! - b.y!);
+        if (oy <= 0) continue;
         if (oy < ox) {
           const push = (a.y! < b.y! ? -1 : 1) * oy * 0.25;
           a.vy! += push;
@@ -83,10 +104,15 @@ function forceLabels(labeled: (n: N) => boolean) {
     }
   };
   force.initialize = (nodes: N[]) => {
-    list = nodes.filter(labeled);
+    list = nodes.map((n) => ({ n, b: box(n, named(n)), named: named(n) }));
   };
   return force;
 }
+
+/** Room left at the graph's edges when it's fitted: for the find field above and the tools below, and a
+ * margin at the sides. */
+const EDGE_X = 32;
+const EDGE_Y = 64;
 
 /** How well a concept is known, as a word the styles key on. */
 export const levelOf = (m: number | null) => (m === null ? "none" : m >= 0.8 ? "strong" : m >= 0.55 ? "ok" : "weak");
@@ -195,6 +221,8 @@ export function GraphView({
     setView(next);
   };
   const sim = useRef<Simulation<N, L> | null>(null);
+  // the view the graph was last fitted to, until you move it (or an item) yourself
+  const fitted = useRef<View | null>(null);
   const drag = useRef<{ node?: N; sx: number; sy: number; v: View; moved: boolean } | null>(null);
   const svg = useRef<SVGSVGElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
@@ -224,7 +252,10 @@ export function GraphView({
   const covered = useRef({ left: 0, right: 0 });
   covered.current = { left: insetLeft, right: inset };
 
-  /** The view that shows every item, between the cards if any are open. */
+  const named = useMemo(() => namedIn(nodes), [nodes]);
+
+  /** The view that shows every item (and the names always shown), between the cards if any are open and
+   * clear of the find field and the tools. */
   const fit = (list: N[]): View => {
     const { w, h } = sizeRef.current;
     const { left, right } = covered.current;
@@ -235,54 +266,66 @@ export function GraphView({
       y1 = Number.NEGATIVE_INFINITY;
     for (const n of list) {
       if (n.x === undefined || n.y === undefined) continue;
-      x0 = Math.min(x0, n.x - 30);
-      x1 = Math.max(x1, n.x + Math.min(140, box(n).x1)); // labels run to the right
-      y0 = Math.min(y0, n.y - 24);
-      y1 = Math.max(y1, n.y + 24);
+      const b = box(n, named(n));
+      x0 = Math.min(x0, n.x + b.x0);
+      x1 = Math.max(x1, n.x + b.x1);
+      y0 = Math.min(y0, n.y - b.h / 2);
+      y1 = Math.max(y1, n.y + b.h / 2);
     }
     if (!Number.isFinite(x0)) return { k: 1, x: mid, y: 0 };
-    const k = Math.min(1.25, Math.max(0.3, Math.min((w - left - right - 48) / (x1 - x0), (h - 48) / (y1 - y0))));
+    const k = Math.min(
+      1.25,
+      Math.max(0.3, Math.min((w - left - right - 2 * EDGE_X) / (x1 - x0), (h - 2 * EDGE_Y) / (y1 - y0))),
+    );
     return { k, x: -((x0 + x1) / 2) * k + mid, y: -((y0 + y1) / 2) * k };
   };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: lays out again only when the graph changes (fit reads the size from a ref)
   useLayoutEffect(() => {
-    const concepts = nodes.filter((n) => n.kind === "concept").length;
-    const notes = nodes.filter((n) => n.kind === "note").length;
-    const labeled = (n: N) =>
-      (n.kind === "concept" && (concepts <= 40 || n.size > 1.3)) || (n.kind === "note" && notes <= 30);
     const fresh = nodes.filter((n) => n.x === undefined).length > nodes.length / 2;
+    // the graph takes the shape of the room it's drawn in, wide on a wide screen and tall on a phone (the
+    // pull to the middle is weaker along the longer side), and a small graph spreads out to fill it: a
+    // big one keeps the spacing below and is zoomed out to fit
+    const { w, h } = sizeRef.current;
+    const roomW = w - 2 * EDGE_X,
+      roomH = Math.max(1, h - 2 * EDGE_Y);
+    const aspect = Math.min(2.5, Math.max(0.4, roomW / roomH));
+    // 15000: about the room (px²) an item takes at the spacing below
+    const spread = Math.min(2, Math.max(1, Math.sqrt((roomW * roomH) / (nodes.length * 15000))));
     const s = forceSimulation<N, L>(nodes)
       .force(
         "link",
         forceLink<N, L>(links)
           .id((d) => d.id)
-          .distance((l) => (l.kind === "related" ? 85 : l.kind === "source" ? 110 : 55))
-          .strength((l) => (l.kind === "source" ? 0.15 : 0.5)),
+          .distance((l) => spread * (l.kind === "related" ? 110 : l.kind === "source" ? 150 : 80))
+          .strength((l) => (l.kind === "source" ? 0.15 : 0.3)),
       )
       .force(
         "charge",
-        forceManyBody<N>().strength((d) => (d.kind === "book" ? -900 : d.kind === "concept" ? -220 : -60)),
+        forceManyBody<N>().strength(
+          (d) => spread ** 2 * (d.kind === "book" ? -1200 : d.kind === "concept" ? -400 : -150),
+        ),
       )
       .force(
         "collide",
         forceCollide<N>()
-          .radius((d) => (d.kind === "book" ? radius(d) + 45 : d.kind === "concept" ? radius(d) + 36 : radius(d) + 8))
+          .radius((d) => radius(d) + (d.kind === "book" ? 60 : d.kind === "concept" ? 44 : 20))
           .strength(0.9),
       )
-      .force(
-        "labels",
-        forceLabels((n) => n.kind === "book" || labeled(n)),
-      )
-      .force("x", forceX(0).strength(0.04))
-      .force("y", forceY(0).strength(0.06))
+      .force("labels", forceLabels(named))
+      .force("x", forceX(0).strength(0.05 / aspect ** 2))
+      .force("y", forceY(0).strength(0.05 * aspect ** 2))
       .alphaDecay(0.035)
       .stop();
-    // most of the layout happens before the first frame, so the graph opens calm instead of flying apart
-    s.alpha(fresh ? 1 : 0.3).tick(fresh ? (nodes.length > 600 ? 60 : 160) : 30);
+    // the layout happens before the first frame (200 steps take it all the way to rest; a graph of over 600
+    // items finishes on screen), so the graph opens calm and framed instead of flying apart
+    s.alpha(fresh ? 1 : 0.3).tick(fresh ? (nodes.length > 600 ? 80 : 200) : 30);
     if (fresh) {
+      fitted.current = fit(nodes);
+      // read at once by bringing a picked item into view, before the next render
+      viewRef.current = fitted.current;
       setGlide(false);
-      setView(fit(nodes));
+      setView(fitted.current);
     }
     let frame = 0;
     s.on("tick", () => {
@@ -291,6 +334,13 @@ export function GraphView({
           frame = 0;
           setTick((t) => t + 1);
         });
+    });
+    // once it comes to rest, a graph still as it was fitted is fitted again: what settles after the first
+    // frame (items added, links accepted) stays in view
+    s.on("end", () => {
+      if (!fitted.current || viewRef.current !== fitted.current) return;
+      fitted.current = fit(nodes);
+      moveTo(fitted.current);
     });
     s.restart();
     sim.current = s;
@@ -324,7 +374,7 @@ export function GraphView({
     const v = viewRef.current;
     const sx = n.x * v.k + v.x,
       sy = n.y * v.k + v.y;
-    if (sx > -w / 2 + left + 40 && sx < w / 2 - right - 40 && sy > -h / 2 + 40 && sy < h / 2 - 40) return;
+    if (sx > -w / 2 + left + 40 && sx < w / 2 - right - 40 && sy > -h / 2 + EDGE_Y && sy < h / 2 - EDGE_Y) return;
     setGlide(glided);
     setView({ ...v, x: (left - right) / 2 - n.x * v.k, y: -n.y * v.k });
   };
@@ -355,8 +405,6 @@ export function GraphView({
   const lead = hover ?? selected;
   const focus = lead ? new Set([lead, ...(neighbors.get(lead) || [])]) : null;
   const born = (n: N) => until === undefined || n.created <= until;
-  const fewConcepts = nodes.filter((n) => n.kind === "concept").length <= 40;
-  const fewNotes = nodes.filter((n) => n.kind === "note").length <= 30;
   const dimmed = (n: N) => (focus ? !focus.has(n.id) : q ? !matches(n) : false);
 
   const describe = (n: N) =>
@@ -424,6 +472,7 @@ export function GraphView({
             d.moved = true;
             (e.currentTarget as Element).setPointerCapture(e.pointerId);
             if (d.node) {
+              fitted.current = null;
               d.node.fx = d.node.x;
               d.node.fy = d.node.y;
               sim.current?.alphaTarget(0.2).restart();
@@ -512,13 +561,7 @@ export function GraphView({
             };
             const r = radius(n);
             const s = iconSize(r);
-            const showLabel =
-              n.kind === "book" ||
-              (n.kind === "concept" && (fewConcepts || n.size > 1.3)) ||
-              (n.kind === "note" && fewNotes) ||
-              hit ||
-              focus?.has(n.id) ||
-              view.k > 1.6;
+            const showLabel = named(n) || hit || focus?.has(n.id) || view.k > 1.6;
             return (
               <g
                 key={n.id}
