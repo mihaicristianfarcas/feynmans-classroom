@@ -40,7 +40,7 @@ export const ICON_STROKE = 2.25;
 
 /** An item's circle: books largest, concepts by how much is built on them, notes, then annotations. */
 const radius = (n: Pick<N, "kind" | "size">) =>
-  n.kind === "book" ? 15 : n.kind === "concept" ? 8 + n.size * 2.4 : n.kind === "annotation" ? 7.5 : 9.5;
+  n.kind === "book" ? 17 : n.kind === "concept" ? 9 + n.size * 2.8 : n.kind === "annotation" ? 8.5 : 11;
 /** How big the icon inside a circle of radius `r` is. */
 export const iconSize = (r: number) => Math.max(9, r * 1.1);
 
@@ -62,7 +62,7 @@ type Box = { x0: number; x1: number; h: number };
 /** The box an item takes up around its centre: its circle, and its name to the right if `named`. */
 const box = (n: N, named: boolean): Box => {
   const r = radius(n);
-  const label = named ? 8 + labelOf(n).length * (n.kind === "book" ? 6.9 : 6.3) : 2;
+  const label = named ? 8 + labelOf(n).length * (n.kind === "book" ? 7.5 : 6.85) : 2;
   return { x0: -r - 2, x1: r + label, h: Math.max(16, r * 2 + 2) };
 };
 /** The room kept between one item's box and the next: across, and above and below. */
@@ -109,10 +109,45 @@ function forceLabels(named: (n: N) => boolean) {
   return force;
 }
 
+/**
+ * Gives the graph the shape of the room it's drawn in (`aspect`, width over height): while the items and
+ * their names take up a narrower shape than that, they're spread apart sideways from the middle out (or
+ * up and down while it's flatter). It only ever spreads, so it adds room between items and never crowds
+ * them.
+ */
+function forceShape(aspect: number, named: (n: N) => boolean) {
+  let list: { n: N; b: Box }[] = [];
+  const force = (alpha: number) => {
+    let x0 = Number.POSITIVE_INFINITY,
+      x1 = Number.NEGATIVE_INFINITY,
+      y0 = Number.POSITIVE_INFINITY,
+      y1 = Number.NEGATIVE_INFINITY;
+    for (const { n, b } of list) {
+      x0 = Math.min(x0, n.x! + b.x0);
+      x1 = Math.max(x1, n.x! + b.x1);
+      y0 = Math.min(y0, n.y! - b.h / 2);
+      y1 = Math.max(y1, n.y! + b.h / 2);
+    }
+    const off = Math.log(aspect / ((x1 - x0) / (y1 - y0) || 1));
+    if (!Number.isFinite(off) || Math.abs(off) < 0.02) return;
+    const k = alpha * 0.6 * Math.min(1, Math.abs(off));
+    const cx = (x0 + x1) / 2,
+      cy = (y0 + y1) / 2;
+    for (const { n } of list) {
+      if (off > 0) n.vx! += (n.x! - cx) * k;
+      else n.vy! += (n.y! - cy) * k;
+    }
+  };
+  force.initialize = (nodes: N[]) => {
+    list = nodes.map((n) => ({ n, b: box(n, named(n)) }));
+  };
+  return force;
+}
+
 /** Room left at the graph's edges when it's fitted: for the find field above and the tools below, and a
  * margin at the sides. */
 const EDGE_X = 32;
-const EDGE_Y = 64;
+const EDGE_Y = 56;
 
 /** How well a concept is known, as a word the styles key on. */
 export const levelOf = (m: number | null) => (m === null ? "none" : m >= 0.8 ? "strong" : m >= 0.55 ? "ok" : "weak");
@@ -223,6 +258,8 @@ export function GraphView({
   const sim = useRef<Simulation<N, L> | null>(null);
   // the view the graph was last fitted to, until you move it (or an item) yourself
   const fitted = useRef<View | null>(null);
+  // the graph last laid out
+  const laidOut = useRef<{ nodes?: N[]; links?: L[]; alpha?: number }>({});
   const drag = useRef<{ node?: N; sx: number; sy: number; v: View; moved: boolean } | null>(null);
   const svg = useRef<SVGSVGElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
@@ -283,43 +320,59 @@ export function GraphView({
   // biome-ignore lint/correctness/useExhaustiveDependencies: lays out again only when the graph changes (fit reads the size from a ref)
   useLayoutEffect(() => {
     const fresh = nodes.filter((n) => n.x === undefined).length > nodes.length / 2;
-    // the graph takes the shape of the room it's drawn in, wide on a wide screen and tall on a phone (the
-    // pull to the middle is weaker along the longer side), and a small graph spreads out to fill it: a
-    // big one keeps the spacing below and is zoomed out to fit
+    // the same graph laid out again (React mounting it twice in development): it carries on from where it was
+    const again = laidOut.current.nodes === nodes && laidOut.current.links === links;
+    const wasAt = laidOut.current.alpha ?? 0;
+    laidOut.current = { nodes, links };
+    // the graph takes the shape of the room it's drawn in (forceShape, and a pull to the middle that is
+    // weaker along the longer side), and a small graph spreads out to fill it: a big one keeps the spacing
+    // below and is zoomed out to fit
     const { w, h } = sizeRef.current;
     const roomW = w - 2 * EDGE_X,
       roomH = Math.max(1, h - 2 * EDGE_Y);
     const aspect = Math.min(2.5, Math.max(0.4, roomW / roomH));
-    // 15000: about the room (px²) an item takes at the spacing below
-    const spread = Math.min(2, Math.max(1, Math.sqrt((roomW * roomH) / (nodes.length * 15000))));
+    // 25000: about the room (px²) an item and its name take at the spacing below
+    const spread = Math.min(2, Math.max(1, Math.sqrt((roomW * roomH) / (nodes.length * 25000))));
+    // links hold an item with few of them close (a note on one book stays by it), a hub more loosely
+    const idOf = (end: L["source"]) => (typeof end === "object" ? (end as N).id : String(end));
+    const degree = new Map<string, number>();
+    for (const l of links)
+      for (const end of [l.source, l.target]) degree.set(idOf(end), (degree.get(idOf(end)) ?? 0) + 1);
     const s = forceSimulation<N, L>(nodes)
       .force(
         "link",
         forceLink<N, L>(links)
           .id((d) => d.id)
-          .distance((l) => spread * (l.kind === "related" ? 110 : l.kind === "source" ? 150 : 80))
-          .strength((l) => (l.kind === "source" ? 0.15 : 0.3)),
+          .distance((l) => spread * (l.kind === "related" ? 100 : l.kind === "source" ? 110 : 70))
+          .strength(
+            (l) =>
+              (l.kind === "source" ? 0.5 : 1) /
+              Math.min(degree.get(idOf(l.source)) ?? 1, degree.get(idOf(l.target)) ?? 1),
+          ),
       )
       .force(
         "charge",
-        forceManyBody<N>().strength(
-          (d) => spread ** 2 * (d.kind === "book" ? -1200 : d.kind === "concept" ? -400 : -150),
-        ),
+        // pushing only across a short way, so the graph fills evenly and nothing is flung far off
+        forceManyBody<N>()
+          .strength((d) => spread ** 2 * (d.kind === "book" ? -500 : d.kind === "concept" ? -300 : -200))
+          .distanceMax(spread * 320),
       )
       .force(
         "collide",
         forceCollide<N>()
-          .radius((d) => radius(d) + (d.kind === "book" ? 60 : d.kind === "concept" ? 44 : 20))
+          .radius((d) => radius(d) + (d.kind === "book" ? 50 : d.kind === "concept" ? 36 : 24))
           .strength(0.9),
       )
       .force("labels", forceLabels(named))
-      .force("x", forceX(0).strength(0.05 / aspect ** 2))
-      .force("y", forceY(0).strength(0.05 * aspect ** 2))
+      .force("shape", forceShape(aspect, named))
+      .force("x", forceX(0).strength(0.06 / aspect))
+      .force("y", forceY(0).strength(0.06 * aspect))
       .alphaDecay(0.035)
       .stop();
     // the layout happens before the first frame (200 steps take it all the way to rest; a graph of over 600
     // items finishes on screen), so the graph opens calm and framed instead of flying apart
-    s.alpha(fresh ? 1 : 0.3).tick(fresh ? (nodes.length > 600 ? 80 : 200) : 30);
+    if (again) s.alpha(wasAt);
+    else s.alpha(fresh ? 1 : 0.3).tick(fresh ? (nodes.length > 600 ? 80 : 200) : 30);
     if (fresh) {
       fitted.current = fit(nodes);
       // read at once by bringing a picked item into view, before the next render
@@ -348,6 +401,7 @@ export function GraphView({
     setTick((t) => t + 1);
     return () => {
       s.stop();
+      laidOut.current.alpha = s.alpha();
       cancelAnimationFrame(frame);
     };
   }, [nodes, links]);
