@@ -112,6 +112,8 @@ function inner(node: Node, walk: Walk, table = false): string {
       const body = inner(el, walk, table);
       if (INLINE_OK.has(tag) || (table && TABLE_OK.has(tag)))
         out += tag === "a" ? `<span class="ln">${body}</span>` : `<${tag}>${body}</${tag}>`;
+      // a list or paragraphs inside a table's cell keep their line breaks (not run together)
+      else if (table && /^(li|p|div|dd|dt)$/.test(tag) && body.trim()) out += `${body}<br>`;
       else out += body;
     }
   }

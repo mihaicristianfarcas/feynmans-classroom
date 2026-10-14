@@ -26,8 +26,10 @@ server/            the API and everything behind it (Node, TypeScript, run with 
   vault/           the vault as files: the document store, each kind's file format (kinds.ts), history
                    (jj), logs, watching, indexes, links
   books/           the book store, types, finding quotes (locate.ts), find in a book (find.ts), figure
-                   placement and numbers
-  ingest/          reading uploaded books: PDF, EPUB, Markdown, text, chapter detection
+                   placement and numbers, the shelf (shelf.ts: topics sorted by a model, lengths)
+  ingest/          reading uploaded books: PDF, EPUB, Markdown, text, chapter detection; saving links
+                   (web.ts: an article through Readability, or the PDF behind it; fetch.ts: the guarded
+                   fetcher)
   annotations/     the margin: anchors, files, model-written answers, live updates, sending to notes
   learn/           documents of any kind (docs.ts: make, change, rename, delete, versions), then what
                    each kind does beyond that: notes, concepts, cards (FSRS-6), the tutor's sessions;
@@ -40,7 +42,7 @@ server/            the API and everything behind it (Node, TypeScript, run with 
   agents/          the agent: where the learner is, the prompt, its jj workspace, checks, landing, undo
 shared/            code the server and the browser both run
   scene/           the figure engine: spec types, the expression language, five renderers, validation
-  fsrs.ts links.ts textmatch.ts thread.ts chapters.ts vault-types.ts
+  fsrs.ts links.ts textmatch.ts thread.ts chapters.ts topics.ts vault-types.ts
 web/src/           the React app (Vite)
   app/             the shell (a slim bar along the top): routing (each page its own chunk, loaded on
                    first visit), navigation, theme, the ⌘K palette, what a page shows when it fails
@@ -88,7 +90,10 @@ on the book's event stream, and resumes after a restart.
 
 The server binds to 127.0.0.1 and answers only requests that name a local host and don't come from
 another website (`localOnly()` in `server/http.ts`). Book content is never trusted: EPUB and HTML are
-sanitized at ingest, book pictures are served with a script-blocking CSP, hand-built demos run in a
+sanitized at ingest (a saved web page keeps nothing but sanitized blocks and its pictures), links are
+fetched only from the public internet (`server/ingest/fetch.ts` refuses this machine and its network
+on every hop), the browser bookmark's page asks before saving, book pictures are served with a
+script-blocking CSP, hand-built demos run in a
 sandboxed iframe with no network, model prompts treat book text as material, and agents run inside
 the CLI's OS sandbox. See [SECURITY.md](../SECURITY.md).
 

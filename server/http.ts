@@ -20,6 +20,7 @@ const TYPES: Record<string, string> = {
   ".gif": "image/gif",
   ".svg": "image/svg+xml",
   ".webp": "image/webp",
+  ".avif": "image/avif",
   ".pdf": "application/pdf",
   ".epub": "application/epub+zip",
   ".txt": "text/plain; charset=utf-8",

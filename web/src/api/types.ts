@@ -75,7 +75,7 @@ export interface Book {
   folder?: string;
   file?: string;
   author?: string;
-  format: "pdf" | "epub" | "text";
+  format: "pdf" | "epub" | "text" | "web";
   pageCount?: number;
   blockCount?: number;
   toc: TocEntry[];
@@ -85,6 +85,17 @@ export interface Book {
   tocSource?: "outline" | "nav" | "headings" | "chunks" | "codex";
   demoCount?: number;
   building?: number;
+  /** Where an article (or a PDF from a link) was saved from. */
+  source?: { url: string; site?: string; published?: string };
+  /** What it is about, in a line (an article's standfirst). */
+  summary?: string;
+  /** Its cover picture, in its folder (served at /api/books/<id>/cover). */
+  cover?: string;
+  /** The shelf's topic (shared/topics.ts) and tags; none until it has been sorted. */
+  topic?: string;
+  tags?: string[];
+  /** Its length in words. */
+  words?: number;
 }
 export interface Brief {
   slug: string;

@@ -1,15 +1,21 @@
-/* Routes for books: the library, uploading (any PDF, EPUB, Markdown or text file), a book's file,
- * text blocks and pictures, finding its chapters, its live event stream, and reading sessions. */
+/* Routes for books: the library, uploading (any PDF, EPUB, Markdown or text file), saving a link (an
+ * article or a PDF), renaming a book or moving it to another topic, a book's file, cover, text blocks
+ * and pictures, finding its chapters, its live event stream, and reading sessions. */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { isTopic } from "../../shared/topics.ts";
 import { findInBook } from "../books/find.ts";
-import { bookDir, bookFolder, deleteBook, getBlocks, getBook, listBooks, listDemos } from "../books/store.ts";
+import { announceBook, shelveSoon } from "../books/shelf.ts";
+import { bookDir, bookFolder, deleteBook, getBlocks, getBook, listBooks, listDemos, saveBook } from "../books/store.ts";
+import type { Book } from "../books/types.ts";
 import { safeJoin } from "../fs.ts";
 import { CONTENT_ONLY, eventStream, readBody, sendFile } from "../http.ts";
 import { detectChapters } from "../ingest/chapters.ts";
+import { FetchError } from "../ingest/fetch.ts";
 import { formatOf, ingestBook } from "../ingest/index.ts";
+import { saveLink } from "../ingest/web.ts";
 import { queue } from "../jobs.ts";
 import { bookNote } from "../learn/notes.ts";
 import { type ReadingPing, recordReading } from "../learn/reading.ts";
@@ -17,6 +23,18 @@ import { logActivity } from "../vault/index.ts";
 import { exportBook } from "../vault/library.ts";
 
 const MAX_UPLOAD = 200 * 1024 * 1024;
+
+/** A new book is in: its text written out for the vault, the activity logged, and its topic sorted soon. */
+function arrived(book: Book) {
+  try {
+    exportBook(book);
+  } catch (error) {
+    console.warn("[vault] export failed:", (error as Error).message);
+  }
+  logActivity({ type: "book", bookId: book.id, text: `Added ${book.title}` });
+  shelveSoon(book.id);
+  announceBook(book);
+}
 
 export function bookRoutes(app: Hono) {
   /** Every book, with how many of its figures are ready and how many are being made. */
@@ -58,15 +76,52 @@ export function bookRoutes(app: Hono) {
       if (!formatOf(file.name)) return c.json({ error: "Upload a PDF, EPUB, Markdown or plain-text book." }, 415);
       const book = await ingestBook({ name: file.name, data: Buffer.from(await file.arrayBuffer()) });
       if (book.status === "error") return c.json({ error: book.error, book }, 422);
-      try {
-        exportBook(book);
-      } catch (error) {
-        console.warn("[vault] export failed:", (error as Error).message);
-      }
-      logActivity({ type: "book", bookId: book.id, text: `Added ${book.title}` });
+      arrived(book);
       return c.json(book);
     },
   );
+
+  /** Saves what a link points at: a web page as an article (its pictures downloaded), or a PDF. */
+  app.post("/api/books/link", async (c) => {
+    const { url } = await readBody<{ url?: string }>(c);
+    if (!url?.trim()) return c.json({ error: "send the link as { url }" }, 400);
+    try {
+      const book = await saveLink(url, (pdf) => ingestBook(pdf));
+      if (book.status === "error") return c.json({ error: book.error, book }, 422);
+      arrived(book);
+      return c.json(book);
+    } catch (error) {
+      if (error instanceof FetchError) return c.json({ error: error.message }, error.status as 400);
+      throw error;
+    }
+  });
+
+  /** Renames a book or moves it to another topic. */
+  app.patch("/api/books/:id", async (c) => {
+    const book = getBook(c.req.param("id"));
+    if (!book) return c.json({ error: "not found" }, 404);
+    const patch = await readBody<{ title?: string; topic?: string }>(c);
+    if (typeof patch.title === "string") {
+      const title = patch.title.replace(/\s+/g, " ").trim().slice(0, 300);
+      if (!title) return c.json({ error: "a book needs a title" }, 400);
+      book.title = title;
+    }
+    if (patch.topic !== undefined) {
+      if (!isTopic(patch.topic)) return c.json({ error: "unknown topic" }, 400);
+      book.topic = patch.topic;
+    }
+    saveBook(book);
+    announceBook(book);
+    return c.json(book);
+  });
+
+  /** A book's cover picture (an EPUB's own, an article's lead picture). */
+  app.get("/api/books/:id/cover", (c) => {
+    const book = getBook(c.req.param("id"));
+    const path = book?.cover ? safeJoin(bookDir(book.id), book.cover) : null;
+    if (!path || !existsSync(path)) return c.json({ error: "no cover" }, 404);
+    return sendFile(path, { "cache-control": "private, max-age=86400", ...CONTENT_ONLY });
+  });
 
   app.get("/api/books/:id", (c) => {
     const book = getBook(c.req.param("id"));
@@ -83,7 +138,11 @@ export function bookRoutes(app: Hono) {
   app.get("/api/books/:id/file", (c) => {
     const book = getBook(c.req.param("id"));
     if (!book) return c.json({ error: "not found" }, 404);
-    return sendFile(join(bookDir(book.id), book.file), { "cache-control": "private, max-age=3600" });
+    // a saved article's page is sanitized, and served so that nothing in it could run all the same
+    return sendFile(join(bookDir(book.id), book.file), {
+      "cache-control": "private, max-age=3600",
+      ...(book.format === "web" ? CONTENT_ONLY : {}),
+    });
   });
 
   app.get("/api/books/:id/blocks", (c) => c.json(getBlocks(c.req.param("id"))));

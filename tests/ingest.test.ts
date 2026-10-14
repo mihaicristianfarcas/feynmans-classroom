@@ -1,4 +1,5 @@
-// Reading books: Markdown and text, PDF line joining and chapter titles, page text, and EPUBs.
+// Reading books: Markdown and text, PDF line joining and chapter titles, page text, and EPUBs (with
+// their cover pictures).
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -84,17 +85,22 @@ import JSZip from "jszip";
 import { ingestEpub } from "../server/ingest/epub.ts";
 
 describe("ingestEpub", () => {
-  const epub = async (chapter: string) => {
+  const epub = async (chapter: string, cover?: "epub3" | "epub2") => {
     const zip = new JSZip();
     zip.file(
       "META-INF/container.xml",
       '<container><rootfiles><rootfile full-path="OEBPS/book.opf"/></rootfiles></container>',
     );
+    const meta = cover === "epub2" ? '<meta name="cover" content="pic"/>' : "";
+    const pic = cover
+      ? `<item id="pic" href="images/front.jpg" media-type="image/jpeg"${cover === "epub3" ? ' properties="cover-image"' : ""}/>`
+      : "";
     zip.file(
       "OEBPS/book.opf",
-      '<package><metadata><dc:title>Bomb</dc:title></metadata><manifest><item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="c1"/></spine></package>',
+      `<package><metadata><dc:title>Bomb</dc:title>${meta}</metadata><manifest><item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/>${pic}</manifest><spine><itemref idref="c1"/></spine></package>`,
     );
     zip.file("OEBPS/c1.xhtml", chapter);
+    if (cover) zip.file("OEBPS/images/front.jpg", Buffer.from("not really a jpeg"));
     const dir = mkdtempSync(join(tmpdir(), "classroom-epub-"));
     const path = join(dir, "book.epub");
     writeFileSync(path, await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
@@ -106,6 +112,15 @@ describe("ingestEpub", () => {
     );
     const book = await ingestEpub(path, join(dir, "assets"), (a) => a);
     expect(book.blocks.map((b) => b.text)).toContain("A candle burns.");
+  });
+  it("names its cover picture, marked the EPUB 3 way or the EPUB 2 way", async () => {
+    const body = "<html><body><h1>One</h1><p>A candle burns.</p></body></html>";
+    for (const kind of ["epub3", "epub2"] as const) {
+      const { path, dir } = await epub(body, kind);
+      expect((await ingestEpub(path, join(dir, "assets"), (a) => a)).cover).toBe("OEBPS/images/front.jpg");
+    }
+    const { path, dir } = await epub(body);
+    expect((await ingestEpub(path, join(dir, "assets"), (a) => a)).cover).toBeUndefined();
   });
   it("refuses an archive that inflates past its budget", async () => {
     const { path, dir } = await epub(`<html><body><p>${"a".repeat(70 * 1024 * 1024)}</p></body></html>`);
