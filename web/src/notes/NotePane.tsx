@@ -5,7 +5,7 @@
  * typing in it, asks which text to keep. */
 import { ArrowUpRight, History, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { learn, type NoteDetail } from "../api";
+import { docs, type Note, type NoteDetail } from "../api";
 import { go } from "../app/navigation";
 import { Markdown } from "../components/Markdown";
 import { PanelEdge, PanelToggle } from "../components/Panel";
@@ -56,7 +56,7 @@ export function NotePane({
 
   const load = useCallback(
     () =>
-      learn.note(id).then(
+      docs.get<Note>(id).then(
         (n) => {
           setNote(n);
           if (!modeSet.current) {
@@ -91,7 +91,7 @@ export function NotePane({
       if (clashRef.current && patch.body !== undefined) return;
       setSaving("saving");
       try {
-        const updated = await learn.updateNote(id, patch);
+        const updated = await docs.update<Note>(id, patch);
         dirty.current = false;
         setSaving("saved");
         if (patch.title !== undefined) {
@@ -120,7 +120,7 @@ export function NotePane({
     () => () => {
       if (dirty.current) {
         clearTimeout(timer.current);
-        void learn.updateNote(id, { body: bodyRef.current });
+        void docs.update<Note>(id, { body: bodyRef.current });
       }
     },
     [id],
@@ -232,7 +232,7 @@ export function NotePane({
               aria-label="Delete note"
               onClick={async () => {
                 if (!confirm(`Move “${note.title}” to the vault's trash?`)) return;
-                await learn.deleteNote(note.id);
+                await docs.remove(note.id);
                 onChanged();
                 go("#/notes");
               }}
@@ -243,7 +243,7 @@ export function NotePane({
           <Properties
             note={note}
             onSave={async (patch) => {
-              await learn.updateNote(note.id, patch);
+              await docs.update<Note>(note.id, patch);
               load();
             }}
           />

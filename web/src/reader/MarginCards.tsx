@@ -4,7 +4,7 @@
 import { Copy, Ellipsis, FileText, Link2, Maximize2, Quote, SquarePlus, Trash2 } from "lucide-react";
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { threadOf } from "../../../shared/thread.ts";
-import { type Annotation, type Book, type Demo, learn } from "../api";
+import { type Annotation, type Book, type Demo, docs, learn } from "../api";
 import { ChatInput, type ChatMessage, ChatThread } from "../components/Chat";
 import { Spinner } from "../components/feedback";
 import { Markdown } from "../components/Markdown";
@@ -57,10 +57,10 @@ export const AnnotationCard = memo(function AnnotationCard({
   const [redrawing, setRedrawing] = useState(false);
   const [notes, setNotes] = useState("");
   const [comment, setComment] = useState(a.body);
-  const label = a.kind === "visualize" ? fig || "Figure" : KIND[a.kind];
+  const label = a.type === "visualize" ? fig || "Figure" : KIND[a.type];
   const pending = a.status === "pending";
   const since = pending ? new Date(a.updated || a.created).getTime() : 0;
-  const where = a.anchor.page !== undefined ? `p. ${a.anchor.page}` : "";
+  const where = a.source.page !== undefined ? `p. ${a.source.page}` : "";
   const { answer, turns } = useMemo(() => threadOf(a.body), [a.body]);
   const messages: ChatMessage[] = useMemo(
     () => (asking ? [...turns, { role: "user", text: asking.q }] : turns),
@@ -91,7 +91,7 @@ export const AnnotationCard = memo(function AnnotationCard({
   return (
     <article
       className="mcard open"
-      data-kind={a.kind}
+      data-kind={a.type}
       data-status={a.status}
       data-color={a.color}
       data-focused={focused || undefined}
@@ -101,21 +101,21 @@ export const AnnotationCard = memo(function AnnotationCard({
       <header className="mcard-head">
         <span className="mcard-kind">{label}</span>
         <span className="spacer" />
-        {a.kind === "visualize" && a.status === "ready" && (
+        {a.type === "visualize" && a.status === "ready" && (
           <button type="button" className="mcard-icon" aria-label="Open large" title="Open large" onClick={onOpen}>
             <Maximize2 aria-hidden="true" />
           </button>
         )}
         <CardMenu a={a} onToNote={onToNote} toast={toast} />
       </header>
-      {a.request && a.kind !== "comment" && (
+      {a.request && a.type !== "comment" && (
         <div className="mcard-thread">
           <div className="msg" data-role="user">
             <p>{a.request}</p>
           </div>
         </div>
       )}
-      {a.kind === "highlight" || a.kind === "comment" ? (
+      {a.type === "highlight" || a.type === "comment" ? (
         <div className="mcard-comment">
           <fieldset className="colors">
             <legend className="visually-hidden">Colour</legend>
@@ -127,7 +127,7 @@ export const AnnotationCard = memo(function AnnotationCard({
                 data-color={c}
                 aria-pressed={(a.color || "yellow") === c}
                 aria-label={c}
-                onClick={() => learn.updateAnnotation(a.id, { color: c })}
+                onClick={() => docs.update<Annotation>(a.id, { color: c })}
               />
             ))}
           </fieldset>
@@ -139,7 +139,7 @@ export const AnnotationCard = memo(function AnnotationCard({
             onChange={(e) => setComment(e.target.value)}
             onBlur={() =>
               comment !== a.body &&
-              learn.updateAnnotation(a.id, { body: comment, kind: comment.trim() ? "comment" : "highlight" })
+              docs.update<Annotation>(a.id, { body: comment, type: comment.trim() ? "comment" : "highlight" })
             }
           />
         </div>
@@ -152,9 +152,9 @@ export const AnnotationCard = memo(function AnnotationCard({
             label={
               a.props?.engine === "manim"
                 ? "Writing the animation and checking it runs"
-                : a.kind === "visualize"
+                : a.type === "visualize"
                   ? "Drawing"
-                  : a.kind === "resources"
+                  : a.type === "resources"
                     ? "Searching"
                     : "Thinking"
             }
@@ -167,7 +167,7 @@ export const AnnotationCard = memo(function AnnotationCard({
           <button
             type="button"
             className="button"
-            onClick={() => (a.kind === "visualize" ? learn.redraw(a.id) : learn.retryAnnotation(a.id))}
+            onClick={() => (a.type === "visualize" ? learn.redraw(a.id) : learn.retryAnnotation(a.id))}
           >
             Try again
           </button>
@@ -184,7 +184,7 @@ export const AnnotationCard = memo(function AnnotationCard({
           <ChatThread messages={messages} theme={theme} busy={asking?.at} base={a.path} />
         </div>
       )}
-      {GENERATED.includes(a.kind) && !pending && a.status !== "failed" && (
+      {GENERATED.includes(a.type) && !pending && a.status !== "failed" && (
         <>
           <footer className="mcard-foot">
             <span className="fine">
@@ -194,7 +194,7 @@ export const AnnotationCard = memo(function AnnotationCard({
               {timeAgo(a.created)}
             </span>
             <span className="spacer" />
-            {a.kind === "visualize" && (
+            {a.type === "visualize" && (
               <button type="button" className="link" aria-expanded={redrawing} onClick={() => setRedrawing((r) => !r)}>
                 Redraw…
               </button>
@@ -298,14 +298,14 @@ function CardMenu({ a, onToNote, toast }: { a: Annotation; onToNote: ToNote; toa
           {item(
             "embed",
             <SquarePlus aria-hidden="true" />,
-            `Add to note${a.kind === "highlight" ? "" : " (with the answer)"}`,
+            `Add to note${a.type === "highlight" ? "" : " (with the answer)"}`,
             () => onToNote(a, "embed"),
           )}
           {item("passage", <Quote aria-hidden="true" />, "Add the passage to note", () => onToNote(a, "passage"))}
           {item("reference", <Link2 aria-hidden="true" />, "Add a reference to note", () => onToNote(a, "reference"))}
           <div className="menu-sep" />
           {item("copy", <Copy aria-hidden="true" />, "Copy", () => {
-            void navigator.clipboard?.writeText(`${a.anchor.quote}\n\n${a.body}`.trim()).then(() => toast("Copied."));
+            void navigator.clipboard?.writeText(`${a.source.quote}\n\n${a.body}`.trim()).then(() => toast("Copied."));
           })}
           <a
             role="menuitem"
@@ -316,7 +316,7 @@ function CardMenu({ a, onToNote, toast }: { a: Annotation; onToNote: ToNote; toa
             <FileText aria-hidden="true" />
             Show the file
           </a>
-          {item("delete", <Trash2 aria-hidden="true" />, "Delete", () => void learn.deleteAnnotation(a.id), true)}
+          {item("delete", <Trash2 aria-hidden="true" />, "Delete", () => void docs.remove(a.id), true)}
         </div>
       )}
     </div>

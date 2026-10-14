@@ -1,10 +1,10 @@
-/* Where the learner is when they ask the agent something: the page, the open note, the book with its
- * chapter and page, the concept, the selected text. The prompt gets the paths to start from (so
+/* Where the learner is when they ask the agent something: the page, the open document (a note, a
+ * concept), the book with its chapter and page, the selected text. The prompt gets the paths to start from (so
  * "summarise this chapter" needs no explaining); the run keeps a short label for the panel. */
 import type { AgentContext } from "../../shared/vault-types.ts";
 import { chapterAt } from "../books/locate.ts";
 import { getBook } from "../books/store.ts";
-import { concepts, notes } from "../vault/index.ts";
+import { docs } from "../vault/index.ts";
 import { bookSlug, chapterFile } from "../vault/library.ts";
 
 const PAGES: Record<string, string> = {
@@ -22,21 +22,15 @@ export function describeWhere(context: AgentContext = {}): { label: string; line
   const lines: string[] = [];
   const labels: string[] = [];
   const page = (context.route || "").replace(/^#\/?/, "").split(/[/?]/)[0];
-  if (PAGES[page] && !context.noteId && !context.conceptId) {
+  if (PAGES[page] && !context.docId) {
     lines.push(`They are on ${PAGES[page]}.`);
     labels.push(page ? page[0].toUpperCase() + page.slice(1) : "Today");
   }
 
-  const note = context.noteId ? notes.get(context.noteId) : undefined;
-  if (note) {
-    lines.push(`They have this note open: ${note.path} ("${note.title}").`);
-    labels.push(note.title);
-  }
-
-  const concept = context.conceptId ? concepts.get(context.conceptId) : undefined;
-  if (concept) {
-    lines.push(`They are looking at the concept "${concept.name}" (${concept.path || `concepts/${concept.name}.md`}).`);
-    labels.push(concept.name);
+  const doc = context.docId ? docs.get(context.docId) : undefined;
+  if (doc) {
+    lines.push(`They have this ${doc.kind} open: ${doc.path} ("${doc.title}").`);
+    labels.push(doc.title);
   }
 
   const book = context.bookId ? getBook(context.bookId) : null;

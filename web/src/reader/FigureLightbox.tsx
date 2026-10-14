@@ -3,7 +3,7 @@
  * passage, redraw it with your notes (quickly or carefully), keep it in your brain, make cards from it,
  * have Codex hand-build it, or delete it. */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type Book, learn } from "../api";
+import { api, type Book, docs, learn } from "../api";
 import { CardDrafter, Modal } from "../components/tools";
 import { ManimView } from "../manim/ManimView";
 import { SceneView } from "../scene/SceneView";
@@ -168,7 +168,7 @@ export function FigureLightbox({
             onClick={() => {
               if (!confirm(`Delete “${entry.title}”?`)) return;
               void run(async () => {
-                if (a) await learn.deleteAnnotation(a.id);
+                if (a) await docs.remove(a.id);
                 else if (demo) await api.deleteDemo(book.id, demo.id);
                 onClose();
               });

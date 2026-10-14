@@ -12,8 +12,6 @@ export const DATA_DIR = resolve(process.env.DATA_DIR || join(ROOT, "data"));
 export const VAULT_DIR = join(DATA_DIR, "vault");
 /** One folder per book inside the vault: the file, its text, annotations and figures. */
 export const BOOKS_DIR = join(VAULT_DIR, "library");
-/** Where books lived before they moved into the vault (migrated at startup). */
-export const LEGACY_BOOKS_DIR = join(DATA_DIR, "books");
 /** Scratch working copies of the vault for agents that write (outside the vault, never versioned). */
 export const RUNS_DIR = join(DATA_DIR, "agent-runs");
 export const RUNTIME_DIR = join(ROOT, "runtime");

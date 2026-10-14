@@ -4,24 +4,25 @@
 import type { Anchor, Annotation } from "../../shared/vault-types.ts";
 import { getBook } from "../books/store.ts";
 import { NotFound } from "../errors.ts";
-import { appendToNote, bookNote } from "../learn/notes.ts";
-import { annotations, notes } from "../vault/index.ts";
+import { appendToDoc } from "../learn/docs.ts";
+import { bookNote } from "../learn/notes.ts";
+import { docs, whereOf } from "../vault/index.ts";
 import { createAnnotation } from "./index.ts";
 
 export type NoteMode = "reference" | "passage" | "embed";
 
 /** The Markdown a passage becomes in a note. */
 export function noteMarkdown(a: Annotation, mode: NoteMode): string {
-  const book = getBook(a.bookId);
+  const book = getBook(a.source.bookId);
   const link = a.path.replace(/\.md$/, "");
-  const where = a.anchor.page !== undefined ? `p. ${a.anchor.page}` : `¶${a.anchor.block}`;
+  const where = a.source.page !== undefined ? whereOf(a.source) : `¶${a.source.block}`;
   const short = book ? (book.title.length > 40 ? `${book.title.slice(0, 38)}…` : book.title) : "the book";
   if (mode === "reference") {
-    const words = a.anchor.quote.split(/\s+/).slice(0, 8).join(" ");
+    const words = a.source.quote.split(/\s+/).slice(0, 8).join(" ");
     return `[[${link}|${short}, ${where}: “${words.replace(/[[\]|]/g, "")}…”]]`;
   }
   if (mode === "embed") return `![[${link}]]`;
-  return `> [!quote] [[${link}|${short} · ${where}]]\n${a.anchor.quote
+  return `> [!quote] [[${link}|${short} · ${where}]]\n${a.source.quote
     .split("\n")
     .map((l) => `> ${l}`)
     .join("\n")}`;
@@ -40,13 +41,13 @@ export interface ToNoteRequest {
 
 /** Adds a passage to a note; returns the note, the annotation it links to, and the Markdown added. */
 export function sendToNote(bookId: string, request: ToNoteRequest) {
-  let a = request.annotationId ? annotations.get(request.annotationId) : undefined;
+  let a = request.annotationId ? docs.get(request.annotationId, "annotation") : undefined;
   if (!a) {
     if (!request.anchor?.quote?.trim()) throw new Error("select some text first");
-    a = createAnnotation(bookId, { kind: "highlight", anchor: request.anchor });
+    a = createAnnotation(bookId, { type: "highlight", anchor: request.anchor });
   }
-  const note = request.noteId ? notes.get(request.noteId) : bookNote(bookId);
+  const note = request.noteId ? docs.get(request.noteId) : bookNote(bookId);
   if (!note) throw new NotFound("note not found");
   const markdown = `${noteMarkdown(a, request.mode || "passage")}${request.comment?.trim() ? `\n\n${request.comment.trim()}` : ""}`;
-  return { note: appendToNote(note.id, markdown), annotation: a, markdown };
+  return { note: appendToDoc(note.id, markdown), annotation: a, markdown };
 }

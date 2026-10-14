@@ -1,12 +1,14 @@
 /* Flashcards and spaced repetition (retrieval practice + spacing, the two techniques with the
- * strongest evidence behind them: Dunlosky et al. 2013). Cards are vault files; their memory
- * state is replayed from the review log with FSRS-6. Review sessions interleave decks. */
+ * strongest evidence behind them: Dunlosky et al. 2013). Cards are documents (cards/*.md); their
+ * memory state is replayed from the review log with FSRS-6, so a review never changes the file.
+ * Review sessions interleave decks. */
 import { type MemoryState, preview, type Rating, review } from "../../shared/fsrs.ts";
 import type { Card, SourceRef } from "../../shared/vault-types.ts";
 import { structured } from "../llm/index.ts";
-import { cards, changed, getProfile, logActivity, logReview, now, reviews, shortId } from "../vault/index.ts";
+import { docs, getProfile, logActivity, logReview, reviews } from "../vault/index.ts";
 import { upsertConcept } from "./concepts.ts";
 import { bookContext, learnerSummary, sourceLine } from "./context.ts";
+import { createDoc, updateDoc } from "./docs.ts";
 
 /* ---------------- memory state ---------------- */
 
@@ -73,7 +75,7 @@ export interface Queue {
 
 export function reviewQueue(opts: { deck?: string; limit?: number; at?: number } = {}): Queue {
   const at = opts.at ?? Date.now();
-  const pool = cards.list().filter((c) => !c.suspended && (!opts.deck || c.deck === opts.deck));
+  const pool = docs.list("card").filter((c) => !c.suspended && (!opts.deck || c.deck === opts.deck));
   const s = states();
   const learning = pool
     .filter((c) => s.get(c.id) && s.get(c.id)!.phase !== "review" && s.get(c.id)!.due <= at + 20 * 60000)
@@ -99,7 +101,7 @@ export function reviewQueue(opts: { deck?: string; limit?: number; at?: number }
 }
 
 export function rateCard(id: string, rating: Rating, took?: number) {
-  const card = cards.get(id);
+  const card = docs.get(id, "card");
   if (!card) throw new Error("card not found");
   if (![1, 2, 3, 4].includes(rating)) throw new Error("rating must be 1–4");
   logReview({ card: id, ts: Date.now(), rating, took });
@@ -108,30 +110,21 @@ export function rateCard(id: string, rating: Rating, took?: number) {
 
 /* ---------------- editing ---------------- */
 
+/** Makes a card, or changes one (given its id). */
 export function saveCard(input: Partial<Card> & { front: string; back: string }): Card {
-  const existing = input.id ? cards.get(input.id) : undefined;
-  const card: Card = {
-    id: existing?.id || shortId("c"),
+  const fields = {
     front: input.front.trim(),
     back: input.back.trim(),
-    kind: input.kind === "cloze" ? "cloze" : "basic",
-    deck: input.deck || existing?.deck || "general",
-    concepts: input.concepts ?? existing?.concepts ?? [],
-    tags: input.tags ?? existing?.tags ?? [],
-    source: input.source ?? existing?.source,
-    figure: input.figure ?? existing?.figure,
-    suspended: input.suspended ?? existing?.suspended ?? false,
-    created: existing?.created || now(),
-    updated: now(),
+    type: input.type === "cloze" ? ("cloze" as const) : ("basic" as const),
+    deck: input.deck,
+    concepts: input.concepts,
+    tags: input.tags,
+    source: input.source,
+    figure: input.figure,
+    suspended: input.suspended,
   };
-  cards.save(card);
-  changed(`card ${card.front.slice(0, 40)}`);
-  return card;
-}
-
-export function deleteCard(id: string) {
-  cards.remove(id);
-  changed(`delete card ${id}`);
+  if (input.id && docs.get(input.id, "card")) return updateDoc(input.id, fields) as Card;
+  return createDoc({ kind: "card", ...fields, deck: fields.deck || "general" }) as Card;
 }
 
 /* ---------------- generation ---------------- */
@@ -146,11 +139,11 @@ const SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["front", "back", "kind", "concept"],
+        required: ["front", "back", "type", "concept"],
         properties: {
           front: { type: "string", description: "the prompt; Markdown, $…$ for math" },
           back: { type: "string", description: "the answer, short; Markdown" },
-          kind: { type: "string", enum: ["basic", "cloze"], description: "cloze: front contains {{the hidden words}}" },
+          type: { type: "string", enum: ["basic", "cloze"], description: "cloze: front contains {{the hidden words}}" },
           concept: { type: "string", description: "name of the concept it tests (one of concepts[].name)" },
         },
       },
@@ -173,7 +166,7 @@ export async function draftCards(input: {
   count?: number;
   focus?: string;
 }): Promise<{
-  cards: (Pick<Card, "front" | "back" | "kind"> & { concept: string })[];
+  cards: (Pick<Card, "front" | "back" | "type"> & { concept: string })[];
   concepts: { name: string; summary: string }[];
 }> {
   const ctx = bookContext(input.source, 5000);
@@ -190,7 +183,7 @@ ${input.passage.slice(0, 6000)}
 ${input.focus ? `\nThe learner asked: ${input.focus}\n` : ""}
 Write ${input.count ?? "3–6"} cards on what matters most in the passage, and name the concepts they test (reuse a concept across cards). Return JSON.`;
   const result = await structured<{
-    cards: (Pick<Card, "front" | "back" | "kind"> & { concept: string })[];
+    cards: (Pick<Card, "front" | "back" | "type"> & { concept: string })[];
     concepts: { name: string; summary: string }[];
   }>({ prompt, schema: SCHEMA, tier: "fast" });
   return result.data;
@@ -198,7 +191,7 @@ Write ${input.count ?? "3–6"} cards on what matters most in the passage, and n
 
 /** Saves reviewed drafts, creating or linking their concepts. */
 export function saveDrafts(
-  drafts: { front: string; back: string; kind?: "basic" | "cloze"; concept?: string }[],
+  drafts: { front: string; back: string; type?: "basic" | "cloze"; concept?: string }[],
   meta: { deck: string; source?: SourceRef; concepts?: { name: string; summary: string }[] },
 ): Card[] {
   const conceptIds = new Map<string, string>();
@@ -210,7 +203,7 @@ export function saveDrafts(
     return saveCard({
       front: d.front,
       back: d.back,
-      kind: d.kind,
+      type: d.type,
       deck: meta.deck,
       source: meta.source,
       concepts: concept ? [concept] : [],
@@ -230,8 +223,8 @@ export function saveDrafts(
 
 /** Cards in a deck and/or about a concept, newest first, with their memory state. */
 export function listCards(filter: { deck?: string; concept?: string }): CardView[] {
-  return cards
-    .list()
+  return docs
+    .list("card")
     .filter((k) => (!filter.deck || k.deck === filter.deck) && (!filter.concept || k.concepts.includes(filter.concept)))
     .sort((a, b) => b.created.localeCompare(a.created))
     .map((k) => viewCard(k));
@@ -240,7 +233,7 @@ export function listCards(filter: { deck?: string; concept?: string }): CardView
 /** Every deck and how many cards it holds. */
 export function deckCounts(): { name: string; count: number }[] {
   const decks = new Map<string, number>();
-  for (const k of cards.list()) decks.set(k.deck, (decks.get(k.deck) || 0) + 1);
+  for (const k of docs.list("card")) decks.set(k.deck, (decks.get(k.deck) || 0) + 1);
   return [...decks].map(([name, count]) => ({ name, count }));
 }
 

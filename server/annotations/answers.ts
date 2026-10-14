@@ -13,18 +13,18 @@ import { learnerSummary, relatedInVault, sourceLine } from "../learn/context.ts"
 import { type CallResult, structured, text } from "../llm/index.ts";
 import { generateAnimation } from "../manim/generate.ts";
 import { generateScene } from "../scene/generate.ts";
-import { annotations, changed, now } from "../vault/index.ts";
+import { changed, docs, now } from "../vault/index.ts";
 
 import { announce } from "./live.ts";
 
 function passageContext(book: Book, a: Annotation) {
   const around = passageAround(
     book,
-    a.anchor.page !== undefined ? { page: a.anchor.page } : { block: a.anchor.block ?? 0 },
+    a.source.page !== undefined ? { page: a.source.page } : { block: a.source.block ?? 0 },
     1,
   );
-  const chapter = a.chapterId ? book.toc.find((c) => c.id === a.chapterId) : undefined;
-  const where = a.anchor.page !== undefined ? `page ${a.anchor.page}` : `block ${a.anchor.block}`;
+  const chapter = a.source.chapterId ? book.toc.find((c) => c.id === a.source.chapterId) : undefined;
+  const where = a.source.page !== undefined ? `page ${a.source.page}` : `block ${a.source.block}`;
   return {
     around: around.slice(0, 7000),
     source: {
@@ -37,7 +37,7 @@ function passageContext(book: Book, a: Annotation) {
 }
 
 function relatedLine(a: Annotation) {
-  const related = relatedInVault(`${a.anchor.quote} ${a.request || ""}`, 8);
+  const related = relatedInVault(`${a.source.quote} ${a.request || ""}`, 8);
   return related.length
     ? `\nAlready in the learner's notes (link one as [[exact title]] only where it truly helps them connect ideas; never invent links):\n${related.map((r) => `- [[${r.title}]] (${r.kind})${r.summary ? `: ${r.summary}` : ""}`).join("\n")}\n`
     : "";
@@ -70,7 +70,7 @@ Book: ${sourceLine(ctx.source)}
 
 The selected passage (${ctx.where}):
 """
-${a.anchor.quote}
+${a.source.quote}
 """
 ${a.request ? `\nTheir ${kind === "ask" ? "question" : "request"}: ${a.request}\n` : ""}${relatedLine(a)}
 The text around it, for context:
@@ -114,7 +114,7 @@ Book: ${sourceLine(ctx.source)}
 
 The selected passage (${ctx.where}):
 """
-${a.anchor.quote}
+${a.source.quote}
 """
 ${a.request ? `\nWhat they're after: ${a.request}\n` : ""}
 Return JSON.`;
@@ -132,13 +132,13 @@ export async function writeAnswer(
   try {
     let body = "";
     let result: CallResult<unknown>;
-    if (a.kind === "explain" || a.kind === "define" || a.kind === "ask") {
+    if (a.type === "explain" || a.type === "define" || a.type === "ask") {
       result = await text({
-        prompt: writtenPrompt(a.kind, book, a),
+        prompt: writtenPrompt(a.type, book, a),
         tier: options.quality === "careful" ? "smart" : "fast",
       });
       body = clean(String(result.data));
-    } else if (a.kind === "resources") {
+    } else if (a.type === "resources") {
       result = await structured<{ resources: { title: string; url: string; kind: string; why: string }[] }>({
         prompt: resourcesPrompt(book, a),
         schema: RESOURCES_SCHEMA,
@@ -154,7 +154,7 @@ export async function writeAnswer(
     } else if (isAnimation(a)) {
       const ctx = passageContext(book, a);
       const made = await generateAnimation({
-        passage: a.anchor.quote,
+        passage: a.source.quote,
         context: ctx.around,
         source: ctx.source,
         request: a.request,
@@ -168,7 +168,7 @@ export async function writeAnswer(
       const ctx = passageContext(book, a);
       const kind = SCENE_KINDS.includes(options.sceneKind || "") ? (options.sceneKind as "plot") : "auto";
       const scene = await generateScene({
-        passage: a.anchor.quote,
+        passage: a.source.quote,
         context: ctx.around,
         source: ctx.source,
         request: a.request,
@@ -185,7 +185,7 @@ export async function writeAnswer(
       body = figureBody(scene.scene);
       a.title = scene.scene.title;
     }
-    const fresh = annotations.get(a.id);
+    const fresh = docs.get(a.id, "annotation");
     if (!fresh) return; // deleted while it was being written
     Object.assign(fresh, {
       body,
@@ -195,14 +195,14 @@ export async function writeAnswer(
       model: { provider: result.provider, name: result.model, ms: Date.now() - started },
       updated: now(),
     });
-    annotations.save(fresh);
-    changed(`${fresh.kind} ${fresh.id}`);
+    docs.save(fresh);
+    changed(`${fresh.type} ${fresh.id}`);
     announce(fresh);
   } catch (error) {
-    const fresh = annotations.get(a.id);
+    const fresh = docs.get(a.id, "annotation");
     if (!fresh) return;
     Object.assign(fresh, { status: "failed", error: (error as Error).message.slice(0, 400), updated: now() });
-    annotations.save(fresh);
+    docs.save(fresh);
     announce(fresh);
   }
 }
@@ -225,7 +225,7 @@ export function animationOf(a: Annotation): string | null {
 }
 /** Whether a figure is (to be) an animation: it has one, or was asked for as one. */
 const isAnimation = (a: Annotation) =>
-  a.kind === "visualize" && (a.props?.engine === "manim" || animationOf(a) !== null);
+  a.type === "visualize" && (a.props?.engine === "manim" || animationOf(a) !== null);
 /** The follow-up conversation at the end of an answer, kept when it is redrawn. */
 const followUps = (body: string) => (followUpsOf(body) ? `\n\n${followUpsOf(body)}` : "");
 
@@ -250,9 +250,9 @@ function clean(md: string) {
 
 /** A question about an annotation: the answer goes in as a "## Follow-up: …" section. */
 export async function followUp(id: string, question: string): Promise<Annotation> {
-  const a = annotations.get(id);
+  const a = docs.get(id, "annotation");
   if (!a) throw new Error("annotation not found");
-  const book = getBook(a.bookId);
+  const book = getBook(a.source.bookId);
   if (!book) throw new Error("book not found");
   const ctx = passageContext(book, a);
   const q = question.trim().replace(/\s+/g, " ").slice(0, 600);
@@ -263,7 +263,7 @@ ${learnerSummary()}
 
 The passage (${ctx.where}):
 """
-${a.anchor.quote}
+${a.source.quote}
 """
 
 So far:
@@ -283,11 +283,11 @@ ${ctx.around.slice(0, 4000)}
 
 Reply with the Markdown only.`;
   const result = await text({ prompt, tier: "fast" });
-  const fresh = annotations.get(id);
+  const fresh = docs.get(id, "annotation");
   if (!fresh) throw new Error("annotation was deleted");
   fresh.body = withFollowUp(fresh.body, q, clean(result.data));
   fresh.updated = now();
-  annotations.save(fresh);
+  docs.save(fresh);
   changed(`follow-up ${fresh.id}`);
   announce(fresh);
   return fresh;
@@ -295,16 +295,16 @@ Reply with the Markdown only.`;
 
 /** Draws a figure annotation again, with the reader's notes on the current one. */
 export function redraw(id: string, input: { notes?: string; quality?: "quick" | "careful" }) {
-  const a = annotations.get(id);
-  if (a?.kind !== "visualize") throw new Error("figure not found");
-  const book = getBook(a.bookId);
+  const a = docs.get(id, "annotation");
+  if (a?.type !== "visualize") throw new Error("figure not found");
+  const book = getBook(a.source.bookId);
   if (!book) throw new Error("book not found");
   if (isAnimation(a)) return redrawAnimation(a, book, input);
   const previous = figureOf(a);
   const thread = followUps(a.body);
   a.status = "pending";
   a.error = undefined;
-  annotations.save(a);
+  docs.save(a);
   announce(a);
   void (async () => {
     const started = Date.now();
@@ -314,7 +314,7 @@ export function redraw(id: string, input: { notes?: string; quality?: "quick" | 
         ? `${a.request ? `${a.request}\n` : ""}The reader's notes on the current version: ${input.notes.trim()}`
         : a.request;
       const scene = await generateScene({
-        passage: a.anchor.quote,
+        passage: a.source.quote,
         context: ctx.around,
         source: ctx.source,
         request,
@@ -323,7 +323,7 @@ export function redraw(id: string, input: { notes?: string; quality?: "quick" | 
         previous: input.notes?.trim() && previous ? previous : undefined,
         tier: input.quality === "careful" ? "smart" : "fast",
       });
-      const fresh = annotations.get(id);
+      const fresh = docs.get(id, "annotation");
       if (!fresh) return;
       Object.assign(fresh, {
         body: figureBody(scene.scene) + thread,
@@ -332,14 +332,14 @@ export function redraw(id: string, input: { notes?: string; quality?: "quick" | 
         model: { provider: scene.provider, name: scene.model, ms: Date.now() - started },
         updated: now(),
       });
-      annotations.save(fresh);
+      docs.save(fresh);
       changed(`figure ${fresh.id}`);
       announce(fresh);
     } catch (error) {
-      const fresh = annotations.get(id);
+      const fresh = docs.get(id, "annotation");
       if (!fresh) return;
       Object.assign(fresh, { status: "failed", error: (error as Error).message.slice(0, 400) });
-      annotations.save(fresh);
+      docs.save(fresh);
       announce(fresh);
     }
   })();
@@ -352,13 +352,13 @@ function redrawAnimation(a: Annotation, book: Book, input: { notes?: string; qua
   const thread = followUps(a.body);
   a.status = "pending";
   a.error = undefined;
-  annotations.save(a);
+  docs.save(a);
   announce(a);
   void (async () => {
     try {
       const ctx = passageContext(book, a);
       const made = await generateAnimation({
-        passage: a.anchor.quote,
+        passage: a.source.quote,
         context: ctx.around,
         source: ctx.source,
         request: a.request,
@@ -367,7 +367,7 @@ function redrawAnimation(a: Annotation, book: Book, input: { notes?: string; qua
         notes: input.notes,
         tier: input.quality === "careful" ? "smart" : "fast",
       });
-      const fresh = annotations.get(a.id);
+      const fresh = docs.get(a.id, "annotation");
       if (!fresh) return;
       Object.assign(fresh, {
         body: animationBody(made) + thread,
@@ -376,14 +376,14 @@ function redrawAnimation(a: Annotation, book: Book, input: { notes?: string; qua
         model: { provider: made.provider, name: made.model, ms: made.ms },
         updated: now(),
       });
-      annotations.save(fresh);
+      docs.save(fresh);
       changed(`animation ${fresh.id}`);
       announce(fresh);
     } catch (error) {
-      const fresh = annotations.get(a.id);
+      const fresh = docs.get(a.id, "annotation");
       if (!fresh) return;
       Object.assign(fresh, { status: "failed", error: (error as Error).message.slice(0, 400) });
-      annotations.save(fresh);
+      docs.save(fresh);
       announce(fresh);
     }
   })();
@@ -392,9 +392,9 @@ function redrawAnimation(a: Annotation, book: Book, input: { notes?: string; qua
 
 /** Explanations and figures that were being written when the server stopped are written again. */
 export function resumeAnnotations() {
-  for (const a of annotations.list()) {
+  for (const a of docs.list("annotation")) {
     if (a.status !== "pending") continue;
-    const book = getBook(a.bookId);
+    const book = getBook(a.source.bookId);
     if (book) void writeAnswer(a, book);
   }
 }

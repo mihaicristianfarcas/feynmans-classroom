@@ -1,21 +1,11 @@
-/* Routes for flashcards and review: browsing, making (by hand, or drafted from a passage by a
- * model), editing, the review queue and ratings (scheduled with FSRS-6), and the decks. */
+/* Routes for flashcards and review: browsing them with their memory state, making them (by hand, or
+ * drafted from a passage by a model), the review queue and ratings (scheduled with FSRS-6), and the
+ * decks. (Changing or deleting one is what every document does: routes/docs.ts.) */
 import type { Hono } from "hono";
 import type { Card, Note } from "../../shared/vault-types.ts";
 import { getBook } from "../books/store.ts";
 import { readBody } from "../http.ts";
-import {
-  deckCounts,
-  deleteCard,
-  draftCards,
-  listCards,
-  rateCard,
-  reviewQueue,
-  saveCard,
-  saveDrafts,
-  saveNewCards,
-} from "../learn/cards.ts";
-import { cards } from "../vault/index.ts";
+import { deckCounts, draftCards, listCards, rateCard, reviewQueue, saveDrafts, saveNewCards } from "../learn/cards.ts";
 
 type NewCard = Partial<Card> & { front: string; back: string };
 
@@ -26,21 +16,11 @@ export function cardRoutes(app: Hono) {
     const b = await readBody<{ cards?: NewCard[] } & Partial<NewCard>>(c);
     return c.json(saveNewCards(b.cards || [b as NewCard]));
   });
-  app.put("/api/cards/:id", async (c) => {
-    const card = cards.get(c.req.param("id"));
-    if (!card) return c.json({ error: "not found" }, 404);
-    const b = await readBody<Partial<NewCard>>(c);
-    return c.json(saveCard({ ...card, ...b, id: card.id, front: b.front ?? card.front, back: b.back ?? card.back }));
-  });
-  app.delete("/api/cards/:id", (c) => {
-    deleteCard(c.req.param("id"));
-    return c.json({ ok: true });
-  });
 
   app.post("/api/cards/draft", async (c) => c.json(await draftCards(await readBody(c))));
   app.post("/api/cards/save-drafts", async (c) => {
     const b = await readBody<{
-      drafts: { front: string; back: string; kind?: "basic" | "cloze"; concept?: string }[];
+      drafts: { front: string; back: string; type?: "basic" | "cloze"; concept?: string }[];
       deck?: string;
       source?: Note["source"];
       concepts?: { name: string; summary: string }[];

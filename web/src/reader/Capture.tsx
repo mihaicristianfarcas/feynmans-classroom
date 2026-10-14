@@ -4,7 +4,7 @@
  * note (linked to its page), with or without a transcription (LaTeX for formulas, a Markdown table,
  * or a description of a figure, by the model looking at it). */
 import { useEffect, useRef, useState } from "react";
-import { type Book, learn, type Note } from "../api";
+import { type Book, docs, learn, type Note } from "../api";
 import { Spinner } from "../components/feedback";
 import { Markdown } from "../components/Markdown";
 import { pageEls } from "./anchoring";
@@ -139,7 +139,7 @@ export function CaptureLayer({
           ? `[[library/${book.folder}/${book.file}#page=${shot!.page}|${book.title}, p. ${shot!.page}]]`
           : `${book.title}, p. ${shot!.page}`;
       const md = `![[${pic.name}]]\n*${pageLink}*${withText && text ? `\n\n${text}` : ""}`;
-      const updated = await learn.appendToNote(n.id, md);
+      const updated = await docs.append<Note>(n.id, md);
       onNote(updated);
       say(`Added to “${updated.title}”.`, { label: "Open", href: `#/notes/${updated.id}` });
       onDone();

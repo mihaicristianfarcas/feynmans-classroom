@@ -5,7 +5,7 @@
 import { Layers, NotebookPen, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { transcript } from "../../../shared/thread.ts";
-import { type Book, learn, type SourceRef, type TocEntry, type TutorSession } from "../api";
+import { type Book, docs, learn, type SourceRef, type TocEntry, type TutorSession } from "../api";
 import { ChatInput, type ChatMessage, ChatThread } from "../components/Chat";
 import { CardDrafter } from "../components/tools";
 import { useIndicator } from "../components/ui";
@@ -23,6 +23,9 @@ export interface TutorConversation {
   mode: "answer" | "socratic";
 }
 export const NEW_CONVERSATION: TutorConversation = { messages: [], sessionId: null, mode: "answer" };
+
+/** The passage a session was about (its source's quote), pinned again when it is reopened. */
+export const pinnedOf = (s: TutorSession) => (s.source.quote ? { text: s.source.quote, source: s.source } : null);
 
 export function TutorTab({
   book,
@@ -87,7 +90,7 @@ export function TutorTab({
   };
   const open = (session: TutorSession) => {
     setConversation({ messages: session.messages, sessionId: session.id, mode: session.mode });
-    setPinned(session.passage || null);
+    setPinned(pinnedOf(session));
   };
   const others = (sessions || []).filter((s) => s.id !== conversation.sessionId);
   const current = (sessions || []).find((s) => s.id === conversation.sessionId);
@@ -203,7 +206,7 @@ export function TutorTab({
                     <span className="session-title">{s.title}</span>
                     <span className="session-meta">
                       {[
-                        book.toc.find((c) => c.id === s.chapterId)?.title,
+                        book.toc.find((c) => c.id === s.source.chapterId)?.title,
                         `${s.messages.filter((m) => m.role === "user").length} question${s.messages.filter((m) => m.role === "user").length === 1 ? "" : "s"}`,
                         timeAgo(s.updated),
                       ]
@@ -218,7 +221,7 @@ export function TutorTab({
                     aria-label={`Delete “${s.title}”`}
                     onClick={async () => {
                       if (!confirm(`Delete the session “${s.title}”?`)) return;
-                      await learn.deleteSession(s.id);
+                      await docs.remove(s.id);
                       reload();
                     }}
                   >

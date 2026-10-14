@@ -9,12 +9,14 @@ import {
   api,
   type Block,
   type Book,
+  docs,
   type FindHit,
   type Loc,
   learn,
   type Note,
   posOf,
   type SourceRef,
+  type TutorSession,
   useBookLive,
   withFigs,
 } from "../api";
@@ -42,7 +44,7 @@ import { type SelectionAction, SelectionMenu } from "./SelectionMenu";
 import { StudyTab } from "./StudyPanel";
 import { readSelection, type Selection } from "./selection";
 import { savedZoom, saveZoom, stepZoom, useReadingTime, useSavedPosition, useWorkingNote } from "./session";
-import { NEW_CONVERSATION, type TutorConversation, TutorTab } from "./Tutor";
+import { NEW_CONVERSATION, pinnedOf, type TutorConversation, TutorTab } from "./Tutor";
 
 type Tab = "margin" | "figures" | "note" | "tutor" | "study";
 type Tool = "cards" | "explain" | "connect";
@@ -122,7 +124,7 @@ export function Reader({
   useEffect(() => {
     if (book && book.format !== "pdf") api.blocks(bookId).then(setBlocks, (e) => setFailed(e.message));
   }, [book, bookId]);
-  const loadNotes = useCallback(() => learn.notes({ book: bookId }).then(setNotes, () => {}), [bookId]);
+  const loadNotes = useCallback(() => docs.list("note", { book: bookId }).then(setNotes, () => {}), [bookId]);
   // notes about this book made elsewhere (the agent, another editor) show up as they land
   useVaultEvents(loadNotes, under("notes/"));
   useEffect(() => {
@@ -134,10 +136,10 @@ export function Reader({
   useEffect(() => {
     const id = query.get("session");
     if (!id) return;
-    learn.session(id).then(
+    docs.get<TutorSession>(id).then(
       (s) => {
         setConversation({ messages: s.messages, sessionId: s.id, mode: s.mode });
-        setPinned(s.passage || null);
+        setPinned(pinnedOf(s));
         show("tutor");
       },
       () => {},
@@ -261,7 +263,7 @@ export function Reader({
     if (!a) return;
     focusJumped.current = true;
     show("margin");
-    setTimeout(() => jumpTo(locOfAnchor(a.anchor), false), 200);
+    setTimeout(() => jumpTo(locOfAnchor(a.source), false), 200);
   }, [annotations, focused, jumpTo, pos, show]);
 
   /** [ and ]: the figure before or after the reading line. */
@@ -352,7 +354,7 @@ export function Reader({
           if (root?.contains(event.target as Node) && reader.current) {
             const hit = annotationsRef.current.find((a) =>
               reader
-                .current!.boxesOf(a.anchor, a.id)
+                .current!.boxesOf(a.source, a.id)
                 ?.some(
                   (r) =>
                     event.clientX >= r.left - 2 &&
@@ -415,19 +417,19 @@ export function Reader({
       };
       switch (action.kind) {
         case "highlight":
-          await annotate({ kind: "highlight", anchor: sel.anchor, color: action.color }, false);
+          await annotate({ type: "highlight", anchor: sel.anchor, color: action.color }, false);
           break;
         case "explain":
         case "define":
         case "resources":
-          await annotate({ kind: action.kind, anchor: sel.anchor });
+          await annotate({ type: action.kind, anchor: sel.anchor });
           break;
         case "ask":
-          await annotate({ kind: "ask", anchor: sel.anchor, request: action.question });
+          await annotate({ type: "ask", anchor: sel.anchor, request: action.question });
           break;
         case "visualize":
           await annotate({
-            kind: "visualize",
+            type: "visualize",
             anchor: sel.anchor,
             request: action.request || undefined,
             sceneKind: action.sceneKind,
@@ -473,7 +475,7 @@ export function Reader({
   if (failed) return <div className="center-note">Could not open this book: {failed}</div>;
   if (!book) return <div className="center-note">Opening…</div>;
 
-  const counted = annotations.filter((a) => a.kind !== "highlight").length;
+  const counted = annotations.filter((a) => a.type !== "highlight").length;
   const lightboxEntry = lightbox ? figures.find((f) => f.id === lightbox) : undefined;
 
   return (

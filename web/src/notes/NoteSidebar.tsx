@@ -2,7 +2,7 @@
  * connections the agent suggests (accept, reject, or remove later). */
 import { X } from "lucide-react";
 import { useState } from "react";
-import { learn, type NoteDetail, type SuggestedLink } from "../api";
+import { docs, learn, type NoteDetail, type SuggestedLink } from "../api";
 import { openLink } from "../app/navigation";
 import { Spinner } from "../components/feedback";
 import type { Panel } from "../lib/usePanel";
@@ -70,11 +70,7 @@ export function NoteSidebar({ note, reload, panel }: { note: NoteDetail; reload:
                   className="link"
                   title={`Turn the mention into [[${note.title}]]`}
                   onClick={async () => {
-                    await fetch(`/api/notes/${note.id}/link-mention`, {
-                      method: "POST",
-                      headers: { "content-type": "application/json" },
-                      body: JSON.stringify({ path: m.path }),
-                    });
+                    await docs.linkMention(note.id, m.path);
                     reload();
                   }}
                 >

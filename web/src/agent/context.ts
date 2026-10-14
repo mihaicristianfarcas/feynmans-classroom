@@ -11,8 +11,7 @@ export function currentContext(): AgentContext {
   const note = /^#\/notes\/([^/?]+)/.exec(path);
   const concept = /^#\/brain\/concept\/([^/?]+)/.exec(path);
   const book = /^#\/book\/([a-z0-9]+)/i.exec(path);
-  if (note) context.noteId = decodeURIComponent(note[1]);
-  else if (concept) context.conceptId = decodeURIComponent(concept[1]);
+  if (note || concept) context.docId = decodeURIComponent((note || concept)![1]);
   else if (book) {
     context.bookId = book[1];
     const at = new URLSearchParams(query || "").get("at");
@@ -27,8 +26,7 @@ export function currentContext(): AgentContext {
 export function contextLabel(context: AgentContext | null): string {
   if (!context) return "";
   const parts: string[] = [];
-  if (context.noteId) parts.push("this note");
-  if (context.conceptId) parts.push("this concept");
+  if (context.docId) parts.push(/^#\/brain\/concept\//.test(context.route || "") ? "this concept" : "this note");
   if (context.bookId) parts.push(context.at !== undefined ? "this book, where you are in it" : "this book");
   if (context.selection) {
     const words = context.selection.split(" ").length;

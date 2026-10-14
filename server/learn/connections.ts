@@ -8,11 +8,11 @@ import type { Connection } from "../../shared/vault-types.ts";
 import { agent } from "../llm/index.ts";
 import { getSettings } from "../settings.ts";
 import { listConnections, saveConnections } from "../vault/connections.ts";
-import { changed, logActivity, notes, now, shortId, VAULT } from "../vault/index.ts";
+import { changed, docs, logActivity, now, shortId, VAULT } from "../vault/index.ts";
 import { writeIndexes } from "../vault/indexes.ts";
 import { resolveLink } from "../vault/links.ts";
 import { learnerSummary } from "./context.ts";
-import { updateNote } from "./notes.ts";
+import { updateDoc } from "./docs.ts";
 
 const SCHEMA = {
   type: "object",
@@ -37,7 +37,7 @@ const SCHEMA = {
 
 /** Links already in a note (in its text or its properties), as keys. */
 function linkedFrom(path: string): Set<string> {
-  const note = notes.byPath(path);
+  const note = docs.at(path);
   if (!note) return new Set();
   const keys = new Set<string>();
   for (const l of [...parseWikiLinks(note.body), ...note.related.flatMap((r) => parseWikiLinks(r))]) {
@@ -51,11 +51,11 @@ export async function suggestConnections(
   path?: string,
   opts: { onActivity?: (t: string) => void } = {},
 ): Promise<{ suggested: Connection[]; ms: number }> {
-  if (path && !notes.byPath(path)) throw new Error("note not found");
-  if (!path && !notes.items.size) return { suggested: [], ms: 0 };
+  if (path && !docs.at(path)) throw new Error("note not found");
+  if (!path && !docs.count("note")) return { suggested: [], ms: 0 };
   writeIndexes(); // the agent starts from the indexes: make sure they're current
-  const recent = notes
-    .list()
+  const recent = docs
+    .list("note")
     .sort((a, b) => b.updated.localeCompare(a.updated))
     .slice(0, 12)
     .map((n) => n.path);
@@ -90,7 +90,7 @@ Return JSON.`;
   const added: Connection[] = [];
   for (const s of data.suggestions || []) {
     const from = (path || s.from || "").replace(/^\.\//, "");
-    const note = notes.byPath(from);
+    const note = docs.at(from);
     const target = resolveLink(s.to);
     if (!note || !target || target.node === `note:${note.id}` || !["note", "concept"].includes(target.kind)) continue;
     const key = `${from}\u0000${target.node}`;
@@ -113,32 +113,32 @@ Return JSON.`;
     saveConnections([...list, ...added], `${added.length} connection${added.length === 1 ? "" : "s"}`);
     logActivity({
       type: "connect",
-      text: `${auto ? "Linked" : "Suggested"} ${added.length} connection${added.length === 1 ? "" : "s"}${path ? ` for ${notes.byPath(path)?.title}` : ""}`,
+      text: `${auto ? "Linked" : "Suggested"} ${added.length} connection${added.length === 1 ? "" : "s"}${path ? ` for ${docs.at(path)?.title}` : ""}`,
     });
   }
   return { suggested: added, ms: result.ms };
 }
 
 function addRelated(noteId: string, to: string) {
-  const note = notes.get(noteId);
+  const note = docs.get(noteId);
   if (!note) return;
   const link = `[[${to}]]`;
   if (note.related.some((r) => linkKey(r.replace(/^\[\[|\]\]$/g, "")) === linkKey(to))) return;
-  updateNote(noteId, { related: [...note.related, link] });
+  updateDoc(noteId, { related: [...note.related, link] });
 }
 
 export function decideConnection(id: string, decision: "accept" | "reject" | "remove"): Connection {
   const list = listConnections();
   const c = list.find((x) => x.id === id);
   if (!c) throw new Error("connection not found");
-  const note = notes.byPath(c.from);
+  const note = docs.at(c.from);
   if (decision === "accept") {
     if (!note) throw new Error("the note is gone");
     addRelated(note.id, c.to);
     c.status = "accepted";
   } else if (decision === "remove") {
     if (note)
-      updateNote(note.id, {
+      updateDoc(note.id, {
         related: note.related.filter((r) => linkKey(r.replace(/^\[\[|\]\]$/g, "").split("|")[0]) !== linkKey(c.to)),
       });
     c.status = "removed";

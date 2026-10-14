@@ -1,21 +1,20 @@
 /* Edits made outside the app (in an editor, in Obsidian, by jj bringing an agent's work in or taking
- * it out) are picked up here: the changed file is re-read into its collection, noted in the change in
+ * it out) are picked up here: the changed file is re-read as a document, noted in the change in
  * progress, and announced. */
 import { existsSync, statSync, watch } from "node:fs";
 import { join } from "node:path";
 import { takeSelfWrite, touched } from "./changes.ts";
-import { isGenerated } from "./collection.ts";
-import { COLLECTIONS } from "./collections.ts";
+import { docs, isGenerated } from "./docs.ts";
 import { VAULT } from "./files.ts";
 import { changed } from "./jj.ts";
 import { forgetLog } from "./logs.ts";
 
-/** Re-reads a file into whichever collection owns it (after an outside edit, or a merge). */
+/** Re-reads a file (after an outside edit, or a merge): a document's, or a log's. */
 export function reloadFile(rel: string): boolean {
   forgetLog(rel);
-  const owner = COLLECTIONS.find((c) => c.owns(rel));
-  if (owner) owner.loadFile(rel);
-  return !!owner || rel.startsWith("log/");
+  const isDoc = docs.owns(rel);
+  if (isDoc) docs.loadFile(rel);
+  return isDoc || rel.startsWith("log/");
 }
 
 /** Watches the vault for edits made outside the app and loads them (debounced per file). */
@@ -41,10 +40,10 @@ export function startWatching() {
         setTimeout(() => {
           debounce.delete(rel);
           if (takeSelfWrite(rel)) return;
-          // a folder that appeared or moved: rescan what lives in it (the files in it are the change)
+          // a folder that appeared, moved or went: rescan what lives in it (the files in it are the change)
           const full = join(VAULT, rel);
-          if (existsSync(full) && statSync(full).isDirectory()) {
-            for (const c of COLLECTIONS) if (c.dir === rel.split("/")[0]) c.load();
+          if ((existsSync(full) && statSync(full).isDirectory()) || (!existsSync(full) && !/\.\w+$/.test(rel))) {
+            docs.loadDir(rel);
             touched(rel);
             return;
           }

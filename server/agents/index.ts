@@ -18,7 +18,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentContext, AgentRun } from "../../shared/vault-types.ts";
 import { publish } from "../events.ts";
-import { createNote } from "../learn/notes.ts";
+import { createDoc } from "../learn/docs.ts";
 import { agent } from "../llm/index.ts";
 import {
   appendLog,
@@ -284,7 +284,8 @@ export function keepRun(id: string): AgentRun {
   const run = get(id);
   if (!run.answer) throw new Error("there's no answer to keep");
   if (run.kept) return run;
-  const note = createNote({
+  const note = createDoc({
+    kind: "note",
     type: "answer",
     title: run.task.split("\n")[0].slice(0, 80),
     body: run.answer,

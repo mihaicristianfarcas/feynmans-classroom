@@ -6,15 +6,15 @@ import type { SourceRef } from "../../shared/vault-types.ts";
 import { chapterRange } from "../books/locate.ts";
 import { getBook } from "../books/store.ts";
 import { chapterText, findChapter, passageAround } from "../ingest/index.ts";
-import { cards, concepts, getProfile, notes } from "../vault/index.ts";
+import { docs, getProfile } from "../vault/index.ts";
 import { cardState } from "./cards.ts";
 
 /** Mastery of a concept, 0–1: recall of its cards now, else its best explanation score. Null when unknown. */
 export function conceptMastery(conceptId: string, now = Date.now()): number | null {
-  const linked = cards.list().filter((c) => c.concepts.includes(conceptId) && !c.suspended);
+  const linked = docs.list("card").filter((c) => c.concepts.includes(conceptId) && !c.suspended);
   const reviewed = linked.map((c) => cardState(c.id)).filter(Boolean);
-  const explained = notes
-    .list()
+  const explained = docs
+    .list("note")
     .filter((n) => n.type === "explanation" && n.concepts.includes(conceptId) && typeof n.score === "number");
   const fromExplain = explained.length ? Math.max(...explained.map((n) => n.score!)) / 100 : null;
   if (!reviewed.length) return fromExplain;
@@ -26,18 +26,18 @@ export function conceptMastery(conceptId: string, now = Date.now()): number | nu
 export function learnerSummary(): string {
   const p = getProfile();
   const style = (v: number) => (v >= 0.7 ? "a lot" : v >= 0.4 ? "some" : "little");
-  const known = concepts
-    .list()
+  const known = docs
+    .list("concept")
     .map((c) => ({ c, m: conceptMastery(c.id) }))
     .filter((x) => x.m !== null);
   const strong = known
     .filter((x) => x.m! >= 0.8)
-    .map((x) => x.c.name)
+    .map((x) => x.c.title)
     .slice(0, 12);
   const weak = known
     .filter((x) => x.m! < 0.6)
     .sort((a, b) => a.m! - b.m!)
-    .map((x) => x.c.name)
+    .map((x) => x.c.title)
     .slice(0, 10);
   const lines = [
     `${p.name || "The learner"} is a ${p.role === "curious" ? "self-directed learner" : p.role}; level: ${p.level}.`,
@@ -142,12 +142,12 @@ export function relatedInVault(
     return words.reduce((n, w) => n + (low.includes(w) ? 1 : 0), 0);
   };
   const out: { title: string; kind: "note" | "concept"; summary: string; s: number }[] = [];
-  for (const c of concepts.list()) {
-    const s = score(`${c.name} ${c.name} ${c.aliases.join(" ")} ${c.summary}`);
-    if (s >= 2 || (s >= 1 && words.some((w) => c.name.toLowerCase().includes(w))))
-      out.push({ title: c.name, kind: "concept", summary: c.summary.slice(0, 120), s: s + 1 });
+  for (const c of docs.list("concept")) {
+    const s = score(`${c.title} ${c.title} ${c.aliases.join(" ")} ${c.summary}`);
+    if (s >= 2 || (s >= 1 && words.some((w) => c.title.toLowerCase().includes(w))))
+      out.push({ title: c.title, kind: "concept", summary: c.summary.slice(0, 120), s: s + 1 });
   }
-  for (const n of notes.list()) {
+  for (const n of docs.list("note")) {
     const s = score(`${n.title} ${n.title} ${n.body.slice(0, 1500)}`);
     if (s >= 2) out.push({ title: n.title, kind: "note", summary: n.body.replace(/\s+/g, " ").slice(0, 120), s });
   }

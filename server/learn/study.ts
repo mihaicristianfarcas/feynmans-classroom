@@ -6,10 +6,10 @@
  * Every result can be kept: wrong answers become cards, explanations and connections become notes. */
 import type { SourceRef } from "../../shared/vault-types.ts";
 import { structured, text } from "../llm/index.ts";
-import { concepts, logActivity, shortId } from "../vault/index.ts";
+import { docs, logActivity, shortId } from "../vault/index.ts";
 import { upsertConcept } from "./concepts.ts";
 import { type BookContext, bookContext, chapterContext, learnerSummary, sourceLine } from "./context.ts";
-import { createNote } from "./notes.ts";
+import { createDoc } from "./docs.ts";
 
 const obj = (properties: Record<string, unknown>) => ({
   type: "object",
@@ -71,8 +71,8 @@ export async function makeQuiz(input: {
   let ctx: BookContext = { source: {}, context: "" };
   if (input.mode === "review") {
     // interleaved review across everything the learner has met, weakest first
-    const known = concepts.list().slice(0, 60);
-    ctx = { source: {}, context: known.map((c) => `- ${c.name}: ${c.summary}`).join("\n") };
+    const known = docs.list("concept").slice(0, 60);
+    ctx = { source: {}, context: known.map((c) => `- ${c.title}: ${c.summary}`).join("\n") };
   } else if (input.bookId && input.chapterId) ctx = chapterContext(input.bookId, input.chapterId, 35000);
   else ctx = bookContext(input.source, 8000);
   const how = {
@@ -197,11 +197,12 @@ export function saveExplanation(input: {
   source?: SourceRef;
 }) {
   const concept = upsertConcept({ name: input.concept, source: input.source });
-  const note = createNote(
+  const note = createDoc(
     {
+      kind: "note",
       type: "explanation",
       title: `Explaining ${input.concept} ${new Date().toISOString().slice(0, 10)}`,
-      body: `${input.explanation.trim()}\n\n---\n\n**Tutor (${input.score}/100):** ${input.feedback.trim()}\n\nAbout [[${concept.name}]].`,
+      body: `${input.explanation.trim()}\n\n---\n\n**Tutor (${input.score}/100):** ${input.feedback.trim()}\n\nAbout [[${concept.title}]].`,
       tags: ["feynman"],
       concepts: [concept.id],
       source: input.source,
@@ -233,9 +234,9 @@ const CONNECT_SCHEMA = obj({
 
 export async function connect(input: { passage: string; source?: SourceRef; question?: string }) {
   const ctx = bookContext(input.source, 5000);
-  const known = concepts
-    .list()
-    .map((c) => c.name)
+  const known = docs
+    .list("concept")
+    .map((c) => c.title)
     .slice(0, 200);
   const prompt = `Elaboration and concrete examples make ideas stick. Connect the passage to the learner's world with three short pieces:
 1. today: a concrete, current example (real companies, markets, systems, events, research) that the idea explains; say how it maps, point by point;

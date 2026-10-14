@@ -1,4 +1,4 @@
-// The vault's files: collections, frontmatter round trips, logs, the profile and jj.
+// The vault's files: documents, frontmatter round trips, logs, the profile and jj.
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -31,11 +31,12 @@ describe("the vault", () => {
       back: "The delay before a follower reflects a write.",
       deck: "DDIA",
     });
-    const file = V.cards.fileOf(card.id)!;
-    const text = readFileSync(join(V.VAULT, file), "utf8");
+    const text = readFileSync(join(V.VAULT, card.path), "utf8");
+    expect(text).toMatch(/^kind: card$/m);
     expect(text).toMatch(/## Front\s+What is replication lag\?/);
-    V.cards.load();
-    expect(V.cards.get(card.id)?.back).toBe("The delay before a follower reflects a write.");
+    expect(card.title).toBe("What is replication lag?");
+    V.docs.load();
+    expect(V.docs.get(card.id, "card")?.back).toBe("The delay before a follower reflects a write.");
   });
   it("counts a review once, even as the first log entry after a restart", () => {
     const card = C.saveCard({ front: "Q", back: "A", deck: "t" });

@@ -76,13 +76,13 @@ async function serve() {
   );
   await fetch(`${BASE}api/books`, { method: "POST", body: book });
   await seedMargin();
-  await json("api/notes", "POST", {
+  await json("api/docs", "POST", {
     title: "Small quantities",
     body: "A [[Derivative]] compares two small quantities.",
     concepts: ["Derivative"],
   });
-  await json("api/cards", "POST", { front: "What is dx?", back: "A little bit of x.", deck: "Calculus" });
-  await json("api/notes", "POST", {
+  await json("api/docs", "POST", { kind: "card", front: "What is dx?", back: "A little bit of x.", deck: "Calculus" });
+  await json("api/docs", "POST", {
     title: "Smallness, check yourself",
     type: "quiz",
     folder: "Calculus/Quizzes",
@@ -124,15 +124,16 @@ async function seedMargin() {
   const at = new Date().toISOString();
   const file = (rel: string, front: Record<string, unknown>, body: string) => {
     mkdirSync(join(lib, rel, ".."), { recursive: true });
-    const yaml = Object.entries({ ...front, book_id: b.id, created: at, updated: at })
+    const yaml = Object.entries({ ...front, created: at, updated: at })
       .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
       .join("\n");
     writeFileSync(join(lib, rel), `---\n${yaml}\n---\n\n${body}\n`);
   };
-  const anchor = { quote: "small quantities of various degrees of smallness" };
+  const quote = "small quantities of various degrees of smallness";
+  const at2 = { book: b.id, block: 2, quote };
   file(
     "annotations/b2-explain-a11y.md",
-    { id: "a11yexp1", kind: "explain", block: 2, anchor },
+    { id: "a11yexp1", kind: "annotation", type: "explain", source: at2 },
     [
       "Quantities can be small **to different degrees**: a small part of a small part is far smaller still.",
       "",
@@ -144,17 +145,23 @@ async function seedMargin() {
   const tangent = EXAMPLES.tangent as { title: string };
   file(
     "annotations/b2-visualize-a11y.md",
-    { id: "a11yfig1", kind: "visualize", title: tangent.title, block: 2, anchor },
+    { id: "a11yfig1", kind: "annotation", type: "visualize", title: tangent.title, source: at2 },
     `## ${tangent.title}\n\n\`\`\`figure\n${JSON.stringify(tangent)}\n\`\`\``,
   );
   file(
     "annotations/b5-visualize-a11y-anim.md",
-    { id: "a11yani1", kind: "visualize", title: "Smaller and smaller", block: 5, anchor },
+    {
+      id: "a11yani1",
+      kind: "annotation",
+      type: "visualize",
+      title: "Smaller and smaller",
+      source: { ...at2, block: 5 },
+    },
     "## Smaller and smaller\n\nWatch each part shrink.\n\n```manim\nimport manimgx as m\n\nclass Shrink(m.Scene):\n    def construct(self) -> None:\n        self.play(m.Create(m.Square(color=INK)))\n```",
   );
   file(
     "sessions/2026-10-13 What is dx.md",
-    { id: "a11yses1", kind: "tutor", title: "What is dx?", mode: "answer" },
+    { id: "a11yses1", kind: "session", title: "What is dx?", mode: "answer", source: { book: b.id } },
     "## You\n\nWhat is dx?\n\n## Tutor\n\nA little bit of x.",
   );
   await wait(1500);
@@ -165,7 +172,7 @@ async function seedMargin() {
 async function routes(): Promise<string[]> {
   const get = (path: string) => fetch(BASE + path).then((r) => r.json());
   const books = (await get("api/books")) as { id: string }[];
-  const notes = (await get("api/notes")) as { id: string }[];
+  const notes = (await get("api/docs?kind=note")) as { id: string }[];
   const concepts = (await get("api/concepts")) as { id: string }[];
   const list = [
     "#/",
@@ -496,7 +503,7 @@ try {
     }
   }
   // the agent's panel, a note's versions and the Brain's legend and card, open, in both themes
-  const quizNote = ((await fetch(`${BASE}api/notes?type=quiz`).then((r) => r.json())) as { id: string }[])[0];
+  const quizNote = ((await fetch(`${BASE}api/docs?kind=note&type=quiz`).then((r) => r.json())) as { id: string }[])[0];
   const note = quizNote ? `#/notes/${quizNote.id}` : list.find((r) => r.startsWith("#/notes/"));
   for (const theme of ["light", "dark"] as const) {
     if (arg("only") && !"agent".includes(arg("only")!)) break;

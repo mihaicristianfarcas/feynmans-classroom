@@ -12,7 +12,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { SKIP, visit } from "unist-util-visit";
 import { codeRanges } from "../../../shared/links.ts";
-import { learn, type Resolved } from "../api";
+import { type Doc, docs, learn, type Resolved } from "../api";
 import { openLink } from "../app/navigation";
 import { ManimView, sceneTitle } from "../manim/ManimView";
 import { SceneView } from "../scene/SceneView";
@@ -345,8 +345,8 @@ function EmbeddedFigure({ id, theme }: { id: string; theme: "light" | "dark" }) 
   const [spec, setSpec] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    learn.figure(id).then(
-      (f) => setSpec(f.scene),
+    docs.get(id).then(
+      (f) => (f.kind === "figure" ? setSpec(f.scene) : setError("not a figure")),
       (e) => setError(e.message),
     );
   }, [id]);
@@ -357,6 +357,13 @@ function EmbeddedFigure({ id, theme }: { id: string; theme: "light" | "dark" }) 
       <SceneView spec={spec} theme={theme} compact predict={false} />
     </span>
   );
+}
+
+/** What an embedded document shows: its body, a concept with its summary first, an annotation under its passage. */
+function embedBody(doc: Doc) {
+  if (doc.kind === "concept") return `**${doc.title}**: ${doc.summary}\n\n${doc.body}`;
+  if (doc.kind === "annotation") return `> ${doc.source.quote.replace(/\n/g, "\n> ")}\n\n${doc.body}`;
+  return doc.body;
 }
 
 /** ![[Note]] or ![[library/…/annotations/…]]: the file's content, framed, with a way to open it. */
@@ -376,15 +383,8 @@ function EmbeddedFile({
     let alive = true;
     learn.resolve(target, sub).then(
       async (resolved) => {
-        let body = "";
-        if (resolved.kind === "note") body = (await learn.note(resolved.id)).body;
-        else if (resolved.kind === "concept") {
-          const c = await learn.concept(resolved.id);
-          body = `**${c.name}**: ${c.summary}\n\n${c.body}`;
-        } else if (resolved.kind === "annotation") {
-          const a = await learn.annotation(resolved.id);
-          body = `> ${a.anchor.quote.replace(/\n/g, "\n> ")}\n\n${a.body}`;
-        }
+        const body =
+          resolved.kind === "book" || resolved.kind === "attachment" ? "" : embedBody(await docs.get(resolved.id));
         if (alive) setState({ resolved, body });
       },
       (e) => alive && setState({ error: (e as Error).message }),

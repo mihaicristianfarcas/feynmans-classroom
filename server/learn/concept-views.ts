@@ -2,7 +2,7 @@
  * with its cards, the notes that link to it, related concepts and the passages it came from. */
 import type { Concept } from "../../shared/vault-types.ts";
 import { getBook } from "../books/store.ts";
-import { cards, concepts, notes } from "../vault/index.ts";
+import { docs } from "../vault/index.ts";
 import { allEdges } from "../vault/links.ts";
 import { viewCard } from "./cards.ts";
 import { conceptMastery } from "./context.ts";
@@ -10,41 +10,37 @@ import { conceptMastery } from "./context.ts";
 /** Every concept, by name, with its mastery and how many cards it has. */
 export function listConcepts() {
   const at = Date.now();
-  return concepts
-    .list()
+  const cards = docs.list("card");
+  return docs
+    .list("concept")
     .map((x) => ({
       ...x,
       mastery: conceptMastery(x.id, at),
-      cards: cards.list().filter((k) => k.concepts.includes(x.id)).length,
+      cards: cards.filter((k) => k.concepts.includes(x.id)).length,
     }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => a.title.localeCompare(b.title));
 }
 
-const brief = (c: Concept) => ({ id: c.id, name: c.name, mastery: conceptMastery(c.id) });
+const brief = (c: Concept) => ({ id: c.id, title: c.title, mastery: conceptMastery(c.id) });
+const concept = (node: string) => (node.startsWith("concept:") ? docs.get(node.slice(8), "concept") : undefined);
 
 /** One concept's page: its cards, the notes that use or link to it, related and linking concepts, its sources. */
-export function conceptDetail(concept: Concept) {
-  const linking = new Set(
-    allEdges()
-      .filter((e) => e.to === `concept:${concept.id}` && e.from.startsWith("note:"))
-      .map((e) => e.from.slice(5)),
-  );
+export function conceptDetail(c: Concept) {
+  const node = `concept:${c.id}`;
+  const edges = allEdges();
+  const linking = new Set(edges.filter((e) => e.to === node && e.from.startsWith("note:")).map((e) => e.from.slice(5)));
+  const related = edges.filter((e) => e.from === node && e.kind === "concept" && e.to).map((e) => concept(e.to!));
+  const linkedFrom = edges.filter((e) => e.to === node && e.kind === "concept").map((e) => concept(e.from));
   return {
-    ...concept,
-    sources: concept.sources.map((s) => ({ ...s, title: getBook(s.bookId)?.title })),
-    mastery: conceptMastery(concept.id),
-    cards: cards
-      .list()
-      .filter((k) => k.concepts.includes(concept.id))
+    ...c,
+    sources: c.sources.map((s) => ({ ...s, title: getBook(s.bookId)?.title })),
+    mastery: conceptMastery(c.id),
+    cards: docs
+      .list("card")
+      .filter((k) => k.concepts.includes(c.id))
       .map((k) => viewCard(k)),
-    notes: notes.list().filter((n) => n.concepts.includes(concept.id) || linking.has(n.id)),
-    related: concept.related
-      .map((id) => concepts.get(id))
-      .filter((c): c is NonNullable<typeof c> => !!c)
-      .map(brief),
-    backlinks: concepts
-      .list()
-      .filter((x) => x.related.includes(concept.id))
-      .map(brief),
+    notes: docs.list("note").filter((n) => n.concepts.includes(c.id) || linking.has(n.id)),
+    related: related.filter((x): x is Concept => !!x).map(brief),
+    backlinks: linkedFrom.filter((x): x is Concept => !!x).map(brief),
   };
 }

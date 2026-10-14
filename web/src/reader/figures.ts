@@ -63,9 +63,9 @@ const sectionAt = (chapter: TocEntry | null, at: number) =>
 export function figureEntries(book: Book, demos: Demo[], annotations: Annotation[]): FigureEntry[] {
   const entries: FigureEntry[] = [];
   for (const a of annotations) {
-    if (a.kind !== "visualize") continue;
+    if (a.type !== "visualize") continue;
     const loc: Loc =
-      a.anchor.page !== undefined ? { page: a.anchor.page, y: a.anchor.y ?? 0 } : { block: a.anchor.block ?? 0 };
+      a.source.page !== undefined ? { page: a.source.page, y: a.source.y ?? 0 } : { block: a.source.block ?? 0 };
     const at = posOf(loc);
     const chapter = chapterAt(book, at);
     const animation = animationIn(a.body);
@@ -76,7 +76,7 @@ export function figureEntries(book: Book, demos: Demo[], annotations: Annotation
       caption: captionIn(a.body),
       at,
       loc,
-      quote: a.anchor.quote,
+      quote: a.source.quote,
       chapter,
       section: sectionAt(chapter, at),
       status: a.status,

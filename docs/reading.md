@@ -35,18 +35,19 @@ section you're in, its chapter or the whole book (a still of each, its number an
 one to go to its passage, or open it large to redraw it, keep it, make cards from it or delete it).
 **Tutor** keeps every conversation as a session of the book (below).
 
-Every card is a Markdown file beside the book, `library/<book>/annotations/p152-explain-….md`:
+Every card is a Markdown file beside the book, `library/<book>/annotations/p152-explain-….md`, a
+document like every other in the vault (see [vault.md](vault.md)): `kind: annotation`, what was asked
+for as its `type`, and the passage as its `source`:
 
 ```markdown
 ---
 id: a8c1f0e2
-kind: explain                     # highlight · comment · explain · define · ask · resources · visualize
-book: designing-data-intensive-applications
-book_id: b15c347ba44
-pdf: { file: source.pdf, sha256: 9c1e…, pages: 613 }
-chapter: c5
-page: 152
-anchor:
+kind: annotation
+type: explain                     # highlight · comment · explain · define · ask · resources · visualize
+source:
+  book: b15c347ba44               # the book's id (its book.json)
+  chapter: c5
+  page: 152
   quote: Replication means keeping a copy of the same data on multiple machines
   prefix: "…in this chapter we discuss "
   suffix: " that are connected via a network"
@@ -58,6 +59,7 @@ anchor:
 request: what does "copy" mean here, physically?
 model: { provider: codex, name: gpt-6-luna, ms: 8421 }
 created: 2026-10-13T07:42:10.000Z
+updated: 2026-10-13T07:42:18.000Z
 ---
 
 > [!quote] p. 152
@@ -69,8 +71,8 @@ created: 2026-10-13T07:42:10.000Z
 
 Every conversation with the tutor is saved, after each reply, as a Markdown file beside the book:
 `library/<book>/sessions/2026-10-13 Why does Thompson call dx a little bit of x.md`, named by its
-first question, with the passage it was about (if one was pinned), the chapter and the tutor's style
-in its frontmatter, and the conversation as `## You` / `## Tutor` sections. The Tutor pane lists a
+first question (`kind: session`), with the passage it was about (if one was pinned) and the chapter as
+its `source`, the tutor's style as its `mode`, and the conversation as `## You` / `## Tutor` sections. The Tutor pane lists a
 book's earlier sessions when you start a new one: open one to read it again or carry it on (it keeps
 its file). Like everything in the vault, sessions can be linked from notes, read by the agent, and
 opened in Obsidian.
@@ -79,7 +81,7 @@ Two buttons above a saved conversation keep what it taught you:
 
 - **Save as note** writes what you worked out as a note of your own in `notes/` (`type: session`,
   named after the idea, not the conversation), ending with a link back to the session. The session's
-  frontmatter links to the note in turn (`note`, `note_id`), and the button becomes **Open note**.
+  frontmatter links to the note in turn (in `related`), and the button becomes **Open note**.
 - **Make cards** drafts flashcards on the ideas the tutor explained, to review and edit before they
   are saved, as from a passage.
 

@@ -1,7 +1,7 @@
 /* A note's saved versions (from the vault's jj history): pick one to read it as it was, see what that
  * version changed, and bring it back (as a new change, so the current text stays in the history). */
 import { useEffect, useState } from "react";
-import { learn, type NoteDetail, type Version } from "../api";
+import { docs, type Note, type NoteDetail, type Version } from "../api";
 import { Spinner } from "../components/feedback";
 import { Markdown } from "../components/Markdown";
 import { Modal } from "../components/tools";
@@ -27,12 +27,12 @@ export function Versions({
   const [error, setError] = useState<string | null>(null);
   const views = useIndicator<HTMLFieldSetElement>(`${view}:${picked?.commit}:${!!shown}`);
   useEffect(() => {
-    learn.noteVersions(note.id).then(setVersions, (e) => setError((e as Error).message));
+    docs.versions(note.id).then(setVersions, (e) => setError((e as Error).message));
   }, [note.id]);
   useEffect(() => {
     if (!picked) return;
     setShown(null);
-    learn.noteVersion(note.id, picked.commit).then(setShown, (e) => setError((e as Error).message));
+    docs.version(note.id, picked.commit).then(setShown, (e) => setError((e as Error).message));
   }, [note.id, picked]);
   return (
     <Modal title={`Versions of “${note.title}”`} eyebrow="History" onClose={onClose} wide>
@@ -83,7 +83,7 @@ export function Versions({
                     className="button primary"
                     onClick={async () => {
                       try {
-                        await learn.restoreNote(note.id, picked.commit);
+                        await docs.restore<Note>(note.id, picked.commit);
                         announce("Brought back that version");
                         onRestored();
                         onClose();
