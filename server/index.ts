@@ -19,7 +19,13 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal
 
 // files changing in the vault (from the app, an agent, Obsidian): pages showing them reload
 onVaultChange((path) => publish("global", { type: "vault", data: { path } }));
-initVault();
+try {
+  initVault();
+} catch (error) {
+  // jj missing, or the vault's repository couldn't be started: say what to do, without a stack trace
+  console.error(`Feynman's Classroom can't start: ${(error as Error).message}`);
+  process.exit(1);
+}
 exportMissingBooks();
 startIndexing();
 resumeAnnotations();

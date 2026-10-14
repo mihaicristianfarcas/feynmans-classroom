@@ -2,14 +2,12 @@
 // workspace, and its change lands after what the learner did meanwhile, can be undone, is refused
 // when it clashes (never leaving conflict markers in the learner's files), and several run at once.
 // Runs only where jj is installed.
-import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { AgentRun } from "../shared/vault-types.ts";
 
-const hasJj = spawnSync(process.env.JJ_BIN || "jj", ["--version"]).status === 0;
 const dir = mkdtempSync(join(tmpdir(), "classroom-agents-"));
 process.env.DATA_DIR = dir;
 const vault = join(dir, "vault");
@@ -57,11 +55,10 @@ const write = (root: string, rel: string, text: string) => {
   writeFileSync(join(root, rel), text);
 };
 
-describe.skipIf(!hasJj)("the vault on jj", () => {
+describe("the vault on jj", () => {
   it("is a jj repository colocated with git", () => {
     expect(existsSync(join(vault, ".jj"))).toBe(true);
     expect(existsSync(join(vault, ".git"))).toBe(true);
-    expect(V.vaultIsRepo()).toBe(true);
   });
 
   it("keeps every version of a note, and can show an older one", () => {
@@ -77,7 +74,7 @@ describe.skipIf(!hasJj)("the vault on jj", () => {
   });
 });
 
-describe.skipIf(!hasJj)("the agent on a jj vault", () => {
+describe("the agent on a jj vault", () => {
   it("lands a new note after the learner's own edits, and can take it out again", async () => {
     const mine = N.createDoc({ title: "Mine", body: "one" });
     V.checkpoint();

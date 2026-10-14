@@ -11,18 +11,21 @@
  * first without touching the files on disk, then rolled back, so conflict markers never reach a
  * note. jj runs with the app's own config, so the learner's own jj or git setup doesn't matter. */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_DIR } from "../config.ts";
 import { VAULT } from "./files.ts";
 
 const BIN = process.env.JJ_BIN || "jj";
 
-/** Whether jj is installed. Without it the vault still works, unversioned (and agents can't write). */
-export const hasJj = spawnSync(BIN, ["--version"], { encoding: "utf8" }).status === 0;
-
-/** Whether the vault is a jj repository (it becomes one on first start when jj is installed). */
-export const vaultIsRepo = () => hasJj && existsSync(join(VAULT, ".jj"));
+/** Stops with what to do when jj isn't installed: the vault's history, Undo and the agent's changes all
+ * go through it. */
+export function requireJj() {
+  if (spawnSync(BIN, ["--version"], { encoding: "utf8" }).status === 0) return;
+  throw new Error(
+    `Jujutsu (jj) isn't installed${process.env.JJ_BIN ? `, or JJ_BIN (${process.env.JJ_BIN}) doesn't point to it` : ""}. Install it (brew install jj, or see https://www.jj-vcs.dev) and start again: the vault's history, Undo and the agent's changes all go through it.`,
+  );
+}
 
 /** How long the vault stays quiet before the change in progress is closed and a new one begun. */
 const SITTING_MS = Number(process.env.VAULT_SITTING_MS) || 3 * 60 * 1000;
@@ -83,7 +86,6 @@ let sittingTimer: ReturnType<typeof setTimeout> | null = null;
 /** Something in the vault changed: the change in progress is named a few seconds from now. */
 export function changed(what: string) {
   pending.push(what);
-  if (!hasJj) return;
   if (snapTimer) clearTimeout(snapTimer);
   snapTimer = setTimeout(snapshot, 3000);
   snapTimer.unref?.();
@@ -121,7 +123,6 @@ const nameOfChange = () => (sitting.some((i) => !quiet(i)) ? subjectOf(sitting) 
 function snapshot() {
   snapTimer = null;
   sitting.push(...pending.splice(0).filter(Boolean));
-  if (!vaultIsRepo()) return;
   // nothing differs on disk (jj itself just updated the files, or an edit was taken back)
   if (isEmpty("@")) return;
   jj(["describe", "-m", nameOfChange()]);
@@ -134,7 +135,6 @@ function snapshot() {
  * the app's logs changed. Returns the change id of the latest change in the history, which agents
  * start from. */
 export function checkpoint(): string | null {
-  if (!vaultIsRepo()) return null;
   for (const t of [snapTimer, sittingTimer]) if (t) clearTimeout(t);
   snapTimer = sittingTimer = null;
   sitting.push(...pending.splice(0).filter(Boolean));
@@ -168,7 +168,6 @@ const VERSION =
   'change_id.short(12) ++ "\\t" ++ commit_id.short(12) ++ "\\t" ++ committer.timestamp().utc().format("%Y-%m-%dT%H:%M:%SZ") ++ "\\t" ++ description.first_line() ++ "\\n"';
 
 function versions(revset: string, paths: string[], limit: number): Version[] {
-  if (!vaultIsRepo()) return [];
   const run = jj(["log", "-r", revset, "-n", String(limit), "--no-graph", "-T", VERSION, ...paths.map(fileset)]);
   return run.stdout
     .split("\n")

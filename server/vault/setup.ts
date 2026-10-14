@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { docs } from "./docs.ts";
 import { VAULT } from "./files.ts";
-import { changed, hasJj, jj, vaultIsRepo } from "./jj.ts";
+import { changed, jj, requireJj } from "./jj.ts";
 import { reviews } from "./logs.ts";
 import { startWatching } from "./watch.ts";
 
@@ -54,18 +54,17 @@ function writeGitignore() {
 let ready = false;
 /** Makes a new vault a jj repository (colocated with git, so git tools and Obsidian Git can read it). */
 function initRepository() {
-  if (!hasJj || existsSync(join(VAULT, ".jj"))) return;
+  if (existsSync(join(VAULT, ".jj"))) return;
   const init = jj(["git", "init"]);
-  if (!init.ok) {
-    console.warn("[vault] could not start a jj repository:", init.stderr);
-    return;
-  }
+  if (!init.ok) throw new Error(`could not start the vault's jj repository: ${init.stderr}`);
   changed("vault created");
 }
 
-/** Prepares the vault on startup: folders, AGENTS.md, .gitignore, jj, the documents in memory, the watcher. */
+/** Prepares the vault on startup: folders, AGENTS.md, .gitignore, jj, the documents in memory, the watcher.
+ * Throws when jj isn't installed: the vault needs it. */
 export function initVault() {
   if (ready) return;
+  requireJj();
   ready = true;
   for (const dir of DIRS) mkdirSync(join(VAULT, dir), { recursive: true });
   copyFileSync(join(TEMPLATES, "AGENTS.md"), join(VAULT, "AGENTS.md"));
@@ -87,8 +86,6 @@ export function vaultStats() {
     annotations: docs.count("annotation"),
     sessions: docs.count("session"),
     reviews: reviews().length,
-    versioned: vaultIsRepo(),
-    jj: hasJj,
     path: VAULT,
   };
 }

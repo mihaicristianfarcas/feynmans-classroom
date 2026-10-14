@@ -8,7 +8,7 @@ Every setting has a default; set environment variables to change them (for `npm 
 | `DATA_DIR` | `./data` | books, figures, the vault, settings |
 | `LLM_PROVIDER` | `auto` | `codex`, `claude` or `auto` (Settings overrides) |
 | `CODEX_BIN` / `CLAUDE_BIN` | `codex` / `claude` | the CLIs |
-| `JJ_BIN` | `jj` | Jujutsu, which keeps the vault's history |
+| `JJ_BIN` | `jj` | Jujutsu, which keeps the vault's history (required: the server won't start without it) |
 | `VAULT_SITTING_MS` | `180000` | how long the vault stays quiet before the change in progress is closed (a new entry in its history) |
 | `CODEX_FAST_MODEL` | Codex's "fast and affordable" model | quick tier on Codex |
 | `CODEX_FAST_EFFORT` | `low` | quick tier effort |
@@ -34,8 +34,6 @@ PORT=8797 WEB_PORT=5183 npx vite
 - Figures are as true as the model's reading of the passage; every number they show comes from
   their own expressions, so check the readout against the text when it matters.
 - Hand-built demos need Codex (they run in its sandbox).
-- The agent changes files only where Jujutsu (jj) is installed (its changes are checked, landed and
-  undone through the vault's history); without jj it can still read your vault and answer.
 - Capture works on PDF pages; in EPUBs, pictures are already in the text.
 - Animations play with WebGPU (Chrome and Edge 113+, Safari 26); elsewhere their code is shown. The
   first one fetches Python (Pyodide) and ManimGX, about 30 MB, into `DATA_DIR/.cache/manimgx`; after

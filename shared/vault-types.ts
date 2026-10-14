@@ -234,8 +234,6 @@ export interface AgentRun {
   where?: string;
   /** "fast": the quick model (Enter); "smart": the careful one (⌘Enter). */
   tier?: "fast" | "smart";
-  /** "read": it could only look (no jj on this machine); "write": it worked on its own copy. */
-  mode?: "read" | "write";
   status: "running" | "review" | "merged" | "discarded" | "failed" | "undone" | "done";
   started: string;
   ms?: number;

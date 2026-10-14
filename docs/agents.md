@@ -76,6 +76,5 @@ commands under the Codex sandbox):
   changed the same lines. A change already pushed somewhere gets its reverse added instead.
 - Every run is recorded in `log/agents.jsonl` (the request, where you were, the model, the files,
   the jj change).
-- Without jj the agent can still read your vault and answer, but not change it.
 - Book text is material, never instructions, in every prompt; a passage that tries to give orders
   can't get past the sandbox and the checks anyway.

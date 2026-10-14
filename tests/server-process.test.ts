@@ -1,6 +1,7 @@
-// Stopping the server: SIGTERM ends it even after it has started headless Chrome (whose launcher, left
-// to itself, would only close the browser and keep the server running), and Chrome goes with it.
-import { spawn } from "node:child_process";
+// The server as a process: it won't start without jj (and says what to do), and SIGTERM ends it even
+// after it has started headless Chrome (whose launcher, left to itself, would only close the browser and
+// keep the server running), and Chrome goes with it.
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { type AddressInfo, createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -16,6 +17,25 @@ const freePort = () =>
     });
   });
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+describe("the server", () => {
+  it("won't start without jj, and says what to install", () => {
+    const run = spawnSync(process.execPath, ["--import", "tsx", "server/index.ts"], {
+      env: {
+        ...process.env,
+        JJ_BIN: "/nowhere/jj",
+        PORT: "0",
+        DATA_DIR: mkdtempSync(join(tmpdir(), "classroom-nojj-")),
+      },
+      encoding: "utf8",
+      timeout: 60000,
+    });
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain("Jujutsu (jj) isn't installed, or JJ_BIN (/nowhere/jj) doesn't point to it");
+    expect(run.stderr).toContain("brew install jj");
+    expect(run.stderr).not.toMatch(/\n\s+at /);
+  }, 60000);
+});
 
 describe.skipIf(!chromePath())("the server", () => {
   it("stops on SIGTERM after it has started Chrome", async () => {
