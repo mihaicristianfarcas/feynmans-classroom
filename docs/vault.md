@@ -68,8 +68,8 @@ Notes can hold more than prose:
 
 The vault is a [Jujutsu](https://www.jj-vcs.dev/) (jj) repository, colocated with git: `.jj/` and
 `.git/` sit side by side, so `git log`, Obsidian Git or a GitHub remote keep working (the app keeps
-a `main` bookmark on the latest change). A vault that git kept before is adopted with its history.
-The app runs jj with its own config (`DATA_DIR/jj.toml`), so yours doesn't matter.
+a `main` bookmark on the latest change). The app runs jj with its own config (`DATA_DIR/jj.toml`), so
+yours doesn't matter.
 
 - **Nothing to stage.** jj treats the working copy as a change and snapshots it whenever it runs.
   As you work, the app names the change in progress after what happened in it ("3× note, card");

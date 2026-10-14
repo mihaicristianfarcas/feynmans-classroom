@@ -56,9 +56,6 @@ function load() {
   for (const r of runs.values()) {
     if (r.status === "running")
       save({ ...r, status: "failed", activity: undefined, error: "the server stopped during the run" });
-    // runs from before the vault moved to jj: their branches are gone
-    else if (r.status === "review" && !r.change)
-      save({ ...r, status: "discarded", error: "left waiting when the vault moved to jj" });
   }
   if (vaultIsRepo()) cleanUpWorkingCopies(new Set());
 }
