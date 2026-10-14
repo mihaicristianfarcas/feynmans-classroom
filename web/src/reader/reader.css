@@ -6,6 +6,34 @@
   display: grid;
   grid-template-rows: auto 1fr;
   background: var(--bg);
+  animation: fade 200ms var(--ease-out) backwards;
+}
+/* coming in: the panel slides in beside the book, and the book's text rises into place once it is at
+ * your page (until then it is there, unseen, so restoring your place never shows) */
+.reader-app .demo-pane {
+  animation: pane-in 300ms 40ms var(--ease-out) backwards;
+}
+@keyframes pane-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+.book-view:not([data-revealed]) {
+  opacity: 0;
+}
+.book-view[data-revealed] {
+  animation: book-in 380ms var(--ease-out) backwards;
+}
+@keyframes book-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+/* "Opening…" only if it takes a while */
+.reader-wait {
+  animation: fade 300ms 450ms var(--ease-out) backwards;
 }
 
 /* ---------- top bar ---------- */
@@ -966,15 +994,144 @@
   box-shadow:
     var(--shadow-sm),
     0 0 0 1px var(--line);
-  transform-origin: right top;
-  transition:
-    opacity 200ms var(--ease-out),
-    transform 220ms var(--ease-out);
+  /* opening, it unrolls from its top edge down (the clip goes once it is open, so its menu can overhang) */
+  animation: card-open 300ms var(--ease-out) backwards;
 }
-@starting-style {
-  .mcard.open {
-    opacity: 0;
-    transform: scale(0.98);
+@keyframes card-open {
+  from {
+    opacity: 0.4;
+    clip-path: inset(0 0 100% 0 round var(--r-lg));
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(-24px -24px -24px -24px round var(--r-lg));
+  }
+}
+/* a closed card: what was asked and the gist of the answer, one click from open */
+.mcard.closed {
+  display: grid;
+  gap: 3px;
+  padding: 8px 12px 9px 13px;
+  border-radius: var(--r);
+  background: none;
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--k) 80%, transparent);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+  animation: fade 200ms var(--ease-out) backwards;
+}
+.mcard.closed[data-mini] {
+  padding-block: 5px;
+}
+.mcard-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.mcard.closed .mcard-kind {
+  flex: none;
+  height: 20px;
+  padding: 0 8px;
+  font-size: 11.5px;
+}
+.mcard-asked {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font: 500 13px / 1.4 var(--sans);
+  color: var(--ink);
+}
+.mcard-gist {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font: 13.5px / 1.45 var(--serif);
+  color: var(--ink-2);
+}
+.mcard-gist[data-pending] .skeleton {
+  width: 72%;
+  margin: 6px 0 3px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .mcard.closed:hover {
+    background: var(--surface);
+    box-shadow:
+      inset 2px 0 0 var(--k-ink),
+      var(--shadow-xs),
+      0 0 0 1px var(--line);
+  }
+}
+/* waiting for the answer: lines shimmering in the card's own pastel */
+.mcard .skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--k-soft) 0%,
+    color-mix(in srgb, var(--k) 70%, var(--k-soft)) 50%,
+    var(--k-soft) 100%
+  );
+  background-size: 200% 100%;
+}
+/* an answer that lands while its card is open is written in from the top */
+.mcard-body[data-arrived] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent 60%);
+  mask-image: linear-gradient(to bottom, #000 40%, transparent 60%);
+  -webkit-mask-size: 100% 250%;
+  mask-size: 100% 250%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  animation: ink-in 760ms var(--ease-out) backwards;
+}
+@keyframes ink-in {
+  from {
+    -webkit-mask-position: 0 100%;
+    mask-position: 0 100%;
+  }
+  to {
+    -webkit-mask-position: 0 0;
+    mask-position: 0 0;
+  }
+}
+/* the words an answer bolds are the answer in brief: marked in the card's pastel */
+.mcard-md strong {
+  padding: 0 0.14em;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--k) 42%, transparent);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* a highlighter swept across a passage just marked */
+.sweep span {
+  position: fixed;
+  z-index: 2;
+  border-radius: 2px;
+  background: var(--hl-purple);
+  mix-blend-mode: var(--hl-blend);
+  pointer-events: none;
+  transform-origin: left center;
+  animation:
+    sweep-on 320ms var(--ease-out) backwards,
+    fade 360ms 640ms ease reverse forwards;
+}
+.sweep[data-color="yellow"] span {
+  background: var(--hl-yellow);
+}
+.sweep[data-color="green"] span {
+  background: var(--hl-green);
+}
+.sweep[data-color="blue"] span {
+  background: var(--hl-blue);
+}
+.sweep[data-color="pink"] span {
+  background: var(--hl-pink);
+}
+@keyframes sweep-on {
+  from {
+    transform: scaleX(0);
   }
 }
 /* the card whose passage is lit in the book */
@@ -1683,5 +1840,15 @@
   }
   .margin-slot {
     transition: none;
+  }
+  .reader-app .demo-pane,
+  .book-view[data-revealed],
+  .mcard.open {
+    animation-name: fade;
+  }
+  .mcard-body[data-arrived] {
+    animation: none;
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 }

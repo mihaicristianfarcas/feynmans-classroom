@@ -1,9 +1,12 @@
 /* The margin's cards: an annotation (an answer with its conversation, a figure or an animation, a
  * highlight or comment with its colour), its menu (to your note, copy, the file, delete), and a figure
- * from the chapter's own figures. Each is shown whole; the margin places them (Margin.tsx). */
+ * from the chapter's own figures. The open card is shown whole; the others are closed to a line (what
+ * was asked and the answer's gist; in a crowded stretch, just what was asked), and open with a click or
+ * Enter. An answer that arrives while its card is open is written in from the top. The margin places
+ * them (Margin.tsx). */
 import { Copy, Ellipsis, FileText, Link2, Maximize2, Quote, SquarePlus, Trash2 } from "lucide-react";
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { threadOf } from "../../../shared/thread.ts";
+import { gistOf, threadOf } from "../../../shared/thread.ts";
 import { type Annotation, type Book, type Demo, docs, learn } from "../api";
 import { ChatInput, type ChatMessage, ChatThread } from "../components/Chat";
 import { Spinner } from "../components/feedback";
@@ -31,11 +34,65 @@ export type ToNote = (a: Annotation, mode: "embed" | "passage" | "reference") =>
 
 const GENERATED = ["explain", "define", "ask", "visualize", "resources"];
 
+/** A card closed to a line: what it is and what was asked, and (unless the margin is crowded there) the gist of its answer. */
+function ClosedCard({
+  kind,
+  label,
+  status,
+  color,
+  asked,
+  gist,
+  mini,
+  onOpen,
+}: {
+  kind: string;
+  label: string;
+  status: string;
+  color?: string;
+  asked: string;
+  gist: string;
+  mini: boolean;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="mcard closed"
+      data-kind={kind}
+      data-status={status}
+      data-color={color}
+      data-mini={mini || undefined}
+      aria-expanded="false"
+      aria-label={`${label}: ${asked}${gist ? `. ${gist}` : ""}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen();
+      }}
+    >
+      <span className="mcard-line">
+        <span className="mcard-kind">{label}</span>
+        <span className="mcard-asked">{asked}</span>
+      </span>
+      {!mini &&
+        (status === "pending" ? (
+          <span className="mcard-gist" data-pending="">
+            <span className="skeleton" />
+          </span>
+        ) : gist ? (
+          <span className="mcard-gist">{gist}</span>
+        ) : null)}
+    </button>
+  );
+}
+
 export const AnnotationCard = memo(function AnnotationCard({
   a,
   book,
   fig,
   focused,
+  open = true,
+  mini = false,
+  onOpenCard,
   theme,
   onToNote,
   onOpen,
@@ -46,6 +103,11 @@ export const AnnotationCard = memo(function AnnotationCard({
   /** Its figure number, when it is a figure ("Fig 3.2"). */
   fig?: string;
   focused: boolean;
+  /** Shown whole (the card you're on), or closed to a line. */
+  open?: boolean;
+  /** Closed in a crowded stretch: just its first line. */
+  mini?: boolean;
+  onOpenCard?: () => void;
   theme: "light" | "dark";
   onToNote: ToNote;
   onOpen: () => void;
@@ -66,6 +128,18 @@ export const AnnotationCard = memo(function AnnotationCard({
     () => (asking ? [...turns, { role: "user", text: asking.q }] : turns),
     [turns, asking],
   );
+  // an answer that lands while its card is open is written in, from the top
+  const [arrived, setArrived] = useState(false);
+  const wasPending = useRef(pending);
+  useEffect(() => {
+    if (wasPending.current && !pending && a.status === "ready") {
+      setArrived(true);
+      const t = setTimeout(() => setArrived(false), 900);
+      wasPending.current = pending;
+      return () => clearTimeout(t);
+    }
+    wasPending.current = pending;
+  }, [pending, a.status]);
 
   // an animation that hits an error when it plays is written again, told the error
   const fixAnimation = useCallback(
@@ -87,6 +161,33 @@ export const AnnotationCard = memo(function AnnotationCard({
       setAsking(null);
     }
   };
+
+  if (!open) {
+    const asked =
+      a.request ||
+      (a.type === "visualize" ? fig || "A figure" : a.type === "comment" ? a.body : "") ||
+      `“${a.source.quote.replace(/\s+/g, " ").slice(0, 90)}${a.source.quote.length > 90 ? "…" : ""}”`;
+    const gist =
+      a.status === "failed"
+        ? "Couldn’t answer: open it to try again."
+        : a.type === "comment" || a.type === "highlight"
+          ? ""
+          : a.type === "visualize"
+            ? ""
+            : gistOf(answer, { key: a.type === "ask" });
+    return (
+      <ClosedCard
+        kind={a.type}
+        label={label}
+        status={a.status}
+        color={a.color}
+        asked={asked}
+        gist={gist}
+        mini={mini}
+        onOpen={() => onOpenCard?.()}
+      />
+    );
+  }
 
   return (
     <article
@@ -173,7 +274,7 @@ export const AnnotationCard = memo(function AnnotationCard({
           </button>
         </div>
       ) : (
-        <div className="mcard-body">
+        <div className="mcard-body" data-arrived={arrived || undefined}>
           <ManimFix.Provider value={fixAnimation}>
             <Markdown text={answer} theme={theme} className="mcard-md" base={a.path} />
           </ManimFix.Provider>
@@ -329,14 +430,32 @@ export const DemoCard = memo(function DemoCard({
   demo,
   fig,
   theme,
+  open = true,
+  mini = false,
+  onOpenCard,
   onOpen,
 }: {
   demo: Demo;
   fig: string;
   theme: "light" | "dark";
+  open?: boolean;
+  mini?: boolean;
+  onOpenCard?: () => void;
   onOpen: () => void;
 }) {
   const ready = demo.status === "ready";
+  if (!open)
+    return (
+      <ClosedCard
+        kind="figure"
+        label={fig}
+        status={ready ? "ready" : demo.status === "failed" ? "failed" : "pending"}
+        asked={demo.brief.title}
+        gist={demo.brief.caption || ""}
+        mini={mini}
+        onOpen={() => onOpenCard?.()}
+      />
+    );
   return (
     <article
       className="mcard open"

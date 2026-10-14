@@ -1,10 +1,10 @@
 // The reader's helpers: finding words in a book (across hyphenated lines, ignoring case and accents),
-// numbering figures as the book numbers its chapters, the conversation kept on a margin card, and a
-// conversation as text for a model.
+// numbering figures as the book numbers its chapters, the conversation kept on a margin card (and its
+// answer's gist, for a closed card), and a conversation as text for a model.
 import { describe, expect, it } from "vitest";
 import { findInBlocks, findInPages } from "../server/books/find.ts";
 import { chapterNumber, figurePrefix } from "../shared/chapters.ts";
-import { followUpsOf, threadOf, transcript, withFollowUp } from "../shared/thread.ts";
+import { followUpsOf, gistOf, threadOf, transcript, withFollowUp } from "../shared/thread.ts";
 
 const page = (n: number, lines: string[]) => ({
   n,
@@ -115,5 +115,21 @@ describe("a conversation as text", () => {
     expect(short.length).toBeLessThanOrEqual(200);
     expect(short.startsWith("Learner: Why is the sky blue?\n\n[…]\n\nLearner: And sunsets?")).toBe(true);
     expect(short.endsWith("so the blue is scattered away.")).toBe(true);
+  });
+});
+
+describe("a closed card's gist", () => {
+  it("is the answer's opening sentence, as plain text, long enough to stand on", () => {
+    expect(gistOf("No. **Not at all**: the [[Calculus|calculus]] says $dx$ is `tiny`. More here.")).toBe(
+      "No. Not at all: the calculus says dx is tiny.",
+    );
+    expect(gistOf("## Heading\n\n- First point, which is long enough to be the gist of it all.\n- Second")).toBe(
+      "First point, which is long enough to be the gist of it all.",
+    );
+  });
+  it("is the bolded answer when asked for the key, and is cut short with an ellipsis", () => {
+    expect(gistOf("**The veil hides the truth.** More after.", { key: true })).toBe("The veil hides the truth.");
+    expect(gistOf("**Term**: a definition.", { key: true })).toBe("Term: a definition.");
+    expect(gistOf(`${"word ".repeat(60)}end.`, { max: 40 }).endsWith("…")).toBe(true);
   });
 });

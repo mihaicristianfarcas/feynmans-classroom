@@ -115,10 +115,10 @@ try {
   );
   await wait(1500);
   check(
-    "margin cards are shown whole (none folded, none scrolling inside)",
+    "one margin card is open at most, shown whole (not scrolling inside); the others are closed to a line",
     await page.evaluate(
       () =>
-        !document.querySelector(".mcard.collapsed") &&
+        document.querySelectorAll(".mcard.open").length <= 1 &&
         [...document.querySelectorAll<HTMLElement>(".mcard.open")].every((c) => c.scrollHeight <= c.clientHeight + 1),
     ),
   );

@@ -1,10 +1,11 @@
 /* The margin: what was made from passages (explanations, definitions, answers, figures, resources,
- * comments), each as a card beside its passage, as in a well-annotated book. Every card is shown
- * whole: no folding, no scrolling inside it. Cards whose passages overlap (or share a paragraph of a
- * reflowable book) sit side by side in one row; rows never overlap: the focused one (or, when none is,
- * the one for the passage at the reading line) sits exactly by its passage and the others make room
- * above and below it (as comments do in a shared document).
- * Follow-up questions on a card read as a conversation, drawn like the tutor's.
+ * comments), each as a card beside its passage, as in a well-annotated book. One card is open at a time
+ * (the focused one: just made, clicked, or opened from its passage), shown whole and on a line of its
+ * own; the others are closed to a line, and to just their first line where passages crowd together.
+ * Cards whose passages overlap (or share a paragraph of a reflowable book) sit side by side in one row;
+ * rows never overlap: the focused one (or, when none is, the one for the passage at the reading line)
+ * sits exactly by its passage and the others make room above and below it (as comments do in a shared
+ * document). Follow-up questions on a card read as a conversation, drawn like the tutor's.
  *
  * Positions follow the book's scroll without React re-rendering: the reader announces each scroll
  * frame on `bus`, and the margin moves its cards directly. Scrolling over the margin scrolls the book. */
@@ -24,6 +25,8 @@ const GAP = 10;
 const MIN_CARD = 230;
 /** The height a card not yet drawn is taken to have. */
 const GUESS = 180;
+/** Passages that start closer than this make a crowded stretch: their closed cards show one line. */
+const CROWD = 70;
 
 interface Props {
   book: Book;
@@ -67,6 +70,8 @@ export function Margin({
   const heights = useRef(new Map<string, number>());
   const [shown, setShown] = useState<string[]>([]);
   const shownRef = useRef<string[]>([]);
+  const [crowded, setCrowded] = useState<Set<string>>(() => new Set());
+  const crowdedRef = useRef("");
   const scrolling = useRef<ReturnType<typeof setTimeout>>(undefined);
   const settling = useRef<ReturnType<typeof setTimeout>>(undefined);
   const leadRef = useRef<string | null>(null);
@@ -113,6 +118,19 @@ export function Margin({
             b.item.annotation?.created || b.item.demo?.createdAt || "",
           ),
       );
+    // a crowded stretch (read from where the passages are, not from card sizes, so it never flickers):
+    // closed cards there show just their first line
+    const crowd = placed
+      .filter(
+        (p, i) =>
+          (i > 0 && p.at.top - placed[i - 1].at.top < CROWD) ||
+          (i < placed.length - 1 && placed[i + 1].at.top - p.at.top < CROWD),
+      )
+      .map((p) => p.item.id);
+    if (crowd.join() !== crowdedRef.current) {
+      crowdedRef.current = crowd.join();
+      setCrowded(new Set(crowd));
+    }
     // rows: passages that overlap on screen, or share a block of a reflowable book
     const rows: { ids: string[]; top: number; bottom: number; block?: number }[] = [];
     for (const p of placed) {
@@ -133,9 +151,13 @@ export function Margin({
     const cells = new Map<string, { x: number; dy: number; w: number }>();
     const rowHeights = rows.map((row) => {
       const perLine = Math.max(1, Math.min(row.ids.length, Math.floor((width + GAP) / (MIN_CARD + GAP))));
+      // the open card has a line of its own, the full width, and its row's closed cards follow it
+      const open = focused && row.ids.includes(focused) ? [focused] : [];
+      const rest = row.ids.filter((id) => id !== focused);
+      const lines = open.length ? [open] : [];
+      for (let start = 0; start < rest.length; start += perLine) lines.push(rest.slice(start, start + perLine));
       let dy = 0;
-      for (let start = 0; start < row.ids.length; start += perLine) {
-        const line = row.ids.slice(start, start + perLine);
+      for (const line of lines) {
         const w = (width - (line.length - 1) * GAP) / line.length;
         let tallest = 0;
         line.forEach((id, i) => {
@@ -277,6 +299,9 @@ export function Margin({
               book={book}
               fig={figs.get(item.id)}
               focused={item.id === focused}
+              open={item.id === focused}
+              mini={crowded.has(item.id)}
+              onOpenCard={() => setFocused(item.id)}
               theme={theme}
               onToNote={onToNote}
               onOpen={() => onOpenFigure(item.id)}
@@ -287,6 +312,9 @@ export function Margin({
               demo={item.demo!}
               fig={figs.get(item.id) || item.demo!.fig}
               theme={theme}
+              open={item.id === focused}
+              mini={crowded.has(item.id)}
+              onOpenCard={() => setFocused(item.id)}
               onOpen={() => onOpenFigure(item.id)}
             />
           )}

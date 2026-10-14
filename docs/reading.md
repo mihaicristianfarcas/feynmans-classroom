@@ -27,13 +27,18 @@ The reader puts the book on the right and a **margin** on the left, as in the nu
 select text and a dark menu offers **Highlight · Explain · Visualize · Ask · Define · + Note** (and,
 under ⋯, the passage or a reference to your note, resources, flashcards, teach it back, connect it to
 today, the tutor). Keys work too: <kbd>H</kbd> <kbd>E</kbd> <kbd>V</kbd> <kbd>A</kbd> <kbd>D</kbd>
-<kbd>N</kbd>. Each answer becomes a card at the height of its passage, which is underlined in the
-page. Cards are always shown whole (no folding, nothing scrolls inside a card) and never overlap:
-cards whose passages overlap (or share a paragraph of an EPUB) sit **side by side** in one row
-(wrapping onto another line when the panel is too narrow for them all), and rows make room for
-each other, as comments do in a shared document: the cards for the passage at the reading line sit
-right beside it (the ones before slide up out of the way as you read on), and a card you click (or
-whose marked passage you click) lines up exactly with its passage while that passage is on screen.
+<kbd>N</kbd>. The passage is swept with a highlighter as you ask, and each answer becomes a card at
+the height of its passage, which is underlined in the page. **One card is open at a time**: the one
+you just asked for, clicked, or opened from its passage, shown whole (nothing scrolls inside a card),
+its answer written in from the top as it lands and the words it bolds marked as the answer in brief.
+The others are closed to a line: what was asked and the gist of the answer (in a crowded stretch,
+just what was asked); click one, or Tab to it and press Enter, to open it, and Escape (or a click on
+the empty margin) closes it again. Cards never overlap: cards whose passages overlap (or share a
+paragraph of an EPUB) sit **side by side** in one row (the open one on a line of its own, the full
+width, with the others under it), and rows make room for each other, as comments do in a shared
+document: the cards for the passage at the reading line sit right beside it (the ones before slide
+up out of the way as you read on), and the open card lines up exactly with its passage while that
+passage is on screen.
 Scrolling over the margin scrolls the book; the cards follow their passages. On a narrow screen,
 where the margin sits under the book, it lists the cards for what's on screen, in order. A follow-up question on a card reads as a **conversation**, drawn like the
 tutor's: your question on the right, the answer under it, the field to ask the next one below.

@@ -508,6 +508,10 @@ async function readerStates(page: Page, bookRoute: string, theme: "light" | "dar
       !!(await page.$(present)) && (await axe(page)).length === 0,
       (await page.$(present)) ? describe(await axe(page)) : `${present} not found`,
     );
+  await ax("margin cards, closed to a line", ".mcard.closed");
+  // one card open: the explanation with its follow-up
+  await page.click(".mcard.closed[data-kind=explain]").catch(() => {});
+  await wait(600);
   await ax("margin cards", ".mcard.open .mcard-thread .msg");
   if (await page.$(".pdf-root")) {
     await page.keyboard.press("p");
