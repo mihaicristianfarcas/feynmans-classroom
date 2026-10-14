@@ -1,5 +1,5 @@
 /* Starts the server: prepares the vault, picks up work a restart interrupted, keeps the indexes fresh,
- * and serves the API (and, in production, the app) on 127.0.0.1:PORT. */
+ * and serves the API (and, in production, the app) on 127.0.0.1:PORT. A stop signal stops it. */
 import { serve } from "@hono/node-server";
 import { prepareAgents } from "./agents/index.ts";
 import { resumeAnnotations } from "./annotations/index.ts";
@@ -12,6 +12,10 @@ import { resumeFigures } from "./scene/figures.ts";
 import { initVault, onVaultChange } from "./vault/index.ts";
 import { startIndexing } from "./vault/indexes.ts";
 import { exportMissingBooks } from "./vault/library.ts";
+
+// a stop signal (Ctrl-C, a restart, a test that is done with it) ends the server, whoever else listens
+// for it: "exit" hooks then close headless Chrome and the model CLIs it started
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, () => process.exit(0));
 
 // files changing in the vault (from the app, an agent, Obsidian): pages showing them reload
 onVaultChange((path) => publish("global", { type: "vault", data: { path } }));
