@@ -1,6 +1,6 @@
 /* Setting the vault up on startup: its folders, the guide for agents (templates/AGENTS.md, imported
- * by CLAUDE.md), the managed block of its .gitignore (jj reads it too), the jj repository (adopting a
- * git history if there is one), and the first read of every document. */
+ * by CLAUDE.md), the managed block of its .gitignore (jj reads it too), the jj repository, and the
+ * first read of every document. */
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,18 +52,15 @@ function writeGitignore() {
 }
 
 let ready = false;
-/** Makes the vault a jj repository, colocated with git. A vault that was already a git repository keeps
- * its history (jj imports it); the branches agents used under git are dropped, as jj needs none. */
+/** Makes a new vault a jj repository (colocated with git, so git tools and Obsidian Git can read it). */
 function initRepository() {
   if (!hasJj || existsSync(join(VAULT, ".jj"))) return;
-  const hadGit = existsSync(join(VAULT, ".git"));
   const init = jj(["git", "init"]);
   if (!init.ok) {
     console.warn("[vault] could not start a jj repository:", init.stderr);
     return;
   }
-  if (hadGit) jj(["bookmark", "delete", "glob:agent/*"]);
-  changed(hadGit ? "vault moved to jj" : "vault created");
+  changed("vault created");
 }
 
 /** Prepares the vault on startup: folders, AGENTS.md, .gitignore, jj, the documents in memory, the watcher. */
