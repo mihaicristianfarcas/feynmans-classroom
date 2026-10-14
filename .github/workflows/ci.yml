@@ -1,5 +1,5 @@
 # Every pull request (and every change to main) must pass these checks before it can merge.
-# The ruleset in .github/rulesets/main.json requires the "CI passed" job.
+# The "Protect main" ruleset on GitHub requires the "CI passed" job.
 name: CI
 
 on:

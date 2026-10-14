@@ -42,8 +42,9 @@ Git hooks (installed by `npm install`, via husky) run the quick ones for you:
 - **commit-msg**: a subject line of at most 72 characters, a blank line before the body.
 - **pre-push**: no pushing to `main`; the unit tests pass.
 
-`main` only changes through pull requests that pass CI and have a maintainer's approval. The hooks
-catch it early on your machine; the repository's rules on GitHub enforce it for everyone.
+`main` only changes through pull requests that pass CI, and only a maintainer merges them, with
+rebase and merge so every commit is kept. The hooks catch it early on your machine; the repository's
+rules on GitHub enforce it for everyone.
 
 ## Making a change
 
