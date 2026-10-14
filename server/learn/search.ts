@@ -1,13 +1,13 @@
-/* Searching the whole vault from the ⌘K palette: concepts, notes, annotations, cards and the books'
- * text, ranked by simple term scores with the titles weighted up. */
+/* Searching the whole vault from the ⌘K palette: concepts, notes, annotations, sessions with the tutor,
+ * cards and the books' text, ranked by simple term scores with the titles weighted up. */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { listBooks } from "../books/store.ts";
-import { annotations, cards, concepts, notes, VAULT } from "../vault/index.ts";
+import { annotations, cards, concepts, notes, sessions, VAULT } from "../vault/index.ts";
 import { chapterFile } from "../vault/library.ts";
 
 export interface SearchHit {
-  kind: "note" | "concept" | "card" | "book" | "annotation";
+  kind: "note" | "concept" | "card" | "book" | "annotation" | "session";
   id: string;
   title: string;
   snippet: string;
@@ -80,6 +80,26 @@ export function search(q: string, limit = 40): SearchHit[] {
         score: s * 1.2,
         bookId: a.bookId,
         loc: a.anchor.page !== undefined ? { page: a.anchor.page } : { block: a.anchor.block },
+      });
+  }
+  for (const x of sessions.list()) {
+    const said = x.messages.map((m) => m.text).join(" ");
+    const s = scoreText(`${x.title} ${x.title} ${said}`, terms);
+    const where = x.passage?.source;
+    if (s)
+      hits.push({
+        kind: "session",
+        id: x.id,
+        title: `Tutor: ${x.title}`,
+        snippet: snippet(said, terms),
+        score: s * 1.1,
+        bookId: x.bookId,
+        loc:
+          where?.page !== undefined
+            ? { page: where.page }
+            : where?.block !== undefined
+              ? { block: where.block }
+              : undefined,
       });
   }
   for (const k of cards.list()) {

@@ -47,6 +47,58 @@ shading and crisp outlines, calm motion. The 3D renderer (`shared/scene/object3d
 mesh-to-SVG engine in that style. The reference figures in `shared/scene/examples.ts` (see them at `#/gallery`) are the
 quality bar and the few-shot examples the model sees.
 
+## Animations (ManimGX)
+
+When a moving picture explains it better than one you play with (a secant turning into a tangent,
+a proof by rearrangement, a sum building up), choose **Animation** under Visualize. A model writes a
+short film for [ManimGX](https://manimgx.academa.ai/) (Manim Community Edition's API on a Rust GPU
+core): a Python scene in 2 to 5 steps, written to the house guide (`server/manim/GUIDE.md`: one
+idea, few words on screen, the palette, the frame, what doesn't run here).
+
+```
+passage + your request + who you are
+        │   one structured call: title, caption, the scene's Python
+        ▼
+ tidied (server/manim/source.ts): the palette block in place, read for what can't work here
+        │
+        ▼
+ run in headless Chrome, in the same sandboxed page the reader uses (server/manim/check.ts):
+ it must finish without an error, and ManimGX's own layout checks (what `manimgx inspect` reports:
+ text cut off by the frame, texts over each other, lines through labels) look at each play's end
+        │   errors or layout problems? up to two repair turns with exactly what was reported
+        ▼
+ a ```manim block in the margin card, played in ManimGX's own player
+```
+
+The player is ManimGX's (`runtime/manim/`, from its npm package, MIT, adapted): Pyodide runs the
+scene in a Web Worker and the engine, compiled to WebAssembly, draws it with WebGPU (Chrome, Edge,
+Safari 26), with its own controls: play and pause, a scrubber, the timeline in the scene's plays,
+full screen, and keys (Space, ← →, `?`). It starts when you press play (each player runs its own
+Python). The scene states the classroom's palette at its top (`PAPER`, `INK`, `ACCENT`…) and the
+player swaps the values for your light or dark theme. Each animation keeps its code: copy it or
+download it, and `manimgx render scene.py` makes the video. If one ever stops with an error while it
+plays, **Fix it** has it written again with that error.
+
+Python and the packages come from the server's own mirror (`/api/manim/…`, `server/manim/mirror.ts`):
+Pyodide from jsDelivr and ManimGX with its few dependencies from PyPI, each file fetched once into
+`DATA_DIR/.cache/manimgx` (about 30 MB), so animations play offline afterwards. The scene runs in an
+iframe with an opaque origin and a policy that allows nothing but that mirror (see
+[SECURITY.md](../SECURITY.md)).
+
+``````markdown
+```manim
+import manimgx as m
+…
+class SecantToTangent(m.Scene):
+    def construct(self) -> None:
+        …
+```
+``````
+
+A ```` ```manim ```` block plays in any note too, so the agent can write animations into notes.
+
+## Qualities
+
 Two qualities per figure: **Quick** (the fast model; ~10–20 s) and **Careful** (your default model;
 about a minute). "Improve → Redraw" applies your notes to the current figure, keeping what works.
 For the rare figure the kinds can't express, **Hand-build** has Codex write a custom `demo.js` in

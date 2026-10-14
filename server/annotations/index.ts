@@ -14,7 +14,7 @@ import { chapterOf, completeAnchor } from "./anchor.ts";
 import { writeAnswer } from "./answers.ts";
 import { announce, forget, remember } from "./live.ts";
 
-export { figureBody, figureOf, followUp, redraw, resumeAnnotations } from "./answers.ts";
+export { animationOf, figureBody, figureOf, followUp, redraw, resumeAnnotations } from "./answers.ts";
 export { migrateHighlightNotes } from "./migrate.ts";
 
 export const KINDS: AnnotationKind[] = ["highlight", "explain", "define", "ask", "visualize", "resources", "comment"];
@@ -51,7 +51,8 @@ export interface NewAnnotation {
   color?: string;
   body?: string;
   quality?: "quick" | "careful";
-  /** For figures: plot, sequence, graph, diagram, object3d (default: the model picks). */
+  /** For figures: plot, sequence, graph, diagram, object3d (default: the model picks), or "animation"
+   * for an animation (a ManimGX scene) instead of a figure. */
   sceneKind?: string;
 }
 
@@ -75,6 +76,8 @@ export function createAnnotation(bookId: string, input: NewAnnotation): Annotati
     status: generated ? "pending" : "ready",
     body: input.body?.trim() || "",
     tags: [],
+    // an animation is a figure drawn by ManimGX: remembered, so a retry or a restart writes one again
+    ...(input.kind === "visualize" && input.sceneKind === "animation" ? { props: { engine: "manim" } } : {}),
     created: now(),
     updated: now(),
   };

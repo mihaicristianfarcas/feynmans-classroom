@@ -1,5 +1,5 @@
-/* The reading session's hooks: the note it writes into, remembering the place, and logging reading
- * time while the reader is actually reading. */
+/* The reading session's hooks: the note it writes into, remembering the place and the zoom, and
+ * logging reading time while the reader is actually reading. */
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { type Book, learn, type Note, type TocEntry } from "../api";
 import { savePos } from "./position";
@@ -77,4 +77,29 @@ export function useReadingTime(
       clearInterval(timer);
     };
   }, [book, lastScroll]);
+}
+
+/* ---------------- zoom ---------------- */
+
+const ZOOMS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+
+/** How big this book was last drawn ("fit": to the pane). */
+export function savedZoom(bookId: string): number | "fit" {
+  try {
+    const saved = localStorage.getItem(`classroom-zoom-${bookId}`);
+    return saved && Number.isFinite(Number(saved)) ? Number(saved) : "fit";
+  } catch {
+    return "fit";
+  }
+}
+export function saveZoom(bookId: string, zoom: number | "fit") {
+  try {
+    localStorage.setItem(`classroom-zoom-${bookId}`, String(zoom));
+  } catch {}
+}
+/** The next scale up or down from the one shown. */
+export function stepZoom(scale: number, direction: 1 | -1): number {
+  return direction > 0
+    ? (ZOOMS.find((z) => z > scale * 1.02) ?? ZOOMS[ZOOMS.length - 1])
+    : ([...ZOOMS].reverse().find((z) => z < scale * 0.98) ?? ZOOMS[0]);
 }

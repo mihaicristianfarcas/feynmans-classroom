@@ -23,32 +23,40 @@ server/            the API and everything behind it (Node, TypeScript, run with 
   config.ts        paths, ports and tuning from the environment; settings.ts: the learner's settings
   routes/          one file per API area (books, demos, annotations, notes, cards, study, brain, agents…)
   vault/           the vault as files: collections, file formats, history (jj), logs, watching, indexes, links
-  books/           the book store, types, finding quotes (locate.ts), figure placement and numbers
+  books/           the book store, types, finding quotes (locate.ts), find in a book (find.ts), figure
+                   placement and numbers
   ingest/          reading uploaded books: PDF, EPUB, Markdown, text, chapter detection
   annotations/     the margin: anchors, files, model-written answers, live updates, sending to notes
-  learn/           notes, concepts, cards (FSRS-6), study tools, connections, search, graph, journey
+  learn/           notes, concepts, cards (FSRS-6), study tools, the tutor's sessions, connections,
+                   search, graph, journey
   scene/           drawing figures with a model (one structured call → a validated scene spec)
+  manim/           animations (ManimGX): the guide, writing and checking a scene in headless Chrome,
+                   the sandboxed page it plays in, the local mirror of Pyodide and PyPI it runs on
   handbuilt/       hand-built demos: Codex writes demo.js in a sandboxed workspace, checked in Chrome
   llm/             the one door to models: structured(), text(), agent(); Codex and Claude drivers, sandboxes
   agents/          the agent: where the learner is, the prompt, its jj workspace, checks, landing, undo
 shared/            code the server and the browser both run
   scene/           the figure engine: spec types, the expression language, five renderers, validation
-  fsrs.ts links.ts textmatch.ts vault-types.ts
+  fsrs.ts links.ts textmatch.ts thread.ts chapters.ts vault-types.ts
 web/src/           the React app (Vite)
-  app/             the shell (a slim bar along the top): routing, navigation, theme, the ⌘K palette
+  app/             the shell (a slim bar along the top): routing (each page its own chunk, loaded on
+                   first visit), navigation, theme, the ⌘K palette, what a page shows when it fails
   agent/           the agent's panel (⌘J), its button, the runs it shows, where the learner is
   pages/           Today, Library (and Figures), Review, Journey, Settings, Welcome, Gallery;
                    brain/: the graph that fills the page, the card beside it, its legend, a concept's page
-  reader/          the reader: book views, margin, selection menu, figures pane, note, tutor, capture, gutter
+  reader/          the reader: book views (zoom, links), margin, selection menu, find bar, the figures
+                   index and a figure opened large, note, tutor (with its sessions), capture, gutter
   notes/           notes: the file tree (with folders), the note pane, its versions and links sidebar, the editor
   components/      shared pieces: Markdown, dialogs and study tools, quiz, graph, side panels' edges and
                    buttons, profile form
-  scene/           the figure player (the universal frame around every figure)
+  scene/           the figure player (the universal frame around every figure), and figure stills
+  manim/           an animation in the app: ManimGX's player in its sandboxed frame
   api/             typed calls to the server, and the live book hook
   lib/             small helpers: accessibility (focus traps, arrow keys, announcements), loading, time,
                    side panels' widths
   styles/          the design system and page styles
-runtime/           the runtime hand-built demos run on, in a sandboxed iframe
+runtime/           the runtime hand-built demos run on, in a sandboxed iframe; runtime/manim: ManimGX's
+                   browser player (MIT, adapted), bundled into the page animations play in
 vendor/anatomy/    the anatomy skill (MIT): the drawing kit hand-built demos use
 tests/             unit tests (vitest); tests/browser/: end-to-end, accessibility and screenshot scripts
 scripts/           dev server, kit bundling, skill sync, branch protection, figure experiments
@@ -70,7 +78,7 @@ progress is named as you work and closed when a sitting ends (see [vault.md](vau
 The agent (⌘J) can work on several requests at once: each works in a jj workspace of the vault and
 lands as one change after whatever happened meanwhile (see [agents.md](agents.md)).
 
-Slow work (planning a chapter, drawing figures, building demos) runs in `jobs.ts`, reporting progress
+Slow work (finding chapters, drawing figures, building demos, writing animations) runs in `jobs.ts`, reporting progress
 on the book's event stream, and resumes after a restart.
 
 ## Security model

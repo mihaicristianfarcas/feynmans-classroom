@@ -1,7 +1,8 @@
 /* The API for books and their figures, and the reading-order helpers the reader uses to number
  * figures the same way the server does. */
+import { figurePrefix } from "../../../shared/chapters.ts";
 import { call, post } from "./client";
-import type { Block, Book, Demo, Job, Loc, Status } from "./types";
+import type { Block, Book, Demo, FindHit, Job, Loc, Status } from "./types";
 
 export const api = {
   status: () => call<Status>("/api/status"),
@@ -16,8 +17,6 @@ export const api = {
     return call<Book>("/api/books", { method: "POST", body: form });
   },
   deleteBook: (id: string) => call(`/api/books/${id}`, { method: "DELETE" }),
-  generate: (id: string, chapterId: string, count?: number, mode: "scene" | "code" = "scene") =>
-    post<Job>(`/api/books/${id}/chapters/${chapterId}/generate`, { count, mode }),
   detectChapters: (id: string) => post<Job>(`/api/books/${id}/detect-chapters`),
   visualize: (
     id: string,
@@ -36,6 +35,8 @@ export const api = {
   craft: (id: string, demoId: string, feedback?: string) =>
     post<Job>(`/api/books/${id}/demos/${demoId}/craft`, { feedback }),
   deleteDemo: (id: string, demoId: string) => call(`/api/books/${id}/demos/${demoId}`, { method: "DELETE" }),
+  /** Every place a phrase occurs in the book. */
+  find: (id: string, q: string) => call<FindHit[]>(`/api/books/${id}/find?q=${encodeURIComponent(q)}`),
   fileUrl: (id: string) => `/api/books/${id}/file`,
   pageUrl: (id: string, demoId: string, theme: string, version: string, predict = true) =>
     `/api/books/${id}/demos/${demoId}/page?theme=${theme}&v=${encodeURIComponent(version)}${predict ? "" : "&predict=0"}`,
@@ -61,7 +62,7 @@ export function withFigs(book: Book, demos: Demo[]): Demo[] {
   for (const [chapterId, list] of groups) {
     const index = book.toc.findIndex((entry) => entry.id === chapterId);
     list.sort((a, b) => posOf(a.anchor) - posOf(b.anchor) || a.createdAt.localeCompare(b.createdAt));
-    for (const [i, demo] of list.entries()) demo.fig = `Fig ${index + 1}.${i + 1}`;
+    for (const [i, demo] of list.entries()) demo.fig = `Fig ${figurePrefix(book.toc, index)}.${i + 1}`;
   }
   return out.sort((a, b) => posOf(a.anchor) - posOf(b.anchor) || a.createdAt.localeCompare(b.createdAt));
 }

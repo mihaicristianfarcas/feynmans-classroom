@@ -51,13 +51,6 @@ export const CLAUDE = {
   bin: process.env.CLAUDE_BIN || "claude",
 };
 
-export const GENERATION = {
-  minDemos: num(process.env.DEMOS_MIN, 2),
-  maxDemos: num(process.env.DEMOS_MAX, 5),
-  /** Characters of chapter text sent to the planner. */
-  maxChapterChars: num(process.env.PLAN_MAX_CHARS, 60000),
-};
-
 export function chromePath(): string | null {
   const candidates = [
     process.env.CHROME_PATH,

@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { findInBook } from "../books/find.ts";
 import { bookDir, bookFolder, deleteBook, getBlocks, getBook, listBooks, listDemos } from "../books/store.ts";
 import { safeJoin } from "../fs.ts";
 import { CONTENT_ONLY, eventStream, readBody, sendFile } from "../http.ts";
@@ -86,6 +87,8 @@ export function bookRoutes(app: Hono) {
   });
 
   app.get("/api/books/:id/blocks", (c) => c.json(getBlocks(c.req.param("id"))));
+  /** Every place a phrase occurs in the book, for the reader's find bar. */
+  app.get("/api/books/:id/find", (c) => c.json(findInBook(c.req.param("id"), c.req.query("q") || "")));
 
   /** Pictures inside a reflowable book. */
   app.get("/api/books/:id/assets/*", (c) => {

@@ -105,7 +105,8 @@ export function useArrowKeys(
             el === document.activeElement ||
             el.getAttribute("aria-selected") === "true" ||
             el.getAttribute("aria-checked") === "true" ||
-            el.getAttribute("aria-pressed") === "true",
+            el.getAttribute("aria-pressed") === "true" ||
+            el.getAttribute("aria-current") === "true",
         ),
       );
     const rove = () => {
@@ -121,7 +122,7 @@ export function useArrowKeys(
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ["aria-selected", "aria-pressed", "aria-checked"],
+      attributeFilter: ["aria-selected", "aria-pressed", "aria-checked", "aria-current"],
     });
     const next =
       orientation === "horizontal"

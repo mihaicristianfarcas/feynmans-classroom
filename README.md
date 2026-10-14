@@ -7,15 +7,20 @@ does its thinking on **your own Codex or Claude Code subscription** (no API keys
 
 - **Read with a living margin.** Upload a PDF, EPUB, Markdown or text book. Select any passage and
   choose Explain, Define, Ask or Visualize: the answer appears in the margin **beside the passage**
-  (an explanation in about 8 seconds, a figure in 15–30), with a line to it, and you can ask
-  follow-ups there. Figures are interactive: a graph you can drag, a protocol you can scrub, a
-  network with packets flowing, a 2D physics sketch, a 3D object you can turn and take apart.
+  (an explanation in about 8 seconds, a figure in 15–30), whole, side by side with others on the same
+  passage, and you can ask follow-ups there as a conversation. Figures are interactive: a graph you
+  can drag, a protocol you can scrub, a network with packets flowing, a 2D physics sketch, a 3D object
+  you can turn and take apart. Or ask for an **animation**: a short film written for
+  [ManimGX](https://manimgx.academa.ai/) (3Blue1Brown's Manim, on a GPU engine), checked before you
+  see it, and played step by step right in the margin. Find anything in the book (⌘F), zoom, jump to a
+  page, follow the PDF's own links, and see every figure of a section, chapter or book in one index.
 - **Notes like Obsidian.** Write while you read; send passages, answers, figures and captured
   formulas or pictures to a note in one keystroke. Notes are Markdown files named by their title,
   with `[[links]]`, embeds, backlinks and unlinked mentions, edited in CodeMirror with a live preview.
 - **Learn it for good.** Flashcards scheduled with FSRS-6, pretests before a chapter and quizzes
-  after, the Feynman technique (explain it, get your gaps back), a Socratic tutor, and connections
-  from the idea to today's world and to your own goals.
+  after, the Feynman technique (explain it, get your gaps back), a Socratic tutor whose sessions are
+  kept with the book to look back on (and turned into a note or cards), and connections from the idea to today's world and to your own
+  goals.
 - **A second brain.** Books, annotations, notes, concepts, cards and figures live in one folder of
   plain files (a valid Obsidian vault), versioned by Jujutsu (jj), with indexes kept for people and
   agents. Organise it in folders by subject, book or topic, link notes to what they're about, and
@@ -52,7 +57,7 @@ hand-built demos and the screenshot tests.
 |---|---|
 | [The study tools](docs/learning.md) | what each tool does, and the learning research behind it |
 | [Reading with a margin](docs/reading.md) | the margin, anchoring passages, notes like Obsidian |
-| [Figures](docs/figures.md) | declarative scene specs, the five kinds, hand-built demos |
+| [Figures](docs/figures.md) | declarative scene specs, the five kinds, animations (ManimGX), hand-built demos |
 | [The vault](docs/vault.md) | plain files, indexes for agents, versioning |
 | [Models and agents](docs/agents.md) | Codex and Claude Code, the sandbox and the guardrails |
 | [Design](docs/design.md) | the look, motion, and accessibility rules |

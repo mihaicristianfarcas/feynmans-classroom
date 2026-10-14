@@ -1,8 +1,9 @@
 /* Where the reader is in a book: the reading line, positions (page + fraction for a PDF, block +
- * fraction otherwise), the chapter and figure at a position, and the saved place per book. */
-import { type Anchor, type Book, type Demo, type Loc, posOf, type SourceRef, type TocEntry } from "../api";
+ * fraction otherwise), the chapter at a position, and the saved place per book. */
+import { type Anchor, type Book, type Loc, posOf, type SourceRef, type TocEntry } from "../api";
 
-/** The reading line sits this far down the book pane; the demo whose anchor it last passed is active. */
+/** The reading line sits this far down the book pane: where you are reading (and the margin's cards for
+ * the passage there sit beside it). */
 export const LINE = 0.36;
 
 /** Where to open a book: `?at=` in the link, else where it was left (null for the start). */
@@ -36,20 +37,6 @@ export const locOfAnchor = (a: Anchor): Loc =>
 /** The chapter a position falls in (the first one before the book's first chapter starts). */
 export const chapterAt = (book: Book, pos: number): TocEntry | null =>
   [...book.toc].reverse().find((entry) => posOf(entry.start) <= pos + 1e-6) || book.toc[0] || null;
-
-/** The figure the reading line belongs to: the last one it has passed within the chapter, or the
- * chapter's first figure when that is just ahead. */
-export function activeDemo(demos: Demo[], pos: number, chapter: TocEntry | null, chapterDemos: Demo[]): Demo | null {
-  let found: Demo | null = null;
-  for (const demo of demos) {
-    if (posOf(demo.anchor) <= pos + 0.02) found = demo;
-  }
-  const first = chapterDemos[0];
-  const firstIsNear = !!first && posOf(first.anchor) - pos < 0.35;
-  if (found && chapter && found.chapterId !== chapter.id) return firstIsNear ? first : null;
-  if (!found && firstIsNear) return first;
-  return found;
-}
 
 /** A passage of the book as a vault source reference (for cards, notes and the tutor). */
 export function sourceRef(

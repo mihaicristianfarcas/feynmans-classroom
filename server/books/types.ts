@@ -69,7 +69,7 @@ export interface Predict {
   explain: string;
 }
 
-/** What the planner decides a visualization should be. */
+/** What a figure should be: its idea, picture, motion and controls, and the passage it belongs to. */
 export interface Brief {
   slug: string;
   eyebrow: string;

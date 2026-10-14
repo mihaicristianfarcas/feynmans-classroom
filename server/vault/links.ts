@@ -11,9 +11,9 @@ import type { Annotation, Concept, Note } from "../../shared/vault-types.ts";
 import { bookFolder, listBooks } from "../books/store.ts";
 import type { Book } from "../books/types.ts";
 import { listConnections } from "./connections.ts";
-import { annotations, changed, concepts, figures, notes, onVaultChange, VAULT } from "./index.ts";
+import { annotations, changed, concepts, figures, notes, onVaultChange, sessions, VAULT } from "./index.ts";
 
-export type NodeKind = "note" | "concept" | "book" | "annotation" | "figure" | "attachment";
+export type NodeKind = "note" | "concept" | "book" | "annotation" | "figure" | "attachment" | "session";
 export interface Resolved {
   /** Graph node id: "note:<id>", "concept:<id>", "book:<id>", "annotation:<id>", "figure:<id>". */
   node: string;
@@ -152,6 +152,19 @@ export function resolveLink(target: string, sub?: string): Resolved | null {
       ? { node: `attachment:${path}`, kind: "attachment", id: path, path, title: basename(path) }
       : null;
   }
+  // a session with the tutor: the book, with that conversation in its Tutor pane
+  const session = /^library\/[^/]+\/sessions\/.+/.test(t)
+    ? sessions.byPath(t.endsWith(".md") ? t : `${t}.md`)
+    : undefined;
+  if (session)
+    return {
+      node: `session:${session.id}`,
+      kind: "session",
+      id: session.id,
+      path: session.path,
+      title: session.title,
+      bookId: session.bookId,
+    };
   names ||= buildNames();
   let found = names.byKey.get(linkKey(t))?.[0];
   // a file inside a book's folder (its text by chapter, its PDF): the book, at that chapter's first page
@@ -275,6 +288,20 @@ export function allEdges(): Edge[] {
     if (a.bookId)
       edges.push({ from, fromPath: a.path, to: `book:${a.bookId}`, target: a.bookId, kind: "source", line: 1 });
   }
+  // a tutoring session links to the note written from it (in its frontmatter)
+  for (const x of sessions.list()) {
+    const note = x.note && notes.get(x.note.id);
+    if (note)
+      edges.push({
+        from: `session:${x.id}`,
+        fromPath: x.path,
+        to: `note:${note.id}`,
+        toPath: note.path,
+        target: x.note!.title,
+        kind: "related",
+        line: 1,
+      });
+  }
   const seen = new Set<string>();
   edgesCache = edges.filter((e) => {
     const key = `${e.from}|${e.to ?? `?${e.target}`}|${e.kind}|${e.line}`;
@@ -334,6 +361,11 @@ export function titleOf(node: string, path?: string): string {
     return a ? annotationNode(a).title : id;
   }
   if (kind === "book") return listBooks().find((b) => b.id === id)?.title || id;
+  if (kind === "session") {
+    const x = sessions.get(id);
+    return x ? `Tutor: ${x.title}` : id;
+  }
+  if (kind === "figure") return figures.get(id)?.title || id;
   return id;
 }
 
@@ -391,6 +423,14 @@ export function carryLinks(oldKeys: string[], next: { name: string; path: string
     const body = rewriteLinks(a.body, rename);
     if (body !== a.body) {
       annotations.save({ ...a, body });
+      count++;
+    }
+  }
+  // a tutoring session names the note made from it
+  for (const x of sessions.list()) {
+    const title = x.note && rename(x.note.title);
+    if (x.note && title) {
+      sessions.save({ ...x, note: { ...x.note, title } });
       count++;
     }
   }

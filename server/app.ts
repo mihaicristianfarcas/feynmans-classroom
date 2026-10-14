@@ -17,6 +17,7 @@ import { cardRoutes } from "./routes/cards.ts";
 import { conceptRoutes } from "./routes/concepts.ts";
 import { demoRoutes } from "./routes/demos.ts";
 import { figureRoutes } from "./routes/figures.ts";
+import { manimRoutes } from "./routes/manim.ts";
 import { noteRoutes } from "./routes/notes.ts";
 import { settingsRoutes } from "./routes/settings.ts";
 import { studyRoutes } from "./routes/study.ts";
@@ -40,6 +41,7 @@ export function createApp() {
   cardRoutes(app);
   studyRoutes(app);
   figureRoutes(app);
+  manimRoutes(app);
   brainRoutes(app);
   agentRoutes(app);
 

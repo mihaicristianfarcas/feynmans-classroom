@@ -1,5 +1,5 @@
 /* Small status pieces used across pages: a spinner that says what it's waiting for (and for how long),
- * and a concept's mastery as a bar. */
+ * a page whose code is still loading, and a concept's mastery as a bar. */
 import { useEffect, useState } from "react";
 
 /** Something is being worked on: an announced status with a label and, given `since`, the seconds so far. */
@@ -17,6 +17,20 @@ export function Spinner({ label, since }: { label: string; since?: number }) {
       {since ? <span className="muted"> · {Math.round((Date.now() - since) / 1000)}s</span> : null}
     </span>
   );
+}
+
+/** A page whose code is on its way: nothing for a moment (it's usually quicker), then a spinner. */
+export function Loading({ label = "Loading" }: { label?: string }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setShown(true), 300);
+    return () => clearTimeout(t);
+  }, []);
+  return shown ? (
+    <div className="center-note">
+      <Spinner label={label} />
+    </div>
+  ) : null;
 }
 
 /** Mastery as a small bar (null: not studied yet). */

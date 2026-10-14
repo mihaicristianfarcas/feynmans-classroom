@@ -169,7 +169,9 @@ export function blockAnchor(selection: Selection): Anchor | null {
 
 /* ---------------- back from an anchor ---------------- */
 
-const found = new Map<string, Rect[] | null>();
+/** Boxes found for quote-only anchors, with the length of the page text they were found in (a text
+ * layer still rendering is searched again once it has more). */
+const found = new Map<string, { rects: Rect[] | null; length: number }>();
 
 /**
  * Boxes for an anchor on its (rendered) PDF page: the saved ones, or, for an anchor with only a quote
@@ -177,10 +179,11 @@ const found = new Map<string, Rect[] | null>();
  */
 export function pdfRects(anchor: Anchor, key: string, page: PageEl | undefined): Rect[] | null {
   if (anchor.rects?.length) return anchor.rects;
-  if (found.has(key)) return found.get(key)!;
   const layer = page?.el.querySelector<HTMLElement>(".textLayer");
-  if (!page || !layer?.childNodes.length) return null;
+  if (!page || !layer?.childNodes.length) return found.get(key)?.rects ?? null;
   const text = textOf(layer);
+  const known = found.get(key);
+  if (known && (known.rects || known.length === text.length)) return known.rects;
   const m = findQuote(text, anchor.quote, { prefix: anchor.prefix, suffix: anchor.suffix, hint: anchor.start });
   let rects: Rect[] | null = null;
   if (m && m.score > 0.7) {
@@ -193,7 +196,7 @@ export function pdfRects(anchor: Anchor, key: string, page: PageEl | undefined):
       rects = rectsOf(range, [page], page.page);
     }
   }
-  found.set(key, rects);
+  found.set(key, { rects, length: text.length });
   return rects;
 }
 

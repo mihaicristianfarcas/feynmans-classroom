@@ -1,4 +1,4 @@
-/* ⌘K (Ctrl K): search everything (concepts, notes, annotations, cards, the books' text) and jump to
+/* ⌘K (Ctrl K): search everything (concepts, notes, annotations, tutor sessions, cards, the books' text) and jump to
  * it; with no match, Enter hands the words to the agent instead. A combobox: type to search, arrow keys move
  * through the results, Enter opens one, Escape closes and gives focus back. */
 import { CornerDownLeft, Search } from "lucide-react";
@@ -15,6 +15,7 @@ const KIND_TONE: Record<string, string> = {
   card: "butter",
   book: "peach",
   passage: "peach",
+  session: "rose",
 };
 
 export function Palette() {
@@ -59,8 +60,10 @@ export function Palette() {
     } else if (h.kind === "concept") go(`#/brain/concept/${h.id}`);
     else if (h.kind === "note") go(`#/notes/${h.id}`);
     else if (h.kind === "card") go("#/brain/concepts");
-    else if (h.kind === "annotation") go(`${bookLink({ bookId: h.bookId, ...(h.loc || {}) })}&focus=${h.id}`);
-    else go(bookLink({ bookId: h.bookId, ...(h.loc || {}) }));
+    else if (h.kind === "annotation" || h.kind === "session") {
+      const link = bookLink({ bookId: h.bookId, ...(h.loc || {}) });
+      go(`${link}${link.includes("?") ? "&" : "?"}${h.kind === "session" ? "session" : "focus"}=${h.id}`);
+    } else go(bookLink({ bookId: h.bookId, ...(h.loc || {}) }));
     setOpen(false);
     setQ("");
   };

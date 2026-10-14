@@ -1,5 +1,5 @@
-/* Routes for the figures in a book: listing them with their Fig numbers, drawing them for a chapter
- * or a selected passage, redrawing, hand-building with Codex, and serving hand-built demo pages
+/* Routes for the figures in a book: listing them with their Fig numbers, drawing one for a selected
+ * passage, redrawing, hand-building with Codex, and serving hand-built demo pages
  * (sandboxed: scripts run, nothing else loads). Also the runtime's reference demos and, in
  * development, figures made by scripts/try-scene.ts. */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -10,10 +10,10 @@ import { figOf, withFigs } from "../books/placement.ts";
 import { deleteDemo, demoDir, demoSource, getBook, getDemo, listDemos } from "../books/store.ts";
 import { DATA_DIR, PROD, RUNTIME_DIR } from "../config.ts";
 import { publish } from "../events.ts";
-import { craftFromFigure, generateChapter, regenerate } from "../handbuilt/index.ts";
+import { craftFromFigure, regenerate } from "../handbuilt/index.ts";
 import { readBody, sendFile } from "../http.ts";
 import { queue } from "../jobs.ts";
-import { figureFromSelection, figuresForChapter, regenerateFigure } from "../scene/figures.ts";
+import { figureFromSelection, regenerateFigure } from "../scene/figures.ts";
 
 /** Hand-built demo pages may run their own inline script and nothing else: no network, no other origin. */
 const PAGE_CSP =
@@ -25,17 +25,6 @@ export function demoRoutes(app: Hono) {
     return book ? c.json(withFigs(book, listDemos(book.id))) : c.json([]);
   });
   app.get("/api/books/:id/jobs", (c) => c.json(queue.list(c.req.param("id"))));
-
-  /** Figures for a chapter: scene figures by default (seconds each), hand-built demos on request (minutes, Codex only). */
-  app.post("/api/books/:id/chapters/:chapterId/generate", async (c) => {
-    const body = await readBody<{ count?: number; mode?: "scene" | "code" }>(c);
-    const { id, chapterId } = c.req.param();
-    const job =
-      body.mode === "code"
-        ? generateChapter(id, chapterId, { count: body.count })
-        : figuresForChapter(id, chapterId, { count: body.count });
-    return c.json(job);
-  });
 
   /** A figure of a selected passage. */
   app.post("/api/books/:id/visualize", async (c) => {

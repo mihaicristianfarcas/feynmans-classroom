@@ -47,6 +47,17 @@
       "linter": { "rules": { "suspicious": { "noFocusedTests": "off" } } }
     },
     {
+      // ManimGX's browser player (MIT), adapted but kept close to upstream so its updates merge
+      "includes": ["runtime/manim/player.ts"],
+      "linter": {
+        "rules": {
+          "correctness": { "noVoidTypeReturn": "off" },
+          "suspicious": { "noAssignInExpressions": "off", "noImplicitAnyLet": "off", "noConfusingVoidType": "off" },
+          "style": { "useTemplate": "off" }
+        }
+      }
+    },
+    {
       // stylesheets are ordered by component, not by specificity
       "includes": ["**/*.css"],
       "linter": { "rules": { "style": { "noDescendingSpecificity": "off" } } }

@@ -1,6 +1,6 @@
-/* Study tools that open from a passage, a concept or a note: make cards, explain it back, connect
- * it to the world, draw a figure. Each one saves into the vault. */
-import { Shapes, X } from "lucide-react";
+/* Study tools that open from a passage, a concept, a note or a conversation: make cards, explain it
+ * back, connect it to the world, draw a figure. Each one saves into the vault. */
+import { Clapperboard, Shapes, X } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -78,11 +78,19 @@ export function CardDrafter({
   passage,
   source,
   deck,
+  title = "Flashcards from this passage",
+  focus,
+  quote = true,
   onClose,
 }: {
+  /** What the cards are made from: a passage (shown at the top), or a conversation (`quote` false). */
   passage: string;
   source?: SourceRef;
   deck?: string;
+  title?: string;
+  /** What to make cards on, when it isn't simply the passage. */
+  focus?: string;
+  quote?: boolean;
   onClose: () => void;
 }) {
   const [drafts, setDrafts] = useState<(DraftCard & { keep: boolean })[] | null>(null);
@@ -92,19 +100,19 @@ export function CardDrafter({
   const [saved, setSaved] = useState(0);
   const [started] = useState(Date.now());
   useEffect(() => {
-    learn.draftCards({ passage, source }).then(
+    learn.draftCards({ passage, source, focus }).then(
       (r) => {
         setDrafts(r.cards.map((c) => ({ ...c, keep: true })));
         setConcepts(r.concepts);
       },
       (e) => setError(e.message),
     );
-  }, [passage, source]);
+  }, [passage, source, focus]);
   const edit = (i: number, patch: Partial<DraftCard & { keep: boolean }>) =>
     setDrafts((list) => list!.map((d, k) => (k === i ? { ...d, ...patch } : d)));
   return (
-    <Modal title="Flashcards from this passage" eyebrow="Retrieval practice" onClose={onClose} wide>
-      <Passage text={passage} />
+    <Modal title={title} eyebrow="Retrieval practice" onClose={onClose} wide>
+      {quote && <Passage text={passage} />}
       {error && <p className="form-error">{error}</p>}
       {!drafts && !error && <Spinner label="Writing cards" since={started} />}
       {saved > 0 ? (
@@ -408,17 +416,21 @@ export const KIND_CHOICES = [
   { id: "object3d", label: "3D object" },
 ];
 
-/** What to draw: an optional request in the reader's words, a kind, quick or careful. */
+/** What to draw: an optional request in the reader's words, a kind (or, where it can be kept, an
+ * animation), quick or careful. */
 export function FigureRequest({
   onSubmit,
   busy,
   autoFocus = true,
   compact,
+  animation,
 }: {
   onSubmit: (r: { request: string; kind: string; quality: "quick" | "careful" }) => void;
   busy?: boolean;
   autoFocus?: boolean;
   compact?: boolean;
+  /** Offer an animation (a ManimGX film) besides the figure kinds. */
+  animation?: boolean;
 }) {
   const [request, setRequest] = useState("");
   const [kind, setKind] = useState("auto");
@@ -436,7 +448,11 @@ export function FigureRequest({
         autoFocus={autoFocus}
         value={request}
         onChange={(e) => setRequest(e.target.value)}
-        placeholder="What should it show? (optional: e.g. “what happens if a message is lost”)"
+        placeholder={
+          kind === "animation"
+            ? "What should it show? (optional: e.g. “the secant turning into the tangent”)"
+            : "What should it show? (optional: e.g. “what happens if a message is lost”)"
+        }
         aria-label="What should the figure show?"
       />
       <fieldset className="chips">
@@ -446,6 +462,18 @@ export function FigureRequest({
             {k.label}
           </button>
         ))}
+        {animation && (
+          <button
+            type="button"
+            className="chip"
+            aria-pressed={kind === "animation"}
+            onClick={() => setKind("animation")}
+            title="A short film made with ManimGX: it plays step by step, like a lecture's animation"
+          >
+            <Clapperboard aria-hidden="true" />
+            Animation
+          </button>
+        )}
       </fieldset>
       <div className="figure-request-row">
         <label className="check" title="Careful uses the stronger model: slower, more thorough">
@@ -457,8 +485,8 @@ export function FigureRequest({
           Careful
         </label>
         <button className="button primary" type="submit" disabled={busy}>
-          <Shapes aria-hidden="true" />
-          Draw it
+          {kind === "animation" ? <Clapperboard aria-hidden="true" /> : <Shapes aria-hidden="true" />}
+          {kind === "animation" ? "Animate it" : "Draw it"}
         </button>
       </div>
     </form>

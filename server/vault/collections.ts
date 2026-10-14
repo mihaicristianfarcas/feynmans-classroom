@@ -1,7 +1,7 @@
 /* The vault's collections, one per kind of record, and where each one keeps its files. */
 import { basename } from "node:path";
 import { fileNameOf } from "../../shared/links.ts";
-import type { Annotation, Card, Concept, Note, SavedFigure } from "../../shared/vault-types.ts";
+import type { Annotation, Card, Concept, Note, SavedFigure, TutorSession } from "../../shared/vault-types.ts";
 import { Collection, isGenerated } from "./collection.ts";
 import { slugify } from "./files.ts";
 import {
@@ -14,6 +14,8 @@ import {
   conceptToFile,
   noteFromFile,
   noteToFile,
+  sessionFromFile,
+  sessionToFile,
 } from "./formats.ts";
 
 export const notes = new Collection<Note>({
@@ -62,5 +64,25 @@ export const annotations = new Collection<Annotation>({
     return `library/${folder}/annotations/${where}-${x.kind}-${words}-${x.id.slice(-4)}`;
   },
 });
+/** Conversations with the tutor about a book, to look back on: library/<book>/sessions/<date> <title>.md */
+export const sessions = new Collection<TutorSession>({
+  root: "library",
+  ext: ".md",
+  recursive: true,
+  match: (rel) => /^library\/[^/]+\/sessions\/[^/]+\.md$/.test(rel),
+  read: sessionFromFile,
+  write: sessionToFile,
+  place: (x) => {
+    const folder = annotationBookInfo(x.bookId).folder || "unsorted";
+    return `library/${folder}/sessions/${x.created.slice(0, 10)} ${fileNameOf(x.title).slice(0, 60).trim() || "session"}`;
+  },
+});
 /** Every collection, for scans and for routing a changed file to its owner. */
-export const COLLECTIONS: Collection<{ id: string }>[] = [notes, concepts, cards, figures, annotations] as never;
+export const COLLECTIONS: Collection<{ id: string }>[] = [
+  notes,
+  concepts,
+  cards,
+  figures,
+  annotations,
+  sessions,
+] as never;

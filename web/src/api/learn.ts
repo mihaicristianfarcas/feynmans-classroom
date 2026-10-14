@@ -1,6 +1,6 @@
 /* The API for everything else the learner does: profile and settings, notes, annotations, concepts,
  * cards and review, the study tools, figures, links, search, the journey, and agents. */
-import { call, del, post, put } from "./client";
+import { call, del, patch, post, put } from "./client";
 import type {
   AgentContext,
   AgentRun,
@@ -26,6 +26,7 @@ import type {
   SourceRef,
   SuggestedLink,
   Today,
+  TutorSession,
 } from "./types";
 
 /** A saved version of the vault, or of one file in it (jj's change and commit ids). */
@@ -192,12 +193,20 @@ export const learn = {
   }) => post<Note>("/api/explain/save", input),
   connect: (input: { passage: string; source?: SourceRef; question?: string }) =>
     post<IdeaConnection[]>("/api/connect", input),
+  /** The tutor's reply; the conversation is saved as a session of the book (`sessionId` carries one on). */
   tutor: (input: {
     messages: { role: "user" | "tutor"; text: string }[];
     passage?: string;
     source?: SourceRef;
     mode?: "answer" | "socratic";
-  }) => post<{ reply: string }>("/api/tutor", input),
+    sessionId?: string;
+  }) => post<{ reply: string; session: TutorSession | null }>("/api/tutor", input),
+  sessions: (bookId: string) => call<TutorSession[]>(`/api/books/${bookId}/sessions`),
+  session: (id: string) => call<TutorSession>(`/api/sessions/${id}`),
+  renameSession: (id: string, title: string) => patch<TutorSession>(`/api/sessions/${id}`, { title }),
+  deleteSession: (id: string) => del(`/api/sessions/${id}`),
+  /** Writes a session up as a note of the learner's own (a model call, ~15 s). */
+  sessionNote: (id: string) => post<{ note: Note; session: TutorSession }>(`/api/sessions/${id}/note`),
   figures: () => call<SavedFigure[]>("/api/figures"),
   figure: (id: string) => call<SavedFigure>(`/api/figures/${id}`),
   makeFigure: (input: {

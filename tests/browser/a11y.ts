@@ -1,5 +1,6 @@
 // Accessibility checks of the running app: axe-core's WCAG 2.2 A and AA rules on every page, in both
-// themes, and the keyboard essentials (a skip link, focus that can always be seen, the ⌘K palette and
+// themes (and the reader's states: its margin cards, the find bar, the figures and an animation, the
+// tutor's sessions), and the keyboard essentials (a skip link, focus that can always be seen, the ⌘K palette and
 // dialogs that keep focus and close with Escape, side panels resized and closed from their edge, the
 // reader usable without a mouse).
 //   npm run test:a11y                  checks APP_URL (default http://localhost:5173/, so npm run dev)
@@ -7,12 +8,13 @@
 //                                      seeded with a small book, and checks that (what CI does)
 //   add --only <route-substring> to check fewer pages, --verbose to list every node that fails
 import { type ChildProcess, spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import puppeteer, { type Page } from "puppeteer-core";
 import { chromePath } from "../../server/config.ts";
+import { EXAMPLES } from "../../shared/scene/examples.ts";
 
 const require = createRequire(import.meta.url);
 const AXE = require.resolve("axe-core/axe.min.js");
@@ -73,6 +75,7 @@ async function serve() {
     "calculus.md",
   );
   await fetch(`${BASE}api/books`, { method: "POST", body: book });
+  await seedMargin();
   await json("api/notes", "POST", {
     title: "Small quantities",
     body: "A [[Derivative]] compares two small quantities.",
@@ -101,6 +104,60 @@ async function serve() {
       "> dx², a small quantity of the second order.",
     ].join("\n"),
   });
+}
+
+/** Writes what the reader shows beside the book, as files (no model needed): an explanation with a
+ * follow-up, a figure and an animation on overlapping passages, and a session with the tutor. */
+async function seedMargin() {
+  let books: { id: string; status?: string }[] = [];
+  for (let i = 0; i < 40 && books[0]?.status !== "ready"; i++) {
+    books = await fetch(`${BASE}api/books`).then((r) => r.json());
+    if (books[0]?.status !== "ready") await wait(250);
+  }
+  const b = books[0];
+  const folder =
+    dataDir && existsSync(join(dataDir, "vault", "library"))
+      ? readdirSync(join(dataDir, "vault", "library")).find((f) => !f.includes("."))
+      : undefined;
+  if (!b || !folder || !dataDir) return;
+  const lib = join(dataDir, "vault", "library", folder);
+  const at = new Date().toISOString();
+  const file = (rel: string, front: Record<string, unknown>, body: string) => {
+    mkdirSync(join(lib, rel, ".."), { recursive: true });
+    const yaml = Object.entries({ ...front, book_id: b.id, created: at, updated: at })
+      .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+      .join("\n");
+    writeFileSync(join(lib, rel), `---\n${yaml}\n---\n\n${body}\n`);
+  };
+  const anchor = { quote: "small quantities of various degrees of smallness" };
+  file(
+    "annotations/b2-explain-a11y.md",
+    { id: "a11yexp1", kind: "explain", block: 2, anchor },
+    [
+      "Quantities can be small **to different degrees**: a small part of a small part is far smaller still.",
+      "",
+      "## Follow-up: Can you give an example?",
+      "",
+      "A minute is a small part of an hour; a second is a small part of a minute.",
+    ].join("\n"),
+  );
+  const tangent = EXAMPLES.tangent as { title: string };
+  file(
+    "annotations/b2-visualize-a11y.md",
+    { id: "a11yfig1", kind: "visualize", title: tangent.title, block: 2, anchor },
+    `## ${tangent.title}\n\n\`\`\`figure\n${JSON.stringify(tangent)}\n\`\`\``,
+  );
+  file(
+    "annotations/b5-visualize-a11y-anim.md",
+    { id: "a11yani1", kind: "visualize", title: "Smaller and smaller", block: 5, anchor },
+    "## Smaller and smaller\n\nWatch each part shrink.\n\n```manim\nimport manimgx as m\n\nclass Shrink(m.Scene):\n    def construct(self) -> None:\n        self.play(m.Create(m.Square(color=INK)))\n```",
+  );
+  file(
+    "sessions/2026-10-13 What is dx.md",
+    { id: "a11yses1", kind: "tutor", title: "What is dx?", mode: "answer" },
+    "## You\n\nWhat is dx?\n\n## Tutor\n\nA little bit of x.",
+  );
+  await wait(1500);
 }
 
 /* ---------- pages ---------- */
@@ -374,6 +431,53 @@ async function keyboard(page: Page, bookRoute: string | undefined) {
   await page.emulateMediaFeatures([]);
 }
 
+/* ---------- the reader's states ---------- */
+
+/** The reader with its margin cards, the find bar open, the figures listed and one opened large, the tutor
+ * (its earlier sessions, and one opened). */
+async function readerStates(page: Page, bookRoute: string, theme: "light" | "dark") {
+  await open(page, bookRoute, theme);
+  const tab = (name: string) =>
+    page.evaluate(
+      (n) =>
+        [...document.querySelectorAll<HTMLElement>(".pane-tab")].find((b) => b.textContent?.startsWith(n))?.click(),
+      name,
+    );
+  const ax = async (name: string, present: string) =>
+    check(
+      `axe: the reader's ${name} (${theme})`,
+      !!(await page.$(present)) && (await axe(page)).length === 0,
+      (await page.$(present)) ? describe(await axe(page)) : `${present} not found`,
+    );
+  await ax("margin cards", ".mcard.open .mcard-thread .msg");
+  if (await page.$(".pdf-root")) {
+    await page.keyboard.press("p");
+    await wait(1200);
+    await ax("pages strip", ".pdf-strip .pdf-thumb");
+    await page.keyboard.press("p");
+  }
+  await page.keyboard.press("/");
+  await page.waitForSelector(".find-bar input", { timeout: 5000 }).catch(() => null);
+  await page.keyboard.type("small");
+  await wait(900);
+  await ax("find bar, with every place listed", ".find-bar .find-list .find-hit");
+  await page.keyboard.press("Escape");
+  await tab("Figures");
+  await wait(400);
+  await ax("figures", ".figure-rows .figure-row");
+  await page.click('.figure-rows .icon-button[aria-label^="Open"]').catch(() => null);
+  await wait(600);
+  await ax("figure opened large", ".modal .lightbox");
+  await page.keyboard.press("Escape");
+  await tab("Tutor");
+  await wait(500);
+  await ax("tutor's sessions", ".session-list .session-item");
+  // an earlier session, opened: the conversation, with Save as note and Make cards above it
+  await page.click(".session-list .session-item").catch(() => null);
+  await wait(500);
+  await ax("tutor's session opened", ".tutor-bar .button + .button");
+}
+
 /* ---------- run ---------- */
 
 if (process.argv.includes("--serve")) await serve();
@@ -430,6 +534,9 @@ try {
     );
     await page.click('.graph-tools [aria-label="Legend"]');
   }
+  const seededBook = list.find((r) => r.startsWith("#/book/"));
+  if (seededBook && dataDir && (!arg("only") || "reader".includes(arg("only")!)))
+    for (const theme of ["light", "dark"] as const) await readerStates(page, seededBook, theme);
   if (!arg("only"))
     await keyboard(
       page,

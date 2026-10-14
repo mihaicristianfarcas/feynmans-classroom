@@ -15,5 +15,5 @@
     "types": ["node"],
     "allowImportingTsExtensions": true
   },
-  "include": ["server", "shared", "web/src", "scripts", "tests", "runtime/*.d.ts"]
+  "include": ["server", "shared", "web/src", "scripts", "tests", "runtime/*.d.ts", "runtime/manim"]
 }
