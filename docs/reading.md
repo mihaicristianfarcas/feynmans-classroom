@@ -1,5 +1,26 @@
 # Reading with a margin, and notes
 
+## The library
+
+Books (PDF, EPUB, Markdown, text) and **articles saved from the web** stand on a bookcase in
+**Library**, as pastel spines sorted onto topics (or by when they came, their title, their length).
+A book's topic and a few tags come from one quick model call when it arrives (the fast tier, at low
+effort; a few arriving together share the call) and can be changed by hand. Click a spine (or reach
+it with Tab and the arrow keys and press Enter) and the book comes off the shelf into your hands: a
+bookplate inside its cover, and on its first page what it is, how far you are, **Start** or
+**Continue reading**, and the ways to rename it, move it to another topic or take it off the shelf.
+Escape puts it back.
+
+**Add** saves a link (or several), adds a file, or gives you a bookmark for the browser's bar:
+"Save to Classroom" opens a page here that asks "Save this to your library?" before anything is
+saved (any website could send you there). Pasting a link anywhere on the library saves it too. A web
+page is read with Mozilla's Readability into an article: its text sanitized into blocks like an
+EPUB's, its pictures downloaded into its folder (`library/<article>/assets/`) so it reads offline,
+and a clean copy of the text kept as `article.html`. A link to a PDF (an arXiv abstract page goes to
+the paper, named from the abstract page) is added like an uploaded one. Posts and videos are turned
+away with a pointer to what works. Links are fetched only over http and https, never from this
+machine or its network (checked on every redirect and on the address actually connected to).
+
 ## The margin
 
 The reader puts the book on the right and a **margin** on the left, as in the nutlope reading demo:

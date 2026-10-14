@@ -1,4 +1,4 @@
-/* The app: picks the page from the URL's hash (#/library, #/book/<id>, #/notes/<id>…), sends a new
+/* The app: picks the page from the URL's hash (#/library, #/book/<id>, #/notes/<id>, #/save?url=…), sends a new
  * learner to the welcome page first, and puts every page except the reader inside the Shell (Notes
  * and the Brain's graph fill the window below its bar; the rest scroll). The ⌘K palette and the agent
  * (⌘J) sit over every page; old #/ask links open the agent. Each page but Today is its own chunk,
@@ -24,6 +24,7 @@ const Gallery = lazy(() => import("../pages/Gallery").then((m) => ({ default: m.
 const Journey = lazy(() => import("../pages/Journey").then((m) => ({ default: m.Journey })));
 const Library = lazy(() => import("../pages/Library").then((m) => ({ default: m.Library })));
 const Review = lazy(() => import("../pages/Review").then((m) => ({ default: m.Review })));
+const Save = lazy(() => import("../pages/Save").then((m) => ({ default: m.Save })));
 const Settings = lazy(() => import("../pages/Settings").then((m) => ({ default: m.Settings })));
 const Welcome = lazy(() => import("../pages/Welcome").then((m) => ({ default: m.Welcome })));
 
@@ -41,7 +42,8 @@ type Route =
         | "settings"
         | "gallery"
         | "welcome"
-        | "open";
+        | "open"
+        | "save";
     };
 
 const TITLES: Record<Exclude<Route["name"], "book">, string> = {
@@ -55,6 +57,7 @@ const TITLES: Record<Exclude<Route["name"], "book">, string> = {
   gallery: "Figure gallery",
   welcome: "Welcome",
   open: "Opening a link",
+  save: "Save a page",
 };
 
 /** The page the URL's hash names. */
@@ -65,7 +68,9 @@ function route(): Route {
   const name = hash.replace(/^#\/?/, "").split("/")[0];
   // pages that fill the window: Notes, and the Brain's graph (not a concept's own page)
   const full = name === "notes" || (name === "brain" && !hash.startsWith("#/brain/concept/"));
-  if (["library", "notes", "review", "brain", "journey", "settings", "gallery", "welcome", "open"].includes(name))
+  if (
+    ["library", "notes", "review", "brain", "journey", "settings", "gallery", "welcome", "open", "save"].includes(name)
+  )
     return { name: name as Route["name"], full } as Route;
   return { name: "today" };
 }
@@ -139,6 +144,7 @@ export function App() {
   else if (current.name === "library") page = <Library theme={theme} />;
   else if (current.name === "notes") page = <Notes theme={theme} />;
   else if (current.name === "open") page = <OpenLink />;
+  else if (current.name === "save") page = <Save />;
   else if (current.name === "review") page = <Review theme={theme} />;
   else if (current.name === "brain") page = <Brain theme={theme} />;
   else if (current.name === "journey") page = <Journey />;

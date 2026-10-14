@@ -47,8 +47,11 @@ web/src/           the React app (Vite)
   app/             the shell (a slim bar along the top): routing (each page its own chunk, loaded on
                    first visit), navigation, theme, the ⌘K palette, what a page shows when it fails
   agent/           the agent's panel (⌘J), its button, the runs it shows, where the learner is
-  pages/           Today, Library (and Figures), Review, Journey, Settings, Welcome, Gallery;
-                   brain/: the graph that fills the page, the card beside it, its legend, a concept's page
+  pages/           Today, Library (and Figures), Review, Journey, Settings, Welcome, Gallery, Save (where
+                   the browser bookmark lands); brain/: the graph that fills the page, the card beside
+                   it, its legend, a concept's page
+  library/         the library's bookcase: spines and covers, the shelf's arithmetic, a book taken down
+                   (the 3D book in your hands), adding (links, files, the bookmark), what just arrived
   reader/          the reader: book views (zoom, links), margin, selection menu, find bar, the figures
                    index and a figure opened large, note, tutor (with its sessions), capture, gutter
   notes/           notes: the file tree (with folders), the note pane, its versions and links sidebar, the editor

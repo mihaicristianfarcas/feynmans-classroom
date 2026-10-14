@@ -33,9 +33,15 @@ the narrowest width closes the panel, and a button (`PanelToggle`) opens it agai
 Each panel's width is kept in localStorage (0 while closed).
 
 Motion is quick and quiet: popovers and menus grow from where they open, presses scale slightly,
-tab and nav indicators slide, new content rises a few pixels, and the theme switch crossfades.
-What you do from the keyboard (the ⌘K palette, the agent's ⌘J panel, revealing a card, the reader's
-shortcuts) doesn't animate, and reduced motion keeps only fades. The tokens, controls and motion rules live in
+tab and nav indicators slide, new content rises a few pixels, and the theme switch crossfades. The
+library is the one place with a flourish, kept to a few moments: the shelves draw in and the books
+drop onto them when it opens, sorting slides each book to its new place, a book that arrives falls
+in, and a book taken down comes off the shelf, turns and opens (about a second); going on into the
+reader, the book scales away and the reader's text rises in once it is at your page. In the margin,
+the passage is swept with a highlighter as you ask, a card unrolls as it opens, and an answer is
+written in from the top as it lands; while waiting, lines shimmer in the card's pastel.
+What you do from the keyboard (the ⌘K palette, the agent's ⌘J panel, revealing a card, taking a book
+down from the shelf, the reader's shortcuts) doesn't animate, and reduced motion keeps only fades. The tokens, controls and motion rules live in
 `web/src/styles/styles.css`.
 
 ## Accessibility
@@ -60,7 +66,9 @@ page in both themes, plus keyboard checks) on every pull request.
   `aria-haspopup="dialog"`.
 - **Announcements.** Results, saves and feedback that appear without a page change are announced
   (`announce()`, or `role="status"` / `role="alert"`).
-- **Mouse-only gestures have a keyboard way.** In the reader, `S` selects the passage at the
+- **Mouse-only gestures have a keyboard way.** The library's bookcase is one Tab stop: the arrow
+  keys walk along the shelf and Enter takes a book down (a dialog; Escape puts it back, focus on its
+  spine); a link is saved from Add as well as by pasting it on the page. In the reader, `S` selects the passage at the
   reading line and opens the selection menu with focus in it; capture places its box with the arrow
   keys; the knowledge graph is navigated with the arrow keys, Enter reads an item in the card beside
   it and Escape gives focus back to the item; a figure's parts are picked and read

@@ -97,7 +97,11 @@ async function serve() {
     ),
     "calculus.md",
   );
-  await fetch(`${BASE}api/books`, { method: "POST", body: book });
+  const added = (await fetch(`${BASE}api/books`, { method: "POST", body: book }).then((r) => r.json())) as {
+    id: string;
+  };
+  // shelved by hand, so no model is asked to sort it
+  await json(`api/books/${added.id}`, "PATCH", { topic: "math" });
   await seedMargin();
   await json("api/docs", "POST", {
     title: "Small quantities",
@@ -345,6 +349,31 @@ async function keyboard(page: Page, bookRoute: string | undefined) {
   await page.keyboard.press("Escape");
   await wait(200);
   check("Escape closes the agent", !(await page.$("[role=dialog]")));
+
+  // the shelf is one Tab stop: the arrow keys walk along it, Enter takes a book down (a dialog with focus
+  // inside, there at once: keyboard actions don't animate), Escape puts it back with focus on its spine
+  await open(page, "#/library", "light");
+  const spine = await page.$(".bookcase .bk:not([data-out])");
+  check("the library has a shelf of books", !!spine);
+  if (spine) {
+    await spine.focus();
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowLeft");
+    const stops = await page.evaluate(() => document.querySelectorAll('.bookcase .bk[tabindex="0"]').length);
+    check("the shelf is one Tab stop", stops === 1, `${stops} spines in the Tab order`);
+    await page.keyboard.press("Enter");
+    await wait(400);
+    const inBook = await page.evaluate(() => !!document.activeElement?.closest(".bih-stage[role=dialog]"));
+    check("Enter on a spine takes the book down, with focus in it", inBook, await focused(page));
+    const found = await axe(page);
+    check("axe: a book taken down from the shelf", found.length === 0, describe(found));
+    await page.keyboard.press("Escape");
+    await wait(500);
+    const back = await page.evaluate(
+      () => !!document.activeElement?.classList.contains("bk") && !document.querySelector(".bih-stage"),
+    );
+    check("Escape puts the book back, with focus on its spine", back, await focused(page));
+  }
 
   // a dialog keeps focus inside while open, and Escape returns focus to what opened it
   const concept = (await routes()).find((r) => r.startsWith("#/brain/concept/"));

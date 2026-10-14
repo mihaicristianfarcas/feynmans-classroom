@@ -96,8 +96,8 @@ async function selectAll(p: Page) {
 try {
   // library
   await page.goto(`${BASE}#/library`, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".book-card", { timeout: 10000 });
-  check("library lists books", (await page.$$(".book-card")).length >= 1);
+  await page.waitForSelector(".bookcase .bk", { timeout: 10000 });
+  check("the library's shelf has books", (await page.$$(".bookcase .bk")).length >= 1);
 
   // open the reader at the first figure: the margin first, then the Figures index
   await page.goto(`${BASE}#/book/${bookId}?at=${(pos(first.anchor) + 0.03).toFixed(3)}`, {
