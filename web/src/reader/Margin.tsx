@@ -77,7 +77,7 @@ export function Margin({
       const r = reader.current;
       if (!r) return null;
       if (item.annotation) {
-        const a = item.annotation.anchor;
+        const a = item.annotation.source;
         const boxes = r.boxesOf(a, item.id);
         if (boxes?.length)
           return { top: Math.min(...boxes.map((b) => b.top)), bottom: Math.max(...boxes.map((b) => b.bottom)) };
@@ -102,7 +102,7 @@ export function Margin({
     host.toggleAttribute("data-stacked", stacked);
     // the passages on screen (and around it), top to bottom; a plain highlight shows a card only when opened
     const placed = items
-      .filter((item) => item.annotation?.kind !== "highlight" || item.id === focused)
+      .filter((item) => item.annotation?.type !== "highlight" || item.id === focused)
       .map((item) => ({ item, at: extentOf(item) }))
       .filter((p): p is { item: MarginItem; at: Extent } => p.at !== null)
       .filter((p) => !stacked || !pane || (p.at.bottom > pane.top && p.at.top < pane.bottom))
@@ -117,7 +117,7 @@ export function Margin({
     const rows: { ids: string[]; top: number; bottom: number; block?: number }[] = [];
     for (const p of placed) {
       const last = rows[rows.length - 1];
-      const block = p.item.annotation?.anchor.block ?? p.item.demo?.anchor.block;
+      const block = p.item.annotation?.source.block ?? p.item.demo?.anchor.block;
       const sameBlock = block !== undefined && last?.block === block;
       if (last && (p.at.top < last.bottom - 3 || sameBlock)) {
         last.ids.push(p.item.id);
@@ -292,7 +292,7 @@ export function Margin({
           )}
         </div>
       ))}
-      {!items.some((i) => i.annotation && i.annotation.kind !== "highlight") && !items.some((i) => i.demo) && (
+      {!items.some((i) => i.annotation && i.annotation.type !== "highlight") && !items.some((i) => i.demo) && (
         <div className="margin-empty rise">
           <p className="margin-empty-title">The margin</p>
           <p className="fine">

@@ -1,23 +1,11 @@
 /* Setting the vault up on startup: its folders, the guide for agents (templates/AGENTS.md, imported
- * by CLAUDE.md), the managed block of its .gitignore (jj reads it too), migrations from older
- * layouts, the jj repository (adopting a git history if there is one), and the first load of every
- * collection. */
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+ * by CLAUDE.md), the managed block of its .gitignore (jj reads it too), the jj repository (adopting a
+ * git history if there is one), and the first read of every document. */
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { fileNameOf } from "../../shared/links.ts";
-import { annotations, COLLECTIONS, cards, concepts, figures, notes } from "./collections.ts";
-import { asString, parseFrontmatter, VAULT } from "./files.ts";
+import { docs } from "./docs.ts";
+import { VAULT } from "./files.ts";
 import { changed, hasJj, jj, vaultIsRepo } from "./jj.ts";
 import { reviews } from "./logs.ts";
 import { startWatching } from "./watch.ts";
@@ -59,44 +47,8 @@ function writeGitignore() {
   const start = mine.indexOf(GITIGNORE_START);
   const end = mine.indexOf(GITIGNORE_END);
   if (start >= 0 && end > start) mine = mine.slice(0, start) + mine.slice(end + GITIGNORE_END.length);
-  // the first vaults ignored the whole library; books now live there
-  mine = mine
-    .split("\n")
-    .filter((l) => !["library/", "*.tmp", ".DS_Store"].includes(l.trim()))
-    .join("\n")
-    .trim();
+  mine = mine.trim();
   writeFileSync(path, `${GITIGNORE_START}\n${GITIGNORE.join("\n")}\n${GITIGNORE_END}\n${mine ? `\n${mine}\n` : ""}`);
-}
-
-/** Vaults made before books and annotations moved in: generated pages out, readable file names in. */
-function migrateV1() {
-  const marker = join(VAULT, ".classroom.json");
-  const meta = existsSync(marker) ? (JSON.parse(readFileSync(marker, "utf8")) as { version?: number }) : {};
-  if ((meta.version || 1) >= 2) return;
-  rmSync(join(VAULT, "sources"), { recursive: true, force: true });
-  // v1 exported each book's text to library/<slug>-<id>/; books themselves live there now
-  if (existsSync(join(VAULT, "library")))
-    for (const name of readdirSync(join(VAULT, "library"))) {
-      const dir = join(VAULT, "library", name);
-      if (statSync(dir).isDirectory() && !existsSync(join(dir, "book.json")))
-        rmSync(dir, { recursive: true, force: true });
-    }
-  // notes and concepts were named by slug; name them by title, as Obsidian does
-  for (const dir of ["notes", "concepts"]) {
-    const full = join(VAULT, dir);
-    if (!existsSync(full)) continue;
-    for (const file of readdirSync(full)) {
-      if (!file.endsWith(".md")) continue;
-      const { data } = parseFrontmatter(readFileSync(join(full, file), "utf8"));
-      const title = asString(dir === "notes" ? data.title : data.name);
-      if (!title) continue;
-      const base = fileNameOf(title);
-      let target = `${base}.md`;
-      for (let n = 2; existsSync(join(full, target)) && target !== file; n++) target = `${base} ${n}.md`;
-      if (target !== file) renameSync(join(full, file), join(full, target));
-    }
-  }
-  writeFileSync(marker, JSON.stringify({ version: 2 }, null, 1));
 }
 
 let ready = false;
@@ -114,29 +66,29 @@ function initRepository() {
   changed(hadGit ? "vault moved to jj" : "vault created");
 }
 
-/** Prepares the vault on startup: folders, migrations, AGENTS.md, .gitignore, jj, the indexes in memory, the watcher. */
+/** Prepares the vault on startup: folders, AGENTS.md, .gitignore, jj, the documents in memory, the watcher. */
 export function initVault() {
   if (ready) return;
   ready = true;
   for (const dir of DIRS) mkdirSync(join(VAULT, dir), { recursive: true });
-  migrateV1();
   copyFileSync(join(TEMPLATES, "AGENTS.md"), join(VAULT, "AGENTS.md"));
   // Claude Code reads CLAUDE.md; Codex reads AGENTS.md
   writeFileSync(join(VAULT, "CLAUDE.md"), "@AGENTS.md\n");
   writeGitignore();
   initRepository();
-  for (const c of COLLECTIONS) c.load();
+  docs.load();
   startWatching();
 }
 
 /** Counts for the Settings page. */
 export function vaultStats() {
   return {
-    notes: notes.items.size,
-    concepts: concepts.items.size,
-    cards: cards.items.size,
-    figures: figures.items.size,
-    annotations: annotations.items.size,
+    notes: docs.count("note"),
+    concepts: docs.count("concept"),
+    cards: docs.count("card"),
+    figures: docs.count("figure"),
+    annotations: docs.count("annotation"),
+    sessions: docs.count("session"),
     reviews: reviews().length,
     versioned: vaultIsRepo(),
     jj: hasJj,

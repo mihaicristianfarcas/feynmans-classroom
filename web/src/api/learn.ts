@@ -1,22 +1,24 @@
-/* The API for everything else the learner does: profile and settings, notes, annotations, concepts,
- * cards and review, the study tools, figures, links, search, the journey, and agents. */
-import { call, del, patch, post, put } from "./client";
+/* The API for everything else the learner does: profile and settings, what each kind of document does
+ * beyond being one (an annotation's answer, a card's review, a concept's page, a session's note…), the
+ * study tools, links, search, the journey, and agents. (Documents themselves: docs.ts.) */
+import { call, post, put } from "./client";
+import type { Version } from "./docs";
 import type {
   AgentContext,
   AgentRun,
   Anchor,
   Annotation,
-  AnnotationKind,
+  AnnotationType,
   CardView,
   Concept,
   ConceptDetail,
+  ConceptView,
   DraftCard,
   ExplainFeedback,
   GraphData,
   IdeaConnection,
   Journey,
   Note,
-  NoteDetail,
   Profile,
   Quiz,
   Resolved,
@@ -29,13 +31,7 @@ import type {
   TutorSession,
 } from "./types";
 
-/** A saved version of the vault, or of one file in it (jj's change and commit ids). */
-export interface Version {
-  change: string;
-  commit: string;
-  when: string;
-  subject: string;
-}
+export type { Version } from "./docs";
 
 export const learn = {
   profile: () => call<Profile>("/api/profile"),
@@ -62,17 +58,6 @@ export const learn = {
   search: (q: string) => call<SearchHit[]>(`/api/search?q=${encodeURIComponent(q)}`),
   readPing: (body: { bookId: string; chapter?: string; chapterId?: string; position?: number; page?: number }) =>
     post("/api/activity", { type: "read", ...body }),
-  notes: (filter: { type?: string; book?: string; concept?: string; folder?: string } = {}) =>
-    call<Note[]>(`/api/notes?${new URLSearchParams(filter as Record<string, string>)}`),
-  note: (id: string) => call<NoteDetail>(`/api/notes/${id}`),
-  createNote: (n: Partial<Note> & { folder?: string }) => post<Note>("/api/notes", n),
-  updateNote: (id: string, n: Partial<Note> & { folder?: string }) => put<Note>(`/api/notes/${id}`, n),
-  appendToNote: (id: string, markdown: string) => post<Note>(`/api/notes/${id}/append`, { markdown }),
-  deleteNote: (id: string) => del(`/api/notes/${id}`),
-  noteVersions: (id: string) => call<Version[]>(`/api/notes/${id}/versions`),
-  noteVersion: (id: string, commit: string) =>
-    call<{ body: string; diff: string }>(`/api/notes/${id}/versions/${commit}`),
-  restoreNote: (id: string, commit: string) => post<Note>(`/api/notes/${id}/restore`, { commit }),
   createFolder: (path: string) => post<{ folder: string }>("/api/folders", { path }),
   moveFolder: (from: string, to: string) => post<{ folder: string }>("/api/folders/move", { from, to }),
   deleteFolder: (path: string) => post<{ notes: number }>("/api/folders/delete", { path }),
@@ -89,11 +74,10 @@ export const learn = {
   attach: (data: string, name?: string) => post<{ path: string; name: string }>("/api/attachments", { data, name }),
   transcribe: (path: string) => post<{ markdown: string; ms: number }>("/api/transcribe", { path }),
   annotations: (bookId: string) => call<Annotation[]>(`/api/books/${bookId}/annotations`),
-  annotation: (id: string) => call<Annotation>(`/api/annotations/${id}`),
   annotate: (
     bookId: string,
     input: {
-      kind: AnnotationKind;
+      type: AnnotationType;
       anchor: Anchor;
       request?: string;
       color?: string;
@@ -103,16 +87,6 @@ export const learn = {
     },
   ) => post<Annotation>(`/api/books/${bookId}/annotations`, input),
   retryAnnotation: (id: string) => post<Annotation>(`/api/annotations/${id}/retry`),
-  updateAnnotation: (
-    id: string,
-    patch: Partial<Pick<Annotation, "color" | "body" | "request" | "tags" | "title" | "kind">>,
-  ) =>
-    call<Annotation>(`/api/annotations/${id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(patch),
-    }),
-  deleteAnnotation: (id: string) => del(`/api/annotations/${id}`),
   followUp: (id: string, question: string) => post<Annotation>(`/api/annotations/${id}/followup`, { question }),
   redraw: (id: string, notes?: string, quality?: "quick" | "careful") =>
     post<Annotation>(`/api/annotations/${id}/redraw`, { notes, quality }),
@@ -138,18 +112,13 @@ export const learn = {
   agentAction: (id: string, action: "approve" | "discard" | "undo" | "keep") =>
     post<AgentRun>(`/api/agents/${id}/${action}`),
   agentDiff: (id: string) => call<{ diff: string }>(`/api/agents/${id}/diff`),
-  concepts: () => call<Concept[]>("/api/concepts"),
+  concepts: () => call<ConceptView[]>("/api/concepts"),
   concept: (id: string) => call<ConceptDetail>(`/api/concepts/${id}`),
-  createConcept: (c: { name: string; summary?: string }) => post<Concept>("/api/concepts", c),
-  updateConcept: (id: string, c: Partial<Concept>) => put<Concept>(`/api/concepts/${id}`, c),
-  deleteConcept: (id: string) => del(`/api/concepts/${id}`),
   extractConcepts: (bookId: string, chapterId: string) =>
     post<Concept[]>(`/api/books/${bookId}/chapters/${chapterId}/concepts`),
   cards: (filter: { deck?: string; concept?: string } = {}) =>
     call<CardView[]>(`/api/cards?${new URLSearchParams(filter as Record<string, string>)}`),
   saveCards: (cards: Partial<CardView>[]) => post<CardView[]>("/api/cards", { cards }),
-  updateCard: (id: string, c: Partial<CardView>) => put<CardView>(`/api/cards/${id}`, c),
-  deleteCard: (id: string) => del(`/api/cards/${id}`),
   draftCards: (input: { passage: string; source?: SourceRef; focus?: string; count?: number }) =>
     post<{ cards: DraftCard[]; concepts: { name: string; summary: string }[] }>("/api/cards/draft", input),
   saveDrafts: (input: {
@@ -202,13 +171,8 @@ export const learn = {
     sessionId?: string;
   }) => post<{ reply: string; session: TutorSession | null }>("/api/tutor", input),
   sessions: (bookId: string) => call<TutorSession[]>(`/api/books/${bookId}/sessions`),
-  session: (id: string) => call<TutorSession>(`/api/sessions/${id}`),
-  renameSession: (id: string, title: string) => patch<TutorSession>(`/api/sessions/${id}`, { title }),
-  deleteSession: (id: string) => del(`/api/sessions/${id}`),
   /** Writes a session up as a note of the learner's own (a model call, ~15 s). */
   sessionNote: (id: string) => post<{ note: Note; session: TutorSession }>(`/api/sessions/${id}/note`),
-  figures: () => call<SavedFigure[]>("/api/figures"),
-  figure: (id: string) => call<SavedFigure>(`/api/figures/${id}`),
   makeFigure: (input: {
     passage: string;
     request?: string;
@@ -217,7 +181,6 @@ export const learn = {
     source?: SourceRef;
     save?: boolean;
   }) => post<SavedFigure>("/api/figures", input),
-  deleteFigure: (id: string) => del(`/api/figures/${id}`),
   keepFigure: (input: { scene: unknown; title?: string; source?: SourceRef }) =>
     post<SavedFigure>("/api/figures", input),
   booksLite: () =>

@@ -6,17 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { openAgent } from "../agent/store";
 import { learn, type SearchHit } from "../api";
 import { announce, useFocusTrap } from "../lib/a11y";
-import { bookLink, go } from "./navigation";
-
-const KIND_TONE: Record<string, string> = {
-  concept: "sage",
-  note: "sky",
-  annotation: "lavender",
-  card: "butter",
-  book: "peach",
-  passage: "peach",
-  session: "rose",
-};
+import { KIND_TONE } from "./kinds";
+import { bookLink, docRoute, go } from "./navigation";
 
 export function Palette() {
   const [open, setOpen] = useState(false);
@@ -57,13 +48,16 @@ export function Palette() {
   const pick = (h: SearchHit | undefined) => {
     if (!h) {
       if (q.trim()) openAgent({ text: q.trim(), send: true });
-    } else if (h.kind === "concept") go(`#/brain/concept/${h.id}`);
-    else if (h.kind === "note") go(`#/notes/${h.id}`);
-    else if (h.kind === "card") go("#/brain/concepts");
-    else if (h.kind === "annotation" || h.kind === "session") {
-      const link = bookLink({ bookId: h.bookId, ...(h.loc || {}) });
-      go(`${link}${link.includes("?") ? "&" : "?"}${h.kind === "session" ? "session" : "focus"}=${h.id}`);
-    } else go(bookLink({ bookId: h.bookId, ...(h.loc || {}) }));
+    } else if (h.kind === "book") go(bookLink({ bookId: h.bookId, ...(h.loc || {}) }));
+    else
+      go(
+        docRoute({
+          kind: h.kind,
+          id: h.id,
+          bookId: h.bookId,
+          source: h.bookId ? { bookId: h.bookId, ...h.loc } : undefined,
+        }),
+      );
     setOpen(false);
     setQ("");
   };

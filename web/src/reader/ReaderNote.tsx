@@ -2,7 +2,7 @@
  * another). Passages and answers you send from the book land at its end; you write around them. */
 import { ArrowUpRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { type Book, type Loc, learn, type Note } from "../api";
+import { type Book, docs, type Loc, type Note } from "../api";
 import { Markdown } from "../components/Markdown";
 import { useIndicator } from "../components/ui";
 import { timeAgo } from "../lib/time";
@@ -40,7 +40,7 @@ export function ReaderNote({
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reloads the recent notes when another note is chosen
   useEffect(() => {
-    learn.notes().then(
+    docs.list("note").then(
       (list) => setRecent(list.slice(0, 20)),
       () => {},
     );
@@ -49,7 +49,7 @@ export function ReaderNote({
     const n = current.current;
     if (!n) return;
     try {
-      const fresh = await learn.note(n.id);
+      const fresh = await docs.get<Note>(n.id);
       if (!dirty.current) setBody(fresh.body);
       if (fresh.updated !== n.updated || fresh.title !== n.title) onChoose(fresh);
     } catch {
@@ -81,7 +81,7 @@ export function ReaderNote({
       const n = current.current;
       if (!n) return;
       setState("saving");
-      const saved = await learn.updateNote(n.id, { body: text });
+      const saved = await docs.update<Note>(n.id, { body: text });
       dirty.current = false;
       setState("saved");
       onChoose(saved);
@@ -105,10 +105,10 @@ export function ReaderNote({
             if (v === "__new") {
               const title = prompt("Title of the new note:", `${book.title} — `);
               if (!title?.trim()) return;
-              const created = await learn.createNote({ title: title.trim(), body: "", source: { bookId: book.id } });
+              const created = await docs.create({ title: title.trim(), body: "", source: { bookId: book.id } });
               onChoose(created);
               reload();
-            } else if (v) onChoose(await learn.note(v));
+            } else if (v) onChoose(await docs.get<Note>(v));
           }}
           aria-label="Which note to write in"
         >

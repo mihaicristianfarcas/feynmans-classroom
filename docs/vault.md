@@ -8,7 +8,7 @@ data/vault/
   notes/**.md               your notes, in any folders (notes/INDEX.md: generated table of them)
   concepts/<Name>.md        one page per concept (concepts/INDEX.md: with mastery)
   cards/*.md                flashcards (## Front / ## Back)
-  figures/*.json            saved figures
+  figures/*.md              kept figures (the spec in a ```figure block)
   attachments/              pictures
   library/INDEX.md          generated: every book
   library/<book>/           book.json · the file · text/NN-chapter.md (with [[page N]] markers)
@@ -28,8 +28,25 @@ a hundred files, which is where the savings in tokens and calls come from. At th
 memory builds in a second and ripgrep searches a library in milliseconds; if search ever gets slow,
 a SQLite full-text index can sit in `.cache/` as a disposable copy rebuilt from the files. Books,
 annotations, notes and logs are versioned; the PDFs, the extracted text and the generated indexes
-are not (`.gitignore` keeps a managed block). Vaults and books from earlier versions are migrated at
-startup.
+are not (`.gitignore` keeps a managed block).
+
+## One kind of record: the document
+
+Notes, concepts, flashcards, annotations, sessions with the tutor and kept figures are all
+**documents**: a Markdown file with the same frontmatter (`id`, `kind`, `type`, `title`, `tags`,
+`aliases`, `about`, `related`, `concepts`, `source`, `created`, `updated`), plus a few fields of the
+kind's own (a concept's `summary`, a card's `deck`, an annotation's `request`…). The vault's
+`AGENTS.md` lists them all. Because they share one shape, they share everything built on it:
+links and backlinks, renames that carry links along, search, the generated indexes, version history,
+and one API (`/api/docs`) to list, read, make, change and delete them. What a kind does beyond that
+(an annotation's answer, a card's review, a concept's page) has its own service and routes, and the
+pages show each kind their own way.
+
+`kind` says what a document is (left out, the folder says: a file in `cards/` is a card), and `type`
+what sort of it (a note's summary or quiz, an annotation's highlight or explanation, a cloze card).
+`source` is where it comes from in a book: the book's id, the chapter, a page or block, and for a
+passage the quote and the ways to find it again. A card's file never changes when you review it: its
+schedule is replayed from `log/reviews.jsonl`.
 
 ## Notes, folders, and what they're about
 
@@ -59,8 +76,8 @@ The app runs jj with its own config (`DATA_DIR/jj.toml`), so yours doesn't matte
   when you stop for a few minutes (`VAULT_SITTING_MS`), or before the agent's work comes in, it
   closes it and begins the next. The history reads one entry per sitting, and every snapshot in
   between stays in jj's operation log (`jj op log`, `jj evolog`).
-- **Versions of a note.** The clock button on a note lists its saved versions (`jj log` on the
-  file): read one as it was, see what it changed, and bring it back (as a new change, so nothing is
+- **Versions of a document.** The clock button on a note lists its saved versions (`jj log` on the
+  file; every kind has them, through `/api/docs/<id>/versions`): read one as it was, see what it changed, and bring it back (as a new change, so nothing is
   lost).
 - **The agent's work** is one change per request, made in a workspace of its own and brought in
   after your edits (see [agents.md](agents.md)); Undo takes it out again.

@@ -1,13 +1,15 @@
-/* Searching the whole vault from the ⌘K palette: concepts, notes, annotations, sessions with the tutor,
- * cards and the books' text, ranked by simple term scores with the titles weighted up. */
+/* Searching the whole vault from the ⌘K palette: every document (concepts, notes, annotations, sessions
+ * with the tutor, cards, figures) and the books' text, ranked by simple term scores with the titles
+ * weighted up. */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { Doc, DocKind } from "../../shared/vault-types.ts";
 import { listBooks } from "../books/store.ts";
-import { annotations, cards, concepts, notes, sessions, VAULT } from "../vault/index.ts";
+import { docs, VAULT } from "../vault/index.ts";
 import { chapterFile } from "../vault/library.ts";
 
 export interface SearchHit {
-  kind: "note" | "concept" | "card" | "book" | "annotation" | "session";
+  kind: DocKind | "book";
   id: string;
   title: string;
   snippet: string;
@@ -42,69 +44,44 @@ function snippet(text: string, terms: string[], width = 160): string {
     .trim()}${at + width < text.length ? "…" : ""}`;
 }
 
+/** How each kind's text is weighed against the others', and what a hit shows. */
+const WEIGHT: Record<DocKind, number> = { concept: 1.6, note: 1.3, annotation: 1.2, session: 1.1, figure: 1, card: 1 };
+
+/** The words a document is found by (its title counts twice) and the text a hit's snippet comes from. */
+function searchable(d: Doc): { text: string; snippetOf: string } {
+  const extra =
+    d.kind === "concept"
+      ? d.summary
+      : d.kind === "annotation"
+        ? `${d.source.quote} ${d.request || ""}`
+        : d.kind === "card"
+          ? `${d.front} ${d.back}`
+          : "";
+  return {
+    text: `${d.title} ${d.title} ${d.aliases.join(" ")} ${d.tags.join(" ")} ${extra} ${d.body}`,
+    snippetOf:
+      d.kind === "concept" ? d.summary || d.body : d.kind === "card" ? d.back : d.body || d.source?.quote || "",
+  };
+}
+
 export function search(q: string, limit = 40): SearchHit[] {
   const terms = words(q);
   if (!terms.length) return [];
   const hits: SearchHit[] = [];
-  for (const c of concepts.list()) {
-    const s = scoreText(`${c.name} ${c.name} ${c.aliases.join(" ")} ${c.summary} ${c.body}`, terms);
-    if (s)
-      hits.push({
-        kind: "concept",
-        id: c.id,
-        title: c.name,
-        snippet: c.summary || snippet(c.body, terms),
-        score: s * 1.6,
-      });
-  }
-  for (const n of notes.list()) {
-    const s = scoreText(`${n.title} ${n.title} ${n.body} ${n.tags.join(" ")}`, terms);
-    if (s)
-      hits.push({
-        kind: "note",
-        id: n.id,
-        title: n.title,
-        snippet: snippet(n.body, terms),
-        score: s * 1.3,
-        bookId: n.source?.bookId,
-      });
-  }
-  for (const a of annotations.list()) {
-    const s = scoreText(`${a.anchor.quote} ${a.request || ""} ${a.body}`, terms);
-    if (s)
-      hits.push({
-        kind: "annotation",
-        id: a.id,
-        title: `${a.kind}: ${a.anchor.quote.slice(0, 80)}`,
-        snippet: snippet(a.body || a.anchor.quote, terms),
-        score: s * 1.2,
-        bookId: a.bookId,
-        loc: a.anchor.page !== undefined ? { page: a.anchor.page } : { block: a.anchor.block },
-      });
-  }
-  for (const x of sessions.list()) {
-    const said = x.messages.map((m) => m.text).join(" ");
-    const s = scoreText(`${x.title} ${x.title} ${said}`, terms);
-    const where = x.passage?.source;
-    if (s)
-      hits.push({
-        kind: "session",
-        id: x.id,
-        title: `Tutor: ${x.title}`,
-        snippet: snippet(said, terms),
-        score: s * 1.1,
-        bookId: x.bookId,
-        loc:
-          where?.page !== undefined
-            ? { page: where.page }
-            : where?.block !== undefined
-              ? { block: where.block }
-              : undefined,
-      });
-  }
-  for (const k of cards.list()) {
-    const s = scoreText(`${k.front} ${k.back}`, terms);
-    if (s) hits.push({ kind: "card", id: k.id, title: k.front.slice(0, 90), snippet: k.back.slice(0, 160), score: s });
+  for (const d of docs.list()) {
+    const { text, snippetOf } = searchable(d);
+    const s = scoreText(text, terms);
+    if (!s) continue;
+    const at = d.source;
+    hits.push({
+      kind: d.kind,
+      id: d.id,
+      title: d.title,
+      snippet: d.kind === "concept" && d.summary ? d.summary : snippet(snippetOf, terms),
+      score: s * WEIGHT[d.kind],
+      bookId: at?.bookId,
+      loc: at?.page !== undefined ? { page: at.page } : at?.block !== undefined ? { block: at.block } : undefined,
+    });
   }
   // book text, by chapter file in the library
   for (const b of listBooks().filter((x) => x.status === "ready")) {

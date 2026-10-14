@@ -34,12 +34,12 @@ vi.mock("../server/llm/index.ts", () => ({
 
 let V: typeof import("../server/vault/index.ts");
 let A: typeof import("../server/agents/index.ts");
-let N: typeof import("../server/learn/notes.ts");
+let N: typeof import("../server/learn/docs.ts");
 beforeAll(async () => {
   V = await import("../server/vault/index.ts");
   V.initVault();
   A = await import("../server/agents/index.ts");
-  N = await import("../server/learn/notes.ts");
+  N = await import("../server/learn/docs.ts");
 });
 
 /** Waits for a run to settle. */
@@ -65,9 +65,9 @@ describe.skipIf(!hasJj)("the vault on jj", () => {
   });
 
   it("keeps every version of a note, and can show an older one", () => {
-    const note = N.createNote({ title: "Replication", body: "Leaders and followers." });
+    const note = N.createDoc({ title: "Replication", body: "Leaders and followers." });
     V.checkpoint();
-    N.updateNote(note.id, { body: "Leaders, followers, and lag." });
+    N.updateDoc(note.id, { body: "Leaders, followers, and lag." });
     V.checkpoint();
     const versions = V.fileHistory(note.path);
     expect(versions.length).toBe(2);
@@ -79,36 +79,36 @@ describe.skipIf(!hasJj)("the vault on jj", () => {
 
 describe.skipIf(!hasJj)("the agent on a jj vault", () => {
   it("lands a new note after the learner's own edits, and can take it out again", async () => {
-    const mine = N.createNote({ title: "Mine", body: "one" });
+    const mine = N.createDoc({ title: "Mine", body: "one" });
     V.checkpoint();
     work = (cwd) => {
       write(cwd, "notes/DDIA/Chapter 5 summary.md", "---\ntype: summary\n---\nA summary.\n");
       // meanwhile, the learner keeps writing
-      N.updateNote(mine.id, { body: "one\ntwo" });
+      N.updateDoc(mine.id, { body: "one\ntwo" });
     };
     const run = await settled(A.startRun({ task: "Summarise chapter 5 into my DDIA folder" }));
     expect([run.status, run.error]).toEqual(["merged", undefined]);
     expect(run.files).toEqual([{ path: "notes/DDIA/Chapter 5 summary.md", change: "A" }]);
     expect(read("notes/DDIA/Chapter 5 summary.md")).toContain("A summary.");
-    expect(V.notes.byPath("notes/DDIA/Chapter 5 summary.md")?.type).toBe("summary");
+    expect(V.docs.at("notes/DDIA/Chapter 5 summary.md", "note")?.type).toBe("summary");
     expect(read(mine.path)).toContain("one\ntwo");
     expect(V.vaultHistory(3).map((v) => v.subject)).toContain("agent: Summarise chapter 5 into my DDIA folder");
 
     // later edits of other files survive the undo
-    N.updateNote(mine.id, { body: "one\ntwo\nthree" });
+    N.updateDoc(mine.id, { body: "one\ntwo\nthree" });
     const undone = A.undoRun(run.id);
     expect(undone.status).toBe("undone");
     expect(existsSync(join(vault, "notes/DDIA/Chapter 5 summary.md"))).toBe(false);
-    expect(V.notes.byPath("notes/DDIA/Chapter 5 summary.md")).toBeUndefined();
+    expect(V.docs.at("notes/DDIA/Chapter 5 summary.md", "note")).toBeUndefined();
     expect(read(mine.path)).toContain("one\ntwo\nthree");
   });
 
   it("refuses a change that clashes with the learner's edits, leaving their file as it is", async () => {
-    const note = N.createNote({ title: "Consensus", body: "Raft\nPaxos\nZab" });
+    const note = N.createDoc({ title: "Consensus", body: "Raft\nPaxos\nZab" });
     V.checkpoint();
     work = (cwd) => {
       write(cwd, note.path, read(note.path).replace("Paxos", "Paxos (agent)"));
-      N.updateNote(note.id, { body: "Raft\nPaxos (mine)\nZab" });
+      N.updateDoc(note.id, { body: "Raft\nPaxos (mine)\nZab" });
     };
     const run = await settled(A.startRun({ task: "Expand my consensus note" }));
     expect(run.status).toBe("failed");
@@ -121,8 +121,8 @@ describe.skipIf(!hasJj)("the agent on a jj vault", () => {
     work = (cwd) => write(cwd, "notes/Quiz on lag.md", "Question one\n");
     const run = await settled(A.startRun({ task: "Make a quiz on replication lag" }));
     expect([run.status, run.error]).toEqual(["merged", undefined]);
-    const quiz = V.notes.byPath("notes/Quiz on lag.md")!;
-    N.updateNote(quiz.id, { body: "Question one, answered" });
+    const quiz = V.docs.at("notes/Quiz on lag.md", "note")!;
+    N.updateDoc(quiz.id, { body: "Question one, answered" });
     expect(() => A.undoRun(run.id)).toThrow(/same lines/);
     expect(read("notes/Quiz on lag.md")).toContain("answered");
     expect(read("notes/Quiz on lag.md")).not.toMatch(/<<<<<<<|>>>>>>>/);
@@ -171,9 +171,9 @@ describe.skipIf(!hasJj)("the agent on a jj vault", () => {
   });
 
   it("tells the agent which note is open", async () => {
-    const note = N.createNote({ title: "Open one", body: "here" });
+    const note = N.createDoc({ title: "Open one", body: "here" });
     work = () => {};
-    const run = await settled(A.startRun({ task: "Fix the typos in this", context: { noteId: note.id } }));
+    const run = await settled(A.startRun({ task: "Fix the typos in this", context: { docId: note.id } }));
     expect(run.where).toBe("Open one");
     expect(prompts.at(-1)).toContain(`They have this note open: ${note.path}`);
   });

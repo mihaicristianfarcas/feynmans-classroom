@@ -1,11 +1,9 @@
-/* Starts the server: prepares the vault (migrating older layouts), picks up work a restart
- * interrupted, keeps the indexes fresh, and serves the API (and, in production, the app) on
- * 127.0.0.1:PORT. */
+/* Starts the server: prepares the vault, picks up work a restart interrupted, keeps the indexes fresh,
+ * and serves the API (and, in production, the app) on 127.0.0.1:PORT. */
 import { serve } from "@hono/node-server";
 import { prepareAgents } from "./agents/index.ts";
-import { migrateHighlightNotes, resumeAnnotations } from "./annotations/index.ts";
+import { resumeAnnotations } from "./annotations/index.ts";
 import { createApp } from "./app.ts";
-import { migrateLegacyBooks } from "./books/store.ts";
 import { chromePath, PORT } from "./config.ts";
 import { publish } from "./events.ts";
 import { resumeInterrupted } from "./handbuilt/index.ts";
@@ -18,11 +16,7 @@ import { exportMissingBooks } from "./vault/library.ts";
 // files changing in the vault (from the app, an agent, Obsidian): pages showing them reload
 onVaultChange((path) => publish("global", { type: "vault", data: { path } }));
 initVault();
-const moved = migrateLegacyBooks();
-if (moved.length)
-  console.log(`[vault] moved ${moved.length} book${moved.length === 1 ? "" : "s"} into the vault: ${moved.join(", ")}`);
 exportMissingBooks();
-migrateHighlightNotes();
 startIndexing();
 resumeAnnotations();
 resumeInterrupted();

@@ -2,7 +2,7 @@
  * any idea. Figures drawn in a book stay beside its text. */
 import { Shapes, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { learn } from "../api";
+import { docs } from "../api";
 import { Spinner } from "../components/feedback";
 import { FigureMaker } from "../components/tools";
 import { useLoad } from "../lib/useLoad";
@@ -10,7 +10,7 @@ import { under, useVaultEvents } from "../lib/useVaultEvents";
 import { SceneView } from "../scene/SceneView";
 
 export function Figures({ theme }: { theme: "light" | "dark" }) {
-  const { data, reload } = useLoad(() => learn.figures());
+  const { data, reload } = useLoad(() => docs.list("figure"));
   useVaultEvents(reload, under("figures/"));
   const [making, setMaking] = useState(false);
   const [topic, setTopic] = useState("");
@@ -65,7 +65,7 @@ export function Figures({ theme }: { theme: "light" | "dark" }) {
                   title="Delete"
                   onClick={async () => {
                     if (!confirm(`Delete "${f.title}"?`)) return;
-                    await learn.deleteFigure(f.id);
+                    await docs.remove(f.id);
                     reload();
                   }}
                 >

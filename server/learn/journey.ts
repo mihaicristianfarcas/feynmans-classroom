@@ -2,7 +2,7 @@
  * fading, and what to do next. */
 import { retrievability } from "../../shared/fsrs.ts";
 import { getBook, listBooks, listDemos } from "../books/store.ts";
-import { activity, cards, concepts, figures, getProfile, notes, reviews } from "../vault/index.ts";
+import { activity, docs, getProfile, reviews } from "../vault/index.ts";
 import { cardState, reviewQueue } from "./cards.ts";
 import { conceptMastery, learnerSummary } from "./context.ts";
 
@@ -38,11 +38,11 @@ export function journey() {
     else if (key !== today) break;
   }
   const at = Date.now();
-  const mastery = concepts
-    .list()
-    .map((c) => ({ id: c.id, name: c.name, mastery: conceptMastery(c.id, at) }))
+  const mastery = docs
+    .list("concept")
+    .map((c) => ({ id: c.id, title: c.title, mastery: conceptMastery(c.id, at) }))
     .sort((a, b) => (b.mastery ?? -1) - (a.mastery ?? -1));
-  const states = cards.list().map((c) => cardState(c.id));
+  const states = docs.list("card").map((c) => cardState(c.id));
   const retained = states.filter(Boolean).map((s) => retrievability(s, at));
   const month = revs.filter((r) => r.ts > at - 30 * 86400000);
   return {
@@ -50,11 +50,11 @@ export function journey() {
     streak,
     totals: {
       reviews: revs.length,
-      cards: cards.items.size,
-      concepts: concepts.items.size,
-      notes: notes.items.size,
+      cards: docs.count("card"),
+      concepts: docs.count("concept"),
+      notes: docs.count("note"),
       figures:
-        figures.items.size +
+        docs.count("figure") +
         listBooks().reduce((n, b) => n + listDemos(b.id).filter((d) => d.status === "ready").length, 0),
       books: listBooks().length,
     },
@@ -101,15 +101,15 @@ export function today() {
       action: { route: "#/review" },
     });
   // a concept that is slipping: explain it back
-  const slipping = concepts
-    .list()
+  const slipping = docs
+    .list("concept")
     .map((c) => ({ c, m: conceptMastery(c.id) }))
     .filter((x) => x.m !== null && x.m < 0.65)
     .sort((a, b) => a.m! - b.m!)[0];
   if (slipping)
     suggestions.push({
       kind: "explain",
-      title: `Explain “${slipping.c.name}” in your own words`,
+      title: `Explain “${slipping.c.title}” in your own words`,
       detail: "Your recall of it is slipping. Teaching it back shows you exactly where the gaps are.",
       action: { route: `#/brain/concept/${slipping.c.id}`, explain: "1" },
     });
@@ -143,7 +143,7 @@ export function today() {
       },
     });
   }
-  if (concepts.items.size >= 6)
+  if (docs.count("concept") >= 6)
     suggestions.push({
       kind: "mixed",
       title: "Mixed review quiz",

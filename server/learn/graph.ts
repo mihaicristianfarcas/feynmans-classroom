@@ -1,8 +1,9 @@
-/* The knowledge graph: concepts, notes, books and figures as nodes, with the links between them
- * (the learner's own, accepted and suggested connections) and each concept's mastery as a ring. */
+/* The knowledge graph: books and documents (concepts, notes, annotations) as nodes, with the links
+ * between them (the learner's own, accepted and suggested connections) and each concept's mastery as
+ * a ring. */
 import { listBooks } from "../books/store.ts";
 import { listConnections } from "../vault/connections.ts";
-import { annotations, cards, concepts, notes } from "../vault/index.ts";
+import { docs } from "../vault/index.ts";
 import { allEdges, type Edge, resolveLink } from "../vault/links.ts";
 import { conceptMastery } from "./context.ts";
 
@@ -45,42 +46,33 @@ export function knowledgeGraph(): { nodes: GraphNode[]; edges: GraphEdge[] } {
       bookId: b.id,
       created: new Date(b.createdAt).getTime(),
     });
-  for (const c of concepts.list()) {
-    const linkedCards = cards.list().filter((k) => k.concepts.includes(c.id)).length;
-    nodes.push({
-      id: `concept:${c.id}`,
-      kind: "concept",
-      label: c.name,
-      mastery: conceptMastery(c.id),
-      size: 1 + Math.min(2, (linkedCards + c.sources.length) / 4),
-      detail: c.summary,
-      path: concepts.fileOf(c.id) || undefined,
-      created: new Date(c.created).getTime(),
-    });
-  }
-  for (const n of notes.list())
-    nodes.push({
-      id: `note:${n.id}`,
-      kind: "note",
-      label: n.title,
-      mastery: typeof n.score === "number" ? n.score / 100 : null,
-      size: 0.8,
-      detail: n.type,
-      path: n.path,
-      created: new Date(n.created).getTime(),
-    });
-  for (const a of annotations.list())
-    nodes.push({
-      id: `annotation:${a.id}`,
-      kind: "annotation",
-      label: a.title || `${a.anchor.quote.split(/\s+/).slice(0, 7).join(" ")}…`,
+  const cards = docs.list("card");
+  for (const d of docs.list()) {
+    // cards, kept figures and sessions are reached from the concepts and notes they link, not drawn
+    if (d.kind === "card" || d.kind === "figure" || d.kind === "session") continue;
+    const node: GraphNode = {
+      id: `${d.kind}:${d.id}`,
+      kind: d.kind,
+      label: d.title,
       mastery: null,
-      size: 0.5,
-      detail: a.kind,
-      bookId: a.bookId,
-      path: a.path,
-      created: new Date(a.created).getTime(),
-    });
+      size: 0.8,
+      path: d.path,
+      bookId: d.source?.bookId,
+      created: new Date(d.created).getTime(),
+    };
+    if (d.kind === "concept") {
+      const linkedCards = cards.filter((k) => k.concepts.includes(d.id)).length;
+      Object.assign(node, {
+        mastery: conceptMastery(d.id),
+        size: 1 + Math.min(2, (linkedCards + d.sources.length) / 4),
+        detail: d.summary,
+        bookId: undefined,
+      });
+    } else if (d.kind === "note")
+      Object.assign(node, { mastery: typeof d.score === "number" ? d.score / 100 : null, detail: d.type });
+    else if (d.kind === "annotation") Object.assign(node, { size: 0.5, detail: d.type });
+    nodes.push(node);
+  }
   const ids = new Set(nodes.map((n) => n.id));
   const edges: GraphEdge[] = [];
   const seen = new Set<string>();
@@ -96,9 +88,9 @@ export function knowledgeGraph(): { nodes: GraphNode[]; edges: GraphEdge[] } {
   for (const kind of order) for (const e of all) if (e.kind === kind) add({ from: e.from, to: e.to!, kind: e.kind });
   for (const c of listConnections()) {
     if (c.status !== "suggested") continue;
-    const from = notes.byPath(c.from);
+    const from = docs.at(c.from);
     const to = resolveLink(c.to);
-    if (from && to) add({ from: `note:${from.id}`, to: to.node, kind: "suggested", id: c.id, why: c.why });
+    if (from && to) add({ from: `${from.kind}:${from.id}`, to: to.node, kind: "suggested", id: c.id, why: c.why });
   }
   return { nodes, edges };
 }

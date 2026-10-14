@@ -1,5 +1,5 @@
 // Annotations: anchoring a selection (boxes, quote, context, the place in the book's Markdown), the
-// annotation files, sending passages to notes, and placing annotations an agent wrote by hand.
+// annotation documents, sending passages to notes, and placing annotations an agent wrote by hand.
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,6 +13,7 @@ let V: typeof import("../server/vault/index.ts");
 let A: typeof import("../server/annotations/index.ts");
 let R: typeof import("../server/annotations/to-note.ts");
 let N: typeof import("../server/learn/notes.ts");
+let D: typeof import("../server/learn/docs.ts");
 let book: import("../server/books/types.ts").Book;
 
 beforeAll(async () => {
@@ -23,6 +24,7 @@ beforeAll(async () => {
   A = await import("../server/annotations/index.ts");
   R = await import("../server/annotations/to-note.ts");
   N = await import("../server/learn/notes.ts");
+  D = await import("../server/learn/docs.ts");
   book = await ingestBook({
     name: "Tiny Physics.pdf",
     data: makePdf([
@@ -45,7 +47,7 @@ describe("annotations", () => {
   it("live beside the book, recording where the passage is", () => {
     expect(book.status).toBe("ready");
     const a = A.createAnnotation(book.id, {
-      kind: "highlight",
+      type: "highlight",
       anchor: {
         page: 1,
         quote: "A pendulum trades height for speed",
@@ -56,31 +58,43 @@ describe("annotations", () => {
     });
     expect(a.path).toMatch(/^library\/tiny-physics\/annotations\/p1-highlight-a-pendulum-trades-height-for-\w{4}\.md$/);
     const text = readFileSync(join(V.VAULT, a.path), "utf8");
-    expect(text).toMatch(/^kind: highlight$/m);
-    expect(text).toMatch(/^book: tiny-physics$/m);
-    expect(text).toMatch(/pdf: \{|pdf:\n/);
+    expect(text).toMatch(/^kind: annotation$/m);
+    expect(text).toMatch(/^type: highlight$/m);
+    expect(text).not.toMatch(/^title:/m);
+    expect(text).toMatch(new RegExp(`^source:\\n  book: ${book.id}\\n  chapter: `, "m"));
     expect(text).toMatch(/rects:\n\s+- \[0\.118, 0\.124, 0\.42, 0\.02\]/);
     expect(text).toMatch(/> \[!quote\] p\. 1\n> A pendulum trades height for speed/);
     // found in the book's Markdown text, with its line
-    expect(a.anchor.md?.file).toMatch(/^library\/tiny-physics\/text\/01-.*\.md$/);
-    const chapter = readFileSync(join(V.VAULT, a.anchor.md!.file), "utf8").split("\n");
-    expect(chapter[a.anchor.md!.line - 1]).toContain("pendulum trades height");
+    expect(a.source.md?.file).toMatch(/^library\/tiny-physics\/text\/01-.*\.md$/);
+    const chapter = readFileSync(join(V.VAULT, a.source.md!.file), "utf8").split("\n");
+    expect(chapter[a.source.md!.line - 1]).toContain("pendulum trades height");
     // and read back the same
-    V.annotations.load();
-    const back = V.annotations.get(a.id)!;
-    expect(back.anchor.rects).toEqual([{ x: 0.118, y: 0.124, w: 0.42, h: 0.02 }]);
-    expect(back.anchor.quote).toBe("A pendulum trades height for speed");
+    V.docs.load();
+    const back = V.docs.get(a.id, "annotation")!;
+    expect(back.source.rects).toEqual([{ x: 0.118, y: 0.124, w: 0.42, h: 0.02 }]);
+    expect(back.source.quote).toBe("A pendulum trades height for speed");
+    expect(back.source.bookId).toBe(book.id);
     expect(back.body).toBe("");
   });
   it("find their height on the page from the quote alone (as an agent would write them)", () => {
     const a = A.createAnnotation(book.id, {
-      kind: "comment",
+      type: "comment",
       anchor: { page: 2, quote: "In a collision the total momentum stays the same." },
       body: "Check this against the 2D case.",
     });
-    expect(a.anchor.y).toBeGreaterThan(0.05);
-    expect(a.anchor.y).toBeLessThan(0.25);
+    expect(a.source.y).toBeGreaterThan(0.05);
+    expect(a.source.y).toBeLessThan(0.25);
     expect(a.body).toBe("Check this against the 2D case.");
+  });
+  it("trade a highlight for a comment and back, but keep what was asked of the model", () => {
+    const a = A.createAnnotation(book.id, {
+      type: "highlight",
+      anchor: { page: 2, quote: "In a collision the total momentum stays the same." },
+    });
+    expect(D.updateDoc(a.id, { type: "comment", body: "Even in 2D?" })).toMatchObject({ type: "comment" });
+    expect(readFileSync(join(V.VAULT, a.path), "utf8")).toMatch(/^type: comment$/m);
+    expect(D.updateDoc(a.id, { type: "highlight", body: "" })).toMatchObject({ type: "highlight" });
+    expect(D.updateDoc(a.id, { type: "explain" })).toMatchObject({ type: "highlight" });
   });
   it("keep a figure as a fenced block", () => {
     const scene = { kind: "plot", title: "Energy", caption: "Height and speed trade.", params: [] } as never;
@@ -89,7 +103,7 @@ describe("annotations", () => {
     expect(A.figureOf({ body } as never)).toMatchObject({ title: "Energy" });
   });
   it("go into notes as a reference, a quote, or embedded", () => {
-    const a = V.annotations.list().find((x) => x.kind === "highlight")!;
+    const a = V.docs.list("annotation").find((x) => x.type === "highlight")!;
     const link = a.path.replace(/\.md$/, "");
     expect(R.noteMarkdown(a, "reference")).toBe(
       `[[${link}|Tiny Physics, p. 1: “A pendulum trades height for speed…”]]`,
@@ -100,7 +114,7 @@ describe("annotations", () => {
     expect(R.noteMarkdown(a, "embed")).toBe(`![[${link}]]`);
     const note = N.bookNote(book.id);
     expect(note.title).toBe("Tiny Physics — notes");
-    N.appendToNote(note.id, R.noteMarkdown(a, "passage"));
+    D.appendToDoc(note.id, R.noteMarkdown(a, "passage"));
     expect(readFileSync(join(V.VAULT, note.path), "utf8")).toContain("> [!quote] [[library/tiny-physics/annotations/");
     expect(N.bookNote(book.id).id).toBe(note.id);
   });
@@ -108,14 +122,15 @@ describe("annotations", () => {
     const rel = "library/tiny-physics/annotations/p2-explain-agent.md";
     writeFileSync(
       join(V.VAULT, rel),
-      `---\nid: aagent01\nkind: explain\nbook_id: ${book.id}\npage: 2\nanchor:\n  quote: Elastic collisions also keep kinetic energy.\n---\n\nThey bounce without losing energy to heat or sound.\n`,
+      // the way an agent might write one: its type as the kind, only a page and the quote
+      `---\nid: aagent01\nkind: explain\nsource:\n  book: ${book.id}\n  page: 2\n  quote: Elastic collisions also keep kinetic energy.\n---\n\nThey bounce without losing energy to heat or sound.\n`,
     );
     V.reloadFile(rel);
     V.touched(rel);
-    const a = V.annotations.get("aagent01")!;
-    expect(a.kind).toBe("explain");
-    expect(a.anchor.y).toBeGreaterThan(0.1);
-    expect(a.anchor.md?.file).toMatch(/text\/01-/);
+    const a = V.docs.get("aagent01", "annotation")!;
+    expect(a.type).toBe("explain");
+    expect(a.source.y).toBeGreaterThan(0.1);
+    expect(a.source.md?.file).toMatch(/text\/01-/);
     expect(a.body).toBe("They bounce without losing energy to heat or sound.");
   });
 });

@@ -4,7 +4,7 @@
  * SuggestionsCard lists every suggested link, and asks the agent for more. */
 import { X } from "lucide-react";
 import { type ReactNode, type Ref, useEffect, useId, useRef, useState } from "react";
-import { type GraphData, learn } from "../../api";
+import { docs, type GraphData, learn, type Note } from "../../api";
 import { bookLink } from "../../app/navigation";
 import { Mastery, Spinner } from "../../components/feedback";
 import { levelOf, openNode } from "../../components/GraphView";
@@ -122,7 +122,7 @@ export function NodeCard({
     [node.id],
   );
   const { data: note } = useLoad(
-    () => (node.kind === "note" ? learn.note(node.id.slice(5)) : Promise.resolve(null)),
+    () => (node.kind === "note" ? docs.get<Note>(node.id.slice(5)) : Promise.resolve(null)),
     [node.id],
   );
   // useLoad keeps the last item's data until the next arrives: show it only if it's this item's
@@ -252,7 +252,7 @@ export function NodeCard({
       </div>
       {explaining && c && (
         <ExplainBack
-          concept={c.name}
+          concept={c.title}
           passage={c.summary}
           source={c.sources[0]}
           theme={theme}

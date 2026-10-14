@@ -8,26 +8,69 @@ you need, instead of listing everything.
 |---|---|
 | `INDEX.md` | generated map: counts, recent changes, the other indexes |
 | `profile.md` | who the learner is: goals, background, level, how they like to learn |
-| `notes/**.md` | the learner's notes, in folders (by subject, book, topic: however they like). **The file name is the title.** Optional frontmatter: `type` (note, explanation, summary, quiz, exercises, session, connection, answer), `about` (links to the books, concepts or notes it is about: `["[[Book title]]", "[[Concept]]"]`), `tags`, `aliases`, `related` (links), `concepts`, `source` (`bookId`, `page`/`block`, `quote`) |
+| `notes/**.md` | the learner's notes, in folders (by subject, book, topic: however they like). **The file name is the title** |
 | `notes/INDEX.md` | generated: every note with its tags, links out and backlinks |
-| `concepts/<Name>.md` | one page per concept: `name`, `aliases`, `summary`, `related` concept ids, `sources`; the body explains it. `concepts/INDEX.md` lists them with mastery |
-| `cards/*.md` | flashcards: frontmatter (`deck`, `concepts`, `source`) and a body with `## Front` and `## Back` |
+| `concepts/<Name>.md` | one page per concept (the file name is its name); the body explains it. `concepts/INDEX.md` lists them with mastery |
+| `cards/*.md` | flashcards: the body is `## Front` and `## Back` |
+| `figures/*.md` | kept interactive figures: the scene spec in a ```figure JSON block |
 | `library/INDEX.md` | generated: every book, its folder, pages, chapters |
 | `library/<book>/README.md` | generated: the book's chapters with page ranges and text files, its annotations by chapter |
 | `library/<book>/text/NN-*.md` | the book's text, one file per chapter, with `[[page N]]` (or `[[block N]]`) markers |
-| `library/<book>/annotations/*.md` | highlights and what was made from passages (explanations, definitions, answers, figures, animations). Frontmatter: `kind`, `page`, `anchor` (`quote`, `prefix`, `suffix`, `rects`, `md`: the chapter text file and line), `request`, `model`. Body: the answer, then follow-up questions as `## Follow-up: …` sections; a figure is a ```figure JSON block, an animation a ```manim block (a ManimGX scene in Python) |
-| `library/<book>/sessions/*.md` | conversations with the tutor about the book: frontmatter `title`, `chapter`, `mode`, `passage` (where), `note` (a link to the note written from it, if any); the passage as a `> [!quote]`, then `## You` / `## Tutor` sections |
+| `library/<book>/annotations/*.md` | highlights and what was made from passages (explanations, definitions, answers, figures, animations) |
+| `library/<book>/sessions/*.md` | conversations with the tutor about the book |
 | `library/<book>/book.json` | the book's metadata and chapters (the app's; don't edit) |
-| `figures/*.json` | saved interactive figures (scene specs) |
 | `attachments/` | pictures in notes |
 | `brain/links.tsv` | generated: every link, `from<TAB>to<TAB>kind<TAB>line`; backlinks of X: `rg -F "<TAB>X<TAB>" brain/links.tsv` |
 | `brain/connections.jsonl` | links suggested between notes and the learner's decisions (`suggested`, `accepted`, `rejected`, `removed`) |
-| `log/reviews.jsonl` | every flashcard review `{card, ts, rating 1–4}` (spaced repetition is replayed from it) |
+| `log/reviews.jsonl` | every flashcard review `{card, ts, rating 1–4}` (a card's schedule is replayed from it; the card's file never changes) |
 | `log/activity.jsonl` | the learning journey `{ts, type, text, bookId?}` |
 
+## One shape for every document
+
+Notes, concepts, cards, annotations, sessions and figures are all Markdown files with the same
+frontmatter, every field optional:
+
+```yaml
+id: n1a2b3c4          # the app's id (left out, one is made from the path)
+kind: note            # note, concept, card, annotation, session or figure (left out: the folder's)
+type: summary         # what sort of that kind it is (see below)
+title: …              # cards, annotations, sessions, figures (a note's or concept's title is its file name)
+tags: [physics]
+aliases: [dx]
+about: ["[[Calculus Made Easy]]", "[[Derivative]]"]   # the books, concepts, notes it is about: their pages list it
+related: ["[[Integral]]"]                             # other links: related ideas, the note made from it
+concepts: [derivative]                                # ids of the concepts it is about or tests
+source:               # the book it comes from, or the passage it is anchored to
+  book: b0000ddia     # the book's id (book.json)
+  chapter: c5
+  page: 12            # a PDF's page (or `block` in other formats)
+  quote: the passage, word for word
+created: 2026-10-14T09:00:00.000Z
+updated: 2026-10-14T09:00:00.000Z
+```
+
+What each kind adds:
+
+- **note**: `type` note, explanation, summary, quiz, exercises, session, connection or answer; `score`
+  (an explanation's grade, 0–100).
+- **concept**: `summary` (a sentence or two), `sources` (a list of `source`s: where the books bring it
+  up); `related` links the concepts it builds on.
+- **card**: `type` basic or cloze (the front has `{{the hidden words}}`), `deck` (a book, or general),
+  `figure`, `suspended`.
+- **annotation**: `type` highlight, explain, define, ask, visualize, resources or comment; `source`
+  with the passage (`quote`, `prefix`, `suffix`, `rects`, `md`: the chapter text file and line);
+  `request` (what the learner asked), `color`, `status`, `model`. The body: the passage as a
+  `> [!quote]` callout, the answer, then follow-up questions as `## Follow-up: …` sections; a figure
+  is a ```figure JSON block, an animation a ```manim block (a ManimGX scene in Python). An
+  annotation with only a `page` and a `quote` is given its place in the margin when the app sees it.
+- **session**: `mode` answer or socratic; `source` (with the passage, if one was pinned); the note
+  written from it is in `related`. The body: the passage as a `> [!quote]`, then `## You` / `## Tutor`
+  sections.
+- **figure**: `request`; the body is the ```figure block (a scene spec), then anything else.
+
 Links are Obsidian links: `[[Note title]]`, `[[Note title|shown text]]`, `[[Concept name]]`, a book page
-`[[library/<book>/source.pdf#page=12]]`, an annotation `[[library/<book>/annotations/<file>]]`.
-`![[…]]` embeds a note, a picture or `figure:<id>`.
+`[[library/<book>/source.pdf#page=12]]`, any document by its path (`[[library/<book>/annotations/<file>]]`).
+`![[…]]` embeds a document, a picture or `figure:<id>`.
 
 ## Making things for the learner
 
@@ -62,7 +105,8 @@ pages then list it. Cite book pages as below.
   `> [!solution]-` callout (folded callouts open with a click, so the answer stays hidden).
 - **Study sessions**: `type: session`, e.g. `notes/<subject>/Sessions/2026-10-13.md`: what was
   studied, what went well, what to revisit.
-- **Flashcards**: files in `cards/` (see above), with `concepts` and `source` where they apply.
+- **Flashcards**: files in `cards/` (`kind: card`, see above), with `deck`, `concepts` and `source`
+  where they apply.
 - **Animations**: a fenced `manim` block in a note plays as a short film (ManimGX: Manim Community
   Edition's API, `import manimgx as m`, one `m.Scene` subclass with `construct`). Start it with the
   classroom's palette block exactly as the animations in `library/*/annotations/` have it (`PAPER`,

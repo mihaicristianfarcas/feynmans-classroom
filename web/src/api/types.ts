@@ -1,5 +1,6 @@
-/* The shapes the API answers with. Records kept in the vault (notes, annotations, cards…) share
- * their definitions with the server (shared/vault-types.ts); the rest are views the routes build. */
+/* The shapes the API answers with. The documents kept in the vault (notes, concepts, cards, annotations,
+ * sessions, figures) share their definitions with the server (shared/vault-types.ts); the rest are
+ * views the routes build (a card with its memory state, a concept with its mastery, a document's page). */
 
 import type {
   Activity,
@@ -7,8 +8,13 @@ import type {
   AgentRun,
   Anchor,
   Annotation,
-  AnnotationKind,
+  AnnotationType,
+  Card,
+  Concept,
   Connection,
+  Doc,
+  DocKind,
+  DocOf,
   Note,
   NoteType,
   Profile,
@@ -23,7 +29,12 @@ export type {
   AgentRun,
   Anchor,
   Annotation,
-  AnnotationKind,
+  AnnotationType,
+  Card,
+  Concept,
+  Doc,
+  DocKind,
+  DocOf,
   Note,
   NoteType,
   Profile,
@@ -129,12 +140,14 @@ export interface Status {
   chrome: boolean;
   queue: { running: number; waiting: number; concurrency: number };
 }
-export interface NoteDetail extends Note {
+/** A document with what its page shows beside it: links in and out, unlinked mentions, suggested connections. */
+export type DocDetail<D extends Doc = Doc> = D & {
   backlinks: { from: string; path: string; title: string; kind: string; line: number; context: string }[];
   mentions: { path: string; title: string; context: string }[];
   outgoing: { target: string; kind: string; to: string | null; path?: string; title: string }[];
   connections: SuggestedLink[];
-}
+};
+export type NoteDetail = DocDetail<Note>;
 export interface Rect {
   p?: number;
   x: number;
@@ -143,35 +156,29 @@ export interface Rect {
   h: number;
 }
 /** A link the agent suggested between notes, and what the learner decided. */
+/** What a [[link]] points at: a document (of any kind), a book, a picture. */
 export interface Resolved {
   node: string;
-  kind: "note" | "concept" | "book" | "annotation" | "figure" | "attachment" | "session";
+  kind: DocKind | "book" | "attachment";
   id: string;
   path?: string;
   title: string;
   page?: number;
   bookId?: string;
-  anchor?: Anchor;
+  /** Where in a book it is anchored. */
+  source?: SourceRef;
 }
-export interface Concept {
-  id: string;
-  name: string;
-  aliases: string[];
-  summary: string;
-  body: string;
-  related: string[];
+/** A concept with how well it is known right now, and how many cards it has. */
+export type ConceptView = Concept & { mastery: number | null; cards?: number };
+/** A concept's page. */
+export type ConceptDetail = Omit<Concept, "sources" | "related"> & {
   sources: (SourceRef & { title?: string })[];
-  created: string;
-  updated: string;
   mastery: number | null;
-  cards?: number;
-}
-export interface ConceptDetail extends Omit<Concept, "cards" | "related"> {
   cards: CardView[];
   notes: Note[];
-  related: { id: string; name: string; mastery: number | null }[];
-  backlinks: { id: string; name: string; mastery: number | null }[];
-}
+  related: { id: string; title: string; mastery: number | null }[];
+  backlinks: { id: string; title: string; mastery: number | null }[];
+};
 export interface MemoryState {
   s: number;
   d: number;
@@ -181,25 +188,15 @@ export interface MemoryState {
   reps: number;
   lapses: number;
 }
-export interface CardView {
-  id: string;
-  front: string;
-  back: string;
-  kind: "basic" | "cloze";
-  deck: string;
-  concepts: string[];
-  tags: string[];
-  source?: SourceRef;
-  figure?: string;
-  suspended: boolean;
-  created: string;
+/** A card with its memory state, and when it would come back after each rating. */
+export type CardView = Card & {
   state: MemoryState | null;
   next?: Record<1 | 2 | 3 | 4, number>;
-}
+};
 export interface DraftCard {
   front: string;
   back: string;
-  kind: "basic" | "cloze";
+  type: "basic" | "cloze";
   concept: string;
 }
 export interface Question {
@@ -252,7 +249,7 @@ export interface GraphData {
   edges: { from: string; to: string; kind: string; id?: string; why?: string }[];
 }
 export interface SearchHit {
-  kind: "note" | "concept" | "card" | "book" | "annotation" | "session";
+  kind: DocKind | "book";
   id: string;
   title: string;
   snippet: string;
@@ -265,7 +262,7 @@ export interface Journey {
   streak: number;
   totals: { reviews: number; cards: number; concepts: number; notes: number; figures: number; books: number };
   retention: { now: number | null; month: number | null; mature: number; learning: number; unseen: number };
-  mastery: { id: string; name: string; mastery: number | null }[];
+  mastery: { id: string; title: string; mastery: number | null }[];
   recent: Activity[];
 }
 export interface Today {

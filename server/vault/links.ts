@@ -1,21 +1,22 @@
 /* The link graph of the vault: what every [[link]] points at, backlinks, unlinked mentions, and
- * renames that carry the links along (as Obsidian does).
+ * renames that carry the links along (as Obsidian does). It works on documents of any kind.
  *
  * A link target resolves, in order, to: a path ("library/x/annotations/p12-…", "notes/Ideas/Plan"),
- * a file name anywhere (notes, concepts, annotations), a note or concept alias, a concept id or name,
- * a book (its title, folder, or "library/<folder>/source.pdf#page=12"), or figure:<id>. */
+ * a file name or id (any document), a book (its title, folder, or "library/<folder>/source.pdf#page=12"),
+ * an alias, a picture in attachments/, or figure:<id>. */
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { linkKey, linksInValue, pageOf, parseWikiLinks, rewriteLinks, type WikiLink } from "../../shared/links.ts";
-import type { Annotation, Concept, Note } from "../../shared/vault-types.ts";
+import type { Doc, DocKind, SourceRef } from "../../shared/vault-types.ts";
 import { bookFolder, listBooks } from "../books/store.ts";
 import type { Book } from "../books/types.ts";
 import { listConnections } from "./connections.ts";
-import { annotations, changed, concepts, figures, notes, onVaultChange, sessions, VAULT } from "./index.ts";
+import { changed, docs, onVaultChange, VAULT } from "./index.ts";
+import { withBody } from "./kinds.ts";
 
-export type NodeKind = "note" | "concept" | "book" | "annotation" | "figure" | "attachment" | "session";
+export type NodeKind = DocKind | "book" | "attachment";
 export interface Resolved {
-  /** Graph node id: "note:<id>", "concept:<id>", "book:<id>", "annotation:<id>", "figure:<id>". */
+  /** Graph node id: "<kind>:<id>" ("note:n1a2b3c4", "book:b1…"). */
   node: string;
   kind: NodeKind;
   id: string;
@@ -24,6 +25,8 @@ export interface Resolved {
   title: string;
   page?: number;
   bookId?: string;
+  /** Where in a book it is anchored (annotations, sessions, notes from a passage). */
+  source?: SourceRef;
 }
 
 export interface Edge {
@@ -54,19 +57,16 @@ export function invalidateLinks() {
 }
 onVaultChange(() => invalidateLinks());
 
-const noteNode = (n: Note): Resolved => ({
-  node: `note:${n.id}`,
-  kind: "note",
-  id: n.id,
-  path: n.path,
-  title: n.title,
-});
-const conceptNode = (c: Concept & { path?: string }): Resolved => ({
-  node: `concept:${c.id}`,
-  kind: "concept",
-  id: c.id,
-  path: c.path || concepts.fileOf(c.id) || undefined,
-  title: c.name,
+/** A document as a node of the graph. */
+export const docNode = (d: Doc): Resolved => ({
+  node: `${d.kind}:${d.id}`,
+  kind: d.kind,
+  id: d.id,
+  path: d.path,
+  title: d.title,
+  bookId: d.source?.bookId,
+  page: d.source?.page,
+  source: d.source,
 });
 const bookNode = (b: Book): Resolved => ({
   node: `book:${b.id}`,
@@ -75,15 +75,6 @@ const bookNode = (b: Book): Resolved => ({
   path: `library/${bookFolder(b.id)}/README.md`,
   title: b.title,
   bookId: b.id,
-});
-const annotationNode = (a: Annotation): Resolved => ({
-  node: `annotation:${a.id}`,
-  kind: "annotation",
-  id: a.id,
-  path: a.path,
-  title: a.title || `${a.kind}: ${a.anchor.quote.split(/\s+/).slice(0, 8).join(" ")}…`,
-  bookId: a.bookId,
-  page: a.anchor.page,
 });
 
 function buildNames(): Names {
@@ -98,24 +89,13 @@ function buildNames(): Names {
     else list.push(r);
     byKey.set(k, list);
   };
-  // the more specific the name, the earlier it is added: paths, then file names, then aliases
-  for (const n of notes.list()) {
-    const r = noteNode(n);
-    add(n.path, r, true);
-    add(basename(n.path), r);
-    add(n.id, r);
-  }
-  for (const c of concepts.list()) {
-    const r = conceptNode(c);
-    if (r.path) add(r.path, r, true);
-    add(c.name, r);
-    add(c.id, r);
-  }
-  for (const a of annotations.list()) {
-    const r = annotationNode(a);
-    add(a.path, r, true);
-    add(basename(a.path), r);
-    add(a.id, r);
+  // the more specific the name, the earlier it is added: paths, then file names and ids, then aliases
+  const all = docs.list();
+  for (const d of all) add(d.path, docNode(d), true);
+  for (const d of all) {
+    const r = docNode(d);
+    add(basename(d.path), r);
+    add(d.id, r);
   }
   const books = listBooks().filter((b) => b.status === "ready");
   for (const b of books) {
@@ -130,9 +110,8 @@ function buildNames(): Names {
     add(b.title, r);
     add(b.id, r);
   }
-  // aliases last: a note's own name always wins over another's alias
-  for (const n of notes.list()) for (const alias of n.aliases) add(alias, noteNode(n));
-  for (const c of concepts.list()) for (const alias of c.aliases) add(alias, conceptNode(c));
+  // aliases last: a document's own name always wins over another's alias
+  for (const d of all) for (const alias of d.aliases) add(alias, docNode(d));
   return { byKey, books };
 }
 
@@ -140,11 +119,8 @@ export function resolveLink(target: string, sub?: string): Resolved | null {
   const t = target.trim();
   if (!t) return null;
   if (/^figure:/i.test(t)) {
-    const id = t.slice(7).trim();
-    const f = figures.get(id);
-    return f
-      ? { node: `figure:${id}`, kind: "figure", id, path: figures.fileOf(id) || undefined, title: f.title }
-      : null;
+    const f = docs.get(t.slice(7).trim(), "figure");
+    return f ? docNode(f) : null;
   }
   if (/\.(png|jpe?g|gif|webp|svg)$/i.test(t)) {
     const path = t.includes("/") ? t : `attachments/${t}`;
@@ -152,19 +128,6 @@ export function resolveLink(target: string, sub?: string): Resolved | null {
       ? { node: `attachment:${path}`, kind: "attachment", id: path, path, title: basename(path) }
       : null;
   }
-  // a session with the tutor: the book, with that conversation in its Tutor pane
-  const session = /^library\/[^/]+\/sessions\/.+/.test(t)
-    ? sessions.byPath(t.endsWith(".md") ? t : `${t}.md`)
-    : undefined;
-  if (session)
-    return {
-      node: `session:${session.id}`,
-      kind: "session",
-      id: session.id,
-      path: session.path,
-      title: session.title,
-      bookId: session.bookId,
-    };
   names ||= buildNames();
   let found = names.byKey.get(linkKey(t))?.[0];
   // a file inside a book's folder (its text by chapter, its PDF): the book, at that chapter's first page
@@ -182,23 +145,22 @@ export function resolveLink(target: string, sub?: string): Resolved | null {
   return page !== undefined ? { ...found, page } : found;
 }
 
-/** Everything a [[ can complete to, for the editor. */
+/** Everything a [[ can complete to, for the editor: notes, concepts, kept figures and books. */
 export function linkTargets(): { title: string; kind: NodeKind; path?: string; detail?: string }[] {
   const out: { title: string; kind: NodeKind; path?: string; detail?: string }[] = [];
-  for (const n of notes.list())
-    out.push({
-      title: n.title,
-      kind: "note",
-      path: n.path,
-      detail: n.path.split("/").slice(1, -1).join("/") || undefined,
-    });
-  for (const c of concepts.list())
-    out.push({
-      title: c.name,
-      kind: "concept",
-      path: concepts.fileOf(c.id) || undefined,
-      detail: c.summary.slice(0, 80),
-    });
+  for (const d of docs.list()) {
+    if (d.kind === "note")
+      out.push({
+        title: d.title,
+        kind: "note",
+        path: d.path,
+        detail: d.path.split("/").slice(1, -1).join("/") || undefined,
+      });
+    else if (d.kind === "concept")
+      out.push({ title: d.title, kind: "concept", path: d.path, detail: d.summary.slice(0, 80) });
+    else if (d.kind === "figure")
+      out.push({ title: d.path.replace(/\.md$/, ""), kind: "figure", path: d.path, detail: d.title });
+  }
   for (const b of listBooks().filter((x) => x.status === "ready"))
     out.push({ title: b.title, kind: "book", path: `library/${bookFolder(b.id)}`, detail: b.author });
   return out;
@@ -206,18 +168,43 @@ export function linkTargets(): { title: string; kind: NodeKind; path?: string; d
 
 /* ---------------- the edges ---------------- */
 
-function linkEdges(
-  from: string,
-  fromPath: string,
-  text: string,
-  kindOf: (l: WikiLink) => Edge["kind"] = (l) => (l.embed ? "embed" : "link"),
-): Edge[] {
-  return parseWikiLinks(text).map((l) => {
+/** How many lines of its file come before a document's body (the frontmatter, a quote callout). */
+function bodyOffset(d: Doc): number {
+  try {
+    const text = readFileSync(join(VAULT, d.path), "utf8");
+    const head = d.body.trimStart().slice(0, 60);
+    const at = head ? text.indexOf(head) : -1;
+    return at > 0 ? text.slice(0, at).split("\n").length - 1 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function linkEdges(from: string, fromPath: string, text: string, offset = 0): Edge[] {
+  return parseWikiLinks(text).map((l: WikiLink): Edge => {
     const r = resolveLink(l.target, l.sub);
-    return { from, fromPath, to: r?.node ?? null, toPath: r?.path, target: l.target, kind: kindOf(l), line: l.line };
+    return {
+      from,
+      fromPath,
+      to: r?.node ?? null,
+      toPath: r?.path,
+      target: l.target,
+      kind: l.embed ? "embed" : "link",
+      line: l.line + offset,
+    };
   });
 }
 
+/** The concept a document's `concepts` entry names (its id, or its name). */
+function conceptOf(ref: string): Doc | undefined {
+  const byId = docs.get(ref, "concept");
+  if (byId) return byId;
+  const r = resolveLink(ref);
+  return r?.kind === "concept" ? docs.get(r.id) : undefined;
+}
+
+/** Every link in the vault: written in bodies, kept in frontmatter (related, about), to the concepts a
+ * document is about, and to the books it comes from. */
 export function allEdges(): Edge[] {
   if (edgesCache) return edgesCache;
   const edges: Edge[] = [];
@@ -226,81 +213,40 @@ export function allEdges(): Edge[] {
       .filter((c) => c.status === "accepted")
       .map((c) => `${c.from}\u0000${linkKey(c.to)}`),
   );
-  for (const n of notes.list()) {
-    const from = `note:${n.id}`;
-    // the body starts after the frontmatter: count its lines so line numbers point into the file
-    const offset = frontmatterLines(n.path);
-    for (const e of linkEdges(from, n.path, n.body)) edges.push({ ...e, line: e.line + offset });
-    for (const target of linksInValue(n.related)) {
+  for (const d of docs.list()) {
+    const from = `${d.kind}:${d.id}`;
+    const fromPath = d.path;
+    edges.push(...linkEdges(from, fromPath, d.body, d.body.includes("[[") ? bodyOffset(d) : 0));
+    for (const target of linksInValue(d.related)) {
       const r = resolveLink(target);
-      edges.push({
-        from,
-        fromPath: n.path,
-        to: r?.node ?? null,
-        toPath: r?.path,
-        target,
-        kind: accepted.has(`${n.path}\u0000${linkKey(target)}`) ? "ai" : "related",
-        line: 1,
-      });
+      const kind: Edge["kind"] = accepted.has(`${fromPath}\u0000${linkKey(target)}`)
+        ? "ai"
+        : d.kind === "concept" && r?.kind === "concept"
+          ? "concept"
+          : "related";
+      edges.push({ from, fromPath, to: r?.node ?? null, toPath: r?.path, target, kind, line: 1 });
     }
-    for (const target of linksInValue(n.about)) {
+    for (const target of linksInValue(d.about)) {
       const r = resolveLink(target);
-      edges.push({ from, fromPath: n.path, to: r?.node ?? null, toPath: r?.path, target, kind: "about", line: 1 });
+      edges.push({ from, fromPath, to: r?.node ?? null, toPath: r?.path, target, kind: "about", line: 1 });
     }
-    for (const c of n.concepts) {
-      const concept = concepts.get(c);
-      if (concept)
+    for (const ref of d.concepts) {
+      const concept = conceptOf(ref);
+      if (concept && concept.id !== d.id)
         edges.push({
           from,
-          fromPath: n.path,
+          fromPath,
           to: `concept:${concept.id}`,
-          toPath: concepts.fileOf(concept.id) || undefined,
-          target: c,
+          toPath: concept.path,
+          target: ref,
           kind: "mentions",
           line: 1,
         });
     }
-    if (n.source?.bookId && !edges.some((e) => e.from === from && e.to === `book:${n.source!.bookId}`))
-      edges.push({
-        from,
-        fromPath: n.path,
-        to: `book:${n.source.bookId}`,
-        target: n.source.bookId,
-        kind: "source",
-        line: 1,
-      });
-  }
-  for (const c of concepts.list()) {
-    const from = `concept:${c.id}`;
-    const path = concepts.fileOf(c.id) || "";
-    edges.push(...linkEdges(from, path, c.body));
-    for (const id of c.related) {
-      const r = concepts.get(id) ? conceptNode(concepts.get(id)!) : resolveLink(id);
-      if (r && r.node !== from)
-        edges.push({ from, fromPath: path, to: r.node, toPath: r.path, target: id, kind: "concept", line: 1 });
-    }
-    for (const book of new Set(c.sources.map((s) => s.bookId)))
-      edges.push({ from, fromPath: path, to: `book:${book}`, target: book, kind: "source", line: 1 });
-  }
-  for (const a of annotations.list()) {
-    const from = `annotation:${a.id}`;
-    edges.push(...linkEdges(from, a.path, a.body));
-    if (a.bookId)
-      edges.push({ from, fromPath: a.path, to: `book:${a.bookId}`, target: a.bookId, kind: "source", line: 1 });
-  }
-  // a tutoring session links to the note written from it (in its frontmatter)
-  for (const x of sessions.list()) {
-    const note = x.note && notes.get(x.note.id);
-    if (note)
-      edges.push({
-        from: `session:${x.id}`,
-        fromPath: x.path,
-        to: `note:${note.id}`,
-        toPath: note.path,
-        target: x.note!.title,
-        kind: "related",
-        line: 1,
-      });
+    const books = new Set([d.source?.bookId, ...(d.kind === "concept" ? d.sources.map((s) => s.bookId) : [])]);
+    for (const book of books)
+      if (book && !edges.some((e) => e.from === from && e.to === `book:${book}`))
+        edges.push({ from, fromPath, to: `book:${book}`, target: book, kind: "source", line: 1 });
   }
   const seen = new Set<string>();
   edgesCache = edges.filter((e) => {
@@ -310,16 +256,6 @@ export function allEdges(): Edge[] {
     return true;
   });
   return edgesCache;
-}
-
-/** Lines taken by a file's frontmatter (and the blank lines after it), so body lines map to file lines. */
-function frontmatterLines(rel: string): number {
-  try {
-    const m = /^---\r?\n[\s\S]*?\r?\n---[ \t]*\r?\n(\s*\n)?/.exec(readFileSync(join(VAULT, rel), "utf8"));
-    return m ? m[0].split("\n").length - 1 : 0;
-  } catch {
-    return 0;
-  }
 }
 
 /** Links into a node, each with the line it sits on (for the backlinks panel). */
@@ -339,7 +275,7 @@ export function backlinks(
     }
     const lines = files.get(e.fromPath)!;
     // a link kept in the frontmatter has no line of text around it worth showing
-    const inProperties = ["about", "related", "ai", "mentions", "source"].includes(e.kind);
+    const inProperties = ["about", "related", "ai", "mentions", "source", "concept"].includes(e.kind);
     out.push({
       from: e.from,
       path: e.fromPath,
@@ -352,40 +288,31 @@ export function backlinks(
   return out;
 }
 
+/** What a node is called: a document's title, a book's. */
 export function titleOf(node: string, path?: string): string {
   const [kind, id] = [node.slice(0, node.indexOf(":")), node.slice(node.indexOf(":") + 1)];
-  if (kind === "note") return notes.get(id)?.title || basename(path || id, ".md");
-  if (kind === "concept") return concepts.get(id)?.name || id;
-  if (kind === "annotation") {
-    const a = annotations.get(id);
-    return a ? annotationNode(a).title : id;
-  }
   if (kind === "book") return listBooks().find((b) => b.id === id)?.title || id;
-  if (kind === "session") {
-    const x = sessions.get(id);
-    return x ? `Tutor: ${x.title}` : id;
-  }
-  if (kind === "figure") return figures.get(id)?.title || id;
-  return id;
+  return docs.get(id)?.title || basename(path || id, ".md");
 }
 
-/** Notes that name this note (or its aliases) in plain text without linking it. */
-export function unlinkedMentions(note: Note): { path: string; title: string; context: string }[] {
-  const names_ = [note.title, ...note.aliases].filter((n) => n.length >= 3);
+/** Notes that name this document (by its title or aliases) in plain text without linking it. */
+export function unlinkedMentions(doc: Doc): { path: string; title: string; context: string }[] {
+  const names_ = [doc.title, ...doc.aliases].filter((n) => n.length >= 3);
   if (!names_.length) return [];
   const pattern = new RegExp(
     `(^|[^\\p{L}\\p{N}\\[|])(${names_.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?=$|[^\\p{L}\\p{N}\\]|])`,
     "iu",
   );
+  const node = `${doc.kind}:${doc.id}`;
   const linked = new Set(
     allEdges()
-      .filter((e) => e.to === `note:${note.id}`)
+      .filter((e) => e.to === node)
       .map((e) => e.fromPath),
   );
   const out: { path: string; title: string; context: string }[] = [];
-  for (const other of notes.list()) {
-    if (other.id === note.id || linked.has(other.path)) continue;
-    const line = other.body.split("\n").find((l) => pattern.test(l) && !l.includes(`[[${note.title}`));
+  for (const other of docs.list("note")) {
+    if (other.id === doc.id || linked.has(other.path)) continue;
+    const line = other.body.split("\n").find((l) => pattern.test(l) && !l.includes(`[[${doc.title}`));
     if (line) out.push({ path: other.path, title: other.title, context: line.trim().slice(0, 240) });
   }
   return out.slice(0, 50);
@@ -394,43 +321,22 @@ export function unlinkedMentions(note: Note): { path: string; title: string; con
 /* ---------------- renames ---------------- */
 
 /**
- * After a note or concept is renamed, links to its old name follow it. `oldKeys` are the names the
- * old links could use (its old file name and path); `next` is the new name (or path, for links that
- * were written as paths). Returns how many files changed.
+ * After a document is renamed, links to its old name follow it, in every document (their bodies and
+ * the links in their frontmatter). `oldKeys` are the names the old links could use (its old file name
+ * and path); `next` is the new name (or path, for links that were written as paths). Returns how many
+ * files changed.
  */
 export function carryLinks(oldKeys: string[], next: { name: string; path: string }): number {
   const keys = new Set(oldKeys.map(linkKey));
   const rename = (target: string) =>
     keys.has(linkKey(target)) ? (target.includes("/") ? next.path.replace(/\.md$/, "") : next.name) : null;
   let count = 0;
-  for (const n of notes.list()) {
-    const body = rewriteLinks(n.body, rename);
-    const related = n.related.map((r) => rewriteLinks(r, rename));
-    const about = n.about.map((r) => rewriteLinks(r, rename));
-    if (body !== n.body || related.some((r, i) => r !== n.related[i]) || about.some((r, i) => r !== n.about[i])) {
-      notes.save({ ...n, body, related, about });
-      count++;
-    }
-  }
-  for (const c of concepts.list()) {
-    const body = rewriteLinks(c.body, rename);
-    if (body !== c.body) {
-      concepts.save({ ...c, body });
-      count++;
-    }
-  }
-  for (const a of annotations.list()) {
-    const body = rewriteLinks(a.body, rename);
-    if (body !== a.body) {
-      annotations.save({ ...a, body });
-      count++;
-    }
-  }
-  // a tutoring session names the note made from it
-  for (const x of sessions.list()) {
-    const title = x.note && rename(x.note.title);
-    if (x.note && title) {
-      sessions.save({ ...x, note: { ...x.note, title } });
+  for (const d of docs.list()) {
+    const body = rewriteLinks(d.body, rename);
+    const related = d.related.map((r) => rewriteLinks(r, rename));
+    const about = d.about.map((r) => rewriteLinks(r, rename));
+    if (body !== d.body || related.some((r, i) => r !== d.related[i]) || about.some((r, i) => r !== d.about[i])) {
+      docs.save(Object.assign(d, body !== d.body ? withBody(d, body) : {}, { related, about }));
       count++;
     }
   }

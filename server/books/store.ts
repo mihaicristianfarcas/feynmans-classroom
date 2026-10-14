@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { BOOKS_DIR, LEGACY_BOOKS_DIR } from "../config.ts";
+import { BOOKS_DIR } from "../config.ts";
 import { readJson, writeJson } from "../fs.ts";
 import type { Block, Book, Demo, PageText } from "./types.ts";
 
@@ -84,29 +84,6 @@ export function renameBookDir(bookId: string, title: string) {
   } catch (error) {
     console.warn(`[store] could not rename ${current} to ${name}: ${(error as Error).message}`);
   }
-}
-
-/** Books stored in DATA_DIR/books before they moved into the vault are moved once, at startup. */
-export function migrateLegacyBooks(): string[] {
-  if (!existsSync(LEGACY_BOOKS_DIR)) return [];
-  const moved: string[] = [];
-  for (const id of readdirSync(LEGACY_BOOKS_DIR)) {
-    const from = join(LEGACY_BOOKS_DIR, id);
-    const book = readJson<Book | null>(join(from, "book.json"), null);
-    if (!book?.id || folders.has(book.id)) continue;
-    const name = freeFolder(book.title || id);
-    try {
-      renameSync(from, join(BOOKS_DIR, name));
-      folders.set(book.id, name);
-      moved.push(name);
-    } catch (error) {
-      console.warn(`[store] could not move ${from} into the vault: ${(error as Error).message}`);
-    }
-  }
-  try {
-    if (!readdirSync(LEGACY_BOOKS_DIR).length) rmSync(LEGACY_BOOKS_DIR, { recursive: true, force: true });
-  } catch {}
-  return moved;
 }
 
 /* ---------- books ---------- */

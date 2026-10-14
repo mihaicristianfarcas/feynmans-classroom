@@ -39,8 +39,8 @@ describe.skipIf(!has("jj") || !has("git"))("a git vault moving to jj", () => {
     expect(bookmarks).toContain("main");
   });
   it("carries on: a new edit becomes a new version of the note", () => {
-    const note = V.notes.byPath("notes/Before jj.md")!;
-    V.notes.save({ ...note, body: "Written when git kept the vault, edited under jj." });
+    const note = V.docs.at("notes/Before jj.md", "note")!;
+    V.docs.save({ ...note, body: "Written when git kept the vault, edited under jj." });
     V.checkpoint();
     expect(V.fileHistory("notes/Before jj.md").map((v) => v.subject)).toEqual([
       "edit notes/Before jj.md",

@@ -7,7 +7,7 @@
  *     notes/**.md               notes, in folders if you like; the file name is the title
  *     concepts/<Name>.md        one page per concept, linked to its sources
  *     cards/*.md                flashcards (## Front / ## Back)
- *     figures/*.json            saved figures (scene specs)
+ *     figures/*.md              figures kept in the brain (a ```figure block)
  *     attachments/              pictures pasted into notes or captured from books
  *     library/<book>/           one folder per book: book.json, the file, its text by chapter (text/),
  *                               annotations/ (highlights, explanations, figures made from passages),
@@ -16,14 +16,14 @@
  *     brain/links.tsv           every link in the vault (generated)
  *     log/*.jsonl               reviews, the learning journey, agent runs
  *
- * Markdown with YAML frontmatter is what agents read best and what people can open in any editor
- * (it is a valid Obsidian vault). The server keeps an index in memory, writes through, notices
- * edits made outside the app, and keeps the vault's history with Jujutsu (jj).
+ * Every Markdown record is a document of one shape whose `kind` says what it is (docs.ts, kinds.ts);
+ * books and logs are the only other things kept. It is a valid Obsidian vault, and what agents read
+ * best. The server keeps an index in memory, writes through, notices edits made outside the app, and
+ * keeps the vault's history with Jujutsu (jj).
  *
  * This module is the vault's public face; the work happens in the files it re-exports from. */
 export { onVaultChange, takeSelfWrite, touched, wroteItself } from "./changes.ts";
-export { Collection, GENERATED, trash } from "./collection.ts";
-export { annotations, cards, concepts, figures, notes, sessions } from "./collections.ts";
+export { docs, GENERATED, isGenerated, trash } from "./docs.ts";
 export {
   atomicWrite,
   now,
@@ -35,7 +35,6 @@ export {
   VAULT,
   vaultRel,
 } from "./files.ts";
-export { annotationBookInfo, setAnnotationBookInfo } from "./formats.ts";
 export {
   changed,
   checkpoint,
@@ -50,6 +49,7 @@ export {
   vaultHistory,
   vaultIsRepo,
 } from "./jj.ts";
+export { blankDoc, docFromFile, docToFile, sourceFromYaml, sourceToYaml, whereOf } from "./kinds.ts";
 export { activity, appendLog, logActivity, logReview, readLog, reviews } from "./logs.ts";
 export { DEFAULT_PROFILE, getProfile, saveProfile } from "./profile.ts";
 export { initVault, vaultStats } from "./setup.ts";

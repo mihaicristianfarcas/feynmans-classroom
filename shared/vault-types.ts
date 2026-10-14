@@ -1,86 +1,147 @@
-/* The second brain's records. Each lives as one Markdown file with YAML frontmatter in the vault
- * (DATA_DIR/vault), so a person, Obsidian or an AI agent can read and edit them directly; reviews
- * and activity are append-only JSONL logs. Git keeps the history. */
+/* The second brain's records. Everything the learner reads and writes is a document: one Markdown file
+ * with YAML frontmatter in the vault (DATA_DIR/vault) whose `kind` says what it is, and six kinds share
+ * one shape (the fields of DocBase, plus a few of their own). Books (library/<book>/) and logs
+ * (log/*.jsonl, brain/connections.jsonl) are the only other things kept. A person, Obsidian or an AI
+ * agent can read and write any of them; jj keeps the history. */
 
-export interface SourceRef {
-  bookId: string;
-  chapterId?: string;
-  /** PDF page + fraction, or block index (EPUB, Markdown, text). */
+/**
+ * Where a passage is in a book, recorded several ways (as the W3C Web Annotation model and Hypothesis
+ * do), so it can be found again quickly (rects) and robustly (the quote and its context), and an agent
+ * can find it in the book's Markdown text (md).
+ */
+export interface Anchor {
+  /** PDF page (1-based) where the passage starts. */
   page?: number;
-  y?: number;
+  /** Reflowable books: the block where it starts, and where it ends. */
   block?: number;
-  quote?: string;
+  blockEnd?: number;
+  /** The passage, whitespace collapsed. */
+  quote: string;
+  /** Up to 32 characters before and after it in the page (or block) text. */
+  prefix?: string;
+  suffix?: string;
+  /** Character offsets of the quote in the page's text layer (or the block's text). */
+  start?: number;
+  end?: number;
+  /** PDF: the selection's boxes as fractions of the page, [x, y, w, h]; `p` when not on `page`. */
+  rects?: { p?: number; x: number; y: number; w: number; h: number }[];
+  /** Top of the passage as a fraction of the page height (from the rects, or found from the text). */
+  y?: number;
+  /** The same passage in the book's Markdown: the chapter text file and line. */
+  md?: { file: string; line: number; score?: number };
 }
 
-export type NoteType =
-  | "note"
-  | "highlight"
-  | "explanation"
-  | "connection"
-  | "answer"
-  | "summary"
-  | "quiz"
-  | "exercises"
-  | "session";
+/** The book a document comes from, or the passage it is anchored to: the book, its chapter, and as much
+ * of the anchor as is known (a page and a few words, or the whole passage). */
+export interface SourceRef extends Partial<Anchor> {
+  bookId: string;
+  chapterId?: string;
+}
 
-export interface Note {
-  /** From the frontmatter, or derived from the path for notes written elsewhere (Obsidian, an agent). */
+/* ---------------- documents ---------------- */
+
+export type DocKind = "note" | "concept" | "card" | "annotation" | "session" | "figure";
+export const DOC_KINDS: DocKind[] = ["note", "concept", "card", "annotation", "session", "figure"];
+
+/** What every document has. */
+export interface DocBase {
+  /** From the frontmatter, or derived from the path for a file written without one. */
   id: string;
-  /** Vault-relative path ("notes/Replication lag.md"): the file name is the title, as in Obsidian. */
+  kind: DocKind;
+  /** Vault-relative path ("notes/Replication lag.md"). */
   path: string;
-  type: NoteType;
+  /** A note's or concept's file name (as in Obsidian); the frontmatter's, or one made from the content,
+   * for the other kinds. */
   title: string;
-  /** Markdown. [[wikilinks]] to notes or concepts; ![[figure:id]] embeds a figure. */
+  /** Markdown. [[wikilinks]] to anything in the vault, ![[embeds]]. */
   body: string;
   tags: string[];
   aliases: string[];
-  /** Links kept in the frontmatter (Obsidian properties), e.g. connections the learner accepted. */
-  related: string[];
-  /** What the note is about: links to books, concepts, notes ("[[DDIA]]", "[[Replication]]"). Their
-   * pages list it. */
+  /** What it is about: links to books, concepts, notes ("[[DDIA]]", "[[Replication]]"). Their pages list it. */
   about: string[];
+  /** Other links kept in the frontmatter: related ideas, connections the learner accepted, a note made from it. */
+  related: string[];
+  /** The concepts it is about or tests (their ids). */
   concepts: string[];
+  /** The book it comes from, or the passage it is anchored to. */
   source?: SourceRef;
-  /** Feynman explanations: the grade the tutor gave (0–100). */
-  score?: number;
   /** Frontmatter keys the app doesn't know: kept exactly as they were. */
   props?: Record<string, unknown>;
   created: string;
   updated: string;
 }
 
-export interface Concept {
-  /** Slug of the name. */
-  id: string;
-  name: string;
-  aliases: string[];
-  /** One or two sentences. */
-  summary: string;
-  /** Markdown: a fuller explanation, examples, the user's own words. */
-  body: string;
-  related: string[];
-  sources: SourceRef[];
-  created: string;
-  updated: string;
+export type NoteType = "note" | "explanation" | "connection" | "answer" | "summary" | "quiz" | "exercises" | "session";
+
+/** Notes: the learner's own (notes/**.md, in folders, named by their title). */
+export interface Note extends DocBase {
+  kind: "note";
+  type: NoteType;
+  /** Feynman explanations: the grade the tutor gave (0–100). */
+  score?: number;
 }
 
-export interface Card {
-  id: string;
-  /** Markdown. */
+/** Concepts: one page per idea (concepts/<Name>.md); `related` links the concepts it builds on. */
+export interface Concept extends DocBase {
+  kind: "concept";
+  /** One or two sentences. */
+  summary: string;
+  /** Where in the books it comes up. */
+  sources: SourceRef[];
+}
+
+/** Flashcards (cards/*.md): the body is "## Front" and "## Back". Their memory state is replayed from
+ * the review log, so a review never changes the file. */
+export interface Card extends DocBase {
+  kind: "card";
+  type: "basic" | "cloze";
   front: string;
   back: string;
-  kind: "basic" | "cloze";
   /** The book it came from (or "general"). */
   deck: string;
-  concepts: string[];
-  tags: string[];
-  source?: SourceRef;
   /** A figure shown with the answer. */
   figure?: string;
   suspended: boolean;
-  created: string;
-  updated: string;
 }
+
+export type AnnotationType = "highlight" | "explain" | "define" | "ask" | "visualize" | "resources" | "comment";
+
+/** What was made from a passage of a book, kept beside it (library/<book>/annotations/): a highlight,
+ * or an answer a model wrote (an explanation, a figure, an animation…), shown in the margin. */
+export interface Annotation extends DocBase {
+  kind: "annotation";
+  type: AnnotationType;
+  source: SourceRef & { quote: string };
+  /** Highlight colour (a theme token: yellow, green, blue, pink, purple). */
+  color?: string;
+  /** What the learner asked for ("why not just back up?"), if anything. */
+  request?: string;
+  status: "pending" | "ready" | "failed";
+  error?: string;
+  /** Who made it and how long it took. */
+  model?: { provider: string; name: string; effort?: string; ms?: number };
+}
+
+/** One conversation with the tutor about a book (library/<book>/sessions/), kept to look back on: the
+ * body is "## You" / "## Tutor" sections; `source` is the passage it was about, if one was pinned. */
+export interface TutorSession extends DocBase {
+  kind: "session";
+  source: SourceRef;
+  mode: "answer" | "socratic";
+  messages: { role: "user" | "tutor"; text: string }[];
+  /** The note made from it (Save as note): the first of its `related` links that is a note (read live). */
+  note?: { id: string; title: string };
+}
+
+/** A figure kept in the brain (figures/*.md): its scene spec in a ```figure block. */
+export interface SavedFigure extends DocBase {
+  kind: "figure";
+  scene: unknown;
+  request?: string;
+}
+
+export type Doc = Note | Concept | Card | Annotation | TutorSession | SavedFigure;
+export type DocOf<K extends DocKind> = Extract<Doc, { kind: K }>;
 
 export interface ReviewLog {
   card: string;
@@ -133,94 +194,6 @@ export interface Profile {
   onboarded: boolean;
 }
 
-export interface SavedFigure {
-  id: string;
-  title: string;
-  /** The scene spec. */
-  scene: unknown;
-  source?: SourceRef;
-  request?: string;
-  created: string;
-}
-
-/* ---------------- annotations: what was made from a passage, kept beside the book ---------------- */
-
-export type AnnotationKind = "highlight" | "explain" | "define" | "ask" | "visualize" | "resources" | "comment";
-
-/**
- * Where a passage is, recorded several ways (as the W3C Web Annotation model and Hypothesis do), so it
- * can be found again quickly (rects) and robustly (the quote and its context), and an agent can find
- * it in the book's Markdown text (md).
- */
-export interface Anchor {
-  /** PDF page (1-based) where the passage starts. */
-  page?: number;
-  /** Reflowable books: the block where it starts, and where it ends. */
-  block?: number;
-  blockEnd?: number;
-  /** The selected text, whitespace collapsed. */
-  quote: string;
-  /** Up to 32 characters before and after it in the page (or block) text. */
-  prefix?: string;
-  suffix?: string;
-  /** Character offsets of the quote in the page's text layer (or the block's text). */
-  start?: number;
-  end?: number;
-  /** PDF: the selection's boxes as fractions of the page, [x, y, w, h]; `p` when not on `page`. */
-  rects?: { p?: number; x: number; y: number; w: number; h: number }[];
-  /** Top of the passage as a fraction of the page height (from the rects, or found from the text). */
-  y?: number;
-  /** The same passage in the book's Markdown: the chapter text file and line. */
-  md?: { file: string; line: number; score?: number };
-}
-
-export interface Annotation {
-  id: string;
-  kind: AnnotationKind;
-  bookId: string;
-  /** Vault-relative path of the file. */
-  path: string;
-  chapterId?: string;
-  anchor: Anchor;
-  /** Highlight colour (a theme token: yellow, green, blue, pink, purple). */
-  color?: string;
-  /** What the learner asked for ("why not just back up?"), if anything. */
-  request?: string;
-  status: "pending" | "ready" | "failed";
-  error?: string;
-  /** Who made it and how long it took. */
-  model?: { provider: string; name: string; effort?: string; ms?: number };
-  /** Markdown: the answer, follow-ups as "## Follow-up: …" sections, a figure as a ```figure block. */
-  body: string;
-  title?: string;
-  tags: string[];
-  props?: Record<string, unknown>;
-  created: string;
-  updated: string;
-}
-
-/* ---------------- tutoring sessions about a book ---------------- */
-
-/** One conversation with the tutor about a book (library/<book>/sessions/*.md), kept to look back on. */
-export interface TutorSession {
-  id: string;
-  bookId: string;
-  /** Vault-relative path of the file. */
-  path: string;
-  /** What it was about: the first question, unless renamed. */
-  title: string;
-  chapterId?: string;
-  /** The passage it was about, when one was pinned (its text, and where it is). */
-  passage?: { text: string; source: SourceRef };
-  mode: "answer" | "socratic";
-  messages: { role: "user" | "tutor"; text: string }[];
-  /** The note made from it (Save as note), while that note is still in the vault. */
-  note?: { id: string; title: string };
-  props?: Record<string, unknown>;
-  created: string;
-  updated: string;
-}
-
 /* ---------------- connections the agent suggests between notes ---------------- */
 
 export interface Connection {
@@ -242,8 +215,8 @@ export interface Connection {
 export interface AgentContext {
   /** The page's route ("#/notes/n1a2b3c4", "#/review"). */
   route?: string;
-  noteId?: string;
-  conceptId?: string;
+  /** The document open on the page (a note, a concept). */
+  docId?: string;
   bookId?: string;
   /** In a book: the page (PDF, with the fraction down it) or the block (other formats). */
   at?: number;

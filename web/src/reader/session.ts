@@ -1,7 +1,7 @@
 /* The reading session's hooks: the note it writes into, remembering the place and the zoom, and
  * logging reading time while the reader is actually reading. */
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
-import { type Book, learn, type Note, type TocEntry } from "../api";
+import { type Book, docs, learn, type Note, type TocEntry } from "../api";
 import { savePos } from "./position";
 
 /** The note this session writes into: remembered per book, else the book's own note (made on first use). */
@@ -11,7 +11,7 @@ export function useWorkingNote(bookId: string) {
     try {
       const id = localStorage.getItem(`classroom-note-${bookId}`);
       if (id)
-        learn.note(id).then(
+        docs.get<Note>(id).then(
           (n) => setNote(n),
           () => {},
         );

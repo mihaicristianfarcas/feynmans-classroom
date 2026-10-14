@@ -4,14 +4,7 @@
 import type { Hono } from "hono";
 import type { Note } from "../../shared/vault-types.ts";
 import { readBody } from "../http.ts";
-import {
-  deleteSession,
-  getSession,
-  listSessions,
-  noteFromSession,
-  recordExchange,
-  renameSession,
-} from "../learn/sessions.ts";
+import { listSessions, noteFromSession, recordExchange } from "../learn/sessions.ts";
 import {
   connect,
   gradeExplanation,
@@ -50,10 +43,5 @@ export function studyRoutes(app: Hono) {
     return c.json({ reply, session });
   });
   app.get("/api/books/:id/sessions", (c) => c.json(listSessions(c.req.param("id"))));
-  app.get("/api/sessions/:id", (c) => c.json(getSession(c.req.param("id"))));
-  app.patch("/api/sessions/:id", async (c) =>
-    c.json(renameSession(c.req.param("id"), (await readBody<{ title?: string }>(c)).title || "")),
-  );
-  app.delete("/api/sessions/:id", (c) => c.json({ ok: deleteSession(c.req.param("id")) }));
   app.post("/api/sessions/:id/note", async (c) => c.json(await noteFromSession(c.req.param("id"))));
 }

@@ -15,7 +15,8 @@ import { publish } from "../events.ts";
 import { findChapter, passageAround } from "../ingest/index.ts";
 import { queue } from "../jobs.ts";
 import { bookContext, learnerSummary } from "../learn/context.ts";
-import { changed, figures, logActivity, now, shortId } from "../vault/index.ts";
+import { createDoc } from "../learn/docs.ts";
+import { blankDoc, logActivity, now, shortId } from "../vault/index.ts";
 import { generateScene } from "./generate.ts";
 
 const KINDS = ["plot", "sequence", "graph", "object3d", "diagram"];
@@ -239,7 +240,7 @@ export function regenerateFigure(
   });
 }
 
-/** A figure for the vault (a note, a concept, a flashcard), returned when drawn. */
+/** A figure for the vault (a note, a concept, a flashcard), returned when drawn (and kept, unless `save` is false). */
 export async function standaloneFigure(input: {
   passage: string;
   request?: string;
@@ -258,23 +259,15 @@ export async function standaloneFigure(input: {
     learner: learnerSummary(),
     tier: input.quality === "careful" ? "smart" : "fast",
   });
-  const figure: SavedFigure = {
-    id: shortId("f"),
-    title: result.scene.title,
-    scene: result.scene,
-    source: input.source,
-    request: input.request,
-    created: now(),
-  };
-  if (input.save !== false) {
-    figures.save(figure);
-    logActivity({
-      type: "figure",
-      bookId: input.source?.bookId,
-      text: `Figure: ${figure.title}`,
-      data: { figureId: figure.id, kind: result.scene.kind, ms: result.ms },
-    });
-  }
+  const fields = { title: result.scene.title, scene: result.scene, source: input.source, request: input.request };
+  if (input.save === false) return Object.assign(blankDoc("figure", shortId("f"), now()), fields) as SavedFigure;
+  const figure = createDoc({ kind: "figure", ...fields }) as SavedFigure;
+  logActivity({
+    type: "figure",
+    bookId: input.source?.bookId,
+    text: `Figure: ${figure.title}`,
+    data: { figureId: figure.id, kind: result.scene.kind, ms: result.ms },
+  });
   return figure;
 }
 
@@ -287,23 +280,13 @@ export function keepFigure(input: {
 }): SavedFigure {
   const check = validateScene(input.scene);
   if (!check.ok || !check.scene) throw new Error(check.errors[0] || "not a figure");
-  const figure: SavedFigure = {
-    id: shortId("f"),
+  return createDoc({
+    kind: "figure",
     title: input.title || check.scene.title,
     scene: check.scene,
     source: input.source,
     request: input.request,
-    created: now(),
-  };
-  figures.save(figure);
-  changed(`figure ${figure.title}`);
-  return figure;
-}
-
-/** Deletes a saved figure (to .trash/). */
-export function deleteFigure(id: string) {
-  figures.remove(id);
-  changed("delete figure");
+  }) as SavedFigure;
 }
 
 /** After a restart, scene figures that were being drawn are drawn again. */

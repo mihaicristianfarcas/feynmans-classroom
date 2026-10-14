@@ -32,17 +32,17 @@ for (const book of bookId ? books.filter((b) => b.id === bookId) : books) {
   }[];
   const notes = (await (await fetch(`${BASE}api/books/${book.id}/annotations`)).json()) as {
     id: string;
-    kind: string;
+    type: string;
     status: string;
-    anchor: Place;
+    source: Place;
   }[];
   const list = [
     ...demos
       .filter((d) => d.status === "ready")
       .map((d) => ({ id: d.id, anchor: d.anchor, handbuilt: d.type !== "scene" })),
     ...notes
-      .filter((a) => a.kind === "visualize" && a.status === "ready")
-      .map((a) => ({ id: a.id, anchor: a.anchor, handbuilt: false })),
+      .filter((a) => a.type === "visualize" && a.status === "ready")
+      .map((a) => ({ id: a.id, anchor: a.source, handbuilt: false })),
   ];
   if (list.length >= 2) {
     bookId = book.id;
@@ -245,20 +245,20 @@ try {
     await wait(1200);
     const after = (await (await fetch(`${BASE}api/books/${bookId}/annotations`)).json()) as {
       id: string;
-      kind: string;
+      type: string;
       path: string;
     }[];
     const made = after.find((a) => !before.includes(a.id));
     check(
       "Highlight saves an annotation file beside the book",
-      !!made && made.kind === "highlight" && /^library\/[^/]+\/annotations\//.test(made.path),
+      !!made && made.type === "highlight" && /^library\/[^/]+\/annotations\//.test(made.path),
       made?.path,
     );
     check(
       "the highlight is marked in the book",
       (await page.$$(".page-marks .mark[data-style=fill], .html-reader")).length > 0,
     );
-    if (made) await fetch(`${BASE}api/annotations/${made.id}`, { method: "DELETE" });
+    if (made) await fetch(`${BASE}api/docs/${made.id}`, { method: "DELETE" });
     await selectAll(page);
     await page.evaluate(() =>
       [...document.querySelectorAll<HTMLButtonElement>(".sel-btn")]

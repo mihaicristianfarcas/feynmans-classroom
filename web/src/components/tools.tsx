@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   type DraftCard,
+  docs,
   type ExplainFeedback,
   type IdeaConnection,
   learn,
@@ -155,7 +156,7 @@ export function CardDrafter({
                       aria-label="Back"
                     />
                     <span className="fine">
-                      {d.kind === "cloze" ? "cloze · " : ""}
+                      {d.type === "cloze" ? "cloze · " : ""}
                       {d.concept}
                     </span>
                   </div>
@@ -387,7 +388,7 @@ export function Connector({
             className="button"
             disabled={saved.has(i)}
             onClick={async () => {
-              await learn.createNote({
+              await docs.create({
                 type: "connection",
                 title: c.title,
                 body: `${c.body}\n\n> ${passage.slice(0, 400)}`,

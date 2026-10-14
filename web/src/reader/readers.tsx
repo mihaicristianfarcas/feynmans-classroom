@@ -112,7 +112,7 @@ export const MarksContext = createContext<Marks>({ annotations: [], focused: nul
 /** How big the book is drawn: fitted to the pane (never wider than a comfortable measure), or a scale. */
 export type Zoom = number | "fit";
 
-const markStyle = (a: Annotation) => (a.kind === "highlight" || a.kind === "comment" ? "fill" : "line");
+const markStyle = (a: Annotation) => (a.type === "highlight" || a.type === "comment" ? "fill" : "line");
 
 /* ---------------- PDF (Lector) ---------------- */
 
@@ -334,10 +334,10 @@ function PageMarks({ page }: { page: number }) {
   const { annotations, focused, hovered, found } = useContext(MarksContext);
   const ref = useRef<HTMLDivElement>(null);
   const [tick, setTick] = useState(0);
-  const here = annotations.filter((a) => a.anchor.page === page || a.anchor.rects?.some((r) => r.p === page));
+  const here = annotations.filter((a) => a.source.page === page || a.source.rects?.some((r) => r.p === page));
   const foundHere = found && found.anchor.page === page ? found : null;
   // an annotation with only a quote is found in the text layer once it has rendered
-  const missing = here.some((a) => !a.anchor.rects?.length) || !!foundHere;
+  const missing = here.some((a) => !a.source.rects?.length) || !!foundHere;
   // biome-ignore lint/correctness/useExhaustiveDependencies: polls again for each page
   useEffect(() => {
     if (!missing) return;
@@ -367,16 +367,16 @@ function PageMarks({ page }: { page: number }) {
         />
       ))}
       {here.flatMap((a) => {
-        const rects = a.anchor.rects?.length ? a.anchor.rects : pageRef ? pdfRects(a.anchor, a.id, pageRef) : null;
+        const rects = a.source.rects?.length ? a.source.rects : pageRef ? pdfRects(a.source, a.id, pageRef) : null;
         return (rects || [])
-          .filter((r) => (r.p ?? a.anchor.page) === page)
+          .filter((r) => (r.p ?? a.source.page) === page)
           .map((r, i) => (
             <span
               // biome-ignore lint/suspicious/noArrayIndexKey: a passage's boxes are fixed for its anchor
               key={`${a.id}-${i}`}
               className="mark"
               data-style={markStyle(a)}
-              data-kind={a.kind}
+              data-kind={a.type}
               data-color={a.color || undefined}
               data-state={a.id === focused ? "focused" : a.id === hovered ? "hovered" : undefined}
               style={{ left: `${r.x * 100}%`, top: `${r.y * 100}%`, width: `${r.w * 100}%`, height: `${r.h * 100}%` }}
@@ -557,7 +557,7 @@ export const HtmlReader = forwardRef<ReaderHandle, HtmlProps>(function HtmlReade
     const foundRange = found ? blockRange(found.anchor, root) : null;
     if (foundRange) groups.set("find-hit", [foundRange]);
     for (const a of annotations) {
-      const range = blockRange(a.anchor, root);
+      const range = blockRange(a.source, root);
       if (!range) continue;
       const name =
         a.id === focused ? "anno-focused" : markStyle(a) === "fill" ? `anno-${a.color || "yellow"}` : "anno-line";

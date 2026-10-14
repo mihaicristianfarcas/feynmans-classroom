@@ -3,7 +3,7 @@
 import { ArrowLeft, Shapes } from "lucide-react";
 import { useState } from "react";
 import { humanInterval } from "../../../../shared/fsrs.ts";
-import { learn, type Note } from "../../api";
+import { type Concept, docs, learn, type Note } from "../../api";
 import { bookLink, go } from "../../app/navigation";
 import { Mastery, Spinner } from "../../components/feedback";
 import { Markdown } from "../../components/Markdown";
@@ -35,7 +35,7 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
         <Spinner label="Opening" />
       </div>
     );
-  const text = `${c.name}: ${c.summary}\n\n${c.body}`;
+  const text = `${c.title}: ${c.summary}\n\n${c.body}`;
   const source = c.sources[0];
   return (
     <div className="concept-page rise">
@@ -45,7 +45,7 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
       </a>
       <header className="page-head">
         <span className="eyebrow">Concept</span>
-        <h1 className="page-title">{c.name}</h1>
+        <h1 className="page-title">{c.title}</h1>
         <Mastery value={c.mastery} wide />
       </header>
       <div className="concept-actions">
@@ -64,7 +64,7 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
         </button>
         <a
           className="button subtle"
-          href={`#/ask?q=${encodeURIComponent(`Explain ${c.name} using everything in my library`)}`}
+          href={`#/ask?q=${encodeURIComponent(`Explain ${c.title} using everything in my library`)}`}
         >
           Ask the library
         </a>
@@ -88,7 +88,7 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
               type="button"
               className="button primary"
               onClick={async () => {
-                await learn.updateConcept(c.id, draft);
+                await docs.update<Concept>(c.id, draft);
                 setEditing(false);
                 reload();
               }}
@@ -152,7 +152,7 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
                   r.mastery === null ? "none" : r.mastery >= 0.8 ? "strong" : r.mastery >= 0.55 ? "ok" : "weak"
                 }
               >
-                {r.name}
+                {r.title}
               </a>
             ))}
             {!c.related.length && !c.backlinks.length && <span className="fine">No links yet.</span>}
@@ -188,8 +188,8 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
         type="button"
         className="button danger subtle"
         onClick={async () => {
-          if (!confirm(`Delete the concept "${c.name}"? Cards and notes stay.`)) return;
-          await learn.deleteConcept(c.id);
+          if (!confirm(`Delete the concept "${c.title}"? Cards and notes stay.`)) return;
+          await docs.remove(c.id);
           go("#/brain");
         }}
       >
@@ -197,7 +197,7 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
       </button>
       {tool === "explain" && (
         <ExplainBack
-          concept={c.name}
+          concept={c.title}
           passage={c.summary}
           source={source}
           theme={theme}
@@ -225,7 +225,7 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
           theme={theme}
           onClose={() => setTool(null)}
           onSaved={async (f) => {
-            await learn.updateConcept(c.id, { body: `${c.body}\n\n![[figure:${f.id}]]`.trim() });
+            await docs.update<Concept>(c.id, { body: `${c.body}\n\n![[figure:${f.id}]]`.trim() });
             reload();
           }}
         />

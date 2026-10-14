@@ -1,7 +1,7 @@
 /* The reader's Study pane: the chapter's study tools (pretest, quiz, concept map, explain it back). */
 import { CircleHelp, MessageCircleQuestion, Waypoints } from "lucide-react";
 import { useEffect, useState } from "react";
-import { type Book, type Concept, learn, type Quiz, type TocEntry } from "../api";
+import { type Book, type ConceptView, learn, type Quiz, type TocEntry } from "../api";
 import { Mastery, Spinner } from "../components/feedback";
 import { QuizRunner } from "../components/Quiz";
 import { ExplainBack } from "../components/tools";
@@ -20,8 +20,8 @@ export function StudyTab({
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [busy, setBusy] = useState<{ what: string; at: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [concepts, setConcepts] = useState<Concept[] | null>(null);
-  const [explain, setExplain] = useState<Concept | null>(null);
+  const [concepts, setConcepts] = useState<ConceptView[] | null>(null);
+  const [explain, setExplain] = useState<ConceptView | null>(null);
   const loadConcepts = () =>
     learn
       .concepts()
@@ -114,7 +114,7 @@ export function StudyTab({
         <ul className="chapter-concepts">
           {concepts.map((c) => (
             <li key={c.id}>
-              <a href={`#/brain/concept/${c.id}`}>{c.name}</a>
+              <a href={`#/brain/concept/${c.id}`}>{c.title}</a>
               <Mastery value={c.mastery} />
               <button type="button" className="link" aria-haspopup="dialog" onClick={() => setExplain(c)}>
                 Explain it
@@ -125,7 +125,7 @@ export function StudyTab({
       )}
       {explain && (
         <ExplainBack
-          concept={explain.name}
+          concept={explain.title}
           passage={explain.summary}
           source={explain.sources.find((s) => s.bookId === book.id)}
           theme={theme}

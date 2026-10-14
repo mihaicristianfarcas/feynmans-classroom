@@ -3,7 +3,7 @@
  * folder inside it, rename or move it, or delete it. */
 import { ChevronRight, Ellipsis, FolderInput, FolderPlus, SquarePen, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { learn } from "../api";
+import { docs, learn } from "../api";
 import { go } from "../app/navigation";
 import { Spinner } from "../components/feedback";
 import { announce, useArrowKeys } from "../lib/a11y";
@@ -13,7 +13,7 @@ export type Tree = Awaited<ReturnType<typeof learn.tree>>;
 
 /** Makes an untitled note in a folder and opens it. */
 export async function newNote(folder: string, title = "Untitled") {
-  const note = await learn.createNote({ title, folder, body: "" });
+  const note = await docs.create({ title, folder, body: "" });
   go(`#/notes/${note.id}?new=1`);
 }
 interface Folder {

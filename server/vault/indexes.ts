@@ -5,7 +5,8 @@
  *
  *   INDEX.md                  the map: counts, recent changes, where to look
  *   library/INDEX.md          every book: folder, pages, chapters, annotations
- *   library/<book>/README.md  a book's chapters (page ranges, text files) and its annotations by chapter
+ *   library/<book>/README.md  a book's chapters (page ranges, text files), its annotations by chapter,
+ *                             its sessions with the tutor, the notes and concepts from it
  *   notes/INDEX.md            every note: folder, tags, links out, backlinks
  *   concepts/INDEX.md         every concept: summary, mastery, cards, sources
  *   brain/links.tsv           every link: from, to, kind, line (backlinks are one rg away)
@@ -15,17 +16,7 @@ import { positionOf } from "../books/locate.ts";
 import { bookFolder, listBooks, onBooksChange } from "../books/store.ts";
 import type { Book, TocEntry } from "../books/types.ts";
 import { conceptMastery } from "../learn/context.ts";
-import {
-  annotations,
-  atomicWrite,
-  cards,
-  concepts,
-  figures,
-  notes,
-  onVaultChange,
-  VAULT,
-  wroteItself,
-} from "./index.ts";
+import { atomicWrite, docs, onVaultChange, VAULT, whereOf, wroteItself } from "./index.ts";
 import { chapterFile } from "./library.ts";
 import { allEdges, invalidateLinks } from "./links.ts";
 
@@ -65,10 +56,11 @@ export function writeIndexes() {
   for (const book of books) {
     const folder = bookFolder(book.id);
     if (!folder) continue;
-    const mine = annotations.list().filter((a) => a.bookId === book.id);
-    const fromBook = notes.list().filter((n) => n.source?.bookId === book.id);
-    const bookConcepts = concepts.list().filter((c) => c.sources.some((s) => s.bookId === book.id));
-    const at = (a: (typeof mine)[number]) => positionOf(a.anchor);
+    const mine = docs.list("annotation").filter((a) => a.source.bookId === book.id);
+    const talks = docs.list("session").filter((x) => x.source.bookId === book.id);
+    const fromBook = docs.list("note").filter((n) => n.source?.bookId === book.id);
+    const bookConcepts = docs.list("concept").filter((c) => c.sources.some((s) => s.bookId === book.id));
+    const at = (a: (typeof mine)[number]) => positionOf(a.source);
     const lines = [
       `# ${book.title}`,
       "",
@@ -90,14 +82,22 @@ export function writeIndexes() {
         if (!here.length) continue;
         lines.push(`### ${c.title}`, "");
         for (const a of here) {
-          const where = a.anchor.page !== undefined ? `p. ${a.anchor.page}` : `block ${a.anchor.block}`;
           lines.push(
-            `- ${where} · ${a.kind}${a.request ? ` (“${cell(a.request).slice(0, 80)}”)` : ""} · “${cell(a.anchor.quote).slice(0, 90)}…” → [[${a.path.replace(/\.md$/, "")}]]`,
+            `- ${whereOf(a.source)} · ${a.type}${a.request ? ` (“${cell(a.request).slice(0, 80)}”)` : ""} · “${cell(a.source.quote).slice(0, 90)}…” → [[${a.path.replace(/\.md$/, "")}]]`,
           );
         }
         lines.push("");
       }
     }
+    if (talks.length)
+      lines.push(
+        "",
+        "## Sessions with the tutor",
+        "",
+        ...talks
+          .sort((a, b) => a.created.localeCompare(b.created))
+          .map((x) => `- ${x.created.slice(0, 10)} · ${cell(x.title)} → [[${x.path.replace(/\.md$/, "")}]]`),
+      );
     if (fromBook.length)
       lines.push(
         "",
@@ -106,7 +106,7 @@ export function writeIndexes() {
         ...fromBook.map((n) => `- [[${n.title}]]${n.type !== "note" ? ` (${n.type})` : ""}`),
       );
     if (bookConcepts.length)
-      lines.push("", "## Concepts", "", ...bookConcepts.map((c) => `- [[${c.name}]] — ${cell(c.summary)}`));
+      lines.push("", "## Concepts", "", ...bookConcepts.map((c) => `- [[${c.title}]] — ${cell(c.summary)}`));
     write(`library/${folder}/README.md`, lines.join("\n"));
   }
 
@@ -116,19 +116,19 @@ export function writeIndexes() {
     [
       "# Library",
       "",
-      `${books.length} book${books.length === 1 ? "" : "s"}. Each folder holds book.json, the file, its text by chapter (text/), annotations/ and a README.md with the chapters and annotations.`,
+      `${books.length} book${books.length === 1 ? "" : "s"}. Each folder holds book.json, the file, its text by chapter (text/), annotations/, sessions/ and a README.md with the chapters and annotations.`,
       "",
       "| book | author | folder | format | size | chapters | annotations | added |",
       "|---|---|---|---|---|---|---|---|",
       ...books.map(
         (b) =>
-          `| ${cell(b.title)} | ${cell(b.author)} | [${bookFolder(b.id)}/](${bookFolder(b.id)}/README.md) | ${b.format} | ${b.format === "pdf" ? `${b.pageCount} pages` : `${b.blockCount} blocks`} | ${b.toc.length} | ${annotations.list().filter((a) => a.bookId === b.id).length || ""} | ${b.createdAt.slice(0, 10)} |`,
+          `| ${cell(b.title)} | ${cell(b.author)} | [${bookFolder(b.id)}/](${bookFolder(b.id)}/README.md) | ${b.format} | ${b.format === "pdf" ? `${b.pageCount} pages` : `${b.blockCount} blocks`} | ${b.toc.length} | ${docs.list("annotation").filter((a) => a.source.bookId === b.id).length || ""} | ${b.createdAt.slice(0, 10)} |`,
       ),
     ].join("\n"),
   );
 
   /* notes */
-  const noteList = notes.list().sort((a, b) => a.path.localeCompare(b.path));
+  const noteList = docs.list("note").sort((a, b) => a.path.localeCompare(b.path));
   write(
     "notes/INDEX.md",
     [
@@ -147,7 +147,8 @@ export function writeIndexes() {
 
   /* concepts */
   const at = Date.now();
-  const conceptList = concepts.list().sort((a, b) => a.name.localeCompare(b.name));
+  const conceptList = docs.list("concept").sort((a, b) => a.title.localeCompare(b.title));
+  const cards = docs.list("card");
   write(
     "concepts/INDEX.md",
     [
@@ -159,7 +160,7 @@ export function writeIndexes() {
       "|---|---|---|---|---|---|---|",
       ...conceptList.map((c) => {
         const m = conceptMastery(c.id, at);
-        return `| [[${c.name}]] | \`${c.id}\` | ${cell(c.summary).slice(0, 140)} | ${m === null ? "" : `${Math.round(m * 100)}%`} | ${cards.list().filter((k) => k.concepts.includes(c.id)).length || ""} | ${cell([...new Set(c.sources.map((s) => books.find((b) => b.id === s.bookId)?.title).filter(Boolean))].join(", "))} | ${linksIn.get(`concept:${c.id}`) || ""} |`;
+        return `| [[${c.title}]] | \`${c.id}\` | ${cell(c.summary).slice(0, 140)} | ${m === null ? "" : `${Math.round(m * 100)}%`} | ${cards.filter((k) => k.concepts.includes(c.id)).length || ""} | ${cell([...new Set(c.sources.map((s) => books.find((b) => b.id === s.bookId)?.title).filter(Boolean))].join(", "))} | ${linksIn.get(`concept:${c.id}`) || ""} |`;
       }),
     ].join("\n"),
   );
@@ -179,12 +180,9 @@ export function writeIndexes() {
   atomicWrite(join(VAULT, "brain/unresolved.tsv"), `${missing.join("\n")}\n`);
 
   /* the map */
-  const recent = [
-    ...notes.list().map((n) => ({ path: n.path, when: n.updated })),
-    ...concepts.list().map((c) => ({ path: concepts.fileOf(c.id) || "", when: c.updated })),
-    ...annotations.list().map((a) => ({ path: a.path, when: a.updated })),
-  ]
-    .filter((x) => x.path)
+  const recent = docs
+    .list()
+    .map((d) => ({ path: d.path, when: d.updated }))
     .sort((a, b) => b.when.localeCompare(a.when))
     .slice(0, 20);
   write(
@@ -197,11 +195,12 @@ export function writeIndexes() {
       "| what | how many | where |",
       "|---|---|---|",
       `| books | ${books.length} | [library/INDEX.md](library/INDEX.md), then library/<book>/README.md |`,
-      `| notes | ${notes.items.size} | [notes/INDEX.md](notes/INDEX.md) |`,
-      `| concepts | ${concepts.items.size} | [concepts/INDEX.md](concepts/INDEX.md) |`,
-      `| annotations | ${annotations.items.size} | library/<book>/annotations/, listed in each book's README.md |`,
-      `| flashcards | ${cards.items.size} | cards/ |`,
-      `| saved figures | ${figures.items.size} | figures/ |`,
+      `| notes | ${docs.count("note")} | [notes/INDEX.md](notes/INDEX.md) |`,
+      `| concepts | ${docs.count("concept")} | [concepts/INDEX.md](concepts/INDEX.md) |`,
+      `| annotations | ${docs.count("annotation")} | library/<book>/annotations/, listed in each book's README.md |`,
+      `| sessions with the tutor | ${docs.count("session")} | library/<book>/sessions/, listed in each book's README.md |`,
+      `| flashcards | ${docs.count("card")} | cards/ |`,
+      `| kept figures | ${docs.count("figure")} | figures/ |`,
       `| links | ${edges.filter((e) => e.to).length} (${edges.filter((e) => !e.to).length} unresolved) | brain/links.tsv, brain/unresolved.tsv |`,
       "",
       "## Recently changed",

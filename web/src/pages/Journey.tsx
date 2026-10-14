@@ -71,7 +71,7 @@ export function Journey() {
           <ul className="plain mastery-list">
             {data.mastery.map((m) => (
               <li key={m.id}>
-                <a href={`#/brain?focus=concept:${encodeURIComponent(m.id)}`}>{m.name}</a>
+                <a href={`#/brain?focus=concept:${encodeURIComponent(m.id)}`}>{m.title}</a>
                 <Mastery value={m.mastery} />
               </li>
             ))}

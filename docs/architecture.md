@@ -21,14 +21,17 @@ server/            the API and everything behind it (Node, TypeScript, run with 
   app.ts           the HTTP app: the local-only guard, errors, every route group, the built web app
   http.ts fs.ts    HTTP and file helpers; errors.ts, events.ts (live updates), jobs.ts (queue)
   config.ts        paths, ports and tuning from the environment; settings.ts: the learner's settings
-  routes/          one file per API area (books, demos, annotations, notes, cards, study, brain, agents…)
-  vault/           the vault as files: collections, file formats, history (jj), logs, watching, indexes, links
+  routes/          one file per API area (documents, books, demos, annotations, notes, cards, study, brain,
+                   agents…)
+  vault/           the vault as files: the document store, each kind's file format (kinds.ts), history
+                   (jj), logs, watching, indexes, links
   books/           the book store, types, finding quotes (locate.ts), find in a book (find.ts), figure
                    placement and numbers
   ingest/          reading uploaded books: PDF, EPUB, Markdown, text, chapter detection
   annotations/     the margin: anchors, files, model-written answers, live updates, sending to notes
-  learn/           notes, concepts, cards (FSRS-6), study tools, the tutor's sessions, connections,
-                   search, graph, journey
+  learn/           documents of any kind (docs.ts: make, change, rename, delete, versions), then what
+                   each kind does beyond that: notes, concepts, cards (FSRS-6), the tutor's sessions;
+                   study tools, connections, search, graph, journey
   scene/           drawing figures with a model (one structured call → a validated scene spec)
   manim/           animations (ManimGX): the guide, writing and checking a scene in headless Chrome,
                    the sandboxed page it plays in, the local mirror of Pyodide and PyPI it runs on
@@ -51,7 +54,7 @@ web/src/           the React app (Vite)
                    buttons, profile form
   scene/           the figure player (the universal frame around every figure), and figure stills
   manim/           an animation in the app: ManimGX's player in its sandboxed frame
-  api/             typed calls to the server, and the live book hook
+  api/             typed calls to the server (documents of any kind: docs.ts), and the live book hook
   lib/             small helpers: accessibility (focus traps, arrow keys, announcements), loading, time,
                    side panels' widths
   styles/          the design system and page styles
@@ -69,8 +72,8 @@ Every source file starts with a comment saying what it is for; start there when 
 ## How a request flows
 
 A route in `server/routes/` reads the request and calls a service (`learn/`, `annotations/`,
-`scene/`…). Services read and write the vault through `server/vault/` (collections keep an index in
-memory and write through to disk atomically) and call models through `server/llm/`. Changes are
+`scene/`…). Services read and write the vault through `server/vault/` (one store keeps every document,
+whatever its kind, in memory and writes through to disk atomically) and call models through `server/llm/`. Changes are
 announced on `events.ts`, and open pages follow them over server-sent events (`web/src/api/live.ts`
 for a book, `/api/events` for everything else). The vault's history is kept by Jujutsu: the change in
 progress is named as you work and closed when a sitting ends (see [vault.md](vault.md)).

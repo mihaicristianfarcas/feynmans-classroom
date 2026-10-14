@@ -1,4 +1,4 @@
-// Notes and links: Obsidian links, renames that carry links along, migration of older vaults, and
+// Notes and links: documents as files, Obsidian links, renames that carry links along, folders, and
 // the generated indexes.
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -10,28 +10,24 @@ const dir = mkdtempSync(join(tmpdir(), "classroom-v2-"));
 process.env.DATA_DIR = dir;
 const vault = join(dir, "vault");
 
-// a vault from before books moved in: slug file names, generated source pages, exported text
-function v1Fixture() {
+// a vault with a note, a concept and a book in it (as the app, or a person, would have written them)
+function fixture() {
   mkdirSync(join(vault, "notes"), { recursive: true });
   mkdirSync(join(vault, "concepts"), { recursive: true });
-  mkdirSync(join(vault, "sources"), { recursive: true });
-  mkdirSync(join(vault, "library", "old-book-ab12"), { recursive: true });
   writeFileSync(
-    join(vault, "notes", "my-first-note.md"),
-    "---\nid: n1\ntitle: My first note\ntype: note\nmood: curious\n---\n\nAbout [[replication-lag]] and [[Leader election]].\n",
+    join(vault, "notes", "My first note.md"),
+    "---\nid: n1\nmood: curious\n---\n\nAbout [[replication-lag]] and [[Leader election]].\n",
   );
   writeFileSync(
-    join(vault, "concepts", "replication-lag.md"),
-    "---\nid: replication-lag\nname: Replication lag\nsummary: The delay before a follower has a write.\n---\n\nBody.\n",
+    join(vault, "concepts", "Replication lag.md"),
+    "---\nid: replication-lag\nkind: concept\nsummary: The delay before a follower has a write.\n---\n\nBody.\n",
   );
-  writeFileSync(join(vault, "sources", "old-book-ab12.md"), "generated\n");
-  writeFileSync(join(vault, "library", "old-book-ab12", "01-intro.md"), "derived\n");
-  // and a book in the old place
-  mkdirSync(join(dir, "books", "b0000legacy"), { recursive: true });
+  const folder = join(vault, "library", "designing-data-intensive-applications");
+  mkdirSync(folder, { recursive: true });
   writeFileSync(
-    join(dir, "books", "b0000legacy", "book.json"),
+    join(folder, "book.json"),
     JSON.stringify({
-      id: "b0000legacy",
+      id: "b0000ddia",
       title: "Designing Data-Intensive Applications",
       format: "text",
       file: "source.md",
@@ -50,7 +46,7 @@ function v1Fixture() {
     }),
   );
   writeFileSync(
-    join(dir, "books", "b0000legacy", "blocks.json"),
+    join(folder, "blocks.json"),
     JSON.stringify([
       { id: 0, chapter: 0, tag: "p", html: "Data systems", text: "Data systems are everywhere." },
       { id: 1, chapter: 0, tag: "p", html: "x", text: "Reliability means continuing to work." },
@@ -62,19 +58,18 @@ let V: typeof import("../server/vault/index.ts");
 let S: typeof import("../server/books/store.ts");
 let L: typeof import("../server/vault/links.ts");
 let N: typeof import("../server/learn/notes.ts");
-let C: typeof import("../server/learn/concepts.ts");
+let D: typeof import("../server/learn/docs.ts");
 let I: typeof import("../server/vault/indexes.ts");
 let X: typeof import("../server/vault/library.ts");
 
 beforeAll(async () => {
-  v1Fixture();
+  fixture();
   S = await import("../server/books/store.ts");
   V = await import("../server/vault/index.ts");
   V.initVault();
-  S.migrateLegacyBooks();
   L = await import("../server/vault/links.ts");
   N = await import("../server/learn/notes.ts");
-  C = await import("../server/learn/concepts.ts");
+  D = await import("../server/learn/docs.ts");
   I = await import("../server/vault/indexes.ts");
   X = await import("../server/vault/library.ts");
   X.exportMissingBooks();
@@ -101,20 +96,9 @@ describe("links", () => {
   });
 });
 
-describe("migration", () => {
-  it("names v1 notes and concepts by title and drops generated pages", () => {
-    expect(existsSync(join(vault, "notes", "My first note.md"))).toBe(true);
-    expect(existsSync(join(vault, "concepts", "Replication lag.md"))).toBe(true);
-    expect(existsSync(join(vault, "sources"))).toBe(false);
-    expect(existsSync(join(vault, "library", "old-book-ab12"))).toBe(false);
-    const note = V.notes.get("n1")!;
-    expect(note.title).toBe("My first note");
-    expect(note.props).toEqual({ mood: "curious" });
-  });
-  it("moves books from DATA_DIR/books into a folder named after the book", () => {
-    expect(existsSync(join(dir, "books"))).toBe(false);
-    expect(S.bookFolder("b0000legacy")).toBe("designing-data-intensive-applications");
-    expect(S.getBook("b0000legacy")?.title).toBe("Designing Data-Intensive Applications");
+describe("the book", () => {
+  it("lives in its folder of the library, its text exported by chapter", () => {
+    expect(S.bookFolder("b0000ddia")).toBe("designing-data-intensive-applications");
     expect(
       existsSync(
         join(
@@ -131,7 +115,7 @@ describe("migration", () => {
 
 describe("notes", () => {
   it("are files named by their title, in folders, keeping unknown properties", () => {
-    const note = N.createNote({
+    const note = D.createDoc({
       title: "Quorums: why w + r > n?",
       body: "Overlap guarantees a fresh read. #idea",
       folder: "DDIA/Chapter 5",
@@ -139,13 +123,14 @@ describe("notes", () => {
     expect(note.path).toBe("notes/DDIA/Chapter 5/Quorums why w + r n.md");
     const text = readFileSync(join(vault, note.path), "utf8");
     expect(text).toMatch(/^---\nid: n\w+/);
-    V.notes.save({ ...note, props: { rating: 5 } });
-    V.notes.load();
-    expect(V.notes.get(note.id)?.props).toEqual({ rating: 5 });
+    V.docs.save({ ...note, props: { rating: 5 } });
+    V.docs.load();
+    expect(V.docs.get(note.id)?.props).toEqual({ rating: 5 });
   });
   it("reads notes written elsewhere, without frontmatter", () => {
     writeFileSync(join(vault, "notes", "Plain thought.md"), "Just text linking [[My first note]].\n");
-    const n = V.notes.loadFile("notes/Plain thought.md")!;
+    const n = V.docs.loadFile("notes/Plain thought.md")!;
+    expect(n.kind).toBe("note");
     expect(n.title).toBe("Plain thought");
     expect(n.id).toMatch(/^p[0-9a-f]{9}$/);
     expect(n.body).toBe("Just text linking [[My first note]].");
@@ -155,7 +140,7 @@ describe("notes", () => {
     expect(L.resolveLink("my first note")?.node).toBe("note:n1");
     expect(L.resolveLink("replication-lag")?.node).toBe("concept:replication-lag");
     expect(L.resolveLink("Replication lag")?.kind).toBe("concept");
-    expect(L.resolveLink("Designing Data-Intensive Applications")?.node).toBe("book:b0000legacy");
+    expect(L.resolveLink("Designing Data-Intensive Applications")?.node).toBe("book:b0000ddia");
     expect(L.resolveLink("library/designing-data-intensive-applications/source.md", "page=3")).toMatchObject({
       kind: "book",
       page: 3,
@@ -163,29 +148,30 @@ describe("notes", () => {
     expect(L.resolveLink("Nothing like this")).toBeNull();
   });
   it("list backlinks with the line they sit on, and unlinked mentions", () => {
-    const n1 = V.notes.get("n1")!;
+    const n1 = V.docs.get("n1")!;
+    expect(n1).toMatchObject({ kind: "note", title: "My first note", props: { mood: "curious" } });
     const back = L.backlinks("note:n1");
     expect(back.map((b) => b.title)).toContain("Plain thought");
     expect(back.find((b) => b.title === "Plain thought")?.context).toBe("Just text linking [[My first note]].");
-    N.createNote({ title: "Mentions", body: "I wrote this in my first note yesterday." });
+    D.createDoc({ title: "Mentions", body: "I wrote this in my first note yesterday." });
     expect(L.unlinkedMentions(n1).map((m) => m.title)).toContain("Mentions");
   });
   it("carry links along when renamed", () => {
-    N.updateNote("n1", { title: "Replication notes" });
+    D.updateDoc("n1", { title: "Replication notes" });
     expect(existsSync(join(vault, "notes", "Replication notes.md"))).toBe(true);
-    expect(V.notes.byPath("notes/Plain thought.md")?.body).toBe("Just text linking [[Replication notes]].");
+    expect(V.docs.at("notes/Plain thought.md")?.body).toBe("Just text linking [[Replication notes]].");
     L.invalidateLinks();
     expect(L.resolveLink("Replication notes")?.node).toBe("note:n1");
   });
   it("rename concepts with their name and keep id links working", () => {
-    C.saveConcept("replication-lag", { name: "Follower lag" });
+    D.updateDoc("replication-lag", { title: "Follower lag" });
     expect(existsSync(join(vault, "concepts", "Follower lag.md"))).toBe(true);
     L.invalidateLinks();
     expect(L.resolveLink("replication-lag")?.node).toBe("concept:replication-lag");
   });
   it("go to .trash when deleted", () => {
-    const n = N.createNote({ title: "Temporary" });
-    N.deleteNote(n.id);
+    const n = D.createDoc({ title: "Temporary" });
+    D.deleteDoc(n.id);
     expect(existsSync(join(vault, n.path))).toBe(false);
     expect(readdirSync(join(vault, ".trash")).some((f) => f.endsWith("Temporary.md"))).toBe(true);
   });
@@ -193,33 +179,33 @@ describe("notes", () => {
 
 describe("notes about things, and folders", () => {
   it("say what they are about, and the book lists them", () => {
-    const note = N.createNote({
+    const note = D.createDoc({
       title: "Why systems fail",
       body: "Faults are not failures.",
       about: ["[[Designing Data-Intensive Applications]]"],
     });
     const text = readFileSync(join(vault, note.path), "utf8");
     expect(text).toMatch(/^about: \[.*"\[\[Designing Data-Intensive Applications\]\]"/m);
-    expect(N.listNotes({ book: "b0000legacy" }).map((n) => n.id)).toContain(note.id);
-    expect(L.backlinks("book:b0000legacy").find((b) => b.from === `note:${note.id}`)?.kind).toBe("about");
+    expect(D.listDocs({ kind: "note", book: "b0000ddia" }).map((n) => n.id)).toContain(note.id);
+    expect(L.backlinks("book:b0000ddia").find((b) => b.from === `note:${note.id}`)?.kind).toBe("about");
   });
   it("move with their folder, links following them", () => {
-    const inside = N.createNote({ title: "Partitioning", body: "Split the data.", folder: "DDIA/Part 2" });
-    const deeper = N.createNote({ title: "Rebalancing", body: "Move partitions.", folder: "DDIA/Part 2/Later" });
-    const linking = N.createNote({ title: "Index of DDIA", body: "See [[notes/DDIA/Part 2/Partitioning]]." });
+    const inside = D.createDoc({ title: "Partitioning", body: "Split the data.", folder: "DDIA/Part 2" });
+    const deeper = D.createDoc({ title: "Rebalancing", body: "Move partitions.", folder: "DDIA/Part 2/Later" });
+    const linking = D.createDoc({ title: "Index of DDIA", body: "See [[notes/DDIA/Part 2/Partitioning]]." });
     expect(N.moveFolder("DDIA/Part 2", "Data systems/Scaling")).toBe("Data systems/Scaling");
-    expect(V.notes.get(inside.id)?.path).toBe("notes/Data systems/Scaling/Partitioning.md");
-    expect(V.notes.get(deeper.id)?.path).toBe("notes/Data systems/Scaling/Later/Rebalancing.md");
+    expect(V.docs.get(inside.id)?.path).toBe("notes/Data systems/Scaling/Partitioning.md");
+    expect(V.docs.get(deeper.id)?.path).toBe("notes/Data systems/Scaling/Later/Rebalancing.md");
     expect(existsSync(join(vault, "notes", "DDIA", "Part 2"))).toBe(false);
-    expect(V.notes.get(linking.id)?.body).toContain("[[notes/Data systems/Scaling/Partitioning]]");
+    expect(V.docs.get(linking.id)?.body).toContain("[[notes/Data systems/Scaling/Partitioning]]");
     expect(() => N.moveFolder("Data systems", "Data systems/Inside")).toThrow(/into itself/);
   });
   it("can be made empty, and deleted with their notes going to the trash", () => {
     expect(N.createFolder("Physics/Waves")).toBe("Physics/Waves");
     expect(N.noteTree().folders).toContain("Physics/Waves");
-    const note = N.createNote({ title: "Standing waves", body: "Nodes.", folder: "Physics/Waves" });
+    const note = D.createDoc({ title: "Standing waves", body: "Nodes.", folder: "Physics/Waves" });
     expect(N.deleteFolder("Physics")).toBe(1);
-    expect(V.notes.get(note.id)).toBeUndefined();
+    expect(V.docs.get(note.id)).toBeUndefined();
     expect(existsSync(join(vault, "notes", "Physics"))).toBe(false);
     expect(readdirSync(join(vault, ".trash")).some((f) => f.endsWith("Standing waves.md"))).toBe(true);
   });
@@ -241,8 +227,8 @@ describe("indexes", () => {
     const tsv = readFileSync(join(vault, "brain", "links.tsv"), "utf8");
     expect(tsv).toMatch(/notes\/Plain thought\.md\tnotes\/Replication notes\.md\tlink\t\d+/);
     // generated files are never read as notes
-    V.notes.load();
-    expect(V.notes.list().some((n) => n.title === "INDEX")).toBe(false);
+    V.docs.load();
+    expect(V.docs.list().some((n) => n.title === "INDEX")).toBe(false);
   });
   it("are kept out of git, while annotations and book.json are versioned", () => {
     const ignore = readFileSync(join(vault, ".gitignore"), "utf8");
