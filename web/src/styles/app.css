@@ -1165,7 +1165,7 @@
   opacity: 0.2;
 }
 .g-node text {
-  font: 500 11.5px var(--sans);
+  font: 500 12.5px var(--sans);
   fill: var(--ink);
   paint-order: stroke;
   stroke: var(--bg);
@@ -1220,7 +1220,7 @@
   color: var(--on-ink);
 }
 .g-book text {
-  font: 650 12px var(--sans);
+  font: 650 13px var(--sans);
 }
 .g-note .g-disc {
   fill: var(--sky);
