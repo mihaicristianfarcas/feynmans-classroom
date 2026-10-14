@@ -1126,8 +1126,10 @@
   stroke: color-mix(in srgb, var(--line-strong), var(--ink) 40%);
   stroke-width: 1.4;
 }
+/* the many lines from concepts to their books stay quiet until one is lit */
 .g-edge[data-kind="source"] {
   stroke-dasharray: 3 4;
+  opacity: 0.6;
 }
 .g-edge[data-kind="link"],
 .g-edge[data-kind="embed"] {
