@@ -12,7 +12,8 @@ data/vault/
   attachments/              pictures
   library/INDEX.md          generated: every book
   library/<book>/           book.json · the file · text/NN-chapter.md (with [[page N]] markers)
-                            annotations/*.md · demos/ · README.md (generated: chapters, annotations)
+                            annotations/*.md · sessions/*.md (the tutor) · demos/
+                            README.md (generated: chapters, annotations)
   brain/links.tsv           generated: every link (backlinks are one rg away)
   brain/connections.jsonl   suggested connections and your decisions
   log/*.jsonl               reviews, the journey, agent runs

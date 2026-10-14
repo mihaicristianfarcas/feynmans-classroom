@@ -37,4 +37,8 @@ PORT=8797 WEB_PORT=5183 npx vite
 - The agent changes files only where Jujutsu (jj) is installed (its changes are checked, landed and
   undone through the vault's history); without jj it can still read your vault and answer.
 - Capture works on PDF pages; in EPUBs, pictures are already in the text.
+- Animations play with WebGPU (Chrome and Edge 113+, Safari 26); elsewhere their code is shown. The
+  first one fetches Python (Pyodide) and ManimGX, about 30 MB, into `DATA_DIR/.cache/manimgx`; after
+  that they play offline. They're checked before you see them in headless Chrome (`CHROME_PATH`);
+  without Chrome they're only read, not run, first.
 - Speed and how much you can generate follow your plan's limits.

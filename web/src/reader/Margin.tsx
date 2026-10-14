@@ -1,35 +1,29 @@
 /* The margin: what was made from passages (explanations, definitions, answers, figures, resources,
- * comments), each as a card at the height of its passage, as in a well-annotated book. Cards never
- * overlap: the focused one sits exactly by its passage and the others make room above and below it
- * (as comments do in a shared document). A thin line joins the focused card to its passage.
+ * comments), each as a card beside its passage, as in a well-annotated book. Every card is shown
+ * whole: no folding, no scrolling inside it. Cards whose passages overlap (or share a paragraph of a
+ * reflowable book) sit side by side in one row; rows never overlap: the focused one (or, when none is,
+ * the one for the passage at the reading line) sits exactly by its passage and the others make room
+ * above and below it (as comments do in a shared document).
+ * Follow-up questions on a card read as a conversation, drawn like the tutor's.
  *
  * Positions follow the book's scroll without React re-rendering: the reader announces each scroll
- * frame on `bus`, and the margin moves its cards directly. */
-import { ArrowUp, Copy, Ellipsis, FileText, Link2, Maximize2, Quote, SquarePlus, Trash2, X } from "lucide-react";
-import { memo, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { type Annotation, type Book, type Demo, learn } from "../api";
-import { Spinner } from "../components/feedback";
-import { Markdown } from "../components/Markdown";
-import { useArrowKeys } from "../lib/a11y";
-import { timeAgo } from "../lib/time";
-import { SceneView } from "../scene/SceneView";
+ * frame on `bus`, and the margin moves its cards directly. Scrolling over the margin scrolls the book. */
+import { type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { Annotation, Book, Demo } from "../api";
+import { AnnotationCard, DemoCard, type ToNote } from "./MarginCards";
+import { LINE } from "./position";
 import type { ReaderHandle } from "./readers";
 
 export type MarginItem =
   | { id: string; annotation: Annotation; demo?: undefined }
   | { id: string; demo: Demo; annotation?: undefined };
 
-const GAP = 8;
-const KIND: Record<string, string> = {
-  explain: "Explain",
-  define: "Define",
-  ask: "Ask",
-  visualize: "Figure",
-  resources: "Resources",
-  highlight: "Highlight",
-  comment: "Comment",
-};
-const COLORS = ["yellow", "green", "blue", "pink", "purple"];
+/** Space between cards, and between a row's cards. */
+const GAP = 10;
+/** A card is never narrower than this; a row with more cards than fit wraps onto another line. */
+const MIN_CARD = 230;
+/** The height a card not yet drawn is taken to have. */
+const GUESS = 180;
 
 interface Props {
   book: Book;
@@ -38,13 +32,20 @@ interface Props {
   bus: EventTarget;
   focused: string | null;
   setFocused: (id: string | null) => void;
-  hovered: string | null;
   setHovered: (id: string | null) => void;
-  leader: RefObject<SVGPathElement | null>;
   theme: "light" | "dark";
-  onToNote: (a: Annotation, mode: "embed" | "passage" | "reference") => void;
-  onOpenDemo: (demo: Demo) => void;
+  onToNote: ToNote;
+  /** Opens a figure large (by its id: an annotation's or a chapter figure's). */
+  onOpenFigure: (id: string) => void;
+  /** Figure numbers by id ("Fig 3.2"). */
+  figs: Map<string, string>;
   toast: (text: string) => void;
+}
+
+/** Where a passage is on screen: the top of its first line and the bottom of its last. */
+interface Extent {
+  top: number;
+  bottom: number;
 }
 
 export function Margin({
@@ -54,33 +55,38 @@ export function Margin({
   bus,
   focused,
   setFocused,
-  hovered,
   setHovered,
-  leader,
   theme,
   onToNote,
-  onOpenDemo,
+  onOpenFigure,
+  figs,
   toast,
 }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const cards = useRef(new Map<string, HTMLDivElement>());
+  const heights = useRef(new Map<string, number>());
   const [shown, setShown] = useState<string[]>([]);
   const shownRef = useRef<string[]>([]);
   const scrolling = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const settling = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const leadRef = useRef<string | null>(null);
 
-  /** Where each item's passage is on screen right now (client y), or null when its page isn't rendered. */
-  const anchorY = useCallback(
-    (item: MarginItem): number | null => {
+  /** Where an item's passage is on screen right now, or null when its page isn't rendered. */
+  const extentOf = useCallback(
+    (item: MarginItem): Extent | null => {
       const r = reader.current;
       if (!r) return null;
       if (item.annotation) {
         const a = item.annotation.anchor;
         const boxes = r.boxesOf(a, item.id);
-        if (boxes?.length) return boxes[0].top;
-        if (a.page !== undefined) return r.clientYOf({ page: a.page, y: a.y ?? 0 });
-        return r.clientYOf({ block: a.block ?? 0 });
+        if (boxes?.length)
+          return { top: Math.min(...boxes.map((b) => b.top)), bottom: Math.max(...boxes.map((b) => b.bottom)) };
+        const y =
+          a.page !== undefined ? r.clientYOf({ page: a.page, y: a.y ?? 0 }) : r.clientYOf({ block: a.block ?? 0 });
+        return y === null ? null : { top: y, bottom: y + 16 };
       }
-      return r.clientYOf(item.demo!.anchor);
+      const y = r.clientYOf(item.demo!.anchor);
+      return y === null ? null : { top: y, bottom: y + 16 };
     },
     [reader],
   );
@@ -89,62 +95,107 @@ export function Margin({
     const host = box.current;
     if (!host) return;
     const frame = host.getBoundingClientRect();
+    const width = Math.max(MIN_CARD, host.clientWidth - 24);
+    // on a narrow screen the margin sits under the book: it lists the cards for what's on screen, in order
+    const pane = reader.current?.scroller()?.getBoundingClientRect();
+    const stacked = !!pane && frame.top >= pane.bottom - 4;
+    host.toggleAttribute("data-stacked", stacked);
+    // the passages on screen (and around it), top to bottom; a plain highlight shows a card only when opened
     const placed = items
-      .map((item) => ({ item, y: anchorY(item) }))
-      .filter((p): p is { item: MarginItem; y: number } => p.y !== null);
-    placed.sort((a, b) => a.y - b.y);
-    // which cards to render: those whose passage is near the screen (a screen above and below)
-    const near = placed
-      .filter(
-        (p) =>
-          p.y > frame.top - frame.height * 1.2 &&
-          p.y < frame.bottom + frame.height * 1.2 &&
-          (p.item.annotation?.kind !== "highlight" || p.item.id === focused),
-      )
-      .map((p) => p.item.id);
+      .filter((item) => item.annotation?.kind !== "highlight" || item.id === focused)
+      .map((item) => ({ item, at: extentOf(item) }))
+      .filter((p): p is { item: MarginItem; at: Extent } => p.at !== null)
+      .filter((p) => !stacked || !pane || (p.at.bottom > pane.top && p.at.top < pane.bottom))
+      .sort(
+        (a, b) =>
+          a.at.top - b.at.top ||
+          (a.item.annotation?.created || a.item.demo?.createdAt || "").localeCompare(
+            b.item.annotation?.created || b.item.demo?.createdAt || "",
+          ),
+      );
+    // rows: passages that overlap on screen, or share a block of a reflowable book
+    const rows: { ids: string[]; top: number; bottom: number; block?: number }[] = [];
+    for (const p of placed) {
+      const last = rows[rows.length - 1];
+      const block = p.item.annotation?.anchor.block ?? p.item.demo?.anchor.block;
+      const sameBlock = block !== undefined && last?.block === block;
+      if (last && (p.at.top < last.bottom - 3 || sameBlock)) {
+        last.ids.push(p.item.id);
+        last.bottom = Math.max(last.bottom, p.at.bottom);
+      } else rows.push({ ids: [p.item.id], top: p.at.top, bottom: p.at.bottom, block });
+    }
+    // each row's cards side by side, wrapping onto more lines when they don't fit
+    const heightOf = (id: string) => {
+      const el = cards.current.get(id);
+      if (el) heights.current.set(id, el.offsetHeight);
+      return heights.current.get(id) ?? GUESS;
+    };
+    const cells = new Map<string, { x: number; dy: number; w: number }>();
+    const rowHeights = rows.map((row) => {
+      const perLine = Math.max(1, Math.min(row.ids.length, Math.floor((width + GAP) / (MIN_CARD + GAP))));
+      let dy = 0;
+      for (let start = 0; start < row.ids.length; start += perLine) {
+        const line = row.ids.slice(start, start + perLine);
+        const w = (width - (line.length - 1) * GAP) / line.length;
+        let tallest = 0;
+        line.forEach((id, i) => {
+          const el = cards.current.get(id);
+          if (el && el.dataset.w !== String(Math.round(w))) {
+            el.style.width = `${w}px`;
+            el.dataset.w = String(Math.round(w));
+          }
+          cells.set(id, { x: i * (w + GAP), dy, w });
+          tallest = Math.max(tallest, heightOf(id));
+        });
+        dy += tallest + GAP;
+      }
+      return dy - GAP;
+    });
+    // rows make room for each other; one stays by its passage: the focused one, else the one being read
+    // (the last whose passage starts above the reading line), so the cards for what you're reading are
+    // beside it however long the cards before them are
+    const tops = rows.map((row) => (stacked ? 12 : row.top - frame.top));
+    let f = focused ? rows.findIndex((row) => row.ids.includes(focused)) : -1;
+    // the focused card leads while its passage is on screen; scrolled away from, the reading line leads again
+    if (f >= 0 && pane && (rows[f].bottom < pane.top || rows[f].top > pane.bottom)) f = -1;
+    if (stacked) f = rows.length ? 0 : -1;
+    else if (f < 0 && rows.length) {
+      const line = pane ? pane.top + pane.height * LINE : frame.top + frame.height * LINE;
+      f = 0;
+      for (let i = 0; i < rows.length; i++) if (rows[i].top <= line + 8) f = i;
+    }
+    if (f >= 0) {
+      for (let i = f - 1; i >= 0; i--) tops[i] = Math.min(tops[i], tops[i + 1] - rowHeights[i] - GAP);
+      for (let i = f + 1; i < rows.length; i++) tops[i] = Math.max(tops[i], tops[i - 1] + rowHeights[i - 1] + GAP);
+    }
+    // when another row takes the lead while scrolling, the cards slide to their new places
+    const lead = f >= 0 ? rows[f].ids.join() : "";
+    if (lead !== leadRef.current) {
+      if (leadRef.current !== null && host.hasAttribute("data-scrolling")) {
+        host.setAttribute("data-settling", "");
+        clearTimeout(settling.current);
+        settling.current = setTimeout(() => host.removeAttribute("data-settling"), 260);
+      }
+      leadRef.current = lead;
+    }
+    // only the cards on screen (and a screen around it) are drawn
+    const near = rows.flatMap((row, i) =>
+      stacked || (tops[i] + rowHeights[i] > -frame.height && tops[i] < frame.height * 2) ? row.ids : [],
+    );
     if (near.join() !== shownRef.current.join()) {
       shownRef.current = near;
       setShown(near);
     }
-    const list = placed.filter((p) => cards.current.has(p.item.id));
-    const tops = list.map((p) => p.y - frame.top);
-    const heights = list.map((p) => cards.current.get(p.item.id)!.offsetHeight);
-    const f = list.findIndex((p) => p.item.id === focused);
-    if (f >= 0) {
-      for (let i = f - 1; i >= 0; i--) tops[i] = Math.min(tops[i], tops[i + 1] - heights[i] - GAP);
-      for (let i = f + 1; i < list.length; i++) tops[i] = Math.max(tops[i], tops[i - 1] + heights[i - 1] + GAP);
-    } else {
-      for (let i = 1; i < list.length; i++) tops[i] = Math.max(tops[i], tops[i - 1] + heights[i - 1] + GAP);
-    }
-    list.forEach((p, i) => {
-      const el = cards.current.get(p.item.id)!;
-      el.style.transform = `translateY(${Math.round(tops[i])}px)`;
-      el.style.visibility = "visible";
-    });
-    // the line from the focused (or hovered) card to its passage
-    const path = leader.current;
-    if (path) {
-      const which = list.findIndex((p) => p.item.id === (focused || hovered));
-      const svg = path.ownerSVGElement?.getBoundingClientRect();
-      if (which >= 0 && svg) {
-        const p = list[which];
-        const x1 = frame.right - 1 - svg.left;
-        const y1 = frame.top + tops[which] + 15 - svg.top;
-        const boxes = p.item.annotation ? reader.current?.boxesOf(p.item.annotation.anchor, p.item.id) : null;
-        const target = boxes?.[0];
-        const x2 = (target ? target.left : frame.right + 40) - svg.left - 2;
-        const y2 = (target ? target.top + target.height / 2 : p.y + 8) - svg.top;
-        const inView = y1 > 0 && y1 < svg.height && y2 > -20 && y2 < svg.height + 20;
-        if (inView) {
-          const mid = x1 + Math.max(16, (x2 - x1) * 0.45);
-          path.setAttribute("d", `M${x1},${y1} C${mid},${y1} ${mid},${y2} ${x2},${y2}`);
-          path.style.opacity = "1";
-          return;
-        }
+    rows.forEach((row, i) => {
+      for (const id of row.ids) {
+        const el = cards.current.get(id);
+        const cell = cells.get(id);
+        if (!el || !cell) continue;
+        el.style.transform = `translate(${Math.round(cell.x)}px, ${Math.round(tops[i] + cell.dy)}px)`;
+        el.style.visibility = "visible";
       }
-      path.style.opacity = "0";
-    }
-  }, [items, anchorY, focused, hovered, leader, reader]);
+    });
+  }, [items, extentOf, focused, reader]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -159,40 +210,57 @@ export function Margin({
   useLayoutEffect(() => {
     layout();
   });
-  // cards change height as answers arrive and figures render
+  // cards change height as answers arrive, figures render and the panel is resized
   // biome-ignore lint/correctness/useExhaustiveDependencies: observes the cards again whenever the set of shown cards changes
   useEffect(() => {
     const ro = new ResizeObserver(() => layout());
     for (const el of cards.current.values()) ro.observe(el);
+    if (box.current) ro.observe(box.current);
     return () => ro.disconnect();
   }, [shown, layout]);
-  useEffect(() => () => leader.current?.style.setProperty("opacity", "0"), [leader]);
 
-  // a card opened or closed from the keyboard keeps focus: the open card, or the collapsed one it came from
+  // the card opened from the book (a click on its passage, a link) takes focus when focus was in the margin
   const lastFocused = useRef(focused);
   useEffect(() => {
     const was = lastFocused.current;
     lastFocused.current = focused;
+    if (!focused || focused === was) return;
     const active = document.activeElement;
     if (active && active !== document.body && !box.current?.contains(active)) return;
-    const id = focused ?? was;
-    const card = id ? cards.current.get(id) : undefined;
     requestAnimationFrame(() =>
-      card?.querySelector<HTMLElement>(focused ? ".mcard.open" : ".mcard.collapsed")?.focus({ preventScroll: true }),
+      cards.current.get(focused)?.querySelector<HTMLElement>(".mcard")?.focus({ preventScroll: true }),
     );
   }, [focused]);
 
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const visible = shown.map((id) => byId.get(id)).filter((x): x is MarginItem => !!x);
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: a click on the empty margin closes the open card; Escape does the same
+    // biome-ignore lint/a11y/useKeyWithClickEvents: a click on the empty margin lets go of the focused card; Escape does the same
     // biome-ignore lint/a11y/noStaticElementInteractions: as above
-    <div className="margin" ref={box} onClick={(e) => e.target === box.current && setFocused(null)}>
+    <div
+      className="margin"
+      ref={box}
+      onClick={(e) => e.target === box.current && setFocused(null)}
+      onWheel={(e) => {
+        // the margin follows the book: scrolling over it scrolls the book (a pinch or a sideways swipe stays
+        // here, and so does scrolling a margin listed under the book, on a narrow screen)
+        if (
+          e.ctrlKey ||
+          e.metaKey ||
+          Math.abs(e.deltaX) > Math.abs(e.deltaY) ||
+          box.current?.hasAttribute("data-stacked")
+        )
+          return;
+        reader.current?.scroller()?.scrollBy({ top: e.deltaY * (e.deltaMode === 1 ? 18 : 1) });
+      }}
+    >
       {visible.map((item) => (
         // biome-ignore lint/a11y/noStaticElementInteractions: hovering or focusing a card marks its passage in the book
+        // biome-ignore lint/a11y/useKeyWithClickEvents: a click lines the card up with its passage; focusing it from the keyboard marks the passage too
         <div
           key={item.id}
           className="margin-slot"
+          data-focused={item.id === focused || undefined}
           ref={(el) => {
             if (el) cards.current.set(item.id, el);
             else cards.current.delete(item.id);
@@ -201,26 +269,25 @@ export function Margin({
           onMouseLeave={() => setHovered(null)}
           onFocus={() => setHovered(item.id)}
           onBlur={() => setHovered(null)}
+          onClick={() => item.id !== focused && setFocused(item.id)}
         >
           {item.annotation ? (
             <AnnotationCard
               a={item.annotation}
               book={book}
-              open={item.id === focused}
+              fig={figs.get(item.id)}
+              focused={item.id === focused}
               theme={theme}
-              onOpen={() => setFocused(item.id)}
-              onClose={() => setFocused(null)}
               onToNote={onToNote}
+              onOpen={() => onOpenFigure(item.id)}
               toast={toast}
             />
           ) : (
             <DemoCard
               demo={item.demo!}
-              open={item.id === focused}
+              fig={figs.get(item.id) || item.demo!.fig}
               theme={theme}
-              onOpen={() => setFocused(item.id)}
-              onClose={() => setFocused(null)}
-              onOpenDemo={onOpenDemo}
+              onOpen={() => onOpenFigure(item.id)}
             />
           )}
         </div>
@@ -237,379 +304,3 @@ export function Margin({
     </div>
   );
 }
-
-/* ---------------- an annotation ---------------- */
-
-const plain = (md: string) =>
-  md
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/!\[\[[^\]]*\]\]/g, "")
-    .replace(/\[\[([^\]|]*)\|?([^\]]*)\]\]/g, (_, a, b) => b || a)
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/[#*_>`~=]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-const AnnotationCard = memo(function AnnotationCard({
-  a,
-  book,
-  open,
-  theme,
-  onOpen,
-  onClose,
-  onToNote,
-  toast,
-}: {
-  a: Annotation;
-  book: Book;
-  open: boolean;
-  theme: "light" | "dark";
-  onOpen: () => void;
-  onClose: () => void;
-  onToNote: Props["onToNote"];
-  toast: (t: string) => void;
-}) {
-  const [ask, setAsk] = useState("");
-  const [asking, setAsking] = useState<number | null>(null);
-  const [menu, setMenu] = useState(false);
-  const [comment, setComment] = useState(a.body);
-  const [redrawing, setRedrawing] = useState(false);
-  const menuButton = useRef<HTMLButtonElement>(null);
-  const menuBox = useRef<HTMLDivElement>(null);
-  useArrowKeys(menuBox, { selector: '[role="menuitem"]', orientation: "vertical" });
-  useEffect(() => {
-    if (menu) menuBox.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
-  }, [menu]);
-  const where = a.anchor.page !== undefined ? `p. ${a.anchor.page}` : "";
-  const label = a.kind === "visualize" && a.title ? "Figure" : KIND[a.kind];
-  const pending = a.status === "pending";
-  const since = pending ? new Date(a.updated || a.created).getTime() : 0;
-
-  if (!open)
-    return (
-      <button
-        type="button"
-        className="mcard collapsed"
-        data-kind={a.kind}
-        data-status={a.status}
-        data-color={a.color}
-        onClick={onOpen}
-        title="Open"
-      >
-        <span className="mcard-label">
-          <b>{label}</b>
-          {a.kind === "visualize" && a.title
-            ? ` · ${a.title}`
-            : a.request
-              ? ` “${a.request.length > 60 ? `${a.request.slice(0, 58)}…` : a.request}”`
-              : ` “${a.anchor.quote.slice(0, 42)}${a.anchor.quote.length > 42 ? "…" : ""}”`}
-          <span className="where">{where}</span>
-        </span>
-        {pending ? (
-          <span className="skeleton short" />
-        ) : a.status === "failed" ? (
-          <span className="mcard-excerpt error">Couldn’t finish: {a.error}</span>
-        ) : a.kind === "comment" || a.body ? (
-          <span className="mcard-excerpt">
-            {plain(a.kind === "visualize" ? a.body.split("```")[0].replace(/^##[^\n]*\n/, "") : a.body).slice(0, 180) ||
-              "(figure)"}
-          </span>
-        ) : null}
-      </button>
-    );
-
-  return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: only keeps clicks inside the card from closing it
-    <article
-      className="mcard open"
-      data-kind={a.kind}
-      data-status={a.status}
-      data-color={a.color}
-      tabIndex={-1}
-      aria-label={`${label}${where ? `, ${where}` : ""}`}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <header className="mcard-head">
-        <span className="mcard-kind">{label}</span>
-        {where && <span className="chip-where">{where}</span>}
-        <span className="spacer" />
-        <div className="menu-host">
-          <button
-            type="button"
-            className="mcard-icon"
-            aria-label="More"
-            title="More"
-            aria-haspopup="menu"
-            aria-expanded={menu}
-            ref={menuButton}
-            onClick={() => setMenu((m) => !m)}
-          >
-            <Ellipsis aria-hidden="true" />
-          </button>
-          {menu && (
-            <div
-              className="menu"
-              role="menu"
-              aria-label="More"
-              ref={menuBox}
-              onMouseLeave={() => setMenu(false)}
-              onKeyDown={(e) => {
-                if (e.key !== "Escape") return;
-                e.stopPropagation(); // closes the menu, not the card
-                setMenu(false);
-                menuButton.current?.focus();
-              }}
-            >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenu(false);
-                  onToNote(a, "embed");
-                }}
-              >
-                <SquarePlus aria-hidden="true" />
-                Add to note{a.kind === "highlight" ? "" : " (with the answer)"}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenu(false);
-                  onToNote(a, "passage");
-                }}
-              >
-                <Quote aria-hidden="true" />
-                Add the passage to note
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenu(false);
-                  onToNote(a, "reference");
-                }}
-              >
-                <Link2 aria-hidden="true" />
-                Add a reference to note
-              </button>
-              <div className="menu-sep" />
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenu(false);
-                  void navigator.clipboard
-                    ?.writeText(`${a.anchor.quote}\n\n${a.body}`.trim())
-                    .then(() => toast("Copied."));
-                }}
-              >
-                <Copy aria-hidden="true" />
-                Copy
-              </button>
-              <a
-                role="menuitem"
-                href={`#/open?target=${encodeURIComponent(a.path.replace(/\.md$/, ""))}`}
-                onClick={() => setMenu(false)}
-                title={a.path}
-              >
-                <FileText aria-hidden="true" />
-                Show the file
-              </a>
-              <button
-                type="button"
-                role="menuitem"
-                className="danger"
-                onClick={async () => {
-                  setMenu(false);
-                  await learn.deleteAnnotation(a.id);
-                }}
-              >
-                <Trash2 aria-hidden="true" />
-                Delete
-              </button>
-            </div>
-          )}
-        </div>
-        <button type="button" className="mcard-icon" aria-label="Collapse" title="Collapse (Esc)" onClick={onClose}>
-          <X aria-hidden="true" />
-        </button>
-      </header>
-      <blockquote className="mcard-quote">
-        {a.anchor.quote.length > 420 ? `${a.anchor.quote.slice(0, 420)}…` : a.anchor.quote}
-      </blockquote>
-      {a.request && a.kind !== "comment" && <p className="mcard-request">{a.request}</p>}
-      {a.kind === "highlight" || a.kind === "comment" ? (
-        <div className="mcard-comment">
-          <fieldset className="colors">
-            <legend className="visually-hidden">Colour</legend>
-            {COLORS.map((c) => (
-              <button
-                type="button"
-                key={c}
-                className="color-dot"
-                data-color={c}
-                aria-pressed={(a.color || "yellow") === c}
-                aria-label={c}
-                onClick={() => learn.updateAnnotation(a.id, { color: c })}
-              />
-            ))}
-          </fieldset>
-          <textarea
-            rows={2}
-            value={comment}
-            aria-label="Your comment"
-            placeholder="Add a comment…"
-            onChange={(e) => setComment(e.target.value)}
-            onBlur={() =>
-              comment !== a.body &&
-              learn.updateAnnotation(a.id, { body: comment, kind: comment.trim() ? "comment" : "highlight" })
-            }
-          />
-        </div>
-      ) : pending ? (
-        <div className="mcard-body">
-          <span className="skeleton" />
-          <span className="skeleton" />
-          <span className="skeleton short" />
-          <Spinner
-            label={a.kind === "visualize" ? "Drawing" : a.kind === "resources" ? "Searching" : "Thinking"}
-            since={since}
-          />
-        </div>
-      ) : a.status === "failed" ? (
-        <div className="mcard-body">
-          <p className="form-error">{a.error}</p>
-          <button
-            type="button"
-            className="button"
-            onClick={() => (a.kind === "visualize" ? learn.redraw(a.id) : learn.retryAnnotation(a.id))}
-          >
-            Try again
-          </button>
-        </div>
-      ) : (
-        <div className="mcard-body">
-          <Markdown text={a.body} theme={theme} className="mcard-md" base={a.path} />
-        </div>
-      )}
-      <footer className="mcard-foot">
-        <span className="fine">
-          {a.model
-            ? `${a.model.name || a.model.provider}${a.model.ms ? ` · ${Math.round(a.model.ms / 1000)} s` : ""} · `
-            : ""}
-          {timeAgo(a.created)}
-        </span>
-        <span className="spacer" />
-        {a.kind === "visualize" && !pending && (
-          <button type="button" className="link" onClick={() => setRedrawing((r) => !r)}>
-            Redraw
-          </button>
-        )}
-      </footer>
-      {GENERATED.includes(a.kind) && !pending && a.status !== "failed" && (
-        <form
-          className="mcard-ask"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const q = ask.trim();
-            if (!q || asking) return;
-            setAsking(Date.now());
-            try {
-              if (redrawing || a.kind === "visualize") {
-                await learn.redraw(a.id, q);
-                setRedrawing(false);
-              } else await learn.followUp(a.id, q);
-              setAsk("");
-            } catch (error) {
-              toast((error as Error).message);
-            } finally {
-              setAsking(null);
-            }
-          }}
-        >
-          <input
-            value={ask}
-            onChange={(e) => setAsk(e.target.value)}
-            aria-label={a.kind === "visualize" ? "What should change in the figure" : "A follow-up question"}
-            placeholder={a.kind === "visualize" ? "What should change? (redraws it)" : "Ask a follow-up…"}
-            disabled={!!asking}
-          />
-          <button className="mcard-send" type="submit" disabled={!ask.trim() || !!asking} aria-label="Send">
-            {asking ? <span className="spinner-mark" aria-hidden="true" /> : <ArrowUp aria-hidden="true" />}
-          </button>
-        </form>
-      )}
-      {asking && <Spinner label={a.kind === "visualize" ? "Redrawing" : "Thinking"} since={asking} />}
-      <span className="visually-hidden">{book.title}</span>
-    </article>
-  );
-});
-const GENERATED = ["explain", "define", "ask", "visualize", "resources"];
-
-/* ---------------- a figure from the chapter's figures ---------------- */
-
-const DemoCard = memo(function DemoCard({
-  demo,
-  open,
-  theme,
-  onOpen,
-  onClose,
-  onOpenDemo,
-}: {
-  demo: Demo;
-  open: boolean;
-  theme: "light" | "dark";
-  onOpen: () => void;
-  onClose: () => void;
-  onOpenDemo: (d: Demo) => void;
-}) {
-  if (!open)
-    return (
-      <button
-        type="button"
-        className="mcard collapsed"
-        data-kind="figure"
-        data-status={demo.status === "ready" ? "ready" : demo.status === "failed" ? "failed" : "pending"}
-        onClick={onOpen}
-      >
-        <span className="mcard-label">
-          <b>{demo.fig}</b> · {demo.brief.title}
-        </span>
-        {demo.status !== "ready" && (
-          <span className="mcard-excerpt">
-            {demo.status === "failed" ? `Couldn’t finish: ${demo.error}` : demo.activity || "drawing…"}
-          </span>
-        )}
-      </button>
-    );
-  return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: only keeps clicks inside the card from closing it
-    <article
-      className="mcard open"
-      data-kind="figure"
-      tabIndex={-1}
-      aria-label={`${demo.fig}: ${demo.brief.title}`}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <header className="mcard-head">
-        <span className="mcard-kind">{demo.fig}</span>
-        <span className="spacer" />
-        <button type="button" className="link" onClick={() => onOpenDemo(demo)}>
-          <Maximize2 aria-hidden="true" />
-          Open large
-        </button>
-        <button type="button" className="mcard-icon" aria-label="Collapse" onClick={onClose}>
-          <X aria-hidden="true" />
-        </button>
-      </header>
-      {demo.type === "scene" && demo.scene && demo.status === "ready" ? (
-        <SceneView spec={demo.scene} theme={theme} compact predict={false} />
-      ) : (
-        <p className="fine">
-          {demo.status === "ready" ? "A hand-built demo: open it large to play with it." : demo.activity || demo.status}
-        </p>
-      )}
-    </article>
-  );
-});

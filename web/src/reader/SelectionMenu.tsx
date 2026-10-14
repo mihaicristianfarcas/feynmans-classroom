@@ -229,6 +229,7 @@ export function SelectionMenu({
         <div className="sel-visualize">
           <FigureRequest
             compact
+            animation
             onSubmit={({ request, kind, quality }) =>
               onAction({ kind: "visualize", request, sceneKind: kind, quality })
             }

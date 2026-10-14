@@ -199,6 +199,28 @@ export interface Annotation {
   updated: string;
 }
 
+/* ---------------- tutoring sessions about a book ---------------- */
+
+/** One conversation with the tutor about a book (library/<book>/sessions/*.md), kept to look back on. */
+export interface TutorSession {
+  id: string;
+  bookId: string;
+  /** Vault-relative path of the file. */
+  path: string;
+  /** What it was about: the first question, unless renamed. */
+  title: string;
+  chapterId?: string;
+  /** The passage it was about, when one was pinned (its text, and where it is). */
+  passage?: { text: string; source: SourceRef };
+  mode: "answer" | "socratic";
+  messages: { role: "user" | "tutor"; text: string }[];
+  /** The note made from it (Save as note), while that note is still in the vault. */
+  note?: { id: string; title: string };
+  props?: Record<string, unknown>;
+  created: string;
+  updated: string;
+}
+
 /* ---------------- connections the agent suggests between notes ---------------- */
 
 export interface Connection {

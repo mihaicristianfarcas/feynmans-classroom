@@ -11,10 +11,8 @@ import type { SavedFigure, SourceRef } from "../../shared/vault-types.ts";
 import { anchorFor } from "../books/placement.ts";
 import { bookDir, getBook, getDemo, listBooks, listDemos, newId, saveDemo } from "../books/store.ts";
 import type { Book, Brief, Demo, TocEntry } from "../books/types.ts";
-import { GENERATION } from "../config.ts";
 import { publish } from "../events.ts";
-import { planChapter } from "../handbuilt/plan.ts";
-import { chapterText, findChapter, passageAround } from "../ingest/index.ts";
+import { findChapter, passageAround } from "../ingest/index.ts";
 import { queue } from "../jobs.ts";
 import { bookContext, learnerSummary } from "../learn/context.ts";
 import { changed, figures, logActivity, now, shortId } from "../vault/index.ts";
@@ -200,55 +198,6 @@ export function figureFromSelection(
   );
   runFigure(demo, { passage: input.text, context, request: input.request, book, chapter });
   return demo;
-}
-
-/** Plans a chapter's figures, then draws each one (a few at a time). */
-export function figuresForChapter(bookId: string, chapterId: string, options: { count?: number } = {}) {
-  const book = getBook(bookId);
-  if (!book) throw new Error("book not found");
-  const chapter = findChapter(book, chapterId);
-  if (!chapter) throw new Error("chapter not found");
-  const existing = listDemos(bookId).filter((d) => d.chapterId === chapterId);
-  return queue.add({ bookId, kind: "plan", chapterId, message: "reading the chapter" }, async (job, signal) => {
-    const say = (message: string) => {
-      job.message = message;
-      publish(bookId, { type: "job", data: job });
-    };
-    const text = chapterText(book, chapter, GENERATION.maxChapterChars);
-    const briefs = await planChapter(book, chapter, text, {
-      count: options.count,
-      existing: existing.map((d) => `${d.brief.title}: ${d.brief.idea}`),
-      onActivity: say,
-      signal,
-      log: join(bookDir(bookId), "plan.jsonl"),
-    });
-    if (signal.aborted || !getBook(bookId)) return;
-    say(`planned ${briefs.length} figures`);
-    for (const brief of briefs) {
-      const demo = newSceneDemo(book, chapter, brief, {
-        source: "chapter",
-        kind: kindOf(brief.kind),
-        quality: "quick",
-      });
-      const context = passageAround(
-        book,
-        book.format === "pdf" ? { page: demo.anchor.page ?? brief.page } : { block: demo.anchor.block ?? brief.page },
-        1,
-      );
-      const request = [
-        `Show: ${brief.idea}`,
-        brief.picture && `Picture: ${brief.picture}`,
-        brief.motion && `Motion: ${brief.motion}`,
-        brief.controls && `Controls: ${brief.controls}`,
-        brief.readouts && `Readouts: ${brief.readouts}`,
-        brief.truth && `Must hold: ${brief.truth}`,
-        `Title idea: ${brief.title}. Caption idea: ${brief.caption}`,
-      ]
-        .filter(Boolean)
-        .join("\n");
-      runFigure(demo, { passage: `${brief.anchorQuote}\n\n${brief.idea}`, context, request, book, chapter });
-    }
-  });
 }
 
 /** Redraws a scene figure with the reader's notes (keeping what works). */

@@ -14,6 +14,7 @@ import type {
   Profile,
   SavedFigure,
   SourceRef,
+  TutorSession,
 } from "../../../shared/vault-types.ts";
 
 export type {
@@ -28,10 +29,21 @@ export type {
   Profile,
   SavedFigure,
   SourceRef,
+  TutorSession,
 };
 /** A link an agent suggested between notes, and what the learner decided. */
 export type SuggestedLink = Connection;
 
+/** A place a phrase was found in a book (see server/books/find.ts). */
+export interface FindHit {
+  page?: number;
+  y?: number;
+  block?: number;
+  quote: string;
+  prefix: string;
+  suffix: string;
+  chapterId?: string;
+}
 export interface Loc {
   page?: number;
   y?: number;
@@ -133,7 +145,7 @@ export interface Rect {
 /** A link the agent suggested between notes, and what the learner decided. */
 export interface Resolved {
   node: string;
-  kind: "note" | "concept" | "book" | "annotation" | "figure" | "attachment";
+  kind: "note" | "concept" | "book" | "annotation" | "figure" | "attachment" | "session";
   id: string;
   path?: string;
   title: string;
@@ -240,7 +252,7 @@ export interface GraphData {
   edges: { from: string; to: string; kind: string; id?: string; why?: string }[];
 }
 export interface SearchHit {
-  kind: "note" | "concept" | "card" | "book" | "annotation";
+  kind: "note" | "concept" | "card" | "book" | "annotation" | "session";
   id: string;
   title: string;
   snippet: string;

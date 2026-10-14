@@ -10,8 +10,8 @@ import { CODEX, chromePath, ROOT, RUNTIME_DIR, VENDOR_DIR } from "../config.ts";
 import { publish } from "../events.ts";
 import { passageAround } from "../ingest/index.ts";
 import { runCodex } from "../llm/codex.ts";
+import { briefMarkdown } from "./brief.ts";
 import { browserCheck } from "./browser-check.ts";
-import { briefMarkdown } from "./plan.ts";
 
 const TEMPLATE = join(ROOT, "server", "handbuilt", "workspace");
 const LINKEDOM = join(ROOT, "node_modules", "linkedom", "esm", "index.js");

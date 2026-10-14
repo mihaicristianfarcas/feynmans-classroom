@@ -1,75 +1,17 @@
 /* Hand-built demos: for what the declarative figure kinds can't show, Codex writes a custom demo.js
  * in a sandboxed workspace, checks it in Node and in Chrome, and fixes what fails (minutes per demo,
- * Codex only). This module plans a chapter's demos, queues their builds, and resumes builds that a
- * restart interrupted; build.ts runs one build. */
-import { join } from "node:path";
-import { chapterAt } from "../books/locate.ts";
-import { anchorFor } from "../books/placement.ts";
-import { bookDir, getBook, getDemo, listBooks, listDemos, newId, saveDemo } from "../books/store.ts";
-import type { Book, Brief, Demo, TocEntry } from "../books/types.ts";
-import { GENERATION } from "../config.ts";
+ * Codex only). This module makes a hand-built demo from a scene figure, queues its build, rebuilds,
+ * and resumes builds that a restart interrupted; build.ts runs one build. */
+import { getDemo, listBooks, listDemos, newId, saveDemo } from "../books/store.ts";
+import type { Demo } from "../books/types.ts";
 import { publish } from "../events.ts";
-import { chapterText, findChapter } from "../ingest/index.ts";
 import { queue } from "../jobs.ts";
 import { activeProvider } from "../settings.ts";
 import { buildDemo, resetWorkspace } from "./build.ts";
-import { planChapter } from "./plan.ts";
-
-function createDemo(book: Book, chapter: TocEntry, brief: Brief, source: Demo["source"]): Demo {
-  const now = new Date().toISOString();
-  const anchor = anchorFor(book, chapter, brief);
-  if (anchor.matched) chapter = chapterAt(book, anchor)?.entry || chapter;
-  const demo: Demo = {
-    id: newId("d"),
-    bookId: book.id,
-    chapterId: chapter.id,
-    status: "queued",
-    brief,
-    anchor,
-    fig: "Fig",
-    createdAt: now,
-    updatedAt: now,
-    attempts: 0,
-    source,
-    activity: "waiting for a Codex slot",
-  };
-  saveDemo(demo, { create: true });
-  publish(book.id, { type: "demo", data: demo });
-  return demo;
-}
 
 export function enqueueBuild(demo: Demo) {
   return queue.add({ bookId: demo.bookId, kind: "build", demoId: demo.id, chapterId: demo.chapterId }, (_job, signal) =>
     buildDemo(demo.id, demo.bookId, signal),
-  );
-}
-
-/** Plans a chapter with Codex, then queues one build per planned demo. */
-export function generateChapter(bookId: string, chapterId: string, options: { count?: number } = {}) {
-  const book = getBook(bookId);
-  if (!book) throw new Error("book not found");
-  const chapter = findChapter(book, chapterId);
-  if (!chapter) throw new Error("chapter not found");
-  const existing = listDemos(bookId).filter((demo) => demo.chapterId === chapterId);
-  return queue.add(
-    { bookId, kind: "plan", chapterId, message: "Codex is reading the chapter" },
-    async (job, signal) => {
-      const say = (message: string) => {
-        job.message = message;
-        publish(bookId, { type: "job", data: job });
-      };
-      const text = chapterText(book, chapter, GENERATION.maxChapterChars);
-      const briefs = await planChapter(book, chapter, text, {
-        count: options.count,
-        existing: existing.map((demo) => `${demo.brief.title}: ${demo.brief.idea}`),
-        onActivity: say,
-        signal,
-        log: join(bookDir(bookId), "plan.jsonl"),
-      });
-      if (signal.aborted || !getBook(bookId)) return;
-      say(`planned ${briefs.length} demos`);
-      for (const brief of briefs) enqueueBuild(createDemo(book, chapter, brief, "chapter"));
-    },
   );
 }
 

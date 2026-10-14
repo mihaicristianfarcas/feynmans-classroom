@@ -1,6 +1,7 @@
 /* Where a figure sits in its book, and its number. A figure (a declarative scene or a hand-built
  * demo) is anchored to the passage its brief quotes, and numbered in reading order within the
  * chapter that passage falls in ("Fig 7.2"). */
+import { figurePrefix } from "../../shared/chapters.ts";
 import { chapterAt, chapterRange, locateInBlocks, locateInPages, positionOf } from "./locate.ts";
 import { getBlocks, getBook, getPages, listDemos } from "./store.ts";
 import type { Book, Brief, Demo, TocEntry } from "./types.ts";
@@ -36,7 +37,7 @@ export function withFigs(book: Book, demos: Demo[]): Demo[] {
   for (const [chapterId, list] of byChapter) {
     const index = book.toc.findIndex((entry) => entry.id === chapterId);
     list.sort((a, b) => positionOf(a.anchor) - positionOf(b.anchor) || a.createdAt.localeCompare(b.createdAt));
-    for (const [i, demo] of list.entries()) demo.fig = `Fig ${index + 1}.${i + 1}`;
+    for (const [i, demo] of list.entries()) demo.fig = `Fig ${figurePrefix(book.toc, index)}.${i + 1}`;
   }
   return demos;
 }

@@ -15,7 +15,8 @@ you need, instead of listing everything.
 | `library/INDEX.md` | generated: every book, its folder, pages, chapters |
 | `library/<book>/README.md` | generated: the book's chapters with page ranges and text files, its annotations by chapter |
 | `library/<book>/text/NN-*.md` | the book's text, one file per chapter, with `[[page N]]` (or `[[block N]]`) markers |
-| `library/<book>/annotations/*.md` | highlights and what was made from passages (explanations, definitions, answers, figures). Frontmatter: `kind`, `page`, `anchor` (`quote`, `prefix`, `suffix`, `rects`, `md`: the chapter text file and line), `request`, `model`. Body: the answer; a figure is a ```figure JSON block |
+| `library/<book>/annotations/*.md` | highlights and what was made from passages (explanations, definitions, answers, figures, animations). Frontmatter: `kind`, `page`, `anchor` (`quote`, `prefix`, `suffix`, `rects`, `md`: the chapter text file and line), `request`, `model`. Body: the answer, then follow-up questions as `## Follow-up: …` sections; a figure is a ```figure JSON block, an animation a ```manim block (a ManimGX scene in Python) |
+| `library/<book>/sessions/*.md` | conversations with the tutor about the book: frontmatter `title`, `chapter`, `mode`, `passage` (where), `note` (a link to the note written from it, if any); the passage as a `> [!quote]`, then `## You` / `## Tutor` sections |
 | `library/<book>/book.json` | the book's metadata and chapters (the app's; don't edit) |
 | `figures/*.json` | saved interactive figures (scene specs) |
 | `attachments/` | pictures in notes |
@@ -62,6 +63,16 @@ pages then list it. Cite book pages as below.
 - **Study sessions**: `type: session`, e.g. `notes/<subject>/Sessions/2026-10-13.md`: what was
   studied, what went well, what to revisit.
 - **Flashcards**: files in `cards/` (see above), with `concepts` and `source` where they apply.
+- **Animations**: a fenced `manim` block in a note plays as a short film (ManimGX: Manim Community
+  Edition's API, `import manimgx as m`, one `m.Scene` subclass with `construct`). Start it with the
+  classroom's palette block exactly as the animations in `library/*/annotations/` have it (`PAPER`,
+  `INK`, `MUTED`, `FAINT`, `ACCENT`, `RED`, `GREEN`, `BLUE`, `YELLOW`, `ORANGE`, then
+  `m.config.background_color = PAPER`), pass `color=` one of those names to everything, keep it inside
+  x ∈ [−6.6, 6.6], y ∈ [−3.6, 3.6], and import only `manimgx`, `numpy` and Python's maths modules.
+  The learner can't see it run until they open the note, so keep it simple and certain to work.
+
+What the learner asked while reading is in `library/<book>/sessions/` (the tutor) and in the
+follow-ups of `library/<book>/annotations/`: read them to see what puzzled them.
 
 When asked to change a note, keep the learner's own words unless they asked for a rewrite. Don't
 delete or rename notes they didn't mention.

@@ -14,4 +14,6 @@ export const post = <T>(path: string, body?: unknown) =>
 
 export const put = <T>(path: string, body?: unknown) =>
   call<T>(path, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body ?? {}) });
+export const patch = <T>(path: string, body?: unknown) =>
+  call<T>(path, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body ?? {}) });
 export const del = (path: string) => call(path, { method: "DELETE" });

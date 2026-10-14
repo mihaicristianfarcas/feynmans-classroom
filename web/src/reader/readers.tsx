@@ -1,18 +1,35 @@
-/* The two book views the reader uses: a PDF (pdf.js pages with a selectable text layer) and a
- * reflowable book (sanitized HTML blocks), both drawing the book's highlights and answering the same
- * questions about positions (where am I, where is this passage, which boxes does it cover). */
-import { CanvasLayer, CustomLayer, Page, Pages, Root, TextLayer, usePdf, usePdfJump } from "@anaralabs/lector";
+/* The two book views the reader uses: a PDF (Lector's pdf.js pages with a selectable text layer and
+ * working links) and a reflowable book (sanitized HTML blocks), both drawing the book's highlights and
+ * the phrase the find bar is on, zoomed as the reader asks (fit to the pane, or a scale), and
+ * answering the same questions about positions (where am I, where is this passage, which boxes does it
+ * cover). */
+import {
+  AnnotationLayer,
+  CanvasLayer,
+  CustomLayer,
+  Page,
+  Pages,
+  Root,
+  TextLayer,
+  Thumbnail,
+  Thumbnails,
+  usePdf,
+  usePdfJump,
+} from "@anaralabs/lector";
 import { GlobalWorkerOptions } from "pdfjs-dist/legacy/build/pdf.mjs";
 import workerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import "pdfjs-dist/web/pdf_viewer.css";
 import {
+  type CSSProperties,
   createContext,
   forwardRef,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -82,13 +99,18 @@ function selectPdfLines(scroller: HTMLElement, clientY: number): boolean {
   return true;
 }
 
-/** What the views draw over the text: highlights and underlines for the book's annotations. */
+/** What the views draw over the text: highlights and underlines for the book's annotations, and the
+ * phrase the find bar is on. */
 export interface Marks {
   annotations: Annotation[];
   focused: string | null;
   hovered: string | null;
+  found: { anchor: Anchor; key: string } | null;
 }
-export const MarksContext = createContext<Marks>({ annotations: [], focused: null, hovered: null });
+export const MarksContext = createContext<Marks>({ annotations: [], focused: null, hovered: null, found: null });
+
+/** How big the book is drawn: fitted to the pane (never wider than a comfortable measure), or a scale. */
+export type Zoom = number | "fit";
 
 const markStyle = (a: Annotation) => (a.kind === "highlight" || a.kind === "comment" ? "fill" : "line");
 
@@ -97,31 +119,45 @@ const markStyle = (a: Annotation) => (a.kind === "highlight" || a.kind === "comm
 interface PdfProps {
   url: string;
   dark: boolean;
+  /** Show the pages as a strip of thumbnails beside the book. */
+  pages?: boolean;
+  zoom: Zoom;
+  /** The scale the pages are drawn at now (1 is the PDF's own size). */
+  onZoomed: (scale: number) => void;
   onScroll: () => void;
   onReady: () => void;
 }
 
-export const PdfReader = forwardRef<ReaderHandle, PdfProps>(function PdfReader({ url, dark, onScroll, onReady }, ref) {
+export const PdfReader = forwardRef<ReaderHandle, PdfProps>(function PdfReader(
+  { url, dark, pages, zoom, onZoomed, onScroll, onReady },
+  ref,
+) {
   return (
     <Root
       source={url}
       className="pdf-root"
+      data-pages={pages || undefined}
       colorScheme={dark ? "dark" : "light"}
       loader={<div className="reader-loading">Opening the book…</div>}
     >
-      <PdfInner ref={ref} onScroll={onScroll} onReady={onReady} />
+      <PdfInner ref={ref} zoom={zoom} onZoomed={onZoomed} onScroll={onScroll} onReady={onReady} />
+      {pages && <PageStrip />}
     </Root>
   );
 });
 
 const PdfInner = forwardRef<ReaderHandle, Omit<PdfProps, "url" | "dark">>(function PdfInner(
-  { onScroll, onReady },
+  { zoom, onZoomed, onScroll, onReady },
   ref,
 ) {
   const viewportRef = usePdf((state) => state.viewportRef);
   const doc = usePdf((state) => state.pdfDocumentProxy);
   const viewports = usePdf((state) => state.viewports);
   const updateZoom = usePdf((state) => state.updateZoom);
+  const scale = usePdf((state) => state.zoom);
+  useEffect(() => {
+    onZoomed(scale);
+  }, [scale, onZoomed]);
   const { jumpToPage } = usePdfJump();
   const pending = useRef<{ loc: Loc; clientY: number; tries: number } | null>(null);
 
@@ -226,13 +262,22 @@ const PdfInner = forwardRef<ReaderHandle, Omit<PdfProps, "url" | "dark">>(functi
       });
     };
     scroller.addEventListener("scroll", handler, { passive: true });
-    // fit the page to the pane, but never wider than a comfortable reading measure
+    // a page's text renders after the page itself: passages found in it move the margin and the marks
+    const rendered = new MutationObserver((records) => {
+      if (records.some((r) => (r.target as Element).classList?.contains("textLayer"))) handler();
+    });
+    rendered.observe(scroller, { childList: true, subtree: true });
+    // fit the page to the pane, but never wider than a comfortable reading measure; or the scale asked for
     const fit = () => {
+      if (zoom !== "fit") {
+        updateZoom(zoom);
+        return;
+      }
       const width = viewports?.[0]?.width;
       if (!width) return;
       const room = scroller.clientWidth - 40;
-      const zoom = Math.max(0.5, Math.min(room / width, MAX_PAGE_WIDTH / width));
-      updateZoom(Math.round(zoom * 100) / 100);
+      const fitted = Math.max(0.5, Math.min(room / width, MAX_PAGE_WIDTH / width));
+      updateZoom(Math.round(fitted * 100) / 100);
     };
     fit();
     const resize = new ResizeObserver(() => {
@@ -244,9 +289,10 @@ const PdfInner = forwardRef<ReaderHandle, Omit<PdfProps, "url" | "dark">>(functi
     return () => {
       scroller.removeEventListener("scroll", handler);
       resize.disconnect();
+      rendered.disconnect();
       cancelAnimationFrame(frame);
     };
-  }, [viewportRef, onScroll, onReady, updateZoom, viewports]);
+  }, [viewportRef, onScroll, onReady, updateZoom, viewports, zoom]);
 
   return (
     <Pages className="pdf-pages" gap={14}>
@@ -254,20 +300,44 @@ const PdfInner = forwardRef<ReaderHandle, Omit<PdfProps, "url" | "dark">>(functi
         <CanvasLayer />
         <CustomLayer>{(page) => <PageMarks page={page} />}</CustomLayer>
         <TextLayer />
+        <AnnotationLayer externalLinksEnabled jumpOptions={{ behavior: "auto", align: "start" }} />
         <CustomLayer>{(page) => <span data-cr-page={page} className="page-marker" aria-hidden="true" />}</CustomLayer>
       </Page>
     </Pages>
   );
 });
 
+const THUMB_ROW = 196;
+
+/** The book's pages as thumbnails in a strip (Lector's, drawn as they scroll into view): the page you're
+ * on is marked, and choosing one (a click, Enter or Space; the arrow keys move between them) goes there. */
+function PageStrip() {
+  const current = usePdf((state) => state.currentPage);
+  const list = useRef<HTMLDivElement>(null);
+  // opens at the page you're on
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the strip opens
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (el) el.scrollTop = Math.max(0, (current - 1) * THUMB_ROW - el.clientHeight / 2 + THUMB_ROW / 2);
+  }, []);
+  return (
+    <aside className="pdf-strip" aria-label="Pages">
+      <Thumbnails ref={list} className="pdf-strip-list" virtualize={{ itemHeight: THUMB_ROW, overscan: 3 }}>
+        <Thumbnail className="pdf-thumb" />
+      </Thumbnails>
+    </aside>
+  );
+}
+
 /** A page's highlights and underlines, under the text layer (so selecting text still works). */
 function PageMarks({ page }: { page: number }) {
-  const { annotations, focused, hovered } = useContext(MarksContext);
+  const { annotations, focused, hovered, found } = useContext(MarksContext);
   const ref = useRef<HTMLDivElement>(null);
   const [tick, setTick] = useState(0);
   const here = annotations.filter((a) => a.anchor.page === page || a.anchor.rects?.some((r) => r.p === page));
+  const foundHere = found && found.anchor.page === page ? found : null;
   // an annotation with only a quote is found in the text layer once it has rendered
-  const missing = here.some((a) => !a.anchor.rects?.length);
+  const missing = here.some((a) => !a.anchor.rects?.length) || !!foundHere;
   // biome-ignore lint/correctness/useExhaustiveDependencies: polls again for each page
   useEffect(() => {
     if (!missing) return;
@@ -280,12 +350,22 @@ function PageMarks({ page }: { page: number }) {
       }
     }, 100);
     return () => clearInterval(timer);
-  }, [missing, page]);
+  }, [missing, page, foundHere?.key]);
   const host = ref.current?.parentElement;
   const pageRef = host ? { page, el: host } : undefined;
   void tick;
+  const foundRects = foundHere && pageRef ? pdfRects(foundHere.anchor, foundHere.key, pageRef) : null;
   return (
     <div ref={ref} className="page-marks" aria-hidden="true">
+      {foundRects?.map((r, i) => (
+        <span
+          // biome-ignore lint/suspicious/noArrayIndexKey: a match's boxes are fixed for it
+          key={`found-${i}`}
+          className="mark"
+          data-style="found"
+          style={{ left: `${r.x * 100}%`, top: `${r.y * 100}%`, width: `${r.w * 100}%`, height: `${r.h * 100}%` }}
+        />
+      ))}
       {here.flatMap((a) => {
         const rects = a.anchor.rects?.length ? a.anchor.rects : pageRef ? pdfRects(a.anchor, a.id, pageRef) : null;
         return (rects || [])
@@ -309,13 +389,35 @@ function PageMarks({ page }: { page: number }) {
 
 /* ---------------- EPUB, Markdown, text ---------------- */
 
+const BLOCK_TAGS = ["p", "li", "blockquote", "pre", "figure", "table", "dt", "dd"];
+
+/** Each heading block's level on the page: the book's levels in their order, from h2 down (the page's
+ * h1 is the app's title for the book), never more than one deeper than the heading before it. */
+function headingLevels(blocks: Block[]): Map<number, number> {
+  const used = [...new Set(blocks.filter((b) => /^h[1-6]$/.test(b.tag)).map((b) => Number(b.tag[1])))].sort();
+  const rank = new Map(used.map((l, i) => [l, Math.min(6, i + 2)]));
+  const out = new Map<number, number>();
+  let previous = 1;
+  for (const b of blocks) {
+    if (!/^h[1-6]$/.test(b.tag)) continue;
+    const level = Math.min(rank.get(Number(b.tag[1]))!, previous + 1);
+    out.set(b.id, level);
+    previous = level;
+  }
+  return out;
+}
+
 interface HtmlProps {
   blocks: Block[];
+  zoom: Zoom;
   onScroll: () => void;
   onReady: () => void;
 }
 
-export const HtmlReader = forwardRef<ReaderHandle, HtmlProps>(function HtmlReader({ blocks, onScroll, onReady }, ref) {
+export const HtmlReader = forwardRef<ReaderHandle, HtmlProps>(function HtmlReader(
+  { blocks, zoom, onScroll, onReady },
+  ref,
+) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const blockEl = (id: number) => scrollRef.current?.querySelector<HTMLElement>(`[data-block="${id}"]`) || null;
 
@@ -403,8 +505,48 @@ export const HtmlReader = forwardRef<ReaderHandle, HtmlProps>(function HtmlReade
     };
   }, [onScroll, onReady]);
 
+  // the blocks as elements: list items inside their list, headings at levels that follow the page's own
+  // outline (the app's h1 is the book's title), each looking as the book styled it (by its class)
+  const rendered = useMemo(() => {
+    const level = headingLevels(blocks);
+    const one = (block: Block) => {
+      if (block.tag === "hr") return <hr key={block.id} data-block={block.id} />;
+      const Tag = (
+        level.has(block.id) ? `h${level.get(block.id)}` : BLOCK_TAGS.includes(block.tag) ? block.tag : "p"
+      ) as "p";
+      // block.html is sanitized on the server (allow-listed inline tags, no attributes but img src/alt)
+      return (
+        <Tag
+          key={block.id}
+          data-block={block.id}
+          className={`b-${block.tag}`}
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: block HTML is sanitized at ingest (server/ingest/html.ts)
+          dangerouslySetInnerHTML={{ __html: block.html }}
+        />
+      );
+    };
+    const out: ReactNode[] = [];
+    for (let i = 0; i < blocks.length; ) {
+      const list = blocks[i].tag === "li" ? "ul" : blocks[i].tag === "dt" || blocks[i].tag === "dd" ? "dl" : null;
+      if (!list) {
+        out.push(one(blocks[i++]));
+        continue;
+      }
+      const run: Block[] = [];
+      while (i < blocks.length && (list === "ul" ? blocks[i].tag === "li" : /^d[td]$/.test(blocks[i].tag)))
+        run.push(blocks[i++]);
+      const List = list;
+      out.push(
+        <List key={`list-${run[0].id}`} className={`b-${list}`}>
+          {run.map(one)}
+        </List>,
+      );
+    }
+    return out;
+  }, [blocks]);
+
   // highlights through the CSS Custom Highlight API: no change to the book's DOM
-  const { annotations, focused } = useContext(MarksContext);
+  const { annotations, focused, found } = useContext(MarksContext);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the marks are drawn again when the book's blocks render
   useLayoutEffect(() => {
     const registry = (CSS as unknown as { highlights?: Map<string, unknown> }).highlights;
@@ -412,6 +554,8 @@ export const HtmlReader = forwardRef<ReaderHandle, HtmlProps>(function HtmlReade
     const root = scrollRef.current;
     if (!registry || !HighlightCtor || !root) return;
     const groups = new Map<string, Range[]>();
+    const foundRange = found ? blockRange(found.anchor, root) : null;
+    if (foundRange) groups.set("find-hit", [foundRange]);
     for (const a of annotations) {
       const range = blockRange(a.anchor, root);
       if (!range) continue;
@@ -420,7 +564,16 @@ export const HtmlReader = forwardRef<ReaderHandle, HtmlProps>(function HtmlReade
       if (!groups.has(name)) groups.set(name, []);
       groups.get(name)!.push(range);
     }
-    const names = ["anno-focused", "anno-line", "anno-yellow", "anno-green", "anno-blue", "anno-pink", "anno-purple"];
+    const names = [
+      "find-hit",
+      "anno-focused",
+      "anno-line",
+      "anno-yellow",
+      "anno-green",
+      "anno-blue",
+      "anno-pink",
+      "anno-purple",
+    ];
     for (const name of names) {
       const ranges = groups.get(name);
       if (ranges?.length) registry.set(name, new HighlightCtor(...ranges));
@@ -429,45 +582,12 @@ export const HtmlReader = forwardRef<ReaderHandle, HtmlProps>(function HtmlReade
     return () => {
       for (const n of names) registry.delete(n);
     };
-  }, [annotations, focused, blocks]);
+  }, [annotations, focused, found, blocks]);
 
   return (
     <div className="html-reader" ref={scrollRef}>
-      <article className="html-book">
-        {blocks.map((block) => {
-          const Tag = (
-            [
-              "h1",
-              "h2",
-              "h3",
-              "h4",
-              "h5",
-              "h6",
-              "p",
-              "li",
-              "blockquote",
-              "pre",
-              "figure",
-              "table",
-              "dt",
-              "dd",
-              "hr",
-            ].includes(block.tag)
-              ? block.tag
-              : "p"
-          ) as "p";
-          if (block.tag === "hr") return <hr key={block.id} data-block={block.id} />;
-          // block.html is sanitized on the server (allow-listed inline tags, no attributes but img src/alt)
-          return (
-            <Tag
-              key={block.id}
-              data-block={block.id}
-              className={`b-${block.tag}`}
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: block HTML is sanitized at ingest (server/ingest/html.ts)
-              dangerouslySetInnerHTML={{ __html: block.html }}
-            />
-          );
-        })}
+      <article className="html-book" style={{ "--book-scale": zoom === "fit" ? 1 : zoom } as CSSProperties}>
+        {rendered}
       </article>
     </div>
   );

@@ -1,4 +1,5 @@
-// End-to-end check of the app (npm run dev) with at least one book that has two or more ready demos.
+// End-to-end check of the app (npm run dev) with at least one book that has two or more figures (made
+// from passages, or the chapter's own).
 // It never calls a model unless --generate is passed. It makes one highlight (and deletes it again).
 //   npm run test:e2e -- [--book <id>] [--generate]     (APP_URL=http://localhost:5183/ to check a test server)
 import puppeteer, { type Frame, type Page } from "puppeteer-core";
@@ -16,24 +17,44 @@ const check = (name: string, ok: boolean, detail?: string) => {
 };
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const pos = (loc: { page?: number; y?: number; block?: number }) =>
+  loc.page !== undefined ? loc.page + (loc.y ?? 0) : (loc.block ?? 0) + (loc.y ?? 0);
 const books = (await (await fetch(`${BASE}api/books`)).json()) as { id: string; title: string; format: string }[];
 let bookId = arg("book");
-let demos: { id: string; status: string; fig: string; anchor: { page?: number; y?: number; block?: number } }[] = [];
+type Place = { page?: number; y?: number; block?: number };
+let figures: { id: string; anchor: Place; handbuilt: boolean }[] = [];
 for (const book of bookId ? books.filter((b) => b.id === bookId) : books) {
-  const list = (await (await fetch(`${BASE}api/books/${book.id}/demos`)).json()) as typeof demos;
-  if (list.filter((d) => d.status === "ready").length >= 2) {
+  const demos = (await (await fetch(`${BASE}api/books/${book.id}/demos`)).json()) as {
+    id: string;
+    status: string;
+    type?: string;
+    anchor: Place;
+  }[];
+  const notes = (await (await fetch(`${BASE}api/books/${book.id}/annotations`)).json()) as {
+    id: string;
+    kind: string;
+    status: string;
+    anchor: Place;
+  }[];
+  const list = [
+    ...demos
+      .filter((d) => d.status === "ready")
+      .map((d) => ({ id: d.id, anchor: d.anchor, handbuilt: d.type !== "scene" })),
+    ...notes
+      .filter((a) => a.kind === "visualize" && a.status === "ready")
+      .map((a) => ({ id: a.id, anchor: a.anchor, handbuilt: false })),
+  ];
+  if (list.length >= 2) {
     bookId = book.id;
-    demos = list.filter((d) => d.status === "ready");
+    figures = list.sort((a, b) => pos(a.anchor) - pos(b.anchor));
     break;
   }
 }
-if (!bookId || demos.length < 2) {
-  console.log("Need a book with at least two ready demos. Generate some first.");
+if (!bookId || figures.length < 2) {
+  console.log("Need a book with at least two figures. Make some first (select a passage, then Visualize).");
   process.exit(1);
 }
-const pos = (loc: { page?: number; y?: number; block?: number }) =>
-  loc.page !== undefined ? loc.page + (loc.y ?? 0) : (loc.block ?? 0) + (loc.y ?? 0);
-const [first, second] = demos;
+const [first, second] = figures;
 
 const browser = await puppeteer.launch({ executablePath: chromePath()!, headless: true });
 const page = await browser.newPage();
@@ -41,13 +62,12 @@ await page.setViewport({ width: 1440, height: 900 });
 const pageErrors: string[] = [];
 page.on("pageerror", (e) => pageErrors.push((e as Error).message));
 
-const active = (p: Page) =>
-  p.evaluate(
-    () =>
-      document.querySelector(".anchor[data-active]")?.getAttribute("title") ||
-      document.querySelector(".demo-count")?.textContent ||
-      "",
-  );
+/** The margin card lined up with its passage (the one chosen), by its label. */
+const focusedCard = (p: Page) =>
+  p.evaluate(() => {
+    const slot = document.querySelector<HTMLElement>(".margin-slot[data-focused]");
+    return slot?.querySelector(".mcard")?.getAttribute("aria-label") || "";
+  });
 const demoFrame = async (p: Page): Promise<Frame | null> => {
   for (let i = 0; i < 40; i++) {
     const frame = p.frames().find((f) => f.url().includes("/demos/") && f.url().includes("/page"));
@@ -79,7 +99,7 @@ try {
   await page.waitForSelector(".book-card", { timeout: 10000 });
   check("library lists books", (await page.$$(".book-card")).length >= 1);
 
-  // open the reader just past the first demo's anchor: the margin first, then the chapter's figures
+  // open the reader at the first figure: the margin first, then the Figures index
   await page.goto(`${BASE}#/book/${bookId}?at=${(pos(first.anchor) + 0.03).toFixed(3)}`, {
     waitUntil: "domcontentloaded",
   });
@@ -89,57 +109,97 @@ try {
     !!(await page.$(".pane-tab[aria-selected=true]")) &&
       (await page.$eval(".pane-tab[aria-selected=true]", (e) => e.textContent || "")).startsWith("Margin"),
   );
-  await clickTab(page, "Figures");
-  await page.waitForSelector(".demo-frame", { timeout: 20000 });
-  await wait(2500);
   check(
-    "first demo is active when the reading line passes its anchor",
-    (await active(page)).includes(first.fig),
-    await active(page),
+    "there is no reading-line mark and no line from a card to its passage",
+    !(await page.$(".reading-line, .leader")),
   );
-  const frame = await demoFrame(page);
-  check("the demo loads in its iframe", !!frame);
-  if (frame) {
-    // a predict-first question pauses the demo until it's answered or skipped
-    const skipped = await frame.evaluate(() => {
-      const skip = [...document.querySelectorAll<HTMLElement>("button, a")].find((el) =>
-        /^skip$/i.test((el.textContent || "").trim()),
-      );
-      skip?.click();
-      return !!skip;
-    });
-    if (skipped) await wait(1500);
-    const state = await frame.evaluate(() => {
-      const S = (window as unknown as { __classroom?: { frames: number; errors: unknown[] } }).__classroom;
-      return { frames: S?.frames ?? 0, errors: S?.errors?.length ?? -1, origin: String(window.origin) };
-    });
-    check("the demo animates without errors", state.frames > 10 && state.errors === 0, JSON.stringify(state));
-    check("the demo runs in an opaque (sandboxed) origin", state.origin === "null", state.origin);
-  }
-
-  // theme reaches the iframe (the app starts in the system's theme, so switch to the other one)
-  const before = await page.evaluate(() => document.documentElement.dataset.theme);
-  await page.click('button[aria-label="Switch theme"]');
-  await wait(1200);
-  const frame2 = await demoFrame(page);
-  const theme = frame2 ? await frame2.evaluate(() => document.body.getAttribute("data-theme")) : null;
-  check("the theme switch reaches the demo", !!theme && theme !== before, `${before} → ${theme}`);
-  await page.click('button[aria-label="Switch theme"]');
-
-  // ] steps to the next demo
-  await page.keyboard.press("]");
-  await wait(2500);
-  check("] jumps to the next demo", (await active(page)).includes(second.fig), await active(page));
-
-  // h holds it while scrolling back up
-  await page.keyboard.press("h");
-  await page.evaluate(() => (document.querySelector(".pdf-pages, .html-reader") as HTMLElement).scrollBy(0, -2500));
   await wait(1500);
-  const heldEyebrow = await page.evaluate(() => document.querySelector(".held-tag") !== null);
-  const countText = await page.evaluate(() => document.querySelector(".demo-count")?.textContent || "");
-  check("h holds the demo while scrolling away", heldEyebrow && countText.includes(second.fig), countText);
-  await page.keyboard.press("h");
-  await wait(800);
+  check(
+    "margin cards are shown whole (none folded, none scrolling inside)",
+    await page.evaluate(
+      () =>
+        !document.querySelector(".mcard.collapsed") &&
+        [...document.querySelectorAll<HTMLElement>(".mcard.open")].every((c) => c.scrollHeight <= c.clientHeight + 1),
+    ),
+  );
+  await clickTab(page, "Figures");
+  await page.waitForSelector(".figure-rows .figure-row", { timeout: 10000 }).catch(() => null);
+  await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLButtonElement>(".figures-head button")]
+      .find((b) => b.textContent === "Book")
+      ?.click(),
+  );
+  await wait(300);
+  const rows = await page.$$eval(".figure-rows .figure-row", (els) => els.length);
+  check("the Figures tab lists the book's figures", rows >= 2, `${rows} listed`);
+  check("and offers to make none", !(await page.$(".chapter-card, .generate-row")));
+  await page.click(".figure-rows .figure-row");
+  await wait(1500);
+  const chosen = await focusedCard(page);
+  check(
+    "choosing a figure goes to its passage and lines its card up in the margin",
+    (await page.$eval(".pane-tab[aria-selected=true]", (e) => e.textContent || "")).startsWith("Margin") && !!chosen,
+    chosen,
+  );
+
+  // ] steps to the next figure
+  await page.keyboard.press("]");
+  await wait(1500);
+  const next = await focusedCard(page);
+  check("] goes to the next figure", !!next && next !== chosen, `${chosen} → ${next}`);
+  const at = await page.evaluate(() => (window as unknown as { __classroom?: { pos: number } }).__classroom?.pos ?? 0);
+  check("the reading position follows", Math.abs(at - pos(second.anchor)) < 1.5, `${at.toFixed(2)}`);
+
+  // a figure opened large, and a hand-built one in its sandboxed frame
+  await clickTab(page, "Figures");
+  await wait(300);
+  const handbuilt = figures.some((f) => f.handbuilt);
+  await page.evaluate((hand) => {
+    const rows = [...document.querySelectorAll(".figure-rows li")];
+    const row = (hand && rows.find((li) => li.querySelector(".figure-still[data-kind='handbuilt']"))) || rows[0];
+    row?.querySelector<HTMLButtonElement>(".icon-button")?.click();
+  }, handbuilt);
+  await page.waitForSelector(".modal .lightbox", { timeout: 5000 }).catch(() => null);
+  check(
+    "a figure opens large",
+    !!(await page.$(".modal .lightbox .scene, .modal .lightbox iframe, .modal .lightbox .manim")),
+  );
+  if (handbuilt) {
+    const frame = await demoFrame(page);
+    check("the hand-built demo loads in its iframe", !!frame);
+    if (frame) {
+      const origin = await frame.evaluate(() => String(window.origin));
+      check("the demo runs in an opaque (sandboxed) origin", origin === "null", origin);
+    }
+  }
+  await page.keyboard.press("Escape");
+  await wait(300);
+  check("Escape closes it", !(await page.$(".modal .lightbox")));
+
+  // find in the book: every place listed by chapter; choosing one goes there
+  await page.keyboard.press("/");
+  await page.waitForSelector(".find-bar input", { timeout: 5000 }).catch(() => null);
+  await page.keyboard.type("the");
+  await page.waitForSelector(".find-list .find-hit", { timeout: 10000 }).catch(() => null);
+  const listed = await page.$$eval(".find-list .find-hit", (els) => els.length);
+  check("find lists every place the phrase occurs", listed > 3, `${listed} listed`);
+  const pick = await page.evaluate(() => {
+    const hit = document.querySelectorAll<HTMLButtonElement>(".find-list .find-hit")[3];
+    hit?.click();
+    return hit?.querySelector(".find-at")?.textContent || "";
+  });
+  await wait(1200);
+  const count = await page.$eval(".find-count", (e) => e.textContent || "");
+  const now = await page.evaluate(() => (window as unknown as { __classroom?: { pos: number } }).__classroom?.pos ?? 0);
+  const page4 = Number(/^p\. (\d+)/.exec(pick)?.[1]);
+  check(
+    "choosing one goes there",
+    count.startsWith("4 of") && (Number.isNaN(page4) || Math.floor(now) === page4),
+    `${pick}, now at ${now.toFixed(2)}`,
+  );
+  await page.keyboard.press("Escape");
+  await wait(300);
+  check("Escape closes find", !(await page.$(".find-bar")));
 
   // selecting a passage offers "Visualize this"
   const selected = await page.evaluate(() => {

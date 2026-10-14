@@ -2,7 +2,7 @@
  * are Markdown with YAML frontmatter. Readers are forgiving (files are edited by hand, in Obsidian
  * and by agents): missing fields get defaults, unknown fields are kept in `props` and written back. */
 import { basename } from "node:path";
-import type { Annotation, Card, Concept, Note } from "../../shared/vault-types.ts";
+import type { Annotation, Card, Concept, Note, TutorSession } from "../../shared/vault-types.ts";
 import {
   asArray,
   asString,
@@ -284,5 +284,103 @@ export function annotationToFile(x: Annotation): string {
       updated: x.updated,
     },
     `${quote}${x.body}`,
+  );
+}
+
+/* ---------- tutoring sessions: library/<book>/sessions/*.md ---------- */
+
+const SESSION_KEYS = [
+  "id",
+  "kind",
+  "title",
+  "book",
+  "book_id",
+  "chapter",
+  "mode",
+  "passage",
+  "note",
+  "note_id",
+  "created",
+  "updated",
+];
+/** A turn begins with a line "## You" or "## Tutor"; everything until the next one is its text. */
+const TURN = /^## (You|Tutor)[ \t]*$/m;
+
+export function sessionFromFile(rel: string, text: string, mtime: string): TutorSession {
+  const { data, body } = parseFrontmatter(text);
+  const quoted = QUOTE_CALLOUT.exec(body);
+  const passageText = quoted
+    ? quoted[0]
+        .trim()
+        .split("\n")
+        .slice(1)
+        .map((l) => l.replace(/^> ?/, ""))
+        .join("\n")
+        .trim()
+    : "";
+  const parts = body.replace(QUOTE_CALLOUT, "").split(TURN);
+  const messages: TutorSession["messages"] = [];
+  for (let i = 1; i < parts.length; i += 2)
+    messages.push({ role: parts[i] === "You" ? "user" : "tutor", text: (parts[i + 1] || "").trim() });
+  const where = (data.passage || {}) as Record<string, unknown>;
+  const bookId = asString(data.book_id);
+  return {
+    id: asString(data.id) || pathId(rel),
+    bookId,
+    path: rel,
+    title: asString(data.title) || messages.find((m) => m.role === "user")?.text.slice(0, 80) || basename(rel, ".md"),
+    chapterId: data.chapter ? asString(data.chapter) : undefined,
+    passage: passageText
+      ? {
+          text: passageText,
+          source: {
+            bookId,
+            chapterId: data.chapter ? asString(data.chapter) : undefined,
+            page: num(where.page),
+            y: num(where.y),
+            block: num(where.block),
+            quote: where.quote ? asString(where.quote) : undefined,
+          },
+        }
+      : undefined,
+    mode: data.mode === "socratic" ? "socratic" : "answer",
+    messages,
+    note: data.note_id
+      ? { id: asString(data.note_id), title: asString(data.note).replace(/^\[\[|\]\]$/g, "") }
+      : undefined,
+    props: extraProps(data, SESSION_KEYS),
+    created: iso(data.created, mtime),
+    updated: iso(data.updated || data.created, mtime),
+  };
+}
+
+export function sessionToFile(x: TutorSession): string {
+  const info = annotationBookInfo(x.bookId);
+  const src = x.passage?.source;
+  const where = src?.page !== undefined ? `p. ${src.page}` : src?.block !== undefined ? `block ${src.block}` : "";
+  const quote = x.passage?.text
+    ? `> [!quote] ${where}\n${x.passage.text
+        .split("\n")
+        .map((l) => `> ${l}`)
+        .join("\n")}\n\n`
+    : "";
+  const turns = x.messages.map((m) => `## ${m.role === "user" ? "You" : "Tutor"}\n\n${m.text.trim()}`).join("\n\n");
+  return stringifyFrontmatter(
+    {
+      id: x.id,
+      kind: "tutor",
+      title: x.title,
+      book: info.folder,
+      book_id: x.bookId,
+      chapter: x.chapterId,
+      mode: x.mode,
+      passage: src ? { page: src.page, y: src.y, block: src.block, quote: src.quote } : undefined,
+      note: x.note ? `[[${x.note.title}]]` : undefined,
+      note_id: x.note?.id,
+      ...(x.props || {}),
+      created: x.created,
+      updated: x.updated,
+    },
+    `${quote}${turns}`,
   );
 }

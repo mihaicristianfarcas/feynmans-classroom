@@ -1,5 +1,5 @@
-// Drives the margin like a reader: select a passage in a PDF, Explain it, ask a follow-up, highlight
-// another, add one to the note; screenshots each step.
+// Drives the margin like a reader: select a passage in a PDF, Explain it, ask a follow-up (a chat in the
+// card), highlight another, add one to the note; screenshots each step.
 //   npx tsx tests/browser/margin-flow.ts <bookId> <page> <out-dir>      (the app must be running; uses the model)
 //   APP_URL=http://localhost:5180/ to point at another instance
 import { mkdirSync } from "node:fs";
@@ -92,19 +92,13 @@ if (!only || only === "explain") {
   await wait(800);
   await shot("3-explained");
   console.log("card:", (await page.$eval(".mcard.open .mcard-body", (e) => e.textContent || "")).slice(0, 300));
-  console.log("leader visible:", await page.$eval(".leader path", (e) => getComputedStyle(e).opacity));
   console.log("marks on page:", await page.$$eval(`.page-marks .mark`, (els) => els.length));
 
-  // a follow-up question
-  await page.type(".mcard-ask input", "Can you give a numeric example?");
+  // a follow-up question: it reads as a conversation in the card, as the tutor's does
+  await page.type(".mcard-ask textarea", "Can you give a numeric example?");
   const asked = Date.now();
-  await page.click(".mcard-send");
-  await page.waitForFunction(
-    () =>
-      /Follow-up/.test(document.querySelector(".mcard.open .mcard-body")?.textContent || "") ||
-      document.querySelectorAll(".mcard.open h2").length > 0,
-    { timeout: 180000 },
-  );
+  await page.keyboard.press("Enter");
+  await page.waitForSelector('.mcard.open .mcard-thread .msg[data-role="tutor"]', { timeout: 180000 });
   console.log(`follow-up in ${((Date.now() - asked) / 1000).toFixed(1)} s`);
   await wait(800);
   await shot("4-follow-up");

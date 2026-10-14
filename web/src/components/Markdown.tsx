@@ -1,19 +1,20 @@
 /* Markdown as the vault writes it, rendered with react-markdown (remark/rehype): GitHub-flavoured
  * Markdown, KaTeX math, and Obsidian's additions: [[links]], ![[embeds]] (notes, annotations,
  * pictures, figures), > [!callouts] (folded with `-` or `+`, as disclosures), ==highlights==, #tags;
- * plus the platform's own: ```figure blocks become interactive figures, ```quiz blocks quizzes to
- * play, and {{cloze}} deletions become blanks. Raw HTML is never rendered. */
-import "katex/dist/katex.min.css";
+ * plus the platform's own: ```figure blocks become interactive figures, ```manim blocks animations
+ * (ManimGX, played in a sandboxed frame), ```quiz blocks quizzes to play, and {{cloze}} deletions
+ * become blanks. Raw HTML is never rendered. KaTeX (half a megabyte) loads with the first text that
+ * has math in it; until then the math shows as its TeX. */
 import type { Blockquote, Paragraph, PhrasingContent, Root, Text } from "mdast";
 import { Children, isValidElement, memo, type ReactNode, useEffect, useState } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
-import rehypeKatex from "rehype-katex";
+import ReactMarkdown, { type Components, type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { SKIP, visit } from "unist-util-visit";
 import { codeRanges } from "../../../shared/links.ts";
 import { learn, type Resolved } from "../api";
 import { openLink } from "../app/navigation";
+import { ManimView, sceneTitle } from "../manim/ManimView";
 import { SceneView } from "../scene/SceneView";
 import { QuizBlock } from "./QuizBlock";
 
@@ -211,6 +212,14 @@ function makeComponents(
       const code = node?.children?.[0] as { tagName?: string; properties?: { className?: string[] } } | undefined;
       if (code?.tagName === "code" && code.properties?.className?.includes("language-figure"))
         return <FigureBlock source={textOf(children)} theme={theme} />;
+      if (code?.tagName === "code" && code.properties?.className?.includes("language-manim")) {
+        const source = textOf(children);
+        return (
+          <div className="md-figure">
+            <ManimView source={source} title={sceneTitle(source)} theme={theme} />
+          </div>
+        );
+      }
       if (code?.tagName === "code" && code.properties?.className?.includes("language-quiz"))
         return <QuizBlock source={textOf(children)} theme={theme} depth={depth} />;
       return <pre>{children}</pre>;
@@ -231,6 +240,29 @@ function makeComponents(
   };
 }
 
+/* ---------------- math, loaded on first use ---------------- */
+
+type Plugins = NonNullable<Options["rehypePlugins"]>;
+let katex: Plugins | null = null;
+let loadingKatex: Promise<Plugins> | null = null;
+
+/** The KaTeX plugin once it has loaded, starting the load when `needed`. */
+function useKatex(needed: boolean): Plugins | null {
+  const [plugins, setPlugins] = useState(katex);
+  useEffect(() => {
+    if (!needed || plugins) return;
+    let alive = true;
+    loadingKatex ??= Promise.all([import("rehype-katex"), import("katex/dist/katex.min.css")]).then(
+      ([m]) => (katex = [[m.default, { throwOnError: false, strict: false }]]),
+    );
+    loadingKatex.then((p) => alive && setPlugins(p)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [needed, plugins]);
+  return plugins;
+}
+
 /** Markdown with math, links, embeds, callouts, cloze blanks and figures. */
 export const Markdown = memo(function Markdown({
   text,
@@ -249,14 +281,16 @@ export const Markdown = memo(function Markdown({
   onLink?: (href: string) => boolean /** The file's vault path, for relative links in it. */;
   base?: string;
 }) {
+  const source = normalizeMath(text || "");
+  const math = useKatex(source.includes("$"));
   return (
     <div className={`md ${hideCloze ? "hide-cloze" : ""} ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }], remarkObsidian]}
-        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
+        rehypePlugins={math || undefined}
         components={makeComponents(theme, depth, onLink, base)}
       >
-        {normalizeMath(text || "")}
+        {source}
       </ReactMarkdown>
     </div>
   );

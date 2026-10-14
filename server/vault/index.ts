@@ -11,7 +11,7 @@
  *     attachments/              pictures pasted into notes or captured from books
  *     library/<book>/           one folder per book: book.json, the file, its text by chapter (text/),
  *                               annotations/ (highlights, explanations, figures made from passages),
- *                               a generated README.md
+ *                               sessions/ (conversations with the tutor), a generated README.md
  *     brain/connections.jsonl   links the agent suggested between notes, and what you decided
  *     brain/links.tsv           every link in the vault (generated)
  *     log/*.jsonl               reviews, the learning journey, agent runs
@@ -23,7 +23,7 @@
  * This module is the vault's public face; the work happens in the files it re-exports from. */
 export { onVaultChange, takeSelfWrite, touched, wroteItself } from "./changes.ts";
 export { Collection, GENERATED, trash } from "./collection.ts";
-export { annotations, cards, concepts, figures, notes } from "./collections.ts";
+export { annotations, cards, concepts, figures, notes, sessions } from "./collections.ts";
 export {
   atomicWrite,
   now,

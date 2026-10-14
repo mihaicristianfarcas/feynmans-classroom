@@ -9,7 +9,7 @@ import {
   api,
   type Block,
   type Book,
-  type Demo,
+  type FindHit,
   type Loc,
   learn,
   type Note,
@@ -27,18 +27,22 @@ import { useArrowKeys } from "../lib/a11y";
 import { usePanel } from "../lib/usePanel";
 import { under, useVaultEvents } from "../lib/useVaultEvents";
 import { CaptureLayer } from "./Capture";
-import { DemoPanel } from "./DemoPanel";
+import { FigureLightbox } from "./FigureLightbox";
+import { FiguresIndex } from "./FiguresIndex";
+import { FindBar } from "./FindBar";
+import { type FigureEntry, figureEntries } from "./figures";
 import { type DemoMarker, demoMarkers, Gutter, type NoteMarker, noteMarkers, sameMarkers } from "./Gutter";
 import { Margin, type MarginItem } from "./Margin";
-import { activeDemo, chapterAt, LINE, locOfAnchor, locOfPos, savedPos, sourceRef } from "./position";
+import { chapterAt, LINE, locOfAnchor, locOfPos, savedPos, sourceRef } from "./position";
 import { ReaderHelp } from "./ReaderHelp";
 import { ReaderNote } from "./ReaderNote";
 import { ReaderTopbar } from "./ReaderTopbar";
-import { HtmlReader, MarksContext, PdfReader, type ReaderHandle } from "./readers";
+import { HtmlReader, MarksContext, PdfReader, type ReaderHandle, type Zoom } from "./readers";
 import { type SelectionAction, SelectionMenu } from "./SelectionMenu";
-import { StudyTab, type TutorMessage, TutorTab } from "./StudyPanel";
+import { StudyTab } from "./StudyPanel";
 import { readSelection, type Selection } from "./selection";
-import { useReadingTime, useSavedPosition, useWorkingNote } from "./session";
+import { savedZoom, saveZoom, stepZoom, useReadingTime, useSavedPosition, useWorkingNote } from "./session";
+import { NEW_CONVERSATION, type TutorConversation, TutorTab } from "./Tutor";
 
 type Tab = "margin" | "figures" | "note" | "tutor" | "study";
 type Tool = "cards" | "explain" | "connect";
@@ -67,13 +71,16 @@ export function Reader({
   const reader = useRef<ReaderHandle>(null);
   const pane = useRef<HTMLDivElement>(null);
   const split = useRef<HTMLElement>(null);
-  const leader = useRef<SVGPathElement>(null);
   const bus = useMemo(() => new EventTarget(), []);
   // start at the saved position, so the chapter is right before the PDF has even rendered
   const [pos, setPos] = useState(() => savedPos(bookId) ?? 0);
   const [markers, setMarkers] = useState<DemoMarker[]>([]);
-  const [heldId, setHeldId] = useState<string | null>(null);
-  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [zoom, setZoom] = useState<Zoom>(() => savedZoom(bookId));
+  const [scale, setScale] = useState(1);
+  const [finding, setFinding] = useState(false);
+  const [pagesOpen, setPagesOpen] = useState(false);
+  const [found, setFound] = useState<{ anchor: Anchor; key: string } | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
   const query = new URLSearchParams(location.hash.split("?")[1] || "");
   const [tab, setTab] = useState<Tab>(query.get("quiz") ? "study" : "margin");
@@ -92,7 +99,7 @@ export function Reader({
   const [hovered, setHovered] = useState<string | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteMarks, setNoteMarks] = useState<NoteMarker[]>([]);
-  const [tutorMessages, setTutorMessages] = useState<TutorMessage[]>([]);
+  const [conversation, setConversation] = useState<TutorConversation>(NEW_CONVERSATION);
   const [pinned, setPinned] = useState<{ text: string; source: SourceRef } | null>(null);
   const [tool, setTool] = useState<{ kind: Tool; text: string; source: SourceRef } | null>(null);
   const lastScroll = useRef(Date.now());
@@ -108,6 +115,10 @@ export function Reader({
   useEffect(() => {
     if (liveBook) setBook(liveBook);
   }, [liveBook]);
+  // the window's title names the book (as every other page names itself)
+  useEffect(() => {
+    if (book?.title) document.title = `${book.title} · Feynman’s Classroom`;
+  }, [book?.title]);
   useEffect(() => {
     if (book && book.format !== "pdf") api.blocks(bookId).then(setBlocks, (e) => setFailed(e.message));
   }, [book, bookId]);
@@ -118,13 +129,29 @@ export function Reader({
     loadNotes();
   }, [loadNotes]);
   const { note: workingNote, choose: chooseNote, ensure: ensureNote } = useWorkingNote(bookId);
+  // a link to a session with the tutor (from ⌘K, a note): the Tutor pane, with that conversation
+  // biome-ignore lint/correctness/useExhaustiveDependencies: opens the session in the link once, when the reader opens
+  useEffect(() => {
+    const id = query.get("session");
+    if (!id) return;
+    learn.session(id).then(
+      (s) => {
+        setConversation({ messages: s.messages, sessionId: s.id, mode: s.mode });
+        setPinned(s.passage || null);
+        show("tutor");
+      },
+      () => {},
+    );
+  }, [bookId]);
 
   const demos = useMemo(() => (book ? withFigs(book, rawDemos) : []), [book, rawDemos]);
   const chapterOf = useCallback((p: number) => (book ? chapterAt(book, p) : null), [book]);
   const chapter = chapterOf(pos);
   const chapterOfRef = useRef(chapterOf);
   chapterOfRef.current = chapterOf;
-  const chapterDemos = useMemo(() => demos.filter((d) => d.chapterId === chapter?.id), [demos, chapter]);
+  const section = [...(chapter?.sections || [])].reverse().find((s) => posOf(s.start) <= pos + 1e-6) || null;
+  const figures = useMemo(() => (book ? figureEntries(book, demos, annotations) : []), [book, demos, annotations]);
+  const figs = useMemo(() => new Map(figures.map((f) => [f.id, f.fig])), [figures]);
   const marginItems = useMemo<MarginItem[]>(
     () => [
       ...annotations.map((a) => ({ id: a.id, annotation: a })),
@@ -162,15 +189,6 @@ export function Reader({
       };
   });
 
-  // the active demo: the last anchor the reading line has passed, within the current chapter
-  const autoActive = useMemo(() => activeDemo(demos, pos, chapter, chapterDemos), [demos, pos, chapter, chapterDemos]);
-  const active =
-    (heldId && demos.find((d) => d.id === heldId)) || (pickedId && demos.find((d) => d.id === pickedId)) || autoActive;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: when the reading line reaches another figure, the one picked by hand gives way
-  useEffect(() => {
-    setPickedId(null);
-  }, [autoActive?.id]);
-
   const onReady = useCallback(() => {
     if (restored.current || !book) return;
     restored.current = true;
@@ -196,13 +214,43 @@ export function Reader({
     if (!box) return;
     reader.current?.jumpTo(loc, box.top + box.height * LINE - 4, smooth);
   }, []);
-  const jumpToDemo = useCallback(
-    (demo: Demo) => {
-      setPickedId(demo.id);
-      if (heldId) setHeldId(demo.id);
-      jumpTo(demo.anchor);
+  /** Draws the book bigger or smaller, keeping the reading line on the same words. */
+  const zoomTo = useCallback(
+    (next: Zoom) => {
+      const box = pane.current?.getBoundingClientRect();
+      const at = box ? reader.current?.positionAt(box.top + box.height * LINE) : null;
+      setZoom(next);
+      saveZoom(bookId, next);
+      if (book && at !== null && at !== undefined) setTimeout(() => jumpTo(locOfPos(book, at), false), 180);
     },
-    [heldId, jumpTo],
+    [book, bookId, jumpTo],
+  );
+  const shownScale = book?.format === "pdf" ? scale : zoom === "fit" ? 1 : zoom;
+  /** The find bar goes to a place the phrase occurs, and marks it. */
+  const goToFound = useCallback(
+    (hit: FindHit | null, key: string) => {
+      if (!hit) {
+        setFound(null);
+        return;
+      }
+      const anchor: Anchor =
+        hit.page !== undefined
+          ? { page: hit.page, y: hit.y, quote: hit.quote, prefix: hit.prefix, suffix: hit.suffix }
+          : { block: hit.block, quote: hit.quote, prefix: hit.prefix, suffix: hit.suffix };
+      setFound({ anchor, key });
+      jumpTo(hit.page !== undefined ? { page: hit.page, y: hit.y ?? 0 } : { block: hit.block ?? 0 }, false);
+    },
+    [jumpTo],
+  );
+
+  /** Goes to a figure's passage and lines its card up beside it in the margin. */
+  const goToFigure = useCallback(
+    (entry: FigureEntry) => {
+      show("margin");
+      setFocused(entry.id);
+      jumpTo(entry.loc);
+    },
+    [jumpTo, show],
   );
 
   // a link to an annotation (from a note, the palette): go to its passage and open its card
@@ -216,19 +264,16 @@ export function Reader({
     setTimeout(() => jumpTo(locOfAnchor(a.anchor), false), 200);
   }, [annotations, focused, jumpTo, pos, show]);
 
-  const index = active ? demos.findIndex((d) => d.id === active.id) : -1;
-  const nextAfterPos = demos.find((d) => posOf(d.anchor) > pos + 0.02);
+  /** [ and ]: the figure before or after the reading line. */
   const step = useCallback(
     (direction: -1 | 1) => {
       const target =
-        index >= 0
-          ? demos[index + direction]
-          : direction === 1
-            ? nextAfterPos
-            : [...demos].reverse().find((d) => posOf(d.anchor) < pos);
-      if (target) jumpToDemo(target);
+        direction === 1
+          ? figures.find((f) => f.at > pos + 0.02)
+          : [...figures].reverse().find((f) => f.at < pos - 0.02);
+      if (target) goToFigure(target);
     },
-    [demos, index, jumpToDemo, nextAfterPos, pos],
+    [figures, goToFigure, pos],
   );
 
   // selecting a passage opens the menu; clicking a highlight opens its card
@@ -252,17 +297,32 @@ export function Reader({
     setTimeout(() => menuForSelection(true), 0);
   }, [menuForSelection]);
 
-  // keyboard: [ and ] step through figures, h holds, s selects the passage at the reading line, c captures, ? help, Esc closes
+  // keyboard: ⌘F or / finds, [ and ] step through figures, + − 0 zoom, p shows the pages, s selects the
+  // passage at the reading line, c captures, ? help, Esc closes
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "f") {
+        // the browser's own find can't see the pages that aren't drawn yet
+        event.preventDefault();
+        setFinding(true);
+        requestAnimationFrame(() => document.querySelector<HTMLInputElement>(".find-bar input")?.select());
+        return;
+      }
       const target = event.target as HTMLElement;
       if (target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable)) return;
       if (selection && "hevadn".includes(event.key.toLowerCase())) return; // the selection menu's keys
       if (event.key === "]") step(1);
       else if (event.key === "[") step(-1);
-      else if (event.key === "h" && active) setHeldId((id) => (id ? null : active.id));
       else if (event.key === "?") setHelp((v) => !v);
+      else if (event.key === "/") {
+        event.preventDefault();
+        setFinding(true);
+      } else if ((event.key === "+" || event.key === "=") && !event.metaKey && !event.ctrlKey)
+        zoomTo(stepZoom(shownScale, 1));
+      else if (event.key === "-" && !event.metaKey && !event.ctrlKey) zoomTo(stepZoom(shownScale, -1));
+      else if (event.key === "0" && !event.metaKey && !event.ctrlKey) zoomTo("fit");
       else if (event.key === "c" && book?.format === "pdf") setCapturing((v) => !v);
+      else if (event.key === "p" && book?.format === "pdf") setPagesOpen((v) => !v);
       else if (event.key === "s") {
         event.preventDefault();
         selectAtLine();
@@ -275,7 +335,7 @@ export function Reader({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [step, active, selection, book, selectAtLine]);
+  }, [step, selection, book, selectAtLine, zoomTo, shownScale]);
   useEffect(() => {
     // a selection made with the keyboard (Shift and the arrows, with caret browsing on) opens the menu when Shift is let go
     const onKeyUp = (event: KeyboardEvent) => {
@@ -373,7 +433,13 @@ export function Reader({
             sceneKind: action.sceneKind,
             quality: action.quality,
           });
-          say(action.quality === "careful" ? "Drawing carefully: about a minute." : "Drawing: about fifteen seconds.");
+          say(
+            action.sceneKind === "animation"
+              ? "Writing the animation and checking it runs: about a minute."
+              : action.quality === "careful"
+                ? "Drawing carefully: about a minute."
+                : "Drawing: about fifteen seconds.",
+          );
           break;
         case "note":
           await toNote({ anchor: sel.anchor }, action.mode);
@@ -389,7 +455,7 @@ export function Reader({
           break;
         case "tutor":
           setPinned({ text: sel.text, source });
-          setTutorMessages([]);
+          setConversation((c) => ({ ...NEW_CONVERSATION, mode: c.mode }));
           show("tutor");
           break;
         case "copy":
@@ -400,7 +466,7 @@ export function Reader({
     [selection, book, pos, chapter, toNote, say, show],
   );
 
-  const marks = useMemo(() => ({ annotations, focused, hovered }), [annotations, focused, hovered]);
+  const marks = useMemo(() => ({ annotations, focused, hovered, found }), [annotations, focused, hovered, found]);
   const tabs = useIndicator<HTMLDivElement>(tab);
   useArrowKeys(tabs, { selector: '[role="tab"]', select: true });
 
@@ -408,6 +474,7 @@ export function Reader({
   if (!book) return <div className="center-note">Opening…</div>;
 
   const counted = annotations.filter((a) => a.kind !== "highlight").length;
+  const lightboxEntry = lightbox ? figures.find((f) => f.id === lightbox) : undefined;
 
   return (
     <div className="reader-app">
@@ -424,15 +491,9 @@ export function Reader({
           setSelection(null);
         }}
         panel={study}
-        hold={
-          tab === "figures" && study.open
-            ? {
-                held: !!heldId,
-                disabled: !active && !heldId,
-                toggle: () => setHeldId(heldId ? null : active?.id || null),
-              }
-            : null
-        }
+        zoom={{ scale: shownScale, fit: zoom === "fit", set: zoomTo }}
+        onFind={() => setFinding(true)}
+        pages={book.format === "pdf" ? { open: pagesOpen, toggle: () => setPagesOpen((v) => !v) } : null}
         help={help}
         onHelp={() => setHelp(!help)}
         theme={theme}
@@ -474,7 +535,7 @@ export function Reader({
             </div>
           </div>
           <div className="pane-body" role="tabpanel" id="pane-panel" aria-labelledby={`pane-tab-${tab}`}>
-            {/* a hidden panel keeps its tabs but not its panes (the margin's line to the page goes with it) */}
+            {/* a hidden panel keeps its tabs but not its panes */}
             {!study.open ? null : tab === "margin" ? (
               <Margin
                 book={book}
@@ -483,33 +544,21 @@ export function Reader({
                 bus={bus}
                 focused={focused}
                 setFocused={setFocused}
-                hovered={hovered}
                 setHovered={setHovered}
-                leader={leader}
                 theme={theme}
                 onToNote={(a: Annotation, mode) => toNote({ annotationId: a.id }, mode)}
-                onOpenDemo={(d) => {
-                  show("figures");
-                  jumpToDemo(d);
-                }}
+                onOpenFigure={(id) => setLightbox(id)}
+                figs={figs}
                 toast={say}
               />
             ) : tab === "figures" ? (
-              <DemoPanel
-                book={book}
-                demo={active || null}
+              <FiguresIndex
+                entries={figures}
                 chapter={chapter}
-                chapterDemos={chapterDemos}
-                allDemos={demos}
-                jobs={jobs}
+                section={section}
                 theme={theme}
-                held={!!heldId}
-                onJump={jumpToDemo}
-                onStep={step}
-                canStep={{
-                  prev: index > 0 || (index < 0 && demos.some((d) => posOf(d.anchor) < pos)),
-                  next: index >= 0 ? index < demos.length - 1 : !!nextAfterPos,
-                }}
+                onGo={goToFigure}
+                onOpen={(entry) => setLightbox(entry.id)}
               />
             ) : tab === "note" ? (
               <ReaderNote
@@ -527,10 +576,11 @@ export function Reader({
                 book={book}
                 chapter={chapter}
                 pinned={pinned}
-                onUnpin={() => setPinned(null)}
+                setPinned={setPinned}
                 theme={theme}
-                messages={tutorMessages}
-                setMessages={setTutorMessages}
+                conversation={conversation}
+                setConversation={setConversation}
+                say={say}
               />
             ) : (
               <StudyTab book={book} chapter={chapter} theme={theme} autoQuiz={autoQuiz} />
@@ -542,15 +592,11 @@ export function Reader({
           <Gutter
             demos={markers}
             notes={noteMarks}
-            activeId={active?.id}
+            activeId={focused || undefined}
             onNote={() => show("note")}
             onDemo={(id) => {
-              const demo = demos.find((d) => d.id === id);
-              if (demo) {
-                expand();
-                setFocused(demo.id);
-                jumpToDemo(demo);
-              }
+              const entry = figures.find((f) => f.id === id);
+              if (entry) goToFigure(entry);
             }}
           />
           <div className="book-view">
@@ -560,16 +606,30 @@ export function Reader({
                   ref={reader}
                   url={api.fileUrl(book.id)}
                   dark={theme === "dark"}
+                  pages={pagesOpen}
+                  zoom={zoom}
+                  onZoomed={setScale}
                   onScroll={measure}
                   onReady={onReady}
                 />
               ) : blocks ? (
-                <HtmlReader ref={reader} blocks={blocks} onScroll={measure} onReady={onReady} />
+                <HtmlReader ref={reader} blocks={blocks} zoom={zoom} onScroll={measure} onReady={onReady} />
               ) : (
                 <div className="reader-loading">Opening the book…</div>
               )}
             </MarksContext.Provider>
           </div>
+          {finding && (
+            <FindBar
+              book={book}
+              onGo={goToFound}
+              onClose={() => {
+                setFinding(false);
+                setFound(null);
+                document.getElementById("book-text")?.focus({ preventScroll: true });
+              }}
+            />
+          )}
           {selection && !capturing && (
             <SelectionMenu
               x={selection.x}
@@ -597,9 +657,6 @@ export function Reader({
             />
           )}
         </section>
-        <svg className="leader" aria-hidden="true">
-          <path ref={leader} />
-        </svg>
       </main>
       <Toast toast={toast} />
       {tool?.kind === "cards" && (
@@ -620,6 +677,16 @@ export function Reader({
         />
       )}
       {help && <ReaderHelp onClose={() => setHelp(false)} />}
+      {lightboxEntry && (
+        <FigureLightbox
+          entry={lightboxEntry}
+          book={book}
+          theme={theme}
+          onClose={() => setLightbox(null)}
+          onGo={goToFigure}
+          say={say}
+        />
+      )}
     </div>
   );
 }

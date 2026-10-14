@@ -1,7 +1,6 @@
-/* The strip between the panes and the book: the reading line, a mark beside each passage your notes
- * come from, and a mark beside each figure's anchor (lit for the active one). */
+/* The strip between the panes and the book: a mark beside each passage your notes come from, and a
+ * mark beside each figure's anchor (lit for the active one). */
 import type { Demo, Loc, Note } from "../api";
-import { LINE } from "./position";
 import type { ReaderHandle } from "./readers";
 
 export interface DemoMarker {
@@ -66,7 +65,6 @@ export function Gutter({
 }) {
   return (
     <div className="gutter">
-      <span className="reading-line" style={{ top: `${LINE * 100}%` }} title="Reading line" />
       {notes.map((m) => (
         <button
           type="button"

@@ -1,14 +1,17 @@
 /* What the models write in the margin: explanations, definitions and answers (prose), resources
- * (found with live web search), and figures (scene specs drawn by the platform). Also follow-up
- * questions on an answer, redrawing a figure with the reader's notes, and writing again what a
- * restart interrupted. Book text is always given as material, never as instructions. */
+ * (found with live web search), figures (scene specs drawn by the platform) and animations (ManimGX
+ * scenes, run in the reader's browser). Also follow-up questions on an answer, redrawing a figure or an
+ * animation with the reader's notes (its conversation kept), and writing again what a restart
+ * interrupted. Book text is always given as material, never as instructions. */
 import type { Scene } from "../../shared/scene/types.ts";
+import { followUpsOf, withFollowUp } from "../../shared/thread.ts";
 import type { Annotation } from "../../shared/vault-types.ts";
 import { getBook } from "../books/store.ts";
 import type { Book } from "../books/types.ts";
 import { passageAround } from "../ingest/index.ts";
 import { learnerSummary, relatedInVault, sourceLine } from "../learn/context.ts";
 import { type CallResult, structured, text } from "../llm/index.ts";
+import { generateAnimation } from "../manim/generate.ts";
 import { generateScene } from "../scene/generate.ts";
 import { annotations, changed, now } from "../vault/index.ts";
 
@@ -148,6 +151,19 @@ export async function writeAnswer(
       body =
         list.map((r) => `- [${r.title.replace(/[[\]]/g, "")}](${r.url}) — ${r.why} *(${r.kind})*`).join("\n") ||
         "_Nothing reliable found._";
+    } else if (isAnimation(a)) {
+      const ctx = passageContext(book, a);
+      const made = await generateAnimation({
+        passage: a.anchor.quote,
+        context: ctx.around,
+        source: ctx.source,
+        request: a.request,
+        learner: learnerSummary(),
+        tier: options.quality === "careful" ? "smart" : "fast",
+      });
+      result = { data: made.code, ms: made.ms, provider: made.provider as CallResult["provider"], model: made.model };
+      body = animationBody(made);
+      a.title = made.title;
     } else {
       const ctx = passageContext(book, a);
       const kind = SCENE_KINDS.includes(options.sceneKind || "") ? (options.sceneKind as "plot") : "auto";
@@ -198,6 +214,21 @@ export function figureBody(scene: Scene) {
     "\n\n",
   );
 }
+/** An animation inside an annotation: its title, caption, and its Python as a ```manim block. */
+export function animationBody(made: { title: string; caption: string; code: string }) {
+  const caption = made.caption.trim() ? `${made.caption.trim()}\n\n` : "";
+  return `## ${made.title}\n\n${caption}\`\`\`manim\n${made.code.trimEnd()}\n\`\`\``;
+}
+/** The ManimGX scene inside an annotation's body, if it has one. */
+export function animationOf(a: Annotation): string | null {
+  return /```manim\s*\n([\s\S]*?)\n```/.exec(a.body)?.[1] ?? null;
+}
+/** Whether a figure is (to be) an animation: it has one, or was asked for as one. */
+const isAnimation = (a: Annotation) =>
+  a.kind === "visualize" && (a.props?.engine === "manim" || animationOf(a) !== null);
+/** The follow-up conversation at the end of an answer, kept when it is redrawn. */
+const followUps = (body: string) => (followUpsOf(body) ? `\n\n${followUpsOf(body)}` : "");
+
 /** The figure spec inside an annotation's body, if it has one. */
 export function figureOf(a: Annotation): Scene | null {
   const m = /```figure\s*\n([\s\S]*?)\n```/.exec(a.body);
@@ -237,7 +268,10 @@ ${a.anchor.quote}
 
 So far:
 """
-${a.request ? `They asked: ${a.request}\n\n` : ""}${a.body.replace(/```figure[\s\S]*?```/g, "[an interactive figure]").slice(0, 5000)}
+${a.request ? `They asked: ${a.request}\n\n` : ""}${a.body
+  .replace(/```figure[\s\S]*?```/g, "[an interactive figure]")
+  .replace(/```manim[\s\S]*?```/g, "[an animation]")
+  .slice(0, 5000)}
 """
 ${relatedLine({ ...a, request: q })}
 Their follow-up: ${q}
@@ -251,7 +285,7 @@ Reply with the Markdown only.`;
   const result = await text({ prompt, tier: "fast" });
   const fresh = annotations.get(id);
   if (!fresh) throw new Error("annotation was deleted");
-  fresh.body = `${fresh.body.trim()}\n\n## Follow-up: ${q}\n\n${clean(result.data)}`;
+  fresh.body = withFollowUp(fresh.body, q, clean(result.data));
   fresh.updated = now();
   annotations.save(fresh);
   changed(`follow-up ${fresh.id}`);
@@ -265,7 +299,9 @@ export function redraw(id: string, input: { notes?: string; quality?: "quick" | 
   if (a?.kind !== "visualize") throw new Error("figure not found");
   const book = getBook(a.bookId);
   if (!book) throw new Error("book not found");
+  if (isAnimation(a)) return redrawAnimation(a, book, input);
   const previous = figureOf(a);
+  const thread = followUps(a.body);
   a.status = "pending";
   a.error = undefined;
   annotations.save(a);
@@ -290,7 +326,7 @@ export function redraw(id: string, input: { notes?: string; quality?: "quick" | 
       const fresh = annotations.get(id);
       if (!fresh) return;
       Object.assign(fresh, {
-        body: figureBody(scene.scene),
+        body: figureBody(scene.scene) + thread,
         title: scene.scene.title,
         status: "ready",
         model: { provider: scene.provider, name: scene.model, ms: Date.now() - started },
@@ -301,6 +337,50 @@ export function redraw(id: string, input: { notes?: string; quality?: "quick" | 
       announce(fresh);
     } catch (error) {
       const fresh = annotations.get(id);
+      if (!fresh) return;
+      Object.assign(fresh, { status: "failed", error: (error as Error).message.slice(0, 400) });
+      annotations.save(fresh);
+      announce(fresh);
+    }
+  })();
+  return a;
+}
+
+/** Writes an animation again, with the reader's notes on the current one (or an error it hit). */
+function redrawAnimation(a: Annotation, book: Book, input: { notes?: string; quality?: "quick" | "careful" }) {
+  const previous = animationOf(a);
+  const thread = followUps(a.body);
+  a.status = "pending";
+  a.error = undefined;
+  annotations.save(a);
+  announce(a);
+  void (async () => {
+    try {
+      const ctx = passageContext(book, a);
+      const made = await generateAnimation({
+        passage: a.anchor.quote,
+        context: ctx.around,
+        source: ctx.source,
+        request: a.request,
+        learner: learnerSummary(),
+        previous: previous || undefined,
+        notes: input.notes,
+        tier: input.quality === "careful" ? "smart" : "fast",
+      });
+      const fresh = annotations.get(a.id);
+      if (!fresh) return;
+      Object.assign(fresh, {
+        body: animationBody(made) + thread,
+        title: made.title,
+        status: "ready",
+        model: { provider: made.provider, name: made.model, ms: made.ms },
+        updated: now(),
+      });
+      annotations.save(fresh);
+      changed(`animation ${fresh.id}`);
+      announce(fresh);
+    } catch (error) {
+      const fresh = annotations.get(a.id);
       if (!fresh) return;
       Object.assign(fresh, { status: "failed", error: (error as Error).message.slice(0, 400) });
       annotations.save(fresh);

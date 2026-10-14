@@ -19,6 +19,7 @@ export async function openLink(target: string, sub?: string) {
       const at = r.anchor.page !== undefined ? r.anchor.page + (r.anchor.y ?? 0) : (r.anchor.block ?? 0);
       return go(`#/book/${r.bookId}?at=${at.toFixed(3)}&focus=${r.id}`);
     }
+    if (r.kind === "session" && r.bookId) return go(`#/book/${r.bookId}?session=${r.id}`);
     if (r.kind === "figure") return go("#/library/figures");
     if (r.kind === "attachment" && r.path)
       return window.open(`/api/vault/attachment?path=${encodeURIComponent(r.path)}`, "_blank", "noopener");
@@ -37,7 +38,7 @@ export const bookLink = (ref: Partial<SourceRef> & { bookId?: string }) =>
 
 /** The page that shows a vault file (a note, a concept, an annotation, a book, a card), or null. */
 export function vaultLink(path: string): string | null {
-  if (/^(notes|concepts)\/.+\.md$/.test(path) || /^library\/[^/]+\/annotations\/.+\.md$/.test(path))
+  if (/^(notes|concepts)\/.+\.md$/.test(path) || /^library\/[^/]+\/(annotations|sessions)\/.+\.md$/.test(path))
     return `#/open?target=${encodeURIComponent(path.replace(/\.md$/, ""))}`;
   const book = /^library\/([^/]+)\//.exec(path);
   if (book) return `#/open?target=${encodeURIComponent(`library/${book[1]}`)}`;
