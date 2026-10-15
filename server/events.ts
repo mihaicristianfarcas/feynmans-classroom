@@ -6,7 +6,7 @@
 export type Channel = string;
 
 export interface BookEvent {
-  type: "demo" | "demo-removed" | "job" | "book" | "annotation" | "annotation-removed" | "vault" | "agent";
+  type: "demo" | "demo-removed" | "job" | "book" | "annotation" | "annotation-removed" | "vault" | "vaults" | "agent";
   data: unknown;
 }
 type Listener = (event: BookEvent) => void;
