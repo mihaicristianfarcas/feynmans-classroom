@@ -207,6 +207,7 @@ export function GraphView({
   inset = 0,
   insetLeft = 0,
   tools,
+  onOpen = openNode,
 }: {
   data: GraphData;
   showNotes?: boolean;
@@ -226,6 +227,8 @@ export function GraphView({
   insetLeft?: number;
   /** More buttons for the cluster in the corner. */
   tools?: ReactNode;
+  /** Opens an item's page (on double-click): its own page in the app, unless the graph is of another vault. */
+  onOpen?: (node: N) => void;
 }) {
   // nodes keep where they were when the graph reloads (a link accepted, a note added)
   const previous = useRef<N[]>([]);
@@ -481,7 +484,7 @@ export function GraphView({
         onSelect?.(n, true);
       }
     },
-    onDoubleClick: () => openNode(n),
+    onDoubleClick: () => onOpen(n),
   });
   useArrowKeys(svg, { selector: "[data-node]", orientation: "both" });
   const counts = ["concept", "note", "book"]

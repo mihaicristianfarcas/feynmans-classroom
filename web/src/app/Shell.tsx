@@ -12,6 +12,7 @@ const NAV: { route: string; label: string; match: RegExp }[] = [
   { route: "#/", label: "Today", match: /^#\/?$/ },
   { route: "#/library", label: "Library", match: /^#\/library/ },
   { route: "#/notes", label: "Notes", match: /^#\/notes/ },
+  { route: "#/vaults", label: "Vaults", match: /^#\/vaults/ },
   { route: "#/review", label: "Review", match: /^#\/review/ },
   { route: "#/brain", label: "Brain", match: /^#\/brain/ },
   { route: "#/journey", label: "Journey", match: /^#\/journey/ },

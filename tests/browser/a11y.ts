@@ -1,8 +1,8 @@
 // Accessibility checks of the running app: axe-core's WCAG 2.2 A and AA rules on every page, in both
 // themes (and the reader's states: its margin cards, the find bar, the figures and an animation, the
-// tutor's sessions), and the keyboard essentials (a skip link, focus that can always be seen, the ⌘K palette and
-// dialogs that keep focus and close with Escape, side panels resized and closed from their edge, the
-// reader usable without a mouse).
+// tutor's sessions; an outside vault's note and graph), and the keyboard essentials (a skip link, focus
+// that can always be seen, the ⌘K palette and dialogs that keep focus and close with Escape, side panels
+// resized and closed from their edge, the reader usable without a mouse).
 //   npm run test:a11y                  checks APP_URL (default http://localhost:5173/, so npm run dev)
 //   npm run test:a11y -- --serve       starts the built app (npm run build first) on a throwaway vault
 //                                      seeded with a small book, and checks that (what CI does)
@@ -104,6 +104,7 @@ async function serve() {
     body: "A [[Derivative]] compares two small quantities.",
     concepts: ["Derivative"],
   });
+  await seedOutsideVault(json);
   await json("api/docs", "POST", { kind: "card", front: "What is dx?", back: "A little bit of x.", deck: "Calculus" });
   await json("api/docs", "POST", {
     title: "Smallness, check yourself",
@@ -127,6 +128,20 @@ async function serve() {
       "> dx², a small quantity of the second order.",
     ].join("\n"),
   });
+}
+
+/** An Obsidian vault beside the app's own: a note with properties, links (one to nothing yet), an embedded
+ * section, tasks and a tag, and the note it links to. */
+async function seedOutsideVault(json: (path: string, method: string, body: unknown) => Promise<unknown>) {
+  const root = join(dataDir!, "outside-vault");
+  mkdirSync(join(root, ".obsidian"), { recursive: true });
+  mkdirSync(join(root, "Ideas"), { recursive: true });
+  writeFileSync(
+    join(root, "Home.md"),
+    "---\ntags: [physics]\naliases: [Start]\n---\n# Home\n\nSee [[Energy]], [[Energy#Kinetic|moving]] and [[Later]].\n\n![[Energy#Kinetic]]\n\n- [ ] read chapter 3 #todo\n- [x] set up\n",
+  );
+  writeFileSync(join(root, "Ideas", "Energy.md"), "# Energy\n\nIt is conserved.\n\n## Kinetic\nHalf m v squared.\n");
+  await json("api/vaults", "POST", { path: root, name: "Physics" });
 }
 
 /** Writes what the reader shows beside the book, as files (no model needed): an explanation with a
@@ -201,6 +216,7 @@ async function routes(): Promise<string[]> {
     "#/",
     "#/library",
     "#/notes",
+    "#/vaults",
     "#/review",
     "#/library/figures",
     "#/brain",
@@ -213,6 +229,8 @@ async function routes(): Promise<string[]> {
   const quiz = (notes as { id: string; type?: string }[]).find((n) => n.type === "quiz");
   if (quiz && quiz.id !== notes[0]?.id) list.push(`#/notes/${quiz.id}`);
   if (concepts[0]) list.push(`#/brain/concept/${concepts[0].id}`);
+  const outside = (await get("api/vaults")) as { id: string }[];
+  if (outside[0]) list.push(`#/vaults/${outside[0].id}/note/Home.md`, `#/vaults/${outside[0].id}/graph`);
   if (books[0]) list.push(`#/book/${books[0].id}`);
   const only = arg("only");
   return only ? list.filter((r) => r.includes(only)) : list;

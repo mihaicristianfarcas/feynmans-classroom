@@ -6,6 +6,7 @@ import "./styles/styles.css";
 import "./styles/app.css";
 import "./reader/reader.css";
 import "./notes/notes.css";
+import "./vaults/vaults.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

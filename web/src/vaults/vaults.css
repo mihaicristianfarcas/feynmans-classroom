@@ -1,0 +1,178 @@
+/* The vaults page's own styles; it reuses the notes page's layout (notes.css): the file tree, the note,
+ * its sidebar. Here: the vault switcher, attachments in the tree, search hits, tags, properties, and
+ * embedded pictures, PDFs, sound and video. */
+.vault-switch {
+  padding-bottom: 0;
+}
+.vault-pick {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  margin-right: 4px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
+  font: 600 13.5px / 1 var(--sans);
+}
+.vault-pick:focus-visible {
+  outline: 2px solid var(--focus, var(--sky-ink));
+  outline-offset: 1px;
+}
+.vault-file .vault-file-icon,
+.vault-tags .vault-file-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--ink-3);
+}
+.vault-ext {
+  margin-left: auto;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--sunken);
+  color: var(--ink-3);
+  font-size: 10.5px;
+  text-transform: uppercase;
+}
+.vault-tags {
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+.vault-tags summary {
+  list-style: none;
+}
+.vault-tags summary::-webkit-details-marker {
+  display: none;
+}
+.vault-tags .count {
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: 11.5px;
+}
+.tree-note {
+  padding: 4px 16px;
+}
+.file-tree > .vault-hits {
+  flex: 1;
+  overflow: auto;
+  padding: 2px 8px 14px;
+}
+.tree-row.vault-hit {
+  flex-wrap: wrap;
+  height: auto;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  row-gap: 3px;
+  white-space: normal;
+}
+.vault-snippet {
+  flex-basis: 100%;
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* properties, read */
+.vault-properties {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+.vault-properties > div {
+  display: grid;
+  grid-template-columns: minmax(80px, 140px) 1fr;
+  gap: 12px;
+  align-items: baseline;
+}
+.vault-properties dt {
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vault-properties dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--ink);
+}
+.vault-property > p {
+  margin: 0;
+}
+.vault-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+.vault-outline a {
+  color: var(--ink-2);
+}
+
+/* embeds: pictures, PDFs, sound, video */
+.md img.vault-image,
+.vault-file-view img.vault-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--r);
+}
+.vault-pdf {
+  display: block;
+  width: 100%;
+  height: min(70vh, 720px);
+  border: 0;
+  border-radius: var(--r);
+  background: var(--sunken);
+}
+.vault-audio {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  margin: 8px 0;
+}
+.vault-video {
+  display: block;
+  max-width: 100%;
+  margin: 8px 0;
+  border-radius: var(--r);
+}
+.vault-file-view {
+  max-width: none;
+}
+
+/* the vault's home and graph */
+.vault-where {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.vault-where svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.vault-recent {
+  width: 100%;
+  margin-top: 14px;
+  text-align: left;
+}
+.note-pane > .vault-graph {
+  flex: 1;
+}
+.vault-graph-files {
+  pointer-events: auto;
+  font-size: 13px;
+}
+.vault-graph-files[aria-pressed="true"] {
+  background: var(--sky-soft);
+  color: var(--sky-ink);
+}
