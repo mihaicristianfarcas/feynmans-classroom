@@ -155,9 +155,17 @@ const PdfInner = forwardRef<ReaderHandle, Omit<PdfProps, "url" | "dark">>(functi
   const viewports = usePdf((state) => state.viewports);
   const updateZoom = usePdf((state) => state.updateZoom);
   const scale = usePdf((state) => state.zoom);
+  // the middle of the view, as a fraction of the pages' width: a zoom we ask for keeps it there (Lector
+  // keeps the left edge, so the pages would grow off to the right)
+  const across = useRef(0.5);
+  const recenter = useRef(false);
   useEffect(() => {
     onZoomed(scale);
-  }, [scale, onZoomed]);
+    const scroller = viewportRef.current;
+    if (!scroller || !recenter.current) return;
+    recenter.current = false;
+    scroller.scrollLeft = across.current * scroller.scrollWidth - scroller.clientWidth / 2;
+  }, [scale, onZoomed, viewportRef]);
   const { jumpToPage } = usePdfJump();
   const pending = useRef<{ loc: Loc; clientY: number; tries: number } | null>(null);
 
@@ -258,6 +266,7 @@ const PdfInner = forwardRef<ReaderHandle, Omit<PdfProps, "url" | "dark">>(functi
       if (frame) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
+        across.current = (scroller.scrollLeft + scroller.clientWidth / 2) / scroller.scrollWidth;
         onScroll();
       });
     };
@@ -269,6 +278,7 @@ const PdfInner = forwardRef<ReaderHandle, Omit<PdfProps, "url" | "dark">>(functi
     rendered.observe(scroller, { childList: true, subtree: true });
     // fit the page to the pane, but never wider than a comfortable reading measure; or the scale asked for
     const fit = () => {
+      recenter.current = true;
       if (zoom !== "fit") {
         updateZoom(zoom);
         return;
