@@ -26,7 +26,8 @@ server/            the API and everything behind it (Node, TypeScript, run with 
   vault/           the vault as files: the document store, each kind's file format (kinds.ts), history
                    (jj), logs, watching, indexes, links
   vaults/          outside vaults (Obsidian's, any folder of Markdown): the list, each one's index
-                   (links resolved as Obsidian does, backlinks, tags, search, graph), editing it, watching
+                   (links resolved as Obsidian does, backlinks, tags, search, graph), editing it, watching,
+                   and the server's copy of a vault the browser syncs (sync.ts)
   books/           the book store, types, finding quotes (locate.ts), find in a book (find.ts), figure
                    placement and numbers
   ingest/          reading uploaded books: PDF, EPUB, Markdown, text, chapter detection
@@ -51,9 +52,11 @@ web/src/           the React app (Vite)
                    brain/: the graph that fills the page, the card beside it, its legend, a concept's page
   reader/          the reader: book views (zoom, links), margin, selection menu, find bar, the figures
                    index and a figure opened large, note, tutor (with its sessions), capture, gutter
-  notes/           notes: the file tree (with folders), the note pane, its versions and links sidebar, the editor
-  vaults/          outside vaults: the page, their file tree, a note or file, its links sidebar, embeds,
-                   the graph, adding one
+  notes/           notes in the app's own vault: the file tree (with folders), the note pane, its versions
+                   and links sidebar, the editor
+  vaults/          vaults added from folders, on the notes page: the vault switcher, the page, their file tree, a note or file, its links sidebar, embeds,
+                   the graph, adding one, and sync/: keeping a folder on the learner's computer in step
+                   with the server's copy from the browser
   components/      shared pieces: Markdown, dialogs and study tools, quiz, graph, side panels' edges and
                    buttons, profile form
   scene/           the figure player (the universal frame around every figure), and figure stills

@@ -1,22 +1,21 @@
-/* The vaults page (#/vaults…): your Obsidian vaults, or any folders of Markdown, opened where they are on
- * disk, as many as you add. Like the notes page: the vault's files on the left, the open note (or file)
- * beside them, its links on the right; or the vault's graph. It follows the files as they change, in
- * Obsidian or anywhere else (the server watches each vault's folder). Routes are in routes.ts. */
-import { FolderOpen, Plus, SquarePen } from "lucide-react";
+/* The notes page for a vault added from a folder (#/vaults/<id>…: an Obsidian vault, or any folder of
+ * Markdown; the app's own notes are notes/Notes.tsx). The vault's files on the left, the open note (or
+ * file) beside them, its links on the right; or the vault's graph. It follows the files as they change.
+ * Routes are in routes.ts. */
+import { FolderOpen, SquarePen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { type VaultTree as Tree, type VaultSummary, vaults } from "../api";
 import { go } from "../app/navigation";
 import { PanelEdge, PanelToggle } from "../components/Panel";
 import { useLoad } from "../lib/useLoad";
 import { type Panel, usePanel } from "../lib/usePanel";
-import { AddVault } from "./AddVault";
 import { noteRoute, openVaultLink, parseVaultRoute, vaultRoute } from "./routes";
+import { SyncNotice } from "./SyncNotice";
 import { useVaultChanges } from "./useVaultChanges";
 import { VaultGraph } from "./VaultGraph";
 import { VaultPane } from "./VaultPane";
+import { LAST_VAULT } from "./VaultSwitch";
 import { newVaultNote, VaultTree } from "./VaultTree";
-
-const LAST = "classroom-last-vault";
 
 export function Vaults({ theme }: { theme: "light" | "dark" }) {
   const [hash, setHash] = useState(location.hash);
@@ -26,7 +25,6 @@ export function Vaults({ theme }: { theme: "light" | "dark" }) {
     return () => window.removeEventListener("hashchange", on);
   }, []);
   const route = parseVaultRoute(hash);
-  const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState(route.q ?? "");
   useEffect(() => setQuery(route.q ?? ""), [route.q]);
   const fileList = usePanel("notes-list", { initial: 260, min: 180, max: 480 });
@@ -51,20 +49,21 @@ export function Vaults({ theme }: { theme: "light" | "dark" }) {
 
   useEffect(() => {
     if (!list) return;
-    // #/vaults alone: the vault you were in last, or the first one
-    if (!id && list.length) {
-      let last: string | null = null;
+    if (id && vault) {
       try {
-        last = localStorage.getItem(LAST);
+        localStorage.setItem(LAST_VAULT, id);
       } catch {}
-      const to = list.find((v) => v.id === last) ?? list[0];
-      history.replaceState(null, "", vaultRoute(to.id));
-      setHash(location.hash);
-    } else if (id && vault) {
-      try {
-        localStorage.setItem(LAST, id);
-      } catch {}
+      return;
     }
+    // #/vaults alone: the vault open last, or the first; a vault that's gone: the app's own notes
+    let last: string | null = null;
+    try {
+      last = localStorage.getItem(LAST_VAULT);
+      if (id) localStorage.removeItem(LAST_VAULT);
+    } catch {}
+    const to = id ? undefined : (list.find((v) => v.id === last) ?? list[0]);
+    history.replaceState(null, "", to ? vaultRoute(to.id) : "#/notes");
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
   }, [list, id, vault]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the route is parsed from the hash on each draw; the hash says when it changed
   useEffect(() => {
@@ -78,47 +77,8 @@ export function Vaults({ theme }: { theme: "light" | "dark" }) {
     });
   }, [hash]);
 
-  const add = adding && (
-    <AddVault
-      onClose={() => setAdding(false)}
-      onAdded={(v) => {
-        setAdding(false);
-        reloadList();
-        go(vaultRoute(v.id));
-      }}
-    />
-  );
   if (error) return <div className="center-note">{error}</div>;
-  if (!list) return <div className="center-note">Opening your vaults…</div>;
-  if (!list.length || !vault)
-    return (
-      <div className="notes-page">
-        <div className="note-pane empty-pane">
-          <div className="empty-state rise">
-            <h1 className="empty-title">{list.length ? "No such vault" : "Vaults"}</h1>
-            <p className="fine">
-              {list.length
-                ? "It may have been forgotten. Pick another, or add it again."
-                : "Open your Obsidian vault here, or any folder of Markdown notes, and add as many as you like. Links, embeds, attachments, tags and the graph work as they do in Obsidian; edits are saved to the files, and changes you make in Obsidian show up here as you make them."}
-            </p>
-            <button type="button" className="button primary" onClick={() => setAdding(true)}>
-              <Plus aria-hidden="true" />
-              Add a vault
-            </button>
-            {list.length > 0 && (
-              <ul className="link-list">
-                {list.map((v) => (
-                  <li key={v.id}>
-                    <a href={vaultRoute(v.id)}>{v.name}</a>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-        {add}
-      </div>
-    );
+  if (!list || !vault) return <div className="center-note">Opening the vault…</div>;
 
   const path = route.view === "note" ? route.path : undefined;
   return (
@@ -127,12 +87,10 @@ export function Vaults({ theme }: { theme: "light" | "dark" }) {
         <VaultTree
           key={vault.id}
           vault={vault}
-          list={list}
           current={path ?? null}
           tree={tree}
           query={query}
           onQuery={setQuery}
-          onAdd={() => setAdding(true)}
           onChanged={reloadList}
           panel={fileList}
         />
@@ -160,7 +118,6 @@ export function Vaults({ theme }: { theme: "light" | "dark" }) {
       ) : (
         <VaultHome vault={vault} tree={tree} list={fileList} />
       )}
-      {add}
     </div>
   );
 }
@@ -176,9 +133,13 @@ function VaultHome({ vault, tree, list }: { vault: VaultSummary; tree: Tree | nu
       <PanelToggle panel={list} side="left" label="file list" className="icon-button small pane-corner" />
       <div className="empty-state rise">
         <h1 className="empty-title">{vault.name}</h1>
-        <p className="fine vault-where" title={vault.path}>
-          <FolderOpen aria-hidden="true" /> {vault.path}
-        </p>
+        {vault.synced ? (
+          <SyncNotice id={vault.id} name={vault.name} />
+        ) : (
+          <p className="fine vault-where" title={vault.path}>
+            <FolderOpen aria-hidden="true" /> {vault.path}
+          </p>
+        )}
         <p className="fine">
           {vault.notes} note{vault.notes === 1 ? "" : "s"}
           {vault.files ? `, ${vault.files} attachment${vault.files === 1 ? "" : "s"}` : ""}
@@ -222,7 +183,7 @@ function Missing({ vault, list, onForget }: { vault: VaultSummary; list: Panel; 
             if (!confirm(`Forget “${vault.name}”? Nothing on disk is touched.`)) return;
             await vaults.remove(vault.id);
             onForget();
-            go("#/vaults");
+            go("#/notes");
           }}
         >
           Forget this vault

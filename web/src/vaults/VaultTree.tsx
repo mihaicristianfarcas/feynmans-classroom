@@ -1,7 +1,8 @@
-/* The left side of the vaults page: which vault (switch, add another, and a menu to rename it, scan it
- * again, open its graph or forget it), a search of it ("#tag" for tags), its folders, notes and
+/* The file list of a vault added from a folder, on the notes page: which vault (VaultSwitch, with a menu
+ * to rename it, scan it again, open its graph or forget it), a search of it ("#tag" for tags), its folders, notes and
  * attachments as a tree (each with a menu: a new note or folder inside, rename or move, delete to the
  * vault's .trash), and its tags. */
+
 import {
   ChevronRight,
   Ellipsis,
@@ -13,7 +14,6 @@ import {
   FolderInput,
   FolderPlus,
   Network,
-  Plus,
   RefreshCw,
   SquarePen,
   Tag,
@@ -28,6 +28,10 @@ import { announce, useArrowKeys } from "../lib/a11y";
 import { useLoad } from "../lib/useLoad";
 import type { Panel } from "../lib/usePanel";
 import { graphRoute, noteRoute, searchRoute } from "./routes";
+import { SyncNotice } from "./SyncNotice";
+import { syncVault } from "./sync/engine";
+import { dropLinked } from "./sync/store";
+import { LAST_VAULT, VaultSwitch } from "./VaultSwitch";
 
 const ICON: Record<VaultFileKind, typeof File> = {
   note: FileText,
@@ -112,22 +116,18 @@ export async function trashItem(id: string, path: string, isFolder = false) {
 
 export function VaultTree({
   vault,
-  list,
   current,
   tree,
   query,
   onQuery,
-  onAdd,
   onChanged,
   panel,
 }: {
   vault: VaultSummary;
-  list: VaultSummary[];
   current: string | null;
   tree: Tree | null;
   query: string;
   onQuery: (q: string) => void;
-  onAdd: () => void;
   /** The list of vaults changed (renamed, forgotten). */
   onChanged: () => void;
   panel: Panel;
@@ -238,27 +238,7 @@ export function VaultTree({
 
   return (
     <aside className="file-tree vault-tree" aria-label="Vault" id={panel.id} ref={panel.ref} style={panel.style}>
-      <div className="tree-head vault-switch">
-        <label className="visually-hidden" htmlFor="vault-pick">
-          Vault
-        </label>
-        <select
-          id="vault-pick"
-          className="vault-pick"
-          value={id}
-          onChange={(e) => go(`#/vaults/${e.target.value}`)}
-          title={vault.path}
-        >
-          {list.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.name}
-              {v.status === "missing" ? " (folder missing)" : ""}
-            </option>
-          ))}
-        </select>
-        <button type="button" className="icon-button" title="Add a vault" aria-label="Add a vault" onClick={onAdd}>
-          <Plus aria-hidden="true" />
-        </button>
+      <VaultSwitch current={id}>
         <RowMenu
           label={`Vault ${vault.name}`}
           button="icon-button"
@@ -278,6 +258,7 @@ export function VaultTree({
               label: "Scan for changes",
               icon: RefreshCw,
               run: async () => {
+                if (vault.synced) await syncVault(id);
                 const r = await vaults.rescan(id);
                 announce(r.changes ? `${r.changes} change${r.changes === 1 ? "" : "s"} found` : "Up to date");
               },
@@ -288,17 +269,19 @@ export function VaultTree({
               danger: true,
               run: async () => {
                 if (!confirm(`Stop showing “${vault.name}” here? Its folder and files stay as they are.`)) return;
+                if (vault.synced) await dropLinked(id);
                 await vaults.remove(id);
                 try {
-                  localStorage.removeItem("classroom-last-vault");
+                  localStorage.removeItem(LAST_VAULT);
                 } catch {}
                 onChanged();
-                go("#/vaults");
+                go("#/notes");
               },
             },
           ]}
         />
-      </div>
+      </VaultSwitch>
+      {vault.synced && <SyncNotice id={id} name={vault.name} quiet />}
       <div className="tree-head">
         <input
           className="search"

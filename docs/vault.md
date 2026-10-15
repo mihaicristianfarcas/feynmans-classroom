@@ -86,11 +86,25 @@ yours doesn't matter.
 
 ## Your other vaults (Obsidian, or any folder of Markdown)
 
-The **Vaults** page opens folders of Markdown that live elsewhere on your computer, where they are:
-your Obsidian vaults, or any notes folder. Add as many as you like (the + beside the vault's name, by
-its path, such as `~/Documents/Obsidian/My vault`); the list is kept in `DATA_DIR/vaults.json`, and
-forgetting a vault only takes it off the list. The app never copies these files, puts them in jj or
-touches `.obsidian/`.
+The **Notes** page holds every vault: the app's own (**Classroom**, this folder's `notes/`) and folders
+of Markdown from your computer, your Obsidian vaults or any notes folder. Switch between them at the
+top of the file list. Add as many as you like: the + beside the vault's name, then **Choose folder…**, which opens
+Finder, File Explorer or your desktop's folder window. The server needn't be on your computer: the
+browser reads the folder and keeps the server's copy (`DATA_DIR/vaults/<id>/`) in step with it.
+The list is kept in `DATA_DIR/vaults.json`; forgetting a vault deletes the server's copy and leaves
+your folder as it is. Vaults are never put in jj.
+
+- **Chrome, Edge, Brave, Opera** keep the folder in sync both ways while the app is open: changes
+  in the folder (Obsidian, a sync service) reach the app within a few seconds, and edits made in the
+  app are written to the folder. After the browser restarts it asks once to allow the folder again.
+- **Firefox, Safari** can read a folder only when it's chosen: choosing it again brings in what
+  changed, and edits made in the app stay in the app's copy.
+- If a file changed on both sides between syncs, the folder's version wins and the app's is kept
+  beside it as "name (app copy)". A browser that hasn't chosen a vault's folder shows the server's
+  copy and offers to choose it.
+
+The server can also open a folder on its own disk where it is, without a copy (`POST /api/vaults`
+with its `path`); the rest of this section holds for both.
 
 - **Read and edit as in Obsidian.** Read a note (its properties as a table, callouts, math, embeds,
   task boxes that tick) or edit the file itself, properties included. [[Wiki links]], [text](path.md)
@@ -108,7 +122,8 @@ touches `.obsidian/`.
   the mention into one), what it links to, its tags and its outline. Search finds text, and `#tag`
   finds tags (nested ones too); the graph shows every note and its links.
 
-**Keeping in step with Obsidian is automatic.** The server watches each vault's folder: a note you
+**Keeping in step with Obsidian is automatic.** The server watches each vault's folder (for a
+synced vault, its copy): a note you
 change, add, rename or delete in Obsidian (or sync from another device) is read again within a
 moment, and every open page shows the change. Every `VAULTS_POLL_MS` (a minute) it also compares
 each folder with what it knows, in case the system missed an event, and when the app starts it

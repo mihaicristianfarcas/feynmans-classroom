@@ -1,6 +1,6 @@
-/* The vaults page's own styles; it reuses the notes page's layout (notes.css): the file tree, the note,
- * its sidebar. Here: the vault switcher, attachments in the tree, search hits, tags, properties, and
- * embedded pictures, PDFs, sound and video. */
+/* Styles for vaults added from folders; they reuse the notes page's layout (notes.css): the file tree,
+ * the note, its sidebar. Here: the vault switcher, attachments in the tree, search hits, tags, properties, and
+ * embedded pictures, PDFs, sound and video; the add-vault dialog and sync status. */
 .vault-switch {
   padding-bottom: 0;
 }
@@ -175,4 +175,27 @@
 .vault-graph-files[aria-pressed="true"] {
   background: var(--sky-soft);
   color: var(--sky-ink);
+}
+
+/* add-vault dialog, sync status */
+.add-vault {
+  display: grid;
+  gap: 12px;
+}
+.add-vault > p {
+  margin: 0;
+}
+.add-vault > .button {
+  justify-self: start;
+}
+.vault-sync-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.empty-state .vault-sync-note {
+  justify-content: center;
+  text-align: center;
 }

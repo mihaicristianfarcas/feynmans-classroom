@@ -1,4 +1,4 @@
-/* The notes page's file tree: the vault's notes/ folder as folders you open and close and the notes
+/* The notes page's file tree for the app's own vault: the vault switcher, then its notes/ folder as folders you open and close and the notes
  * in them, with buttons for a new note or a new folder; each folder has a menu to add a note or a
  * folder inside it, rename or move it, or delete it. */
 import { ChevronRight, Ellipsis, FolderInput, FolderPlus, SquarePen, Trash2 } from "lucide-react";
@@ -8,6 +8,7 @@ import { go } from "../app/navigation";
 import { Spinner } from "../components/feedback";
 import { announce, useArrowKeys } from "../lib/a11y";
 import type { Panel } from "../lib/usePanel";
+import { VaultSwitch } from "../vaults/VaultSwitch";
 
 export type Tree = Awaited<ReturnType<typeof learn.tree>>;
 
@@ -128,6 +129,7 @@ export function FileTree({
   );
   return (
     <aside className="file-tree" aria-label="Notes" id={panel.id} ref={panel.ref} style={panel.style}>
+      <VaultSwitch current={null} />
       <div className="tree-head">
         <input
           className="search"

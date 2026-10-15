@@ -8,8 +8,8 @@
  *   - every VAULTS_POLL_MS (a minute) the folder is compared with the index anyway, in case the
  *     watcher missed something (network drives, a folder that was away and came back);
  *   - at start, each vault is read afresh, so what changed while the app was closed is there too. */
-import { createHash } from "node:crypto";
-import { existsSync, type FSWatcher, realpathSync, statSync, watch } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import { existsSync, type FSWatcher, mkdirSync, realpathSync, rmSync, statSync, watch } from "node:fs";
 import { homedir } from "node:os";
 import { basename, isAbsolute, join, resolve, sep } from "node:path";
 import { DATA_DIR, VAULT_DIR } from "../config.ts";
@@ -21,8 +21,11 @@ import { type Change, skipped, Vault } from "./vault.ts";
 export interface VaultInfo {
   id: string;
   name: string;
+  /** The folder on the server; "" for a synced vault. */
   path: string;
   added: string;
+  /** Kept in sync with a folder on the learner's computer by their browser (web/src/vaults/sync/). */
+  synced?: boolean;
 }
 
 export type VaultStatus = "ready" | "missing";
@@ -32,6 +35,9 @@ const POLL_MS = Number(process.env.VAULTS_POLL_MS) || 60_000;
 const SETTLE_MS = 200;
 
 export const listVaults = (): VaultInfo[] => readJson<VaultInfo[]>(FILE(), []);
+
+/** Where a vault's files are on the server: its own folder, or for a synced vault the server's copy. */
+export const rootOf = (v: VaultInfo) => (v.synced ? join(DATA_DIR, "vaults", v.id) : v.path);
 
 const live = new Map<string, { vault: Vault; watcher: FSWatcher | null; timers: Map<string, NodeJS.Timeout> }>();
 let poller: NodeJS.Timeout | null = null;
@@ -85,7 +91,7 @@ export function getVault(id: string): Vault {
   if (!state) {
     const info = listVaults().find((v) => v.id === id);
     if (!info) throw new NotFound("no such vault");
-    state = { vault: new Vault(info.id, info.path), watcher: null, timers: new Map() };
+    state = { vault: new Vault(info.id, rootOf(info)), watcher: null, timers: new Map() };
     live.set(id, state);
     state.vault.reconcile();
     startWatching(id);
@@ -96,9 +102,10 @@ export function getVault(id: string): Vault {
 /** The vaults with what's in them, and whether their folder is there. */
 export function vaultsWithStatus() {
   return listVaults().map((v) => {
-    const status = statusOf(v.path);
+    const root = rootOf(v);
+    const status = statusOf(root);
     const counts = status === "ready" ? getVault(v.id).counts() : { notes: 0, files: 0, folders: 0 };
-    return { ...v, status, obsidian: existsSync(join(v.path, ".obsidian")), ...counts };
+    return { ...v, status, obsidian: existsSync(join(root, ".obsidian")), ...counts };
   });
 }
 
@@ -120,7 +127,7 @@ export function addVault(input: string, name?: string): VaultInfo {
   if (within(path, own) || within(own, path))
     throw new Error("that's the app's own vault (or holds it): it's already in Notes");
   const list = listVaults();
-  const same = list.find((v) => within(path, v.path) || within(v.path, path));
+  const same = list.find((v) => !v.synced && (within(path, v.path) || within(v.path, path)));
   if (same) throw new Error(`that folder is already part of the vault “${same.name}”`);
   const info: VaultInfo = {
     id: createHash("sha1").update(path).digest("hex").slice(0, 10),
@@ -129,6 +136,23 @@ export function addVault(input: string, name?: string): VaultInfo {
     added: new Date().toISOString(),
   };
   writeJson(FILE(), [...list, info]);
+  getVault(info.id);
+  publish("global", { type: "vaults", data: { vault: info.id, path: "", change: "added" } });
+  return info;
+}
+
+/** Adds a vault whose files the browser copies here from a folder on the learner's computer and keeps in sync. */
+export function addSyncedVault(name: string): VaultInfo {
+  if (!name.trim()) throw new Error("give it a name");
+  const info: VaultInfo = {
+    id: randomBytes(5).toString("hex"),
+    name: name.trim(),
+    path: "",
+    added: new Date().toISOString(),
+    synced: true,
+  };
+  mkdirSync(rootOf(info), { recursive: true });
+  writeJson(FILE(), [...listVaults(), info]);
   getVault(info.id);
   publish("global", { type: "vaults", data: { vault: info.id, path: "", change: "added" } });
   return info;
@@ -145,10 +169,12 @@ export function renameVault(id: string, name: string): VaultInfo {
   return info;
 }
 
-/** Forgets a vault: the app stops showing and watching it. Its folder and files stay as they are. */
+/** Forgets a vault: the app stops showing and watching it. Its folder stays as it is; a synced vault's
+ * copy on the server is deleted (the learner's folder is untouched). */
 export function removeVault(id: string) {
   const list = listVaults();
-  if (!list.some((v) => v.id === id)) throw new NotFound("no such vault");
+  const info = list.find((v) => v.id === id);
+  if (!info) throw new NotFound("no such vault");
   writeJson(
     FILE(),
     list.filter((v) => v.id !== id),
@@ -157,6 +183,7 @@ export function removeVault(id: string) {
   state?.watcher?.close();
   for (const t of state?.timers.values() || []) clearTimeout(t);
   live.delete(id);
+  if (info.synced) rmSync(rootOf(info), { recursive: true, force: true });
   publish("global", { type: "vaults", data: { vault: id, path: "", change: "removed" } });
 }
 

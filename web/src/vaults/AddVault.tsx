@@ -1,68 +1,62 @@
-/* The dialog that adds an outside vault: the folder (an Obsidian vault, or any folder of Markdown) by its
- * path on this computer, and a name to show for it. Its files stay where they are; the app reads them
- * there, writes edits back to them, and follows changes made to them in Obsidian or anywhere else. */
-import { type FormEvent, useState } from "react";
+/* Dialog for adding a vault: choose a folder on this computer (an Obsidian vault, or any folder of
+ * Markdown). The app copies it and keeps the copy and the folder in sync from this browser (sync/). */
+import { FolderOpen } from "lucide-react";
+import { useState } from "react";
 import { type VaultSummary, vaults } from "../api";
 import { Modal } from "../components/tools";
+import { announce } from "../lib/a11y";
+import { pickVaultFolder, useVaultSync } from "./sync/engine";
+import { canOpenFolders } from "./sync/folder";
 
 export function AddVault({ onClose, onAdded }: { onClose: () => void; onAdded: (v: VaultSummary) => void }) {
-  const [path, setPath] = useState("");
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState<VaultSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!path.trim()) return;
-    setBusy(true);
+  const progress = useVaultSync(adding?.id);
+  const live = canOpenFolders();
+
+  const choose = async () => {
     setError(null);
+    let created: VaultSummary | null = null;
     try {
-      onAdded(await vaults.add(path.trim(), name.trim() || undefined));
-    } catch (err) {
-      setError((err as Error).message);
-      setBusy(false);
+      const folder = await pickVaultFolder();
+      if (!folder) return;
+      created = await vaults.addSynced(folder.name);
+      setAdding(created);
+      announce(`Copying ${folder.name}`);
+      await folder.sync(created.id);
+      onAdded(created);
+    } catch (e) {
+      if (created) await vaults.remove(created.id).catch(() => {});
+      setAdding(null);
+      setError((e as Error).message);
     }
   };
+
   return (
     <Modal title="Add a vault" eyebrow="Obsidian, or any folder of Markdown" onClose={onClose}>
-      <form onSubmit={submit}>
+      <div className="add-vault">
         <p className="fine">
-          The app opens the files where they are: edits here are saved to them, and changes made in Obsidian show up
-          here as you make them. Add as many vaults as you like.
+          {live
+            ? "Choose the folder on your computer. Edits made here are saved to it, and changes made in Obsidian show up here, while the app is open in this browser."
+            : "Choose the folder on your computer. To bring in later changes made in Obsidian, choose it again. This browser can't save into the folder, so edits made here stay in the app."}
         </p>
-        <label className="field">
-          <span>Folder</span>
-          <input
-            value={path}
-            onChange={(e) => setPath(e.target.value)}
-            placeholder="~/Documents/Obsidian/My vault"
-            spellCheck={false}
-            autoComplete="off"
-            aria-describedby="add-vault-hint"
-            required
-          />
-        </label>
-        <p id="add-vault-hint" className="fine">
-          Its full path on this computer. In Obsidian: right-click the vault's name, then “Reveal in Finder” (or
-          Explorer) shows where it is.
-        </p>
-        <label className="field">
-          <span>Name (optional)</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="The folder's name" />
-        </label>
+        <button type="button" className="button primary" onClick={choose} disabled={!!adding}>
+          <FolderOpen aria-hidden="true" />
+          Choose folder…
+        </button>
+        {adding && (
+          <p className="fine" aria-live="polite">
+            {progress?.state === "syncing"
+              ? `Copying ${adding.name}: ${progress.done} of ${progress.total} files…`
+              : `Copying ${adding.name}…`}
+          </p>
+        )}
         {error && (
           <p className="form-error" role="alert">
             {error}
           </p>
         )}
-        <div className="form-actions">
-          <button type="button" className="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="submit" className="button primary" disabled={busy || !path.trim()}>
-            {busy ? "Reading the vault…" : "Add vault"}
-          </button>
-        </div>
-      </form>
+      </div>
     </Modal>
   );
 }

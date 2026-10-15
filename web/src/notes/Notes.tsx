@@ -1,4 +1,5 @@
-/* The notes page (#/notes[/<id>]), like Obsidian: the file tree on the left and the open note beside
+/* The notes page (#/notes[/<id>]) for the app's own vault, like Obsidian: the vault switcher and file
+ * tree on the left (vaults added from folders open in vaults/Vaults.tsx) and the open note beside
  * it (or a welcome when none is open), with its links on the right. Both sides can be resized from their
  * edge, or closed and opened again with the buttons above the note. It reopens the last note and reloads
  * when the vault changes. The tree, the note and its sidebar live beside this file. */
@@ -10,6 +11,8 @@ import { PanelEdge, PanelToggle } from "../components/Panel";
 import { useLoad } from "../lib/useLoad";
 import { type Panel, usePanel } from "../lib/usePanel";
 import { under, useVaultEvents } from "../lib/useVaultEvents";
+import { vaultRoute } from "../vaults/routes";
+import { LAST_VAULT } from "../vaults/VaultSwitch";
 import { FileTree, newNote, type Tree } from "./FileTree";
 import { NotePane } from "./NotePane";
 
@@ -24,10 +27,15 @@ export function Notes({ theme }: { theme: "light" | "dark" }) {
   const id = route.startsWith("#/notes/") ? decodeURIComponent(route.slice("#/notes/".length)) || null : null;
   const { data: tree, reload } = useLoad(() => learn.tree());
   useEffect(() => {
-    // remember the last note, and open it when coming back to Notes
+    // remember the vault and note open last, and go back to them when coming back to Notes
     try {
-      if (id) localStorage.setItem("classroom-last-note", id);
+      const vault = localStorage.getItem(LAST_VAULT);
+      if (id) {
+        localStorage.setItem("classroom-last-note", id);
+        localStorage.setItem(LAST_VAULT, "");
+      } else if (vault && (route === "#/notes" || route === "#/notes/")) go(vaultRoute(vault));
       else if (route === "#/notes" || route === "#/notes/") {
+        localStorage.setItem(LAST_VAULT, "");
         const last = localStorage.getItem("classroom-last-note");
         if (last) go(`#/notes/${last}`);
       }

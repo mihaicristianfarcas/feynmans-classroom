@@ -1,4 +1,4 @@
-/* A note of an outside vault, opened on the vaults page: its title (renaming the file, links to it
+/* A note of an outside vault, opened on the notes page: its title (renaming the file, links to it
  * follow), the whole file to edit (properties included, as Obsidian's source mode shows it) or to read
  * (properties as a table, links and embeds working, task boxes ticking), and its links in the sidebar.
  * Edits are written to the file itself; changes made to it elsewhere (in Obsidian, say) show at once,

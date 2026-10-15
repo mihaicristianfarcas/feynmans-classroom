@@ -1,6 +1,6 @@
 /* The app: picks the page from the URL's hash (#/library, #/book/<id>, #/notes/<id>…), sends a new
- * learner to the welcome page first, and puts every page except the reader inside the Shell (Notes,
- * Vaults and the Brain's graph fill the window below its bar; the rest scroll). The ⌘K palette and the agent
+ * learner to the welcome page first, and puts every page except the reader inside the Shell (Notes, for
+ * every vault, and the Brain's graph fill the window below its bar; the rest scroll). The ⌘K palette and the agent
  * (⌘J) sit over every page; old #/ask links open the agent. Each page but Today is its own chunk,
  * loaded on first visit (the reader's, with the PDF engine, is fetched ahead once the app is idle); a
  * page that fails to draw or load says so, with a way to reload. */
@@ -10,6 +10,7 @@ import { openAgent } from "../agent/store";
 import { learn } from "../api";
 import { Loading } from "../components/feedback";
 import { Today } from "../pages/Today";
+import { startVaultSync } from "../vaults/sync/engine";
 import { openLink } from "./navigation";
 import { PageBoundary } from "./PageBoundary";
 import { Palette } from "./Palette";
@@ -50,7 +51,7 @@ const TITLES: Record<Exclude<Route["name"], "book">, string> = {
   today: "Today",
   library: "Library",
   notes: "Notes",
-  vaults: "Vaults",
+  vaults: "Notes",
   review: "Review",
   brain: "Brain",
   journey: "Journey",
@@ -66,7 +67,7 @@ function route(): Route {
   const book = hash.match(/^#\/book\/([a-z0-9]+)/i);
   if (book) return { name: "book", id: book[1] };
   const name = hash.replace(/^#\/?/, "").split("/")[0];
-  // pages that fill the window: Notes, Vaults, and the Brain's graph (not a concept's own page)
+  // pages that fill the window: Notes (the app's own and added vaults), and the Brain's graph (not a concept's own page)
   const full = name === "notes" || name === "vaults" || (name === "brain" && !hash.startsWith("#/brain/concept/"));
   if (
     ["library", "notes", "vaults", "review", "brain", "journey", "settings", "gallery", "welcome", "open"].includes(
@@ -89,6 +90,8 @@ export function App() {
   const [current, setCurrent] = useState(route);
   const [theme, setTheme] = useTheme();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  // synced vaults follow their folders on this computer whichever page is open
+  useEffect(() => startVaultSync(), []);
   useEffect(() => {
     redirectAsk();
     const onHash = () => {

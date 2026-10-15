@@ -2,13 +2,14 @@
  * each vault's files and folders, a note with its links and backlinks, resolving a link (for opening
  * and embedding), saving, making, renaming and deleting, attachments (served as content only, with
  * ranges so sound and video can seek), tags, search and the graph. Changes the app makes are announced
- * like the ones the watcher sees, so every open page follows both. */
-import { createReadStream, statSync } from "node:fs";
+ * like the ones the watcher sees, so every open page follows both. A synced vault also has the routes its
+ * browser uses to keep the server's copy and the learner's folder in step (vaults/sync.ts). */
+import { createReadStream, existsSync, statSync } from "node:fs";
 import { extname } from "node:path";
 import { Readable } from "node:stream";
 import type { Context, Hono } from "hono";
 import { NotFound } from "../errors.ts";
-import { CONTENT_ONLY, readBody } from "../http.ts";
+import { CONTENT_ONLY, readBody, sendFile } from "../http.ts";
 import {
   Conflict,
   createFolder,
@@ -19,7 +20,17 @@ import {
   saveNote,
   trash,
 } from "../vaults/edit.ts";
-import { addVault, announceChanges, getVault, removeVault, renameVault, vaultsWithStatus } from "../vaults/index.ts";
+import {
+  addSyncedVault,
+  addVault,
+  announceChanges,
+  getVault,
+  listVaults,
+  removeVault,
+  renameVault,
+  vaultsWithStatus,
+} from "../vaults/index.ts";
+import { deleteFile, manifest, readPath, writeFile } from "../vaults/sync.ts";
 import { cleanRel, kindOf } from "../vaults/vault.ts";
 
 const TYPES: Record<string, string> = {
@@ -80,8 +91,29 @@ function serveFile(c: Context, full: string) {
 export function vaultRoutes(app: Hono) {
   app.get("/api/vaults", (c) => c.json(vaultsWithStatus()));
   app.post("/api/vaults", async (c) => {
-    const b = await readBody<{ path: string; name?: string }>(c);
-    return c.json(addVault(b.path || "", b.name));
+    const b = await readBody<{ path?: string; name?: string; synced?: boolean }>(c);
+    return c.json(b.synced ? addSyncedVault(b.name || "") : addVault(b.path || "", b.name));
+  });
+
+  /** A synced vault's copy, file by file, for the browser that keeps it in step with the folder. */
+  const synced = (c: Context) => {
+    const id = c.req.param("id") || "";
+    if (!listVaults().some((v) => v.id === id && v.synced)) throw new NotFound("no such synced vault");
+    return getVault(id);
+  };
+  app.get("/api/vaults/:id/sync", (c) => c.json(manifest(synced(c))));
+  app.get("/api/vaults/:id/sync/file", (c) => {
+    const path = readPath(synced(c), c.req.query("path") || "");
+    if (!existsSync(path)) throw new NotFound("no such file");
+    return sendFile(path, { ...CONTENT_ONLY, "content-type": "application/octet-stream", "cache-control": "no-store" });
+  });
+  app.put("/api/vaults/:id/sync/file", async (c) => {
+    const vault = synced(c);
+    return c.json(writeFile(vault, c.req.query("path") || "", new Uint8Array(await c.req.arrayBuffer())));
+  });
+  app.delete("/api/vaults/:id/sync/file", (c) => {
+    deleteFile(synced(c), c.req.query("path") || "");
+    return c.json({ ok: true });
   });
   app.patch("/api/vaults/:id", async (c) => {
     const b = await readBody<{ name: string }>(c);

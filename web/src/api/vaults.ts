@@ -21,8 +21,11 @@ export class VaultMissing extends Error {
 export interface VaultSummary {
   id: string;
   name: string;
+  /** The folder on the server; "" for a synced vault. */
   path: string;
   added: string;
+  /** Kept in sync with a folder on the learner's computer by their browser. */
+  synced?: boolean;
   status: "ready" | "missing";
   obsidian: boolean;
   notes: number;
@@ -83,6 +86,7 @@ export const vaultFileUrl = (id: string, path: string) => `/api/vaults/${id}/fil
 export const vaults = {
   list: () => call<VaultSummary[]>("/api/vaults"),
   add: (path: string, name?: string) => post<VaultSummary>("/api/vaults", { path, name }),
+  addSynced: (name: string) => post<VaultSummary>("/api/vaults", { name, synced: true }),
   rename: (id: string, name: string) => patch<VaultSummary>(`/api/vaults/${id}`, { name }),
   remove: (id: string) => del(`/api/vaults/${id}`),
   rescan: (id: string) => post<{ changes: number }>(`/api/vaults/${id}/rescan`),
@@ -140,4 +144,24 @@ export const vaults = {
       nodes: { id: string; label: string; kind: VaultFileKind; links: number; mtime: number }[];
       edges: { from: string; to: string }[];
     }>(`/api/vaults/${id}/graph${files ? "?files=1" : ""}`),
+};
+
+/** A file of a synced vault's copy on the server. */
+export interface SyncEntry {
+  path: string;
+  size: number;
+  mtime: number;
+}
+
+/** The copy of a synced vault, file by file. */
+export const vaultSync = {
+  list: (id: string) => call<SyncEntry[]>(`/api/vaults/${id}/sync`),
+  read: async (id: string, path: string) => {
+    const res = await fetch(`/api/vaults/${id}/sync/file?${q({ path })}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`couldn't read ${path}`);
+    return res.blob();
+  },
+  write: (id: string, path: string, body: Blob) =>
+    call<SyncEntry>(`/api/vaults/${id}/sync/file?${q({ path })}`, { method: "PUT", body }),
+  remove: (id: string, path: string) => del(`/api/vaults/${id}/sync/file?${q({ path })}`),
 };

@@ -216,7 +216,6 @@ async function routes(): Promise<string[]> {
     "#/",
     "#/library",
     "#/notes",
-    "#/vaults",
     "#/review",
     "#/library/figures",
     "#/brain",
@@ -230,7 +229,8 @@ async function routes(): Promise<string[]> {
   if (quiz && quiz.id !== notes[0]?.id) list.push(`#/notes/${quiz.id}`);
   if (concepts[0]) list.push(`#/brain/concept/${concepts[0].id}`);
   const outside = (await get("api/vaults")) as { id: string }[];
-  if (outside[0]) list.push(`#/vaults/${outside[0].id}/note/Home.md`, `#/vaults/${outside[0].id}/graph`);
+  if (outside[0])
+    list.push(`#/vaults/${outside[0].id}`, `#/vaults/${outside[0].id}/note/Home.md`, `#/vaults/${outside[0].id}/graph`);
   if (books[0]) list.push(`#/book/${books[0].id}`);
   const only = arg("only");
   return only ? list.filter((r) => r.includes(only)) : list;
