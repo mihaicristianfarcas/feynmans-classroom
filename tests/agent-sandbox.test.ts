@@ -82,9 +82,12 @@ describe.skipIf(!hasCodex)("an agent's shell under the Codex profile", () => {
     run("echo z > readonly.md", false);
     expect(existsSync(join(folder, "readonly.md"))).toBe(false);
   });
-  it("cannot look around the home folder", () => {
-    const r = run('ls "$HOME" >/dev/null && echo LISTED || echo DENIED');
-    expect(r.stdout).toContain("DENIED");
+  it("cannot look around the home folder, or at Codex's login", () => {
+    // denied (macOS), or empty but for the way to Codex's helper links (Linux)
+    const r = run('for d in "$HOME" "$HOME/.codex" "$HOME/.codex/tmp"; do ls -A "$d" 2>&1; done; echo DONE');
+    expect(r.stdout).toContain("DONE");
+    const seen = r.stdout.split("\n").filter((line) => line && line !== "DONE");
+    expect(seen.filter((line) => !/^(\.codex|tmp|arg0)$|Operation not permitted|No such file/.test(line))).toEqual([]);
   });
   it("cannot reach the network", () => {
     const r = run("curl -sS -m 5 -o /dev/null https://example.com && echo REACHED || echo BLOCKED");

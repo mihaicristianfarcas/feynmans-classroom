@@ -4,7 +4,8 @@
  * version control inside it (.jj, .git), and reach no network. tests/agent-sandbox.test.ts runs real commands under the Codex profile. */
 import { spawnSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { homedir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
 import { CODEX } from "../config.ts";
 
 /** What an agent may touch: its folder (`cwd`), writable only with `write`, and more folders to read. */
@@ -26,6 +27,9 @@ export function codexToolRoots(): string[] {
     const brew = /^(\/opt\/homebrew|\/usr\/local|\/home\/linuxbrew\/\.linuxbrew)\//.exec(path);
     roots.add(brew ? brew[1] : dirname(dirname(path)));
   }
+  // on Linux Codex starts its sandbox helper from links in here (not the rest of CODEX_HOME: the login)
+  if (process.platform === "linux")
+    roots.add(realPath(resolve(process.env.CODEX_HOME || join(homedir(), ".codex"), "tmp", "arg0")));
   return [...roots].filter((r) => r && r !== "/");
 }
 
