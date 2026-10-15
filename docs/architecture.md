@@ -25,6 +25,8 @@ server/            the API and everything behind it (Node, TypeScript, run with 
                    agents…)
   vault/           the vault as files: the document store, each kind's file format (kinds.ts), history
                    (jj), logs, watching, indexes, links
+  vaults/          outside vaults (Obsidian's, any folder of Markdown): the list, each one's index
+                   (links resolved as Obsidian does, backlinks, tags, search, graph), editing it, watching
   books/           the book store, types, finding quotes (locate.ts), find in a book (find.ts), figure
                    placement and numbers
   ingest/          reading uploaded books: PDF, EPUB, Markdown, text, chapter detection
@@ -50,6 +52,8 @@ web/src/           the React app (Vite)
   reader/          the reader: book views (zoom, links), margin, selection menu, find bar, the figures
                    index and a figure opened large, note, tutor (with its sessions), capture, gutter
   notes/           notes: the file tree (with folders), the note pane, its versions and links sidebar, the editor
+  vaults/          outside vaults: the page, their file tree, a note or file, its links sidebar, embeds,
+                   the graph, adding one
   components/      shared pieces: Markdown, dialogs and study tools, quiz, graph, side panels' edges and
                    buttons, profile form
   scene/           the figure player (the universal frame around every figure), and figure stills

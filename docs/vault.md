@@ -83,3 +83,35 @@ yours doesn't matter.
   after your edits (see [agents.md](agents.md)); Undo takes it out again.
 - **From the command line**: `jj log`, `jj diff -r <change>`, `jj undo` and `jj op log` all work in
   the vault (stop the app first if you rewrite history yourself).
+
+## Your other vaults (Obsidian, or any folder of Markdown)
+
+The **Vaults** page opens folders of Markdown that live elsewhere on your computer, where they are:
+your Obsidian vaults, or any notes folder. Add as many as you like (the + beside the vault's name, by
+its path, such as `~/Documents/Obsidian/My vault`); the list is kept in `DATA_DIR/vaults.json`, and
+forgetting a vault only takes it off the list. The app never copies these files, puts them in jj or
+touches `.obsidian/`.
+
+- **Read and edit as in Obsidian.** Read a note (its properties as a table, callouts, math, embeds,
+  task boxes that tick) or edit the file itself, properties included. [[Wiki links]], [text](path.md)
+  links and links in properties all resolve as Obsidian resolves them (by name, then path, then
+  alias); a link to nothing yet is marked, and opening it makes the note. `![[note]]`,
+  `![[note#Heading]]` and `![[note#^block]]` embed a note or a part of it; pictures (`|300` sets the
+  width), PDFs (`#page=3`), sound and video embed too.
+- **Attachments.** A picture, PDF, sound or video pasted or dropped into a note is saved where
+  Obsidian's settings put attachments (`.obsidian/app.json`), and the embed is written as Obsidian
+  would (a Markdown link if you chose those). New notes go where its settings say, too.
+- **Links follow renames.** Renaming or moving a note, a file or a folder (the name above the note,
+  or a row's menu in the tree) rewrites every link to it. Deleting moves things to the vault's
+  `.trash/`, as Obsidian does.
+- **Connections.** Beside a note: what links here, where it's mentioned without a link (Link turns
+  the mention into one), what it links to, its tags and its outline. Search finds text, and `#tag`
+  finds tags (nested ones too); the graph shows every note and its links.
+
+**Keeping in step with Obsidian is automatic.** The server watches each vault's folder: a note you
+change, add, rename or delete in Obsidian (or sync from another device) is read again within a
+moment, and every open page shows the change. Every `VAULTS_POLL_MS` (a minute) it also compares
+each folder with what it knows, in case the system missed an event, and when the app starts it
+rescans everything changed while it was closed. Edits made here are written straight to the file,
+so Obsidian sees them at once. If a note changes on disk while you're typing in it here, the app
+asks whether to show the new text or keep yours, and never overwrites either without asking.

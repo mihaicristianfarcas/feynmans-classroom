@@ -9,6 +9,7 @@ Every setting has a default; set environment variables to change them (for `npm 
 | `LLM_PROVIDER` | `auto` | `codex`, `claude` or `auto` (Settings overrides) |
 | `CODEX_BIN` / `CLAUDE_BIN` | `codex` / `claude` | the CLIs |
 | `JJ_BIN` | `jj` | Jujutsu, which keeps the vault's history (required: the server won't start without it) |
+| `VAULTS_POLL_MS` | `60000` | how often each outside vault (Obsidian's) is compared with its folder, besides watching it |
 | `VAULT_SITTING_MS` | `180000` | how long the vault stays quiet before the change in progress is closed (a new entry in its history) |
 | `CODEX_FAST_MODEL` | Codex's "fast and affordable" model | quick tier on Codex |
 | `CODEX_FAST_EFFORT` | `low` | quick tier effort |
