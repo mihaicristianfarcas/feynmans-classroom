@@ -51,6 +51,8 @@ Requirements: Node 22+, the Codex CLI or Claude Code, [Jujutsu](https://www.jj-v
 jj`; required: it keeps the vault's history and the agent's changes), and Chrome or Chromium only for
 the optional hand-built demos and the screenshot tests.
 
+Or, with only Docker installed: `docker compose up` ([Running it in Docker](docs/docker.md)).
+
 ## Documentation
 
 | | |
@@ -62,6 +64,7 @@ the optional hand-built demos and the screenshot tests.
 | [Models and agents](docs/agents.md) | Codex and Claude Code, the sandbox and the guardrails |
 | [Design](docs/design.md) | the look, motion, and accessibility rules |
 | [Configuration](docs/configuration.md) | environment variables, running a test copy, limits |
+| [Docker](docs/docker.md) | the development container: everything above without installing it |
 | [Architecture](docs/architecture.md) | how the repository is laid out and how a request flows |
 
 ## Accessibility

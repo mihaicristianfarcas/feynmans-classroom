@@ -63,6 +63,7 @@ runtime/           the runtime hand-built demos run on, in a sandboxed iframe; r
 vendor/anatomy/    the anatomy skill (MIT): the drawing kit hand-built demos use
 tests/             unit tests (vitest); tests/browser/: end-to-end, accessibility and screenshot scripts
 scripts/           dev server, kit bundling, skill sync, branch protection, figure experiments
+docker/            the development container's entrypoint and seccomp profile (with Dockerfile, compose.yaml)
 .agents/skills/    skills for coding agents (Claude Code reads them through .claude/skills/)
 docs/              these pages
 ```
