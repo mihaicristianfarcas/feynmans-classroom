@@ -16,7 +16,7 @@ Every setting has a default; set environment variables to change them (for `npm 
 | `CLAUDE_FAST_MODEL` / `CLAUDE_SMART_MODEL` | `sonnet` / `opus` | Claude Code tiers |
 | `LLM_CONCURRENCY` | `3` | model calls at once |
 | `CODEX_CONCURRENCY`, `CODEX_FIX_ROUNDS`, `CODEX_TIMEOUT_MS`, `CHROME_PATH` | | hand-built demos (see `server/config.ts`) |
-| `HOST` | `127.0.0.1` | interface the server listens on. The API has no accounts: keep it on your machine (see [SECURITY.md](../SECURITY.md)) |
+| `HOST` | `127.0.0.1` | interface the server listens on (the Vite dev server too). The API has no accounts: keep it on your machine (see [SECURITY.md](../SECURITY.md)) |
 | `ALLOWED_HOSTS` | | extra host names to accept (comma-separated), for those who serve it on a network on purpose |
 | `WEB_PORT` | `5173` | the Vite dev server's port (`npm run dev`) |
 | `ANATOMY_SKILL_DIR` | | where `npm run sync:anatomy` looks for the anatomy skill |
