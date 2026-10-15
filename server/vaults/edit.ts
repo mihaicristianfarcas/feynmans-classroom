@@ -49,10 +49,10 @@ export function saveNote(vault: Vault, rel: string, text: string, base?: string)
   if (!clean?.toLowerCase().endsWith(".md")) throw new Error("only notes (.md files) can be edited");
   const full = must(vault, clean);
   const exists = existsSync(full);
-  if (base !== undefined && exists) {
-    const now = readFileSync(full, "utf8");
-    if (now !== base && now !== text) throw new Conflict(now);
-  }
+  const now = exists ? readFileSync(full, "utf8") : undefined;
+  if (base !== undefined && now !== undefined && now !== base && now !== text) throw new Conflict(now);
+  // the same text again (an editor echoing a change from disk): the file, and Obsidian, are left alone
+  if (now === text) return { path: clean, change: "changed" };
   atomicWrite(full, text);
   vault.load(clean);
   return { path: clean, change: exists ? "changed" : "added" };

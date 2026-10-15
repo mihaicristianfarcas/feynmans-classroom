@@ -1,6 +1,8 @@
 /* Typed calls for outside vaults (Obsidian's, or any folder of Markdown): the list, a vault's files,
- * a note with its links, resolving links, saving and changing files, attachments, tags, search, graph. */
+ * a note with its links, resolving links, saving and changing files, attachments, a note's versions
+ * and suggested connections, tags, search, graph. */
 import { call, del, patch, post } from "./client";
+import type { SuggestedLink } from "./types";
 
 export type VaultFileKind = "note" | "image" | "pdf" | "audio" | "video" | "file";
 
@@ -65,6 +67,8 @@ export interface VaultNote {
     md: boolean;
     path: string | null;
     kind: VaultFileKind | null;
+    /** Names nothing in the vault, but a concept, book or note of the app. */
+    app?: { kind: "concept" | "book" | "note"; title: string };
   }[];
   backlinks: VaultBacklink[];
   mentions?: VaultBacklink[];
@@ -82,6 +86,14 @@ const q = (params: Record<string, string | undefined>) =>
 
 /** The URL a file of a vault is served from (pictures, PDFs, sound, video). */
 export const vaultFileUrl = (id: string, path: string) => `/api/vaults/${id}/file?${q({ path })}`;
+
+/** A snapshot of a vault that changed a note (`path`: the note's path then). */
+export interface VaultVersion {
+  commit: string;
+  when: string;
+  subject: string;
+  path: string;
+}
 
 export const vaults = {
   list: () => call<VaultSummary[]>("/api/vaults"),
@@ -134,6 +146,23 @@ export const vaults = {
       name,
       note,
     }),
+  append: (id: string, path: string, text: string) =>
+    post<{ path: string; text: string }>(`/api/vaults/${id}/append`, { path, text }),
+  /** The vault notes that link to a book. */
+  bookNotes: (bookId: string) =>
+    call<{ vault: string; vaultName: string; path: string; title: string; page?: number }[]>(
+      `/api/books/${bookId}/vault-notes`,
+    ),
+  versions: (id: string, path: string) => call<VaultVersion[]>(`/api/vaults/${id}/versions?${q({ path })}`),
+  version: (id: string, path: string, commit: string) =>
+    call<{ body: string; diff: string }>(`/api/vaults/${id}/versions/${commit}?${q({ path })}`),
+  restore: (id: string, path: string, commit: string) =>
+    post<{ path: string }>(`/api/vaults/${id}/restore`, { path, commit }),
+  connections: (id: string, path: string) => call<SuggestedLink[]>(`/api/vaults/${id}/connections?${q({ path })}`),
+  suggestConnections: (id: string, path: string) =>
+    post<{ suggested: SuggestedLink[] }>(`/api/vaults/${id}/connections/suggest`, { path }),
+  decideConnection: (id: string, cid: string, decision: "accept" | "reject" | "remove") =>
+    post<SuggestedLink>(`/api/vaults/${id}/connections/${cid}/${decision}`),
   tags: (id: string) => call<{ tag: string; count: number }[]>(`/api/vaults/${id}/tags`),
   search: (id: string, query: string) =>
     call<{ path: string; title: string; kind: VaultFileKind; snippet: string; score: number }[]>(

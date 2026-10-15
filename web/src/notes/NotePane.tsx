@@ -257,7 +257,7 @@ export function NotePane({
               autoFocus={!location.hash.includes("new=1") && !body}
             />
           ) : (
-            <NoteContext.Provider value={{ id: note.id }}>
+            <NoteContext.Provider value={{ append: (md) => docs.append(note.id, md) }}>
               <Markdown text={body} theme={theme} className="note-read" base={note.path} />
             </NoteContext.Provider>
           )}
@@ -267,7 +267,13 @@ export function NotePane({
       {links.open && <NoteSidebar note={note} reload={load} panel={links} />}
       {versions && (
         <Versions
-          note={note}
+          title={note.title}
+          base={note.path}
+          history={{
+            list: () => docs.versions(note.id),
+            open: (v) => docs.version(note.id, v.commit),
+            restore: (v) => docs.restore(note.id, v.commit),
+          }}
           theme={theme}
           onClose={() => setVersions(false)}
           onRestored={() => {

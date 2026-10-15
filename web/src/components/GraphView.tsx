@@ -20,6 +20,7 @@ import { type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, use
 import type { GraphData } from "../api";
 import { go, openLink } from "../app/navigation";
 import { useArrowKeys } from "../lib/a11y";
+import { noteRoute } from "../vaults/routes";
 
 export type GraphNode = SimulationNodeDatum & GraphData["nodes"][number];
 type N = GraphNode;
@@ -182,10 +183,11 @@ export function NodeMark({
 }
 
 /** Opens an item's own page: a book in the reader, a concept's page, a note, an annotation in its book. */
-export function openNode(n: Pick<N, "kind" | "id" | "bookId" | "path">) {
+export function openNode(n: Pick<N, "kind" | "id" | "bookId" | "path" | "vault">) {
   if (n.kind === "book") go(`#/book/${n.bookId}`);
   else if (n.kind === "concept") go(`#/brain/concept/${n.id.slice(8)}`);
   else if (n.kind === "annotation" && n.path) openLink(n.path.replace(/\.md$/, ""));
+  else if (n.vault && n.path) go(noteRoute(n.vault, n.path));
   else go(`#/notes/${n.id.slice(5)}`);
 }
 

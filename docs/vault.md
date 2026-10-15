@@ -92,7 +92,7 @@ top of the file list. Add as many as you like: the + beside the vault's name, th
 Finder, File Explorer or your desktop's folder window. The server needn't be on your computer: the
 browser reads the folder and keeps the server's copy (`DATA_DIR/vaults/<id>/`) in step with it.
 The list is kept in `DATA_DIR/vaults.json`; forgetting a vault deletes the server's copy and leaves
-your folder as it is. Vaults are never put in jj.
+your folder as it is. Vaults are never put in jj (their history is kept apart, below).
 
 - **Chrome, Edge, Brave, Opera** keep the folder in sync both ways while the app is open: changes
   in the folder (Obsidian, a sync service) reach the app within a few seconds, and edits made in the
@@ -130,3 +130,30 @@ each folder with what it knows, in case the system missed an event, and when the
 rescans everything changed while it was closed. Edits made here are written straight to the file,
 so Obsidian sees them at once. If a note changes on disk while you're typing in it here, the app
 asks whether to show the new text or keep yours, and never overwrites either without asking.
+
+**The rest of the app works in them too.** What a note of the app's own vault has, a vault's notes
+have, kept where Obsidian won't trip over it (`DATA_DIR/vault-meta/<id>/`), never in your folder:
+
+- **Versions.** Every Markdown file's history is kept in a git repository of its own
+  (`vault-meta/<id>/history.git`, with your folder as its work tree, so your folder gets no `.git`).
+  A snapshot is taken when the vault opens, a few minutes after a run of edits (in the app or in
+  Obsidian) and before anything the app changes for you. **History** above a note shows its versions
+  and brings one back (the text it had stays in the history).
+- **Suggested connections.** Beside a note, **Suggest** has a model read the vault (read-only) and
+  propose links worth following, each with a reason; accepting one adds it to the note's `related`
+  property. Decisions are kept in `vault-meta/<id>/connections.jsonl`, so nothing turned down comes
+  back. With the "auto" setting they're added at once.
+- **The agent (⌘J)** knows which vault and note you have open. Asked from a vault, it works on a
+  copy of that vault's notes (a git worktree in `DATA_DIR/agent-runs/<id>`, your pictures and PDFs
+  readable beside it), and its change lands in your folder as one commit after whatever you did
+  meanwhile, only if it applies cleanly; **Undo** takes it out the same way, and **Keep** saves an
+  answer as a note in that vault.
+- **Links to the app.** A [[link]] (or a property such as `about`) that names nothing in the vault
+  but names one of the app's concepts, books or notes leads there. Those notes are listed on the
+  concept's page and drawn in the Brain's graph, and `[[` completes to the app's concepts and books.
+- **Reading.** The reader's Note tab can write in a vault note (or make one, its `source` property
+  linking the book): passages and captured pictures land at its end, quoted under
+  `[[Book title#page=12|Book title, p. 12]]`, and the vault notes that link to a book are listed with
+  its notes.
+- **Quizzes and search.** A quiz in a vault note adds each attempt under it, and ⌘K finds vault
+  notes along with everything else.

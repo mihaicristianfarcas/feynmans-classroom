@@ -4,7 +4,7 @@
  * SuggestionsCard lists every suggested link, and asks the agent for more. */
 import { X } from "lucide-react";
 import { type ReactNode, type Ref, useEffect, useId, useRef, useState } from "react";
-import { docs, type GraphData, learn, type Note } from "../../api";
+import { docs, type GraphData, learn, type Note, vaults } from "../../api";
 import { bookLink } from "../../app/navigation";
 import { Mastery, Spinner } from "../../components/feedback";
 import { levelOf, openNode } from "../../components/GraphView";
@@ -13,6 +13,7 @@ import { ExplainBack } from "../../components/tools";
 import { announce } from "../../lib/a11y";
 import { useLoad } from "../../lib/useLoad";
 import { panelId } from "../../lib/usePanel";
+import { bodyOf } from "../../vaults/text";
 
 type Node = GraphData["nodes"][number];
 
@@ -122,12 +123,17 @@ export function NodeCard({
     [node.id],
   );
   const { data: note } = useLoad(
-    () => (node.kind === "note" ? docs.get<Note>(node.id.slice(5)) : Promise.resolve(null)),
+    () =>
+      node.kind === "note" && !node.vault
+        ? docs.get<Note>(node.id.slice(5))
+        : node.vault && node.path
+          ? vaults.note(node.vault, node.path).then((v) => ({ id: node.id, path: v.path, body: bodyOf(v.text ?? "") }))
+          : Promise.resolve(null),
     [node.id],
   );
   // useLoad keeps the last item's data until the next arrives: show it only if it's this item's
   const current = <T extends { id: string }>(x: T | null) =>
-    x && (node.kind === "concept" ? `concept:${x.id}` : `note:${x.id}`) === node.id ? x : null;
+    x && (node.kind === "concept" ? `concept:${x.id}` : node.vault ? x.id : `note:${x.id}`) === node.id ? x : null;
   const c = current(concept);
   const n = current(note);
 

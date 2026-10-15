@@ -1,10 +1,13 @@
 /* The sidebar of a note in an outside vault, as Obsidian's: what links here (backlinks, with the line
  * around each), where it's mentioned without a link (one click links it), what it links to (links to
- * nothing yet marked as such), its tags, and its outline (jump to a heading). */
+ * nothing yet marked as such), the connections an agent suggests, its tags, and its outline (jump to
+ * a heading). */
 import { useState } from "react";
 import { type VaultBacklink, type VaultNote, vaults } from "../api";
 import { announce } from "../lib/a11y";
+import { useLoad } from "../lib/useLoad";
 import type { Panel } from "../lib/usePanel";
+import { Connections } from "../notes/Connections";
 import { linkRoute, noteRoute, openVaultLink, searchRoute } from "./routes";
 import { linkMention } from "./text";
 
@@ -20,6 +23,10 @@ export function VaultSidebar({
   reload: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const { data: connections, reload: reloadConnections } = useLoad(
+    () => (note.kind === "note" ? vaults.connections(id, note.path) : Promise.resolve([])),
+    [id, note.path],
+  );
   const outgoing = (note.outgoing || []).filter(
     (o, i, all) => all.findIndex((x) => x.target === o.target && x.sub === o.sub) === i,
   );
@@ -100,7 +107,7 @@ export function VaultSidebar({
                 <li
                   // biome-ignore lint/suspicious/noArrayIndexKey: a read-only list, replaced whole when it reloads
                   key={i}
-                  data-missing={!o.path || undefined}
+                  data-missing={(!o.path && !o.app) || undefined}
                 >
                   <a
                     href={linkRoute(id, o.target, { sub: o.sub, from: note.path, md: o.md })}
@@ -113,13 +120,38 @@ export function VaultSidebar({
                     {o.target}
                     {o.sub ? ` › ${o.sub.replace(/^\^/, "")}` : ""}
                   </a>
-                  {!o.path && <span className="fine"> (not made yet)</span>}
+                  {!o.path && (
+                    <span className="fine">
+                      {o.app
+                        ? ` (${o.app.kind === "book" ? "a book" : `a ${o.app.kind}`} in the app)`
+                        : " (not made yet)"}
+                    </span>
+                  )}
                   {o.embed && o.path && <span className="fine"> (embedded)</span>}
                 </li>
               ))}
             </ul>
           )}
         </section>
+      )}
+      {note.kind === "note" && (
+        <Connections
+          connections={connections || []}
+          what="notes"
+          decide={async (c, d) => {
+            await vaults.decideConnection(id, c.id, d);
+            reloadConnections();
+            reload();
+          }}
+          suggest={async () => {
+            const r = await vaults.suggestConnections(id, note.path);
+            announce(r.suggested.length ? `${r.suggested.length} suggested` : "Nothing to suggest");
+            reloadConnections();
+            reload();
+          }}
+          open={(c) => void openVaultLink(id, c.to, { from: note.path })}
+          href={(c) => linkRoute(id, c.to, { from: note.path })}
+        />
       )}
       {(note.tags?.length ?? 0) > 0 && (
         <section>

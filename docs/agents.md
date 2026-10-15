@@ -66,6 +66,10 @@ commands under the Codex sandbox):
   change, checked: app-owned files (logs, profile, `book.json`, `AGENTS.md`…) must be untouched (or
   the run fails and nothing lands), and every file must still parse, quizzes included (or it waits
   for your OK, with the diff).
+- **In an added vault** (asked while one is open) it works the same way on a git worktree of that
+  vault's notes (its history, `DATA_DIR/vault-meta/<id>/history.git`), reading its pictures and PDFs
+  and the app's vault beside it; its commit is cherry-picked into the folder after a trial merge,
+  and Undo reverts it the same way ([vault.md](vault.md)).
 - **Landing.** The change is moved onto everything you did meanwhile without touching your files,
   checked for conflicts, and only then do the files follow. If it clashes with something you
   changed meanwhile, it doesn't land at all ("ask again and it starts from your latest version"), so

@@ -28,6 +28,7 @@ import { useIndicator } from "../components/ui";
 import { useArrowKeys } from "../lib/a11y";
 import { usePanel } from "../lib/usePanel";
 import { under, useVaultEvents } from "../lib/useVaultEvents";
+import { noteRoute } from "../vaults/routes";
 import { CaptureLayer } from "./Capture";
 import { FigureLightbox } from "./FigureLightbox";
 import { FiguresIndex } from "./FiguresIndex";
@@ -43,7 +44,15 @@ import { HtmlReader, MarksContext, PdfReader, type ReaderHandle, type Zoom } fro
 import { type SelectionAction, SelectionMenu } from "./SelectionMenu";
 import { StudyTab } from "./StudyPanel";
 import { readSelection, type Selection } from "./selection";
-import { savedZoom, saveZoom, stepZoom, useReadingTime, useSavedPosition, useWorkingNote } from "./session";
+import {
+  isVaultTarget,
+  savedZoom,
+  saveZoom,
+  stepZoom,
+  useReadingTime,
+  useSavedPosition,
+  useWorkingNote,
+} from "./session";
 import { NEW_CONVERSATION, pinnedOf, type TutorConversation, TutorTab } from "./Tutor";
 
 type Tab = "margin" | "figures" | "note" | "tutor" | "study";
@@ -130,7 +139,7 @@ export function Reader({
   useEffect(() => {
     loadNotes();
   }, [loadNotes]);
-  const { note: workingNote, choose: chooseNote, ensure: ensureNote } = useWorkingNote(bookId);
+  const { note: workingNote, vaultNote, choose: chooseNote, chooseVault, ensure: ensureNote } = useWorkingNote(bookId);
   // a link to a session with the tutor (from ⌘K, a note): the Tutor pane, with that conversation
   // biome-ignore lint/correctness/useExhaustiveDependencies: opens the session in the link once, when the reader opens
   useEffect(() => {
@@ -383,9 +392,14 @@ export function Reader({
     async (input: { annotationId?: string; anchor?: Anchor }, mode: "embed" | "passage" | "reference") => {
       try {
         const note = await ensureNote();
+        if (isVaultTarget(note)) {
+          await learn.toNote(bookId, { ...input, vault: note.vault, path: note.path, mode });
+          say(`Added to “${note.title}”.`, { label: "Open", href: noteRoute(note.vault, note.path) });
+          return;
+        }
         const out = await learn.toNote(bookId, { ...input, noteId: note.id, mode });
-        chooseNote(out.note);
-        say(`Added to “${out.note.title}”.`, { label: "Open", href: `#/notes/${out.note.id}` });
+        if (out.note) chooseNote(out.note);
+        say(`Added to “${out.note?.title}”.`, { label: "Open", href: `#/notes/${out.note?.id}` });
       } catch (error) {
         say((error as Error).message);
       }
@@ -566,7 +580,9 @@ export function Reader({
               <ReaderNote
                 book={book}
                 note={workingNote}
+                vaultNote={vaultNote}
                 onChoose={chooseNote}
+                onChooseVault={chooseVault}
                 ensureNote={ensureNote}
                 bookNotes={notes}
                 theme={theme}
@@ -638,7 +654,7 @@ export function Reader({
               y={selection.y}
               side={selection.side}
               onAction={onAction}
-              noteTitle={workingNote?.title}
+              noteTitle={vaultNote?.title ?? workingNote?.title}
               takeFocus={selection.byKeyboard}
               onClose={() => {
                 setSelection(null);
@@ -651,7 +667,7 @@ export function Reader({
               book={book}
               root={pane.current}
               theme={theme}
-              note={workingNote}
+              noteTitle={vaultNote?.title ?? workingNote?.title}
               ensureNote={ensureNote}
               onNote={chooseNote}
               onDone={() => setCapturing(false)}

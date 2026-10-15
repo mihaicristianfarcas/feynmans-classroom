@@ -10,6 +10,9 @@ import { Readable } from "node:stream";
 import type { Context, Hono } from "hono";
 import { NotFound } from "../errors.ts";
 import { CONTENT_ONLY, readBody, sendFile } from "../http.ts";
+import { linkTargets } from "../vault/links.ts";
+import { appTarget } from "../vaults/app-links.ts";
+import { moveConnections } from "../vaults/connections.ts";
 import {
   Conflict,
   createFolder,
@@ -158,7 +161,10 @@ export function vaultRoutes(app: Hono) {
       aliases: entry.aliases,
       headings: entry.headings,
       mtime: entry.mtime,
-      outgoing: vault.outgoing(path),
+      outgoing: vault.outgoing(path).map((o) => {
+        const app = o.path || o.md ? null : appTarget(o.target, o.sub);
+        return app ? { ...o, app: { kind: app.kind, title: app.title } } : o;
+      }),
       backlinks: vault.backlinks(path),
       mentions: vault.mentions(path),
     });
@@ -181,15 +187,24 @@ export function vaultRoutes(app: Hono) {
     });
   });
 
-  /** Names links can use, for completing [[ in the editor. */
+  /** Names links can use, for completing [[ in the editor: the vault's, and the app's concepts and books. */
   app.get("/api/vaults/:id/targets", (c) => {
     const vault = getVault(c.req.param("id"));
-    return c.json(
-      [...vault.files.values()].flatMap((e) => [
+    const own = new Set([...vault.files.values()].map((e) => e.name.toLowerCase()));
+    return c.json([
+      ...[...vault.files.values()].flatMap((e) => [
         { title: e.name, kind: e.kind, detail: e.path },
         ...e.aliases.map((a) => ({ title: a, kind: "alias", detail: e.path })),
       ]),
-    );
+      // the app's concepts and books (a note of the vault by the same name wins)
+      ...linkTargets()
+        .filter((t) => (t.kind === "concept" || t.kind === "book") && !own.has(t.title.toLowerCase()))
+        .map((t) => ({
+          title: t.title,
+          kind: t.kind,
+          detail: t.kind === "book" ? "a book in the Library" : "a concept",
+        })),
+    ]);
   });
 
   app.get("/api/vaults/:id/file", (c) => {
@@ -238,10 +253,9 @@ export function vaultRoutes(app: Hono) {
     const changes = move(vault, b.from, b.to);
     announceChanges(vault.id, changes);
     const to = cleanRel(b.to) || "";
-    return c.json({
-      path: vault.files.has(`${to}.md`) && !vault.files.has(to) ? `${to}.md` : to,
-      changes: changes.length,
-    });
+    const path = vault.files.has(`${to}.md`) && !vault.files.has(to) ? `${to}.md` : to;
+    moveConnections(vault, cleanRel(b.from) || "", path);
+    return c.json({ path, changes: changes.length });
   });
 
   app.post("/api/vaults/:id/trash", async (c) => {

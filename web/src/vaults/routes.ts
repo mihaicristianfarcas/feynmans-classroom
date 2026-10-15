@@ -1,8 +1,8 @@
 /* Where things in an outside vault open: the hash routes of the vaults page (a vault, a note or file
  * in it at a heading, a link to open, the graph, a search), and opening a link the way Obsidian does
  * (to what it names, or, when nothing has that name yet, to a new note made for it). */
-import { vaults } from "../api";
-import { go } from "../app/navigation";
+import { learn, vaults } from "../api";
+import { go, openLink } from "../app/navigation";
 
 export interface VaultRoute {
   /** The vault, or null for the page that lists them. */
@@ -62,7 +62,8 @@ function besideNote(target: string, from?: string) {
   return parts.join("/");
 }
 
-/** Opens what a link in note `from` points at; a link to nothing yet makes that note (as Obsidian does). */
+/** Opens what a link in note `from` points at; a link to nothing in the vault opens the app's concept, book
+ * or note of that name, else makes that note (as Obsidian does). */
 export async function openVaultLink(
   id: string,
   target: string,
@@ -82,6 +83,11 @@ export async function openVaultLink(
     const r = await vaults.resolve(id, target, opts);
     open(noteRoute(id, r.path, opts.sub));
   } catch {
+    // a [[link]] to nothing in the vault may name a concept, a book or a note of the app
+    if (!opts.md) {
+      const app = await learn.resolve(target, opts.sub).catch(() => null);
+      if (app && ["concept", "book", "note"].includes(app.kind)) return openLink(target, opts.sub);
+    }
     // a Markdown link names a path beside the note; a [[link]] a name, put where new notes go
     const title = (opts.md ? besideNote(target, opts.from) : target.trim()).replace(/\.md$/i, "");
     if (!title || /\.[a-z0-9]{2,4}$/i.test(title)) return;

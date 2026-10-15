@@ -3,18 +3,20 @@
  * (properties as a table, links and embeds working, task boxes ticking), and its links in the sidebar.
  * Edits are written to the file itself; changes made to it elsewhere (in Obsidian, say) show at once,
  * and if they land while you're typing, it asks which text to keep. Any other file (a picture, a PDF,
- * a recording) is shown, with what links to it. */
-import { Trash2 } from "lucide-react";
+ * a recording) is shown, with what links to it. A note's versions come from the vault's history. */
+import { History, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { VaultConflict, type VaultNote, vaultFileUrl, vaults } from "../api";
 import { go } from "../app/navigation";
 import { Markdown, MarkdownWorldContext } from "../components/Markdown";
 import { PanelEdge, PanelToggle } from "../components/Panel";
+import { NoteContext } from "../components/QuizBlock";
 import { useIndicator } from "../components/ui";
 import { announce } from "../lib/a11y";
 import { timeAgo } from "../lib/time";
 import type { Panel } from "../lib/usePanel";
 import { type LinkSource, NoteEditor } from "../notes/NoteEditor";
+import { Versions } from "../notes/Versions";
 import { noteRoute, openVaultLink } from "./routes";
 import { bodyOf, toggleTaskAt } from "./text";
 import { useVaultChanges } from "./useVaultChanges";
@@ -72,6 +74,7 @@ export function VaultPane({
     }
   });
   const [saving, setSaving] = useState<"idle" | "saving" | "saved">("idle");
+  const [versions, setVersions] = useState(false);
   /** The text on disk when it changed there while there were unsaved edits here. */
   const [clash, setClash] = useState<string | null>(null);
   const modes = useIndicator<HTMLFieldSetElement>(mode);
@@ -167,6 +170,8 @@ export function VaultPane({
     [save],
   );
   const world = useVaultWorld(id, path, note?.outgoing, toggleTask);
+  // a quiz in the note adds its attempts at the note's end
+  const quizNote = useMemo(() => ({ append: (md: string) => vaults.append(id, path, md) }), [id, path]);
   const source = useMemo<LinkSource>(
     () => ({
       targets: () => vaults.targets(id),
@@ -302,6 +307,18 @@ export function VaultPane({
                       : ""}
             </span>
             <span className="spacer" />
+            {note.kind === "note" && (
+              <button
+                type="button"
+                className="icon-button"
+                title="Versions: read or bring back an earlier one"
+                aria-label="Versions"
+                aria-haspopup="dialog"
+                onClick={() => setVersions(true)}
+              >
+                <History aria-hidden="true" />
+              </button>
+            )}
             <button
               type="button"
               className="icon-button danger"
@@ -353,13 +370,32 @@ export function VaultPane({
             />
           ) : (
             <MarkdownWorldContext.Provider value={world}>
-              <Markdown text={body} theme={theme} className="note-read" base={path} />
+              <NoteContext.Provider value={quizNote}>
+                <Markdown text={body} theme={theme} className="note-read" base={path} />
+              </NoteContext.Provider>
             </MarkdownWorldContext.Provider>
           )}
         </div>
       </div>
       <PanelEdge panel={links} side="right" label="links" />
       {links.open && <VaultSidebar id={id} note={note} panel={links} reload={load} />}
+      {versions && (
+        <Versions
+          title={note.name}
+          base={path}
+          history={{
+            list: () => vaults.versions(id, path),
+            open: (v) => vaults.version(id, path, v.commit),
+            restore: (v) => vaults.restore(id, path, v.commit),
+          }}
+          theme={theme}
+          onClose={() => setVersions(false)}
+          onRestored={() => {
+            dirty.current = false;
+            load();
+          }}
+        />
+      )}
     </div>
   );
 }

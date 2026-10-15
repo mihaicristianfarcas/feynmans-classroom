@@ -28,7 +28,7 @@ function vaultWorld(
     href: (target, sub, md) => (target ? linkRoute(id, target, { sub, from, md }) : noteRoute(id, from, sub)),
     open: (target, sub, md) => void openVaultLink(id, target, { sub, from, md }),
     missing: outgoing
-      ? (target, md) => outgoing.some((o) => !o.path && o.md === !!md && o.target === target.trim())
+      ? (target, md) => outgoing.some((o) => !o.path && !o.app && o.md === !!md && o.target === target.trim())
       : undefined,
     embed: (e) => <VaultEmbed key={`${e.target}#${e.sub ?? ""}`} vault={id} from={from} {...e} />,
     tagHref: (tag) => searchRoute(id, `#${tag}`),

@@ -176,6 +176,8 @@ export type ConceptDetail = Omit<Concept, "sources" | "related"> & {
   mastery: number | null;
   cards: CardView[];
   notes: Note[];
+  /** Notes of added vaults that link to it. */
+  vaultNotes: { vault: string; vaultName: string; path: string; title: string }[];
   related: { id: string; title: string; mastery: number | null }[];
   backlinks: { id: string; title: string; mastery: number | null }[];
 };
@@ -244,18 +246,24 @@ export interface GraphData {
     detail?: string;
     bookId?: string;
     path?: string;
+    /** A note of an added vault: the vault's id. */
+    vault?: string;
     created: number;
   }[];
   edges: { from: string; to: string; kind: string; id?: string; why?: string }[];
 }
 export interface SearchHit {
-  kind: DocKind | "book";
+  /** "vault": a note of an added vault (`vault`, `path`). */
+  kind: DocKind | "book" | "vault";
   id: string;
   title: string;
   snippet: string;
   score: number;
   bookId?: string;
   loc?: { page?: number; block?: number };
+  vault?: string;
+  vaultName?: string;
+  path?: string;
 }
 export interface Journey {
   days: Record<string, { reviews: number; minutes: number; events: number; correct: number }>;

@@ -1,21 +1,11 @@
 /* A note's sidebar: what links here, what it links to, where it's mentioned without a link, and the
  * connections the agent suggests (accept, reject, or remove later). */
-import { X } from "lucide-react";
-import { useState } from "react";
-import { docs, learn, type NoteDetail, type SuggestedLink } from "../api";
+import { docs, learn, type NoteDetail } from "../api";
 import { openLink } from "../app/navigation";
-import { Spinner } from "../components/feedback";
 import type { Panel } from "../lib/usePanel";
+import { Connections } from "./Connections";
 
 export function NoteSidebar({ note, reload, panel }: { note: NoteDetail; reload: () => void; panel: Panel }) {
-  const [busy, setBusy] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const suggested = note.connections.filter((c) => c.status === "suggested");
-  const accepted = note.connections.filter((c) => c.status === "accepted");
-  const decide = async (c: SuggestedLink, d: "accept" | "reject" | "remove") => {
-    await learn.decideConnection(c.id, d);
-    reload();
-  };
   return (
     <aside className="note-side" aria-label="Links" id={panel.id} ref={panel.ref} style={panel.style}>
       <section>
@@ -108,78 +98,19 @@ export function NoteSidebar({ note, reload, panel }: { note: NoteDetail; reload:
           ))}
         </ul>
       </section>
-      <section>
-        <h2 className="side-title">Connections</h2>
-        <p className="fine">
-          An agent reads your vault and suggests notes and concepts this one should link to. You decide.
-        </p>
-        {suggested.map((c) => (
-          <div key={c.id} className="suggestion">
-            <div>
-              <b>[[{c.to}]]</b>
-            </div>
-            <div className="context">{c.why}</div>
-            <div className="row gap">
-              <button type="button" className="button" onClick={() => decide(c, "accept")}>
-                Link it
-              </button>
-              <button type="button" className="link" onClick={() => decide(c, "reject")}>
-                Not related
-              </button>
-            </div>
-          </div>
-        ))}
-        {accepted.length > 0 && (
-          <ul className="link-list compact">
-            {accepted.map((c) => (
-              <li key={c.id}>
-                <a
-                  href={`#/open?target=${encodeURIComponent(c.to)}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    openLink(c.to);
-                  }}
-                >
-                  {c.to}
-                </a>
-                <span className="ai-badge" title={c.why}>
-                  AI
-                </span>
-                <button
-                  type="button"
-                  className="link danger"
-                  title="Remove this link"
-                  aria-label="Remove this link"
-                  onClick={() => decide(c, "remove")}
-                >
-                  <X aria-hidden="true" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <button
-          type="button"
-          className="button"
-          disabled={!!busy}
-          onClick={async () => {
-            setBusy(Date.now());
-            setError(null);
-            try {
-              await learn.suggestConnections(note.path);
-              reload();
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setBusy(null);
-            }
-          }}
-        >
-          {busy ? "Reading your vault…" : "Suggest connections"}
-        </button>
-        {busy && <Spinner label="The agent is reading your notes" since={busy} />}
-        {error && <p className="form-error">{error}</p>}
-      </section>
+      <Connections
+        connections={note.connections}
+        decide={async (c, d) => {
+          await learn.decideConnection(c.id, d);
+          reload();
+        }}
+        suggest={async () => {
+          await learn.suggestConnections(note.path);
+          reload();
+        }}
+        open={(c) => openLink(c.to)}
+        href={(c) => `#/open?target=${encodeURIComponent(c.to)}`}
+      />
     </aside>
   );
 }

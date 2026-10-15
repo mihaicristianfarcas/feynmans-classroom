@@ -1,10 +1,12 @@
 /* The knowledge graph: books and documents (concepts, notes, annotations) as nodes, with the links
  * between them (the learner's own, accepted and suggested connections) and each concept's mastery as
- * a ring. */
+ * a ring; and the notes of added vaults that link to any of them. */
 import { listBooks } from "../books/store.ts";
 import { listConnections } from "../vault/connections.ts";
 import { docs } from "../vault/index.ts";
 import { allEdges, type Edge, resolveLink } from "../vault/links.ts";
+import { appLinks } from "../vaults/app-links.ts";
+import { getVault } from "../vaults/index.ts";
 import { conceptMastery } from "./context.ts";
 
 export interface GraphNode {
@@ -17,6 +19,8 @@ export interface GraphNode {
   detail?: string;
   bookId?: string;
   path?: string;
+  /** A note of an added vault: the vault's id. */
+  vault?: string;
   /** When it entered the brain (ms), for replaying the graph's growth. */
   created: number;
 }
@@ -86,6 +90,26 @@ export function knowledgeGraph(): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const order: Edge["kind"][] = ["link", "embed", "ai", "related", "about", "concept", "mentions", "source"];
   const all = allEdges().filter((e) => e.to);
   for (const kind of order) for (const e of all) if (e.kind === kind) add({ from: e.from, to: e.to!, kind: e.kind });
+  // notes of added vaults that link to something here, with those links
+  for (const l of appLinks()) {
+    const id = `vnote:${l.vault}:${l.path}`;
+    if (!ids.has(id)) {
+      const entry = getVault(l.vault).files.get(l.path);
+      nodes.push({
+        id,
+        kind: "note",
+        label: l.title,
+        mastery: null,
+        size: 0.8,
+        detail: l.vaultName,
+        path: l.path,
+        vault: l.vault,
+        created: entry?.mtime ?? Date.now(),
+      });
+      ids.add(id);
+    }
+    add({ from: id, to: l.to.node, kind: l.property ? "about" : "link" });
+  }
   for (const c of listConnections()) {
     if (c.status !== "suggested") continue;
     const from = docs.at(c.from);

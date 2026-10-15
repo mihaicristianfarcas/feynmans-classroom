@@ -22,6 +22,7 @@ import { manimRoutes } from "./routes/manim.ts";
 import { noteRoutes } from "./routes/notes.ts";
 import { settingsRoutes } from "./routes/settings.ts";
 import { studyRoutes } from "./routes/study.ts";
+import { vaultNoteRoutes } from "./routes/vault-notes.ts";
 import { vaultRoutes } from "./routes/vaults.ts";
 
 export function createApp() {
@@ -48,6 +49,7 @@ export function createApp() {
   brainRoutes(app);
   agentRoutes(app);
   vaultRoutes(app);
+  vaultNoteRoutes(app);
 
   if (PROD && existsSync(WEB_DIST)) {
     // the built app: files by path (hashed assets cached for good), anything else is a route of the app

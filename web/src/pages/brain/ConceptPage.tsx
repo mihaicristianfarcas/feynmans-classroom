@@ -10,6 +10,7 @@ import { Markdown } from "../../components/Markdown";
 import { CardDrafter, Connector, ExplainBack, FigureMaker } from "../../components/tools";
 import { useLoad } from "../../lib/useLoad";
 import { under, useVaultEvents } from "../../lib/useVaultEvents";
+import { noteRoute } from "../../vaults/routes";
 
 const TYPE_LABEL: Record<string, string> = {
   note: "Note",
@@ -174,11 +175,16 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
               </li>
             ))}
           </ul>
-          <h2 className="section-title">Notes ({c.notes.length})</h2>
+          <h2 className="section-title">Notes ({c.notes.length + c.vaultNotes.length})</h2>
           <ul className="plain">
             {c.notes.map((n: Note) => (
               <li key={n.id}>
                 <a href={`#/notes/${n.id}`}>{n.title}</a> <span className="fine">{TYPE_LABEL[n.type]}</span>
+              </li>
+            ))}
+            {c.vaultNotes.map((n) => (
+              <li key={`${n.vault}:${n.path}`}>
+                <a href={noteRoute(n.vault, n.path)}>{n.title}</a> <span className="fine">in {n.vaultName}</span>
               </li>
             ))}
           </ul>

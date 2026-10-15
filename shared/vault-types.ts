@@ -217,6 +217,9 @@ export interface AgentContext {
   route?: string;
   /** The document open on the page (a note, a concept). */
   docId?: string;
+  /** An added vault open on the page, and the note open in it. */
+  vault?: string;
+  vaultPath?: string;
   bookId?: string;
   /** In a book: the page (PDF, with the fraction down it) or the block (other formats). */
   at?: number;
@@ -234,6 +237,8 @@ export interface AgentRun {
   where?: string;
   /** "fast": the quick model (Enter); "smart": the careful one (⌘Enter). */
   tier?: "fast" | "smart";
+  /** It worked in this added vault (its paths are the vault's); otherwise in the app's own vault. */
+  vault?: string;
   status: "running" | "review" | "merged" | "discarded" | "failed" | "undone" | "done";
   started: string;
   ms?: number;
@@ -243,7 +248,7 @@ export interface AgentRun {
   files?: { path: string; change: "A" | "M" | "D" }[];
   /** Why it waits for the learner's OK (a file it wrote can't be read). */
   review?: string[];
-  /** The jj change it made: what Undo takes out again. */
+  /** The jj change it made (in a vault: the git commit): what Undo takes out again. */
   change?: string;
   /** That change's commit: its diff stays readable after an undo. */
   commit?: string;

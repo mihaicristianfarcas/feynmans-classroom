@@ -1,12 +1,15 @@
 /* Sending a passage from the book to a note: as a link to it, as the quote (a callout that links
  * back to the passage), or as the whole annotation embedded. Every passage a note quotes is marked
- * in the book first, so the note and the book point at each other. */
+ * in the book first, so the note and the book point at each other. The note can be one of an added
+ * vault's (vaults/reading.ts). */
 import type { Anchor, Annotation } from "../../shared/vault-types.ts";
 import { getBook } from "../books/store.ts";
 import { NotFound } from "../errors.ts";
 import { appendToDoc } from "../learn/docs.ts";
 import { bookNote } from "../learn/notes.ts";
 import { docs, whereOf } from "../vault/index.ts";
+import { getVault } from "../vaults/index.ts";
+import { appendToVaultNote, passageMarkdown } from "../vaults/reading.ts";
 import { createAnnotation } from "./index.ts";
 
 export type NoteMode = "reference" | "passage" | "embed";
@@ -34,6 +37,9 @@ export interface ToNoteRequest {
   anchor?: Anchor;
   /** The note to add to; the book's reading note by default. */
   noteId?: string;
+  /** Or a note of an added vault. */
+  vault?: string;
+  path?: string;
   mode?: NoteMode;
   /** The learner's own words, added after the passage. */
   comment?: string;
@@ -46,8 +52,14 @@ export function sendToNote(bookId: string, request: ToNoteRequest) {
     if (!request.anchor?.quote?.trim()) throw new Error("select some text first");
     a = createAnnotation(bookId, { type: "highlight", anchor: request.anchor });
   }
+  const comment = request.comment?.trim() ? `\n\n${request.comment.trim()}` : "";
+  if (request.vault && request.path) {
+    const markdown = `${passageMarkdown(a, request.mode || "passage")}${comment}`;
+    const saved = appendToVaultNote(getVault(request.vault), request.path, markdown);
+    return { vaultNote: { vault: request.vault, path: saved.path }, annotation: a, markdown };
+  }
   const note = request.noteId ? docs.get(request.noteId) : bookNote(bookId);
   if (!note) throw new NotFound("note not found");
-  const markdown = `${noteMarkdown(a, request.mode || "passage")}${request.comment?.trim() ? `\n\n${request.comment.trim()}` : ""}`;
+  const markdown = `${noteMarkdown(a, request.mode || "passage")}${comment}`;
   return { note: appendToDoc(note.id, markdown), annotation: a, markdown };
 }

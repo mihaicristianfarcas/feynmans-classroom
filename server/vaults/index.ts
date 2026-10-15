@@ -7,7 +7,8 @@
  *     tools writing in steps), and announces it on the app's event stream ("vaults");
  *   - every VAULTS_POLL_MS (a minute) the folder is compared with the index anyway, in case the
  *     watcher missed something (network drives, a folder that was away and came back);
- *   - at start, each vault is read afresh, so what changed while the app was closed is there too. */
+ *   - at start, each vault is read afresh, so what changed while the app was closed is there too.
+ * Changed notes are snapshotted into the vault's history (history.ts). */
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, type FSWatcher, mkdirSync, realpathSync, rmSync, statSync, watch } from "node:fs";
 import { homedir } from "node:os";
@@ -16,6 +17,7 @@ import { DATA_DIR, VAULT_DIR } from "../config.ts";
 import { NotFound } from "../errors.ts";
 import { publish } from "../events.ts";
 import { readJson, writeJson } from "../fs.ts";
+import { dropMeta, noteChanged, startHistory } from "./history.ts";
 import { type Change, skipped, Vault } from "./vault.ts";
 
 export interface VaultInfo {
@@ -45,6 +47,8 @@ let poller: NodeJS.Timeout | null = null;
 /** Tells open pages what changed in a vault. */
 function announce(id: string, changes: Change[]) {
   for (const c of changes) publish("global", { type: "vaults", data: { vault: id, ...c } });
+  const state = live.get(id);
+  if (state && changes.some((c) => /\.md$/i.test(c.path))) noteChanged(state.vault);
 }
 
 const statusOf = (path: string): VaultStatus => {
@@ -95,6 +99,7 @@ export function getVault(id: string): Vault {
     live.set(id, state);
     state.vault.reconcile();
     startWatching(id);
+    startHistory(state.vault);
   }
   return state.vault;
 }
@@ -184,6 +189,7 @@ export function removeVault(id: string) {
   for (const t of state?.timers.values() || []) clearTimeout(t);
   live.delete(id);
   if (info.synced) rmSync(rootOf(info), { recursive: true, force: true });
+  dropMeta(id);
   publish("global", { type: "vaults", data: { vault: id, path: "", change: "removed" } });
 }
 

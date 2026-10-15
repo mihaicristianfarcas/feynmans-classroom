@@ -94,10 +94,17 @@ export const learn = {
       annotationId?: string;
       anchor?: Anchor;
       noteId?: string;
+      /** Or a note of an added vault. */
+      vault?: string;
+      path?: string;
       mode?: "reference" | "passage" | "embed";
       comment?: string;
     },
-  ) => post<{ note: Note; annotation: Annotation; markdown: string }>(`/api/books/${bookId}/to-note`, input),
+  ) =>
+    post<{ note?: Note; vaultNote?: { vault: string; path: string }; annotation: Annotation; markdown: string }>(
+      `/api/books/${bookId}/to-note`,
+      input,
+    ),
   connections: (path?: string) =>
     call<SuggestedLink[]>(`/api/connections${path ? `?path=${encodeURIComponent(path)}` : ""}`),
   suggestConnections: (path?: string) =>
