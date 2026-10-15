@@ -247,6 +247,7 @@
 .split {
   position: relative;
   display: flex;
+  min-width: 0;
   min-height: 0;
 }
 .demo-pane {
@@ -453,7 +454,10 @@
   height: 100%;
   padding: 20px 0;
 }
+/* nothing drawn for a page reaches past it: Lector's spare canvas keeps its old size for a moment after
+   a zoom, and pdf.js text can run past the edge, either of which would make the pane scroll sideways */
 .pdf-page {
+  overflow: hidden;
   box-shadow:
     0 0 0 1px var(--line),
     var(--shadow-md);
