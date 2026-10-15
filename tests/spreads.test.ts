@@ -1,4 +1,5 @@
-// Two-up PDFs: telling facing pages on one sheet from a landscape page, and splitting them into single pages.
+// Two-up and turned PDFs: telling facing pages on one sheet from a landscape page, splitting them into single
+// pages, and turning pages stored on their side upright.
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -79,9 +80,32 @@ describe("ingesting a two-up PDF", () => {
     await pdf.destroy();
   });
 
+  it("turns pages stored on their side upright, without splitting them", async () => {
+    const book = await ingestBook({ name: "Turned.pdf", data: makePdf([page("a"), page("b")], { turned: true }) });
+    expect(book.spreads).toBeUndefined();
+    expect(book.turned).toBe(2);
+    expect(book.pageCount).toBe(2);
+    const pages = store.getPages(book.id);
+    expect(pages.map((p) => [p.w, p.h])).toEqual([
+      [612, 792],
+      [612, 792],
+    ]);
+    for (const [i, tag] of ["a", "b"].entries()) {
+      expect(pages[i].lines[0].t).toBe(`${tag}: sentence 1 of this page, about energy and motion.`);
+      expect(pages[i].lines.every((l) => l.t.startsWith(`${tag}:`) && l.y >= 0 && l.y <= 1)).toBe(true);
+    }
+    const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const pdf = await getDocument({ data: new Uint8Array(readFileSync(join(store.bookDir(book.id), "source.pdf"))) })
+      .promise;
+    expect((await pdf.getPage(2)).rotate).toBe(0);
+    await pdf.destroy();
+    expect(existsSync(join(store.bookDir(book.id), "original.pdf"))).toBe(true);
+  });
+
   it("leaves an ordinary book alone", async () => {
     const book = await ingestBook({ name: "Portrait.pdf", data: makePdf([page("a"), page("b")]) });
     expect(book.spreads).toBeUndefined();
+    expect(book.turned).toBeUndefined();
     expect(book.pageCount).toBe(2);
     expect(existsSync(join(store.bookDir(book.id), "original.pdf"))).toBe(false);
   });

@@ -1,12 +1,21 @@
 /* Test fixtures: tiny PDFs built by hand, so tests need no binary files. */
 
-/** A small text PDF (Helvetica, one line per entry), enough for pdf.js and pdf-inspector. */
-export function makePdf(pages: string[][]): Buffer {
+/** A small text PDF (Helvetica, one line per entry), enough for pdf.js and pdf-inspector. `turned`
+ * stores each page on its side (landscape, shown upright through /Rotate 90), as scanners often do. */
+export function makePdf(pages: string[][], { turned = false } = {}): Buffer {
   return build(
-    pages.map((lines) => ({
-      size: [612, 792],
-      content: `BT /F1 12 Tf 72 720 Td 18 TL ${lines.map((l) => `(${pdfString(l)}) Tj T*`).join(" ")} ET`,
-    })),
+    pages.map((lines) =>
+      turned
+        ? {
+            size: [792, 612],
+            rotate: 90,
+            content: `BT /F1 12 Tf ${lines.map((l, i) => `0 1 -1 0 ${72 + i * 18} 72 Tm (${pdfString(l)}) Tj`).join(" ")} ET`,
+          }
+        : {
+            size: [612, 792],
+            content: `BT /F1 12 Tf 72 720 Td 18 TL ${lines.map((l) => `(${pdfString(l)}) Tj T*`).join(" ")} ET`,
+          },
+    ),
   );
 }
 

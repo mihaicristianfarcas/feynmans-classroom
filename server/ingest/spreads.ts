@@ -1,8 +1,10 @@
-/* Two-up PDFs: scans and exports that print a book's facing pages side by side on one landscape sheet.
- * Such a book is told by where its text sits (two blocks of text with an empty gutter between them on
- * most sheets), and is split into single pages, each sheet's left half then its right, so the reader,
- * selection, quotes and page numbers all see one page at a time. Both pages draw the sheet's content,
- * upright, cropped to their side (pdf.js and pdf-inspector read only the text inside a page's crop). */
+/* Two-up and turned PDFs. A two-up PDF (scans and exports that print a book's facing pages side by
+ * side on one landscape sheet) is told by where its text sits (two blocks of text with an empty gutter
+ * between them on most sheets), and is split into single pages, each sheet's left half then its right,
+ * so the reader, selection, quotes and page numbers all see one page at a time. A turned page (stored
+ * sideways and shown through /Rotate, as scans often are) is redrawn upright, as pdf.js's text layer
+ * selects badly on rotated pages. Each new page draws its sheet's content, upright, cropped to its
+ * side (pdf.js and pdf-inspector read only the text inside a page's crop). */
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import {
   PDFArray,
@@ -24,13 +26,13 @@ const LANDSCAPE = 1.2;
 /** Pages sampled to decide whether a book is two-up. */
 const SAMPLE = 40;
 
-/** How to cut a sheet: its size as shown, where the cut falls (in points from the left), and how its
- * own coordinates map onto it as shown (pdf.js's viewport transform at scale 1, y down; viewBox is
- * the box shown). */
+/** How to redraw a sheet: its size as shown, where the cut falls (in points from the left; null keeps
+ * it one page, only turned upright), and how its own coordinates map onto it as shown (pdf.js's
+ * viewport transform at scale 1, y down; viewBox is the box shown). */
 export interface Cut {
   width: number;
   height: number;
-  at: number;
+  at: number | null;
   transform: number[];
   viewBox: number[];
 }
@@ -104,7 +106,7 @@ export function findGutter(runs: [number, number][]): number | null {
 }
 
 /** Where to cut a PDF's sheets (by page index; null keeps the sheet whole), or null if the book isn't
- * two-up. */
+ * two-up. Turned sheets that stay whole are left to `planSheets`. */
 export async function detectSpreads(doc: Doc): Promise<(Cut | null)[] | null> {
   const count = doc.numPages;
   const step = Math.max(1, count / SAMPLE);
@@ -120,9 +122,33 @@ export async function detectSpreads(doc: Doc): Promise<(Cut | null)[] | null> {
   return cuts;
 }
 
+/** A page shown turned (/Rotate 90, 180 or 270), to be redrawn upright as it is shown; null if it is
+ * upright already. */
+async function turnedOf(doc: Doc, n: number): Promise<Cut | null> {
+  const page = await doc.getPage(n);
+  if (page.rotate % 360 === 0) return null;
+  const view = page.getViewport({ scale: 1 });
+  return {
+    width: view.width,
+    height: view.height,
+    at: null,
+    transform: [...view.transform],
+    viewBox: [...view.viewBox],
+  };
+}
+
+/** What to redraw in a PDF (by page index; null leaves the page as it is): two-up sheets split, and
+ * turned pages made upright. Null when nothing needs it. */
+export async function planSheets(doc: Doc): Promise<(Cut | null)[] | null> {
+  const cuts = (await detectSpreads(doc)) ?? Array<Cut | null>(doc.numPages).fill(null);
+  for (let n = 1; n <= doc.numPages; n++) cuts[n - 1] ??= await turnedOf(doc, n);
+  return cuts.some(Boolean) ? cuts : null;
+}
+
 /** A sheet's two pages once split: each page's own object, and how a point of the sheet lands on it. */
 interface Split {
-  pages: [PDFRef, PDFRef];
+  pages: [PDFRef] | [PDFRef, PDFRef];
+  /** Where the right page starts on the upright sheet (past its width when there is none). */
   at: number;
   /** The sheet's coordinates to the upright sheet's (PDF space: y up, origin at the bottom left). */
   matrix: number[];
@@ -131,15 +157,21 @@ interface Split {
 const apply = (m: number[], x: number, y: number) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
 
 /**
- * Writes `src` to `out` with each sheet that has a cut split into its two pages. Each page is drawn
- * upright (no /Rotate left, which pdf.js's text layer selects badly on) from the sheet's content held
- * once as a form, and cropped to its side; the sheet's own page object becomes the left page, so the
- * outline and links that point at the sheet still find it. Returns how many sheets were split.
+ * Writes `src` to `out` with each sheet that has a cut redrawn: split into its two pages, or kept one
+ * page. Each page is drawn upright (no /Rotate left, which pdf.js's text layer selects badly on) from
+ * the sheet's content held once as a form, and cropped to its side; the sheet's own page object
+ * becomes the (left) page, so the outline and links that point at the sheet still find it. Returns
+ * how many sheets were split and how many were only turned upright.
  */
-export async function splitSheets(src: string, out: string, cuts: (Cut | null)[]): Promise<number> {
+export async function splitSheets(
+  src: string,
+  out: string,
+  cuts: (Cut | null)[],
+): Promise<{ split: number; turned: number }> {
   const pdf = await PDFDocument.load(readFileSync(src), { ignoreEncryption: true, updateMetadata: false });
   const { context } = pdf;
   const splits = new Map<string, Split>();
+  let split = 0;
   // from the back, so the indexes ahead stay where they were
   for (let i = pdf.getPageCount() - 1; i >= 0; i--) {
     const cut = cuts[i];
@@ -162,18 +194,20 @@ export async function splitSheets(src: string, out: string, cuts: (Cut | null)[]
     for (const name of ["Rotate", "TrimBox", "BleedBox", "ArtBox", "Annots"]) leaf.delete(PDFName.of(name));
     leaf.set(PDFName.of("Rotate"), context.obj(0));
     leaf.set(PDFName.of("Resources"), context.obj({ XObject: { Sheet: sheet } }));
-    const right = leaf.clone();
-    const sides: [PDFPageLeaf, number, number][] = [
-      [leaf, 0, cut.at],
-      [right, cut.at, cut.width - cut.at],
-    ];
+    const at = cut.at ?? cut.width;
+    const right = cut.at === null ? null : leaf.clone();
+    const sides: [PDFPageLeaf, number, number][] = [[leaf, 0, at]];
+    if (right) sides.push([right, at, cut.width - at]);
     for (const [node, dx, width] of sides) {
       node.set(PDFName.of("Contents"), draw(dx));
       node.set(PDFName.MediaBox, context.obj([0, 0, width, cut.height]));
       node.set(PDFName.of("CropBox"), context.obj([0, 0, width, cut.height]));
     }
-    const rightRef = context.register(right);
-    pdf.insertPage(i + 1, PDFPage.of(right, rightRef, pdf));
+    const rightRef = right && context.register(right);
+    if (right && rightRef) {
+      pdf.insertPage(i + 1, PDFPage.of(right, rightRef, pdf));
+      split++;
+    }
     // each link and note goes, moved to match, with the half it sits on
     if (annots) {
       const kept: PDFArray[] = [context.obj([]), context.obj([])];
@@ -184,27 +218,27 @@ export async function splitSheets(src: string, out: string, cuts: (Cut | null)[]
         const n = (j: number) => rect.lookupMaybe(j, PDFNumber)?.asNumber() ?? 0;
         const [ax, ay] = apply(matrix, n(0), n(1));
         const [bx, by] = apply(matrix, n(2), n(3));
-        const side = (ax + bx) / 2 >= cut.at ? 1 : 0;
-        const dx = side ? cut.at : 0;
+        const side = rightRef && (ax + bx) / 2 >= at ? 1 : 0;
+        const dx = side ? at : 0;
         annot.set(
           PDFName.of("Rect"),
           context.obj([Math.min(ax, bx) - dx, Math.min(ay, by), Math.max(ax, bx) - dx, Math.max(ay, by)]),
         );
         annot.delete(PDFName.of("QuadPoints"));
-        annot.set(PDFName.of("P"), side ? rightRef : left.ref);
+        annot.set(PDFName.of("P"), side && rightRef ? rightRef : left.ref);
         kept[side].push(annots.get(k));
       }
       leaf.set(PDFName.of("Annots"), kept[0]);
-      right.set(PDFName.of("Annots"), kept[1]);
+      right?.set(PDFName.of("Annots"), kept[1]);
     }
-    splits.set(left.ref.toString(), { pages: [left.ref, rightRef], at: cut.at, matrix });
+    splits.set(left.ref.toString(), { pages: rightRef ? [left.ref, rightRef] : [left.ref], at, matrix });
   }
   if (splits.size) retargetDestinations(pdf, splits);
   writeFileSync(out, await pdf.save({ useObjectStreams: true }));
-  return splits.size;
+  return { split, turned: splits.size - split };
 }
 
-/** Points the outline's and links' places on split sheets at the page they now fall on, upright. */
+/** Points the outline's and links' places on redrawn sheets at the page they now fall on, upright. */
 function retargetDestinations(pdf: PDFDocument, splits: Map<string, Split>) {
   const { context } = pdf;
   const retarget = (dest: PDFArray | undefined) => {
@@ -215,8 +249,8 @@ function retargetDestinations(pdf: PDFDocument, splits: Map<string, Split>) {
     const [left, top] = [num(2), num(3)];
     if (left === undefined && top === undefined) return;
     const [x, y] = apply(split.matrix, left ?? 0, top ?? 0);
-    const side = x >= split.at ? 1 : 0;
-    dest.set(0, split.pages[side]);
+    const side = split.pages.length > 1 && x >= split.at ? 1 : 0;
+    dest.set(0, split.pages[side] ?? split.pages[0]);
     dest.set(2, context.obj(Math.max(0, x - (side ? split.at : 0))));
     dest.set(3, context.obj(y));
   };
@@ -242,25 +276,26 @@ function retargetDestinations(pdf: PDFDocument, splits: Map<string, Split>) {
   }
 }
 
-/** Splits a two-up PDF in place, keeping the file as it came at `keep`. Returns how many sheets were
- * split (0 when the book isn't two-up, or the file can't be rewritten and is read as it is). */
-export async function splitTwoUp(path: string, keep: string): Promise<number> {
+/** Splits a two-up PDF's sheets and turns its turned pages upright, in place, keeping the file as it
+ * came at `keep`. Returns how many sheets were split and how many only turned (both 0 when there was
+ * nothing to do, or the file can't be rewritten and is read as it is). */
+export async function uprightSheets(path: string, keep: string): Promise<{ split: number; turned: number }> {
   const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const doc = await getDocument({ data: new Uint8Array(readFileSync(path)), useSystemFonts: false, verbosity: 0 })
     .promise;
   let cuts: (Cut | null)[] | null;
   try {
-    cuts = await detectSpreads(doc);
+    cuts = await planSheets(doc);
   } finally {
     await doc.destroy();
   }
-  if (!cuts) return 0;
+  if (!cuts) return { split: 0, turned: 0 };
   renameSync(path, keep);
   try {
     return await splitSheets(keep, path, cuts);
   } catch (error) {
-    console.warn("[ingest] couldn't split the two-up PDF, reading it as it is:", (error as Error).message);
+    console.warn("[ingest] couldn't redraw the PDF's pages, reading it as it is:", (error as Error).message);
     renameSync(keep, path);
-    return 0;
+    return { split: 0, turned: 0 };
   }
 }
