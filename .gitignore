@@ -14,3 +14,6 @@ coverage
 *.log
 *.tmp
 .DS_Store
+
+# your own Docker Compose changes (docs/docker.md)
+compose.override.yaml
