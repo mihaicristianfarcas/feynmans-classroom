@@ -5,10 +5,13 @@ can play with, test yourself at the right moments, explain ideas back in your ow
 what you know grow as a graph. It runs on your machine, keeps everything in plain files you own, and
 does its thinking on **your own Codex or Claude Code subscription** (no API keys).
 
-- **Read with a living margin.** Upload a PDF, EPUB, Markdown or text book. Select any passage and
-  choose Explain, Define, Ask or Visualize: the answer appears in the margin **beside the passage**
-  (an explanation in about 8 seconds, a figure in 15–30), whole, side by side with others on the same
-  passage, and you can ask follow-ups there as a conversation. Figures are interactive: a graph you
+- **A library on a bookcase.** Add a PDF, EPUB, Markdown or text book, or **save an article from
+  any link** (or with a bookmark in your browser): it is sorted onto a topic and stands on the shelf
+  as a pastel spine; take it down to see where you are and open it.
+- **Read with a living margin.** Select any passage and choose Explain, Define, Ask or Visualize: the
+  answer appears in the margin **beside the passage** (an explanation in about 8 seconds, a figure in
+  15–30), the others closed to a line beside theirs, and you can ask follow-ups there as a
+  conversation. Figures are interactive: a graph you
   can drag, a protocol you can scrub, a network with packets flowing, a 2D physics sketch, a 3D object
   you can turn and take apart. Or ask for an **animation**: a short film written for
   [ManimGX](https://manimgx.academa.ai/) (3Blue1Brown's Manim, on a GPU engine), checked before you

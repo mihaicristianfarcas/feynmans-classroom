@@ -115,7 +115,6 @@
 }
 
 /* clickable things share one feel: a quick hover, a small press */
-.book-link,
 .next-row,
 .demo-link,
 .study-action,
@@ -126,7 +125,7 @@
     background-color 150ms ease,
     transform 160ms var(--ease-out);
 }
-:is(.book-link, .next-row, .demo-link, .study-action:not([disabled])):active {
+:is(.next-row, .demo-link, .study-action:not([disabled])):active {
   transform: scale(0.985);
 }
 
@@ -382,101 +381,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- library: a shelf of covers, and the figures ---------- */
+/* ---------- library (the bookcase itself: library/library.css), and the figures ---------- */
 .library {
   min-height: 60vh;
-}
-.shelf {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 32px 24px;
-}
-.book-card {
-  position: relative;
-  min-width: 0;
-}
-.book-link {
-  display: grid;
-  gap: 3px;
-  border-radius: var(--r);
-  text-decoration: none;
-  outline-offset: 4px;
-}
-.book-cover {
-  display: grid;
-  place-items: center;
-  aspect-ratio: 3 / 4;
-  margin-bottom: 10px;
-  border-radius: 4px 8px 8px 4px;
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--t-ink) 14%, transparent) 0 6px, transparent 6px), var(--t-soft);
-  color: var(--t-ink);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--t-ink) 12%, transparent),
-    var(--shadow-sm);
-  transition:
-    transform 220ms var(--ease-out),
-    box-shadow 220ms ease;
-}
-.book-cover-letter {
-  font: 600 44px / 1 var(--serif);
-}
-.book-title {
-  font: 600 14.5px / 1.3 var(--serif);
-  color: var(--ink);
-}
-.book-author {
-  font-size: 12.5px;
-  color: var(--ink-3);
-}
-.book-link .fine,
-.book-link .form-error {
-  margin: 2px 0 0;
-}
-/* remove: on the cover's corner, shown on hover or focus */
-.book-delete {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px !important;
-  height: 28px !important;
-  background: var(--raised) !important;
-  box-shadow: var(--shadow-sm);
-  opacity: 0;
-  transition:
-    opacity 150ms ease,
-    background-color 150ms ease,
-    color 150ms ease;
-}
-.book-delete svg {
-  width: 15px;
-  height: 15px;
-}
-.book-card:focus-within .book-delete {
-  opacity: 1;
-}
-@media (hover: none) {
-  .book-delete {
-    opacity: 1;
-  }
-}
-@media (hover: hover) and (pointer: fine) {
-  .book-card:hover .book-cover {
-    transform: translateY(-3px);
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--t-ink) 12%, transparent),
-      var(--shadow-md);
-  }
-  .book-card:hover .book-delete {
-    opacity: 1;
-  }
-  .book-delete:hover {
-    color: var(--rose-ink) !important;
-    background: var(--rose-soft) !important;
-  }
 }
 /* a file dragged over the page: the whole page takes it */
 .drop-overlay {

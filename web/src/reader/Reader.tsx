@@ -1,6 +1,7 @@
 /* The reader (#/book/<id>): the book on the right and, on the left, its panes (the margin, figures,
  * your note, the tutor, the study tools) in a panel you resize from its edge or hide from the top bar
- * (it opens again by itself when something lands in it). It keeps your place, follows the reading line,
+ * (it opens again by itself when something lands in it). It keeps your place (the book's text is shown
+ * once it is back there, so it never jumps into place before your eyes), follows the reading line,
  * and has keyboard shortcuts for everything (press ? to see them). */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -42,6 +43,7 @@ import { ReaderTopbar } from "./ReaderTopbar";
 import { HtmlReader, MarksContext, PdfReader, type ReaderHandle, type Zoom } from "./readers";
 import { type SelectionAction, SelectionMenu } from "./SelectionMenu";
 import { StudyTab } from "./StudyPanel";
+import { Sweep, type SweepRequest } from "./Sweep";
 import { readSelection, type Selection } from "./selection";
 import { savedZoom, saveZoom, stepZoom, useReadingTime, useSavedPosition, useWorkingNote } from "./session";
 import { NEW_CONVERSATION, pinnedOf, type TutorConversation, TutorTab } from "./Tutor";
@@ -110,6 +112,15 @@ export function Reader({
   const [capturing, setCapturing] = useState(false);
   const restored = useRef(false);
   const focusJumped = useRef(false);
+  // the book's text is shown once it is back at your place (or after a moment, whatever happens)
+  const [revealed, setRevealed] = useState(false);
+  // the passage just marked or asked about, drawn over with a highlighter for a moment
+  const [sweep, setSweep] = useState<SweepRequest | null>(null);
+  const endSweep = useCallback(() => setSweep(null), []);
+  useEffect(() => {
+    const t = setTimeout(() => setRevealed(true), 1500);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     api.book(bookId).then(setBook, (e) => setFailed(e.message));
@@ -204,7 +215,13 @@ export function Reader({
     }
     const saved = savedPos(book.id);
     const box = pane.current?.getBoundingClientRect();
-    if (saved && box) setTimeout(() => reader.current?.jumpTo(locOfPos(book, saved), box.top + box.height * LINE), 120);
+    const reveal = () => requestAnimationFrame(() => setRevealed(true));
+    if (saved && box)
+      setTimeout(() => {
+        reader.current?.jumpTo(locOfPos(book, saved), box.top + box.height * LINE);
+        reveal();
+      }, 120);
+    else reveal();
     setTimeout(measure, 300);
   }, [book, measure]);
 
@@ -405,6 +422,11 @@ export function Reader({
       const annotate = async (input: Parameters<typeof learn.annotate>[1], focus = true) => {
         try {
           const a = await learn.annotate(book.id, input);
+          setSweep({
+            id: a.id,
+            anchor: a.source,
+            color: input.type === "highlight" ? input.color || "yellow" : "purple",
+          });
           if (focus) {
             show("margin");
             setFocused(a.id);
@@ -473,7 +495,8 @@ export function Reader({
   useArrowKeys(tabs, { selector: '[role="tab"]', select: true });
 
   if (failed) return <div className="center-note">Could not open this book: {failed}</div>;
-  if (!book) return <div className="center-note">Opening…</div>;
+  // said only if opening takes a while (a book taken from the shelf is usually here already)
+  if (!book) return <div className="center-note reader-wait">Opening…</div>;
 
   const counted = annotations.filter((a) => a.type !== "highlight").length;
   const lightboxEntry = lightbox ? figures.find((f) => f.id === lightbox) : undefined;
@@ -601,7 +624,12 @@ export function Reader({
               if (entry) goToFigure(entry);
             }}
           />
-          <div className="book-view">
+          <div
+            className="book-view"
+            data-revealed={revealed || undefined}
+            // the margin lines its cards up again once the book has settled where it rises to
+            onAnimationEnd={(e) => e.target === e.currentTarget && measure()}
+          >
             <MarksContext.Provider value={marks}>
               {book.format === "pdf" ? (
                 <PdfReader
@@ -617,10 +645,11 @@ export function Reader({
               ) : blocks ? (
                 <HtmlReader ref={reader} blocks={blocks} zoom={zoom} onScroll={measure} onReady={onReady} />
               ) : (
-                <div className="reader-loading">Opening the book…</div>
+                <div className="reader-loading reader-wait">Opening the book…</div>
               )}
             </MarksContext.Provider>
           </div>
+          {sweep && <Sweep sweep={sweep} reader={reader.current} bus={bus} onDone={endSweep} />}
           {finding && (
             <FindBar
               book={book}

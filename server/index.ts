@@ -1,9 +1,10 @@
-/* Starts the server: prepares the vault, picks up work a restart interrupted, keeps the indexes fresh,
- * and serves the API (and, in production, the app) on 127.0.0.1:PORT. A stop signal stops it. */
+/* Starts the server: prepares the vault, picks up work a restart interrupted (and books not yet measured
+ * or sorted onto a topic), keeps the indexes fresh, and serves the API (and, in production, the app) on 127.0.0.1:PORT. A stop signal stops it. */
 import { serve } from "@hono/node-server";
 import { prepareAgents } from "./agents/index.ts";
 import { resumeAnnotations } from "./annotations/index.ts";
 import { createApp } from "./app.ts";
+import { tidyShelf } from "./books/shelf.ts";
 import { chromePath, PORT } from "./config.ts";
 import { publish } from "./events.ts";
 import { resumeInterrupted } from "./handbuilt/index.ts";
@@ -27,6 +28,7 @@ try {
   process.exit(1);
 }
 exportMissingBooks();
+tidyShelf();
 startIndexing();
 resumeAnnotations();
 resumeInterrupted();

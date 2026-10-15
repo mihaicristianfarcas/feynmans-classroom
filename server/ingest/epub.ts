@@ -1,6 +1,7 @@
 /* EPUB books: the archive is unpacked with limits (no zip bombs), the spine read in order, each
- * chapter turned into sanitized blocks, pictures kept as assets, and chapters taken from the
- * navigation document (or from h1/h2 headings when it is missing). */
+ * chapter turned into sanitized blocks, pictures kept as assets (the cover picture named, for the
+ * library), and chapters taken from the navigation document (or from h1/h2 headings when it is
+ * missing). */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, posix } from "node:path";
 import JSZip from "jszip";
@@ -14,6 +15,8 @@ export interface ReflowIngest {
   author?: string;
   blocks: Block[];
   toc: TocEntry[];
+  /** The cover picture, relative to the assets folder. */
+  cover?: string;
 }
 
 const IMAGE = /\.(png|jpe?g|gif|svg|webp)$/i;
@@ -97,15 +100,23 @@ export async function ingestEpub(
     .filter((item): item is { href: string; type: string; props: string } => !!item && /html|xml/.test(item.type));
 
   // copy images so the reader can show them
+  const assetName = (href: string) => href.replace(/[^a-z0-9._/-]/gi, "_");
+  const copied = new Set<string>();
   mkdirSync(assetsDir, { recursive: true });
   for (const item of manifest.values()) {
     if (!IMAGE.test(item.href)) continue;
     const file = zip.file(item.href) || zip.file(decodeURIComponent(item.href));
     if (!file) continue;
-    const out = join(assetsDir, item.href.replace(/[^a-z0-9._/-]/gi, "_"));
+    const out = join(assetsDir, assetName(item.href));
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, await inflate(file, budget));
+    copied.add(item.href);
   }
+  // the cover: EPUB 3 marks it in the manifest, EPUB 2 names it in a <meta name="cover">
+  const coverId = opfDoc.querySelector('meta[name="cover"]')?.getAttribute("content") || "";
+  const coverItem = [...manifest.values()].find((item) => /\bcover-image\b/.test(item.props)) || manifest.get(coverId);
+  const cover =
+    coverItem && copied.has(coverItem.href) && !/\.svg$/i.test(coverItem.href) ? assetName(coverItem.href) : undefined;
 
   const blocks: Block[] = [];
   const anchors = new Map<string, number>(); // "file#id" or "file" -> block index
@@ -195,7 +206,7 @@ export async function ingestEpub(
   toc = toc.filter((entry, i) => i === 0 || entry.start.block !== toc[i - 1].start.block);
   if (toc.length < 2) toc = headingToc(blocks);
   finishBlockToc(toc, blocks);
-  return { title, author, blocks, toc };
+  return { title, author, blocks, toc, cover };
 }
 
 /** Chapters from h1/h2 blocks when there is no usable nav. */

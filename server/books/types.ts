@@ -1,7 +1,7 @@
-/* The shapes of books and their figures as the server stores them (book.json, demo.json): the book,
- * its chapters and text (positioned PDF lines or sanitized blocks), a figure's brief and record,
- * the checks a hand-built demo passes, and queued jobs. */
-export type BookFormat = "pdf" | "epub" | "text";
+/* The shapes of books and their figures as the server stores them (book.json, demo.json): the book
+ * (or an article saved from the web), its chapters and text (positioned PDF lines or sanitized
+ * blocks), a figure's brief and record, the checks a hand-built demo passes, and queued jobs. */
+export type BookFormat = "pdf" | "epub" | "text" | "web";
 
 /** A place in the book: a PDF page (1-based) and a fraction of its height, or a block index. */
 export interface Loc {
@@ -37,6 +37,17 @@ export interface Book {
   createdAt: string;
   status: "ingesting" | "ready" | "error";
   error?: string;
+  /** Where an article (or a PDF from a link) was saved from. */
+  source?: { url: string; site?: string; published?: string };
+  /** A line saying what it is about (an article's standfirst), when it has one. */
+  summary?: string;
+  /** Its cover picture, relative to its folder ("assets/cover.jpg"): an EPUB's, an article's lead picture. */
+  cover?: string;
+  /** The shelf's topic (shared/topics.ts) and a few tags, sorted by a quick model call when it arrives. */
+  topic?: string;
+  tags?: string[];
+  /** How long it is, in words: how thick its spine is drawn and how long it takes to read. */
+  words?: number;
 }
 
 /** One extracted line of a PDF page; y is the top of the line as a fraction of the page height. */

@@ -1,6 +1,7 @@
 /* Adding a book: the uploaded file is stored in a new folder in the library, its text and chapters
- * are extracted by format (PDF, EPUB, Markdown, plain text), and the folder is named after the
- * title. Also the text helpers the generators use: a chapter's text, a passage around a place. */
+ * are extracted by format (PDF, EPUB, Markdown, plain text), its length counted and its cover kept,
+ * and the folder is named after the title. (Links are saved by web.ts, through here for PDFs.) Also
+ * the text helpers the generators use: a chapter's text, a passage around a place, a book's length. */
 import { createHash } from "node:crypto";
 import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { extname, join } from "node:path";
@@ -61,6 +62,7 @@ export async function ingestBook(
       writeJson(join(dir, "pages.json"), out.pages);
       writeJson(join(dir, "markdown.json"), out.markdown);
       Object.assign(book, {
+        words: out.pages.reduce((n, page) => n + wordsIn(page.lines.map((l) => l.t).join(" ")), 0),
         title: out.title || book.title,
         author: out.author,
         pageCount: out.pageCount,
@@ -75,6 +77,8 @@ export async function ingestBook(
           : ingestText(join(dir, file), ext !== ".txt" && ext !== ".text");
       writeJson(join(dir, "blocks.json"), out.blocks);
       Object.assign(book, {
+        words: out.blocks.reduce((n, block) => n + wordsIn(block.text), 0),
+        cover: out.cover ? `assets/${out.cover}` : undefined,
         title: out.title || book.title,
         author: out.author,
         blockCount: out.blocks.length,
@@ -91,6 +95,16 @@ export async function ingestBook(
   // the folder was named after the file; name it after the title the book itself gives
   renameBookDir(book.id, book.title);
   return book;
+}
+
+/** How many words a stretch of text has. */
+export const wordsIn = (text: string) => (text.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || []).length;
+
+/** A book's length in words, counted from its extracted text (for books added before it was kept). */
+export function wordsOf(book: Book): number {
+  if (book.format === "pdf")
+    return getPages(book.id).reduce((n, page) => n + wordsIn(page.lines.map((l) => l.t).join(" ")), 0);
+  return getBlocks(book.id).reduce((n, block) => n + wordsIn(block.text), 0);
 }
 
 /** The text of one chapter, with [[page N]] or [[block N]] markers, for the planner and builder. */

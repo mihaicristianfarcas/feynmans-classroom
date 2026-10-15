@@ -1,0 +1,1194 @@
+/* The library: a bookcase of pastel spines, the book in your hands, adding, and what just arrived.
+ * Motion: the shelves draw in and the books drop onto them once, when the page opens; sorting and
+ * filtering slide books to their places (across and down on different curves, so a book changing
+ * shelves swings over rather than cutting through the others); a reached-for spine lifts; taking a
+ * book down is one longer movement (out, turned, opened), the library's one flourish. From the keyboard
+ * and with reduced motion, things are simply where they go. */
+
+.library {
+  --wood-top: color-mix(in oklab, var(--surface) 72%, var(--butter-ink) 16%);
+  --wood-front: color-mix(in oklab, var(--sunken) 70%, var(--butter-ink) 30%);
+  transition:
+    opacity 240ms var(--ease-out),
+    filter 240ms var(--ease-out);
+}
+.library[data-leaving] {
+  opacity: 0;
+  filter: blur(2px);
+}
+[data-tone="paper"] {
+  --t: color-mix(in oklab, var(--sunken) 55%, var(--line-strong));
+  --t-soft: var(--sunken);
+  --t-ink: var(--ink-2);
+}
+
+/* ---------- above the shelf ---------- */
+.shelf-stats {
+  margin: -16px 0 18px;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.shelf-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.shelf-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: min(280px, 100%);
+}
+.shelf-search > svg {
+  position: absolute;
+  left: 10px;
+  width: 15px;
+  height: 15px;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+.shelf-search input {
+  width: 100%;
+  padding-left: 31px;
+  padding-right: 30px;
+}
+/* "/" goes to the search: said by the field's hint, shown as a key while it is empty */
+.shelf-search[data-empty]::after {
+  content: "/" / "";
+  position: absolute;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--ink-3);
+  font: 500 11px / 1 var(--sans);
+  pointer-events: none;
+}
+.shelf-only {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px 0 11px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--t-soft);
+  color: var(--t-ink);
+  font: 500 12.5px / 1 var(--sans);
+  cursor: pointer;
+  animation: rise 200ms var(--ease-out) backwards;
+}
+.shelf-only svg {
+  width: 13px;
+  height: 13px;
+}
+.shelf-none {
+  margin: -40px 0 40px;
+  text-align: center;
+  color: var(--ink-3);
+  font-size: 13.5px;
+}
+.shelf-hint {
+  margin-top: 4px;
+  text-align: center;
+  animation: fade 600ms 900ms var(--ease-out) backwards;
+}
+
+/* ---------- the bookcase ---------- */
+.bookcase {
+  position: relative;
+  margin-top: 30px;
+  transition: height 500ms var(--ease-out);
+}
+.bookcase > *,
+.bk-list > * {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.bookcase > .bk-list {
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+.plank {
+  right: 0;
+  height: 14px;
+  border-radius: 2px 2px 4px 4px;
+  background: linear-gradient(
+    180deg,
+    var(--wood-top) 0 5px,
+    color-mix(in oklab, var(--wood-front), white 16%) 5px 6px,
+    var(--wood-front) 6px
+  );
+  box-shadow:
+    inset 0 -2px 0 rgb(0 0 0 / 0.06),
+    0 16px 22px -14px rgb(40 30 20 / 0.32);
+  transition: transform 500ms var(--ease-out);
+}
+/* the shade the books cast on the wall just above the plank */
+.plank::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 22px;
+  background: linear-gradient(to top, rgb(40 30 20 / 0.06), transparent);
+  pointer-events: none;
+}
+:root[data-theme="dark"] .plank::before {
+  background: linear-gradient(to top, rgb(0 0 0 / 0.28), transparent);
+}
+.bookcase[data-entering] .plank {
+  animation: plank-in 520ms var(--ease-out) backwards;
+  animation-delay: calc(var(--i) * 70ms);
+}
+@keyframes plank-in {
+  from {
+    opacity: 0;
+    clip-path: inset(0 50% 0 50%);
+  }
+}
+
+/* a run's name under the plank, as a library shelf is labelled: quiet type, no box until reached for */
+.plank-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-3);
+  font: 500 12.5px / 1 var(--sans);
+  white-space: nowrap;
+  transition:
+    transform 520ms var(--ease-in-out),
+    background-color 150ms ease,
+    color 150ms ease;
+  animation: fade 400ms 300ms var(--ease-out) backwards;
+}
+button.plank-label {
+  cursor: pointer;
+}
+.plank-label .topic-icon {
+  opacity: 0.8;
+}
+.plank-count {
+  margin-left: 2px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+@media (hover: hover) and (pointer: fine) {
+  button.plank-label:hover {
+    background: var(--hover);
+    color: var(--ink);
+  }
+}
+
+.bookend {
+  width: 22px;
+  height: 58px;
+  border-radius: 14px 4px 0 0;
+  background:
+    linear-gradient(90deg, rgb(255 255 255 / 0.18), transparent 45%, rgb(0 0 0 / 0.12)),
+    color-mix(in oklab, var(--ink-3) 55%, var(--sunken));
+  transition: transform 520ms var(--ease-in-out);
+  pointer-events: none;
+}
+/* a few books lying on the last shelf, when there is room */
+.shelf-stack {
+  display: grid;
+  gap: 1px;
+  pointer-events: none;
+  transition:
+    transform 520ms var(--ease-in-out),
+    opacity 300ms var(--ease-out);
+}
+.shelf-stack[data-hidden] {
+  opacity: 0;
+}
+.shelf-stack span {
+  display: block;
+  height: 12px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.2), transparent 45%, rgb(0 0 0 / 0.1)), var(--t);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+}
+.shelf-stack span:nth-child(1) {
+  width: 122px;
+  margin-left: 6px;
+}
+.shelf-stack span:nth-child(2) {
+  width: 134px;
+}
+.shelf-stack span:nth-child(3) {
+  width: 128px;
+  margin-left: 3px;
+}
+
+/* each book moves across and down on different curves */
+.bk-x {
+  transition: transform 560ms var(--ease-in-out);
+  will-change: transform;
+  pointer-events: none;
+}
+.bk-y {
+  transition: transform 560ms var(--ease-out);
+}
+.bk-x[data-jump],
+.bk-y[data-jump] {
+  transition: none;
+}
+.bk-in {
+  transition:
+    opacity 300ms var(--ease-out),
+    transform 400ms var(--ease-out);
+}
+.bk-in[data-out] {
+  opacity: 0;
+  transform: translateY(-26px) rotate(-2deg);
+  pointer-events: none;
+}
+.bookcase[data-entering] .bk-in:not([data-out]) {
+  animation: book-drop 460ms var(--ease-out) backwards;
+  animation-delay: calc(var(--i) * 16ms + 120ms);
+}
+@keyframes book-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-32px);
+  }
+}
+/* a book that arrives falls in from above, settles with a small bounce, and is ringed for a moment */
+.bk-in[data-fresh] {
+  animation: book-fresh 900ms var(--ease-out) backwards;
+}
+.bk-in[data-fresh] .spine {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--lavender-ink),
+    3px 0 6px -3px rgb(0 0 0 / 0.3);
+}
+@keyframes book-fresh {
+  0% {
+    opacity: 0;
+    transform: translateY(-140px) rotate(-8deg);
+  }
+  55% {
+    opacity: 1;
+    transform: none;
+  }
+  72% {
+    transform: translateY(-9px) rotate(0.8deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+.bk {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 3px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.bk .spine {
+  transition:
+    transform 220ms var(--ease-out),
+    box-shadow 220ms var(--ease-out),
+    filter 220ms ease;
+}
+/* reached for, a book rises out of the row on a soft spring and its shadow lengthens */
+@media (hover: hover) and (pointer: fine) {
+  .bk:hover:not(:focus-visible) .spine {
+    transform: translateY(-10px);
+    box-shadow:
+      inset 0 0 0 1px rgb(0 0 0 / 0.08),
+      4px 9px 14px -8px rgb(0 0 0 / 0.38);
+    filter: brightness(1.03);
+    transition-duration: 320ms, 320ms, 200ms;
+    transition-timing-function: cubic-bezier(0.34, 1.36, 0.64, 1), var(--ease-out), ease;
+  }
+}
+.bk:active .spine {
+  transform: translateY(-6px) scale(0.985);
+  transition-duration: 100ms;
+}
+/* from the keyboard the book itself rises, ringed (no animation: keyboard actions don't animate) */
+.bk:focus-visible {
+  transform: translateY(-10px);
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 3px;
+}
+
+/* ---------- spines: cloth in the topic's pastel ---------- */
+.spine {
+  --cloth: var(--t);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 2px 2px 1px 1px;
+  background: var(--cloth);
+  color: var(--on-pastel);
+  font-family: var(--serif);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.08),
+    3px 0 6px -3px rgb(0 0 0 / 0.28);
+  user-select: none;
+}
+.spine[data-shade="1"] {
+  --cloth: color-mix(in oklab, var(--t) 74%, white);
+}
+.spine[data-shade="2"] {
+  --cloth: color-mix(in oklab, var(--t) 90%, black);
+}
+.spine[data-shade="3"] {
+  --cloth: color-mix(in oklab, var(--t) 84%, var(--t-ink));
+}
+:root[data-theme="dark"] .spine[data-shade="1"] {
+  --cloth: color-mix(in oklab, var(--t) 88%, white);
+}
+/* the cloth: rounded at the edges, with a faint weave */
+.spine::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      rgb(0 0 0 / 0.12),
+      rgb(255 255 255 / 0.22) 16%,
+      rgb(255 255 255 / 0.05) 34%,
+      transparent 60%,
+      rgb(0 0 0 / 0.1)
+    ),
+    repeating-linear-gradient(0deg, rgb(255 255 255 / 0.05) 0 1px, transparent 1px 3px);
+}
+.spine-title-wrap {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 30px 3px 8px;
+}
+.spine-title {
+  writing-mode: vertical-rl;
+  max-height: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 1.12;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+}
+.spine[data-wide] .spine-title {
+  white-space: normal;
+  text-wrap: balance;
+  max-block-size: 2.3em;
+}
+.spine-by {
+  position: relative;
+  max-width: calc(100% - 6px);
+  margin: 0 0 9px;
+  overflow: hidden;
+  font: 600 10px / 1 var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0.72;
+}
+.spine-icon {
+  position: absolute;
+  top: 11px;
+  opacity: 0.7;
+}
+.spine-ribbon {
+  position: absolute;
+  top: -2px;
+  right: 22%;
+  width: 6px;
+  height: 22px;
+  background: var(--rose-ink);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+  opacity: 0.85;
+}
+/* bindings: two pairs of rules, a paper label, a single rule, or plain with the topic's mark */
+.spine[data-binding="bands"]::after {
+  content: "";
+  position: absolute;
+  inset: 12px 4px auto;
+  height: 7px;
+  border-block: 1.5px solid color-mix(in srgb, var(--on-pastel) 30%, transparent);
+  pointer-events: none;
+}
+.spine[data-binding="bands"] .spine-by {
+  padding-bottom: 6px;
+  border-bottom: 1.5px solid color-mix(in srgb, var(--on-pastel) 30%, transparent);
+}
+.spine[data-binding="label"] .spine-title-wrap {
+  flex: 0 1 auto;
+  width: calc(100% - 10px);
+  max-height: 64%;
+  margin: 34px 0 auto;
+  padding: 10px 2px;
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--surface) 88%, var(--t));
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+}
+:root[data-theme="dark"] .spine[data-binding="label"] .spine-title-wrap {
+  background: color-mix(in oklab, white 82%, var(--t));
+}
+.spine[data-binding="rule"] .spine-title-wrap::before {
+  content: "";
+  position: absolute;
+  top: 16px;
+  left: 30%;
+  right: 30%;
+  height: 1.5px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--on-pastel) 35%, transparent);
+}
+
+/* ---------- covers ---------- */
+.cover {
+  --cloth: var(--t);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 3px 7px 7px 3px;
+  background: var(--cloth);
+  color: var(--on-pastel);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+}
+.cover[data-shade="1"] {
+  --cloth: color-mix(in oklab, var(--t) 74%, white);
+}
+.cover[data-shade="2"] {
+  --cloth: color-mix(in oklab, var(--t) 90%, black);
+}
+.cover[data-shade="3"] {
+  --cloth: color-mix(in oklab, var(--t) 84%, var(--t-ink));
+}
+.cover-plate {
+  position: relative;
+  flex: 1.25;
+  min-height: 0;
+  margin: 9% 9% 0;
+  overflow: hidden;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--cloth) 70%, white);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+}
+/* the book's own picture, printed in the topic's pastel */
+.cover-plate img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(1) contrast(1.08) brightness(1.04);
+  mix-blend-mode: multiply;
+  opacity: 0.9;
+}
+.cover-mark {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--t-ink);
+  opacity: 0.75;
+}
+.cover-type {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7% 10% 9%;
+}
+.cover-kicker {
+  font: 600 9.5px / 1.2 var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.cover-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  font: 500 clamp(15px, 1.7em, 23px) / 1.15 var(--serif);
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.cover-author {
+  overflow: hidden;
+  font: italic 13px / 1.3 var(--serif);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0.8;
+}
+/* where the board bends at the hinge */
+.cover-hinge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 9px;
+  width: 2px;
+  background: linear-gradient(90deg, rgb(0 0 0 / 0.1), rgb(255 255 255 / 0.25));
+}
+
+/* ---------- the book in your hands ---------- */
+.bih-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+}
+.bih-backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, var(--bg) 70%, transparent);
+  backdrop-filter: blur(10px) saturate(0.9);
+  -webkit-backdrop-filter: blur(10px) saturate(0.9);
+  animation: fade 360ms var(--ease-out) backwards;
+  transition: opacity 400ms 320ms var(--ease-out);
+}
+.bih-stage[data-phase="closing"] .bih-backdrop {
+  opacity: 0;
+  pointer-events: none;
+}
+.bih-world {
+  position: absolute;
+  inset: 0;
+  perspective: 2400px;
+  pointer-events: none;
+  transition:
+    transform 260ms var(--ease-out),
+    opacity 260ms var(--ease-out);
+}
+.bih-stage:not([data-animate]) .bih-world {
+  animation: bih-appear 200ms var(--ease-out) backwards;
+}
+@keyframes bih-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+.bih-stage[data-phase="leaving"] .bih-world {
+  transform: scale(1.06);
+  opacity: 0;
+}
+.bih-stage[data-phase="leaving"] .bih-backdrop {
+  transition-delay: 0ms;
+}
+.bih-shift {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform-style: preserve-3d;
+}
+.bih-book {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-style: preserve-3d;
+  pointer-events: auto;
+}
+.bih-face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.bih-board {
+  --cloth: var(--t);
+  border-radius: 7px 3px 3px 7px;
+  background: var(--cloth);
+}
+.bih-board[data-inside] {
+  border-radius: 3px 7px 7px 3px;
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.1),
+    0 34px 60px -30px rgb(0 0 0 / 0.5);
+}
+.bih-board[data-shade="1"] {
+  --cloth: color-mix(in oklab, var(--t) 74%, white);
+}
+.bih-board[data-shade="2"] {
+  --cloth: color-mix(in oklab, var(--t) 90%, black);
+}
+.bih-board[data-shade="3"] {
+  --cloth: color-mix(in oklab, var(--t) 84%, var(--t-ink));
+}
+.bih-spine {
+  overflow: hidden;
+}
+.bih-spine .spine {
+  box-shadow: none;
+  border-radius: 0;
+}
+.bih-edge {
+  background: repeating-linear-gradient(90deg, #f5f1e8 0 1px, #e3ddd0 1px 2px);
+}
+.bih-edge[data-across] {
+  background: repeating-linear-gradient(0deg, #f5f1e8 0 1px, #e3ddd0 1px 2px);
+}
+.bih-page {
+  overflow: hidden;
+  border-radius: 2px 6px 6px 2px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow:
+    inset 14px 0 18px -14px rgb(0 0 0 / 0.22),
+    1px 1px 0 rgb(0 0 0 / 0.06),
+    2px 2px 0 color-mix(in oklab, var(--surface) 92%, var(--ink)),
+    3px 3px 0 rgb(0 0 0 / 0.05);
+}
+.bih-page-in {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  padding: 22px 22px 18px 28px;
+  scrollbar-width: thin;
+}
+/* what's on the page arrives once the book is open, one line after another */
+.bih-page-in > * {
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 180ms var(--ease-out),
+    transform 180ms var(--ease-out);
+}
+.bih-stage[data-phase="open"] .bih-page-in > *,
+.bih-stage[data-phase="leaving"] .bih-page-in > * {
+  opacity: 1;
+  transform: none;
+  transition-duration: 420ms;
+}
+.bih-stage[data-phase="open"][data-animate] .bih-page-in > :nth-child(2) {
+  transition-delay: 40ms;
+}
+.bih-stage[data-phase="open"][data-animate] .bih-page-in > :nth-child(3) {
+  transition-delay: 80ms;
+}
+.bih-stage[data-phase="open"][data-animate] .bih-page-in > :nth-child(4) {
+  transition-delay: 115ms;
+}
+.bih-stage[data-phase="open"][data-animate] .bih-page-in > :nth-child(5) {
+  transition-delay: 150ms;
+}
+.bih-stage[data-phase="open"][data-animate] .bih-page-in > :nth-child(n + 6) {
+  transition-delay: 185ms;
+}
+.bih-stage:not([data-animate]) .bih-page-in > * {
+  transition: none;
+}
+.bih-kicker {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.bih-kicker .icon-button {
+  width: 28px;
+  height: 28px;
+}
+/* the topic, as a chip that is also the way to move it */
+.bih-topic {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px 0 9px;
+  border-radius: 999px;
+  background: var(--t-soft, var(--sunken));
+  color: var(--t-ink, var(--ink-2));
+  font: 500 12px / 1 var(--sans);
+  cursor: pointer;
+}
+.bih-topic:focus-within {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+.bih-caret {
+  width: 13px;
+  height: 13px;
+  opacity: 0.7;
+}
+.bih-topic select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.bih-title {
+  margin: 14px 0 4px;
+  font: 500 24px / 1.15 var(--serif);
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.bih-title-field {
+  width: 100%;
+  height: auto !important;
+  padding: 2px 6px !important;
+  margin-left: -6px;
+}
+.bih-by {
+  margin: 0;
+  font: italic 14px / 1.4 var(--serif);
+  color: var(--ink-2);
+}
+.bih-meta {
+  font: 12.5px var(--sans);
+  font-style: normal;
+  color: var(--ink-3);
+}
+.bih-summary {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.bih-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+}
+.bih-fact {
+  color: var(--ink-3);
+  font-size: 12px;
+  margin-right: 4px;
+}
+.bih-progress {
+  display: grid;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 16px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.bih-bar {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--sunken);
+}
+.bih-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lavender-ink);
+  transform-origin: left;
+  animation: bar-in 600ms 500ms var(--ease-out) backwards;
+}
+@keyframes bar-in {
+  from {
+    transform: scaleX(0);
+  }
+}
+.bih-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+.bih-read {
+  justify-content: center;
+  height: 40px;
+}
+.bih-sub {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12.5px;
+}
+.bih-sub .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-3);
+}
+.bih-sub .link svg {
+  width: 13px;
+  height: 13px;
+}
+.bih-remove legend {
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.bih-remove .row {
+  gap: 8px;
+}
+
+/* the front board: cover outside, bookplate inside, hinged on its left edge */
+.bih-cover {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform-style: preserve-3d;
+}
+.bih-inside {
+  transform: rotateY(180deg);
+  display: grid;
+  place-items: center;
+  border-radius: 7px 3px 3px 7px;
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--t-ink) 18%, transparent) 1px, transparent 1.2px) 0 0 /
+    12px 12px,
+    var(--t-soft);
+  box-shadow: inset -14px 0 18px -14px rgb(0 0 0 / 0.22);
+}
+.bookplate {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: 72%;
+  padding: 22px 14px 18px;
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: center;
+  box-shadow:
+    0 1px 1px rgb(0 0 0 / 0.04),
+    0 8px 18px -10px rgb(0 0 0 / 0.25);
+  transform: rotate(-1.5deg);
+}
+.bookplate-mark {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--t-soft);
+  color: var(--t-ink);
+  margin-bottom: 4px;
+}
+.bookplate-head {
+  font: 600 9.5px / 1 var(--sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.bookplate-name {
+  font: italic 500 19px / 1.2 var(--serif);
+}
+.bookplate-rule {
+  width: 40%;
+  height: 1px;
+  margin: 4px 0;
+  background: var(--line-strong);
+}
+.bookplate-meta {
+  font-size: 11px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- adding ---------- */
+.add-form {
+  display: grid;
+  gap: 8px;
+}
+.add-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: 600 13.5px var(--sans);
+  color: var(--ink);
+}
+.add-label svg,
+.add-option > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--ink-3);
+}
+.add-form .form-error,
+.add-form .fine {
+  margin: 0;
+}
+.add-more {
+  display: grid;
+  gap: 4px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.add-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px;
+  border: 0;
+  border-radius: var(--r);
+  background: none;
+  text-align: left;
+  color: var(--ink);
+  font-size: 13.5px;
+}
+button.add-option {
+  cursor: pointer;
+}
+.add-option > svg {
+  margin-top: 2px;
+}
+.add-option > span {
+  display: grid;
+  gap: 2px;
+}
+.add-option .fine {
+  margin: 0;
+}
+@media (hover: hover) and (pointer: fine) {
+  button.add-option:hover {
+    background: var(--hover);
+  }
+}
+.bookmarklet {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--lavender-soft);
+  color: var(--lavender-ink);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: grab;
+}
+
+/* ---------- arrivals ---------- */
+.arrivals {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 40;
+  width: min(460px, calc(100vw - 32px));
+  padding: 10px 10px 10px 14px;
+  border-radius: var(--r-lg);
+  background: var(--raised);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(-50%);
+  animation: arrive 260ms var(--ease-out) backwards;
+}
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px) scale(0.98);
+  }
+}
+.arrivals-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+.arrivals-what {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  font: 500 13px var(--sans);
+  color: var(--ink);
+}
+.arrivals-what > svg {
+  width: 15px;
+  height: 15px;
+  color: var(--sage-ink);
+}
+.arrivals-count {
+  font-size: 12px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.arrivals .icon-button {
+  width: 28px;
+  height: 28px;
+}
+.arrivals-latest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  animation: rise 240ms var(--ease-out) backwards;
+}
+.arrivals-covers {
+  display: flex;
+}
+.arrivals-cover {
+  width: 30px;
+  height: 42px;
+  font-size: 4px;
+  animation: cover-pop 420ms cubic-bezier(0.34, 1.36, 0.64, 1) backwards;
+}
+.arrivals-cover + .arrivals-cover {
+  margin-left: -14px;
+}
+.arrivals-cover .cover-type {
+  display: none;
+}
+.arrivals-cover .cover-plate {
+  margin: 12%;
+}
+@keyframes cover-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.8) rotate(-6deg);
+  }
+}
+.arrivals-title {
+  min-width: 0;
+  overflow: hidden;
+  font: 500 14px / 1.3 var(--serif);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.arrivals-error {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--rose-ink);
+}
+
+/* ---------- reduced motion: only fades ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .bk-x,
+  .bk-y,
+  .plank,
+  .plank-label,
+  .bookend,
+  .shelf-stack,
+  .bookcase {
+    transition-duration: 0s !important;
+  }
+  .bookcase[data-entering] .plank,
+  .bookcase[data-entering] .bk-in:not([data-out]),
+  .bk-in[data-fresh],
+  .arrivals-cover,
+  .bih-bar span {
+    animation: fade 300ms backwards;
+  }
+  .bk-in[data-out] {
+    transform: none;
+  }
+  .bk:hover .spine,
+  .bk:focus-visible,
+  .bk:active .spine {
+    transform: none;
+  }
+  .bih-page-in > * {
+    transform: none !important;
+  }
+  .bih-stage[data-phase="leaving"] .bih-world {
+    transform: none;
+  }
+  .arrivals {
+    animation: fade 200ms backwards;
+  }
+}
+
+/* ---------- the bookmark's page: save this? ---------- */
+.save-page {
+  max-width: 560px !important;
+  padding-top: 6vh;
+}
+.save-url {
+  display: grid;
+  gap: 2px;
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+.save-url span {
+  color: var(--ink-3);
+}
+.save-actions {
+  margin-top: 20px;
+}
+.save-done {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 24px;
+  align-items: center;
+}
+.save-cover {
+  display: block;
+  width: 120px;
+  height: 170px;
+  font-size: 9px;
+  box-shadow: var(--shadow-md);
+  border-radius: 3px 7px 7px 3px;
+  animation: save-land 520ms cubic-bezier(0.34, 1.36, 0.64, 1) backwards;
+}
+.save-cover .cover-title {
+  font-size: 15px;
+}
+.save-cover .cover-author {
+  font-size: 11px;
+}
+@keyframes save-land {
+  from {
+    opacity: 0;
+    transform: translateY(-40px) rotate(-6deg);
+  }
+}
+.save-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--sage-ink);
+  font: 500 13px var(--sans);
+}
+.save-kicker svg {
+  width: 15px;
+  height: 15px;
+}
+.save-title {
+  margin: 6px 0 2px;
+  font: 500 24px / 1.2 var(--serif);
+  letter-spacing: -0.015em;
+}
+@media (max-width: 520px) {
+  .save-done {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .save-cover {
+    animation: fade 300ms backwards;
+  }
+}

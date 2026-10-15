@@ -1,14 +1,39 @@
-/* The API for books and their figures, and the reading-order helpers the reader uses to number
+/* The API for books and their figures (with a book fetched ahead while it is in your hands in the
+ * library, so the reader opens on it at once), and the reading-order helpers the reader uses to number
  * figures the same way the server does. */
 import { figurePrefix } from "../../../shared/chapters.ts";
-import { call, post } from "./client";
+import { call, patch, post } from "./client";
 import type { Block, Book, Demo, FindHit, Job, Loc, Status } from "./types";
+
+/** Requests made ahead (a book about to be opened), each used once within half a minute. */
+const ahead = new Map<string, { at: number; promise: Promise<unknown> }>();
+function once<T>(key: string, load: () => Promise<T>): Promise<T> {
+  const hit = ahead.get(key);
+  ahead.delete(key);
+  return hit && Date.now() - hit.at < 30_000 ? (hit.promise as Promise<T>) : load();
+}
+function early(key: string, load: () => Promise<unknown>) {
+  if (ahead.has(key)) return;
+  const promise = load();
+  promise.catch(() => ahead.delete(key));
+  ahead.set(key, { at: Date.now(), promise });
+}
 
 export const api = {
   status: () => call<Status>("/api/status"),
   books: () => call<Book[]>("/api/books"),
-  book: (id: string) => call<Book>(`/api/books/${id}`),
-  blocks: (id: string) => call<Block[]>(`/api/books/${id}/blocks`),
+  book: (id: string) => once(`book:${id}`, () => call<Book>(`/api/books/${id}`)),
+  blocks: (id: string) => once(`blocks:${id}`, () => call<Block[]>(`/api/books/${id}/blocks`)),
+  /** Fetches a book and its text ahead, for the reader about to open it. */
+  fetchAhead: (book: Book) => {
+    early(`book:${book.id}`, () => call<Book>(`/api/books/${book.id}`));
+    if (book.format !== "pdf") early(`blocks:${book.id}`, () => call<Block[]>(`/api/books/${book.id}/blocks`));
+  },
+  /** Saves a link: a web page as an article, or the PDF behind it. */
+  saveLink: (url: string) => post<Book>("/api/books/link", { url }),
+  /** Renames a book or moves it to another topic. */
+  updateBook: (id: string, change: { title?: string; topic?: string }) => patch<Book>(`/api/books/${id}`, change),
+  coverUrl: (id: string) => `/api/books/${id}/cover`,
   demos: (id: string) => call<Demo[]>(`/api/books/${id}/demos`),
   jobs: (id: string) => call<Job[]>(`/api/books/${id}/jobs`),
   upload: (file: File) => {

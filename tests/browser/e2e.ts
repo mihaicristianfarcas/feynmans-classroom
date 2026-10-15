@@ -96,8 +96,8 @@ async function selectAll(p: Page) {
 try {
   // library
   await page.goto(`${BASE}#/library`, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".book-card", { timeout: 10000 });
-  check("library lists books", (await page.$$(".book-card")).length >= 1);
+  await page.waitForSelector(".bookcase .bk", { timeout: 10000 });
+  check("the library's shelf has books", (await page.$$(".bookcase .bk")).length >= 1);
 
   // open the reader at the first figure: the margin first, then the Figures index
   await page.goto(`${BASE}#/book/${bookId}?at=${(pos(first.anchor) + 0.03).toFixed(3)}`, {
@@ -115,10 +115,10 @@ try {
   );
   await wait(1500);
   check(
-    "margin cards are shown whole (none folded, none scrolling inside)",
+    "one margin card is open at most, shown whole (not scrolling inside); the others are closed to a line",
     await page.evaluate(
       () =>
-        !document.querySelector(".mcard.collapsed") &&
+        document.querySelectorAll(".mcard.open").length <= 1 &&
         [...document.querySelectorAll<HTMLElement>(".mcard.open")].every((c) => c.scrollHeight <= c.clientHeight + 1),
     ),
   );

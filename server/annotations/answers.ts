@@ -54,7 +54,7 @@ const INSTRUCTIONS: Record<"explain" | "define" | "ask", string> = {
 - Then what it means in this passage, in one or two sentences; add a contrast or synonym if it helps.
 - At most 70 words. LaTeX in $…$ for math.`,
   ask: `Answer the learner's question about the selected passage.
-- Answer first, directly, in plain words; then the reasoning or an example if it helps.
+- Answer first, directly, in plain words (bold the few words that answer it); then the reasoning or an example if it helps.
 - At most 200 words. LaTeX in $…$ for math.
 - If the book doesn't answer it, say so briefly and answer from general knowledge, marked as such.`,
 };
