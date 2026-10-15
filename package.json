@@ -47,6 +47,7 @@
     "katex": "^0.19.0",
     "linkedom": "^0.18.13",
     "lucide-react": "1.45.0",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.7.284",
     "puppeteer-core": "^25.13.0",
     "react": "^19.3.0",

@@ -283,7 +283,8 @@ const PdfInner = forwardRef<ReaderHandle, Omit<PdfProps, "url" | "dark">>(functi
         updateZoom(zoom);
         return;
       }
-      const width = viewports?.[0]?.width;
+      // the widest page, not the first (a split two-up book can open on a narrow cover)
+      const width = Math.max(0, ...(viewports || []).map((v) => v.width));
       if (!width) return;
       const room = scroller.clientWidth - 40;
       const fitted = Math.max(0.5, Math.min(room / width, MAX_PAGE_WIDTH / width));
