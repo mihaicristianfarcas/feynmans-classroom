@@ -57,7 +57,9 @@ async function loadInspector(): Promise<Inspector | null> {
   return inspector;
 }
 
-export async function ingestPdf(path: string): Promise<PdfIngest> {
+/** `split`: the pages are halves of two-up sheets, which pdf-inspector doesn't always crop (it can
+ * keep some of the facing page's text); pdf.js reads only what is inside each page. */
+export async function ingestPdf(path: string, { split = false } = {}): Promise<PdfIngest> {
   const { getDocument } = await lib();
   const buffer = readFileSync(path);
   const doc = await getDocument({ data: new Uint8Array(buffer), useSystemFonts: false, verbosity: 0 }).promise;
@@ -72,7 +74,7 @@ export async function ingestPdf(path: string): Promise<PdfIngest> {
     let pages: PageText[] | null = null;
     let markdown: string[] = [];
     let extractor: PdfIngest["extractor"] = "pdf.js";
-    const fast = await loadInspector();
+    const fast = split ? null : await loadInspector();
     if (fast) {
       try {
         const [items, md] = await Promise.all([
@@ -176,11 +178,13 @@ async function pageText(doc: Doc, n: number): Promise<PageText> {
   const rows: { y: number; x: number; s: number; parts: { x: number; t: string }[] }[] = [];
   for (const raw of content.items as { str: string; transform: number[]; height: number; hasEOL?: boolean }[]) {
     if (!("str" in raw)) continue;
-    const [, , , , x, base] = raw.transform;
-    const size = Math.abs(raw.height || raw.transform[3] || 0);
+    // where the run starts on the page as it is shown (its box can be cropped away from the origin,
+    // or turned)
+    const [x, base] = view.convertToViewportPoint(raw.transform[4], raw.transform[5]);
+    const size = Math.abs(raw.height || Math.hypot(raw.transform[2], raw.transform[3]) || 0);
     if (!raw.str) continue;
     // y of the line's top, measured from the top of the page
-    const top = view.height - base - size * 0.85;
+    const top = base - size * 0.85;
     let row = rows.find((r) => Math.abs(r.y - top) < Math.max(2, size * 0.45));
     if (!row) {
       row = { y: top, x, s: size, parts: [] };

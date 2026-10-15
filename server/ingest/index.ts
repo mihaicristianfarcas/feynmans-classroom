@@ -1,6 +1,7 @@
-/* Adding a book: the uploaded file is stored in a new folder in the library, its text and chapters
- * are extracted by format (PDF, EPUB, Markdown, plain text), and the folder is named after the
- * title. Also the text helpers the generators use: a chapter's text, a passage around a place. */
+/* Adding a book: the uploaded file is stored in a new folder in the library (a two-up PDF split into
+ * single pages first), its text and chapters are extracted by format (PDF, EPUB, Markdown, plain
+ * text), and the folder is named after the title. Also the text helpers the generators use: a
+ * chapter's text, a passage around a place. */
 import { createHash } from "node:crypto";
 import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { extname, join } from "node:path";
@@ -9,6 +10,7 @@ import type { Book, BookFormat, TocEntry } from "../books/types.ts";
 import { writeJson } from "../fs.ts";
 import { ingestEpub } from "./epub.ts";
 import { ingestPdf, pagesText } from "./pdf.ts";
+import { splitTwoUp } from "./spreads.ts";
 import { ingestText } from "./text.ts";
 
 export function formatOf(name: string): BookFormat | null {
@@ -57,7 +59,11 @@ export async function ingestBook(
 
   try {
     if (format === "pdf") {
-      const out = await ingestPdf(join(dir, file));
+      // a two-up book (facing pages side by side on each sheet) is read as single pages; the file as it
+      // came is kept beside it
+      const spreads = await splitTwoUp(join(dir, file), join(dir, "original.pdf"));
+      if (spreads) book.spreads = spreads;
+      const out = await ingestPdf(join(dir, file), { split: spreads > 0 });
       writeJson(join(dir, "pages.json"), out.pages);
       writeJson(join(dir, "markdown.json"), out.markdown);
       Object.assign(book, {

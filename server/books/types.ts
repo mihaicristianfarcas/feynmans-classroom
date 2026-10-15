@@ -28,6 +28,9 @@ export interface Book {
   file: string;
   /** First 16 hex digits of the file's SHA-256: which edition annotations were made on. */
   sha256?: string;
+  /** A two-up PDF: how many sheets of facing pages were split into single pages (the upload is kept
+   * as original.pdf, and pages are numbered in the split file). */
+  spreads?: number;
   pageCount?: number;
   blockCount?: number;
   extractor?: string;
