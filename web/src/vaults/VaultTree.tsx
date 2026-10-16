@@ -242,6 +242,7 @@ export function VaultTree({
         <RowMenu
           label={`Vault ${vault.name}`}
           button="icon-button"
+          className="vault-menu"
           items={[
             { label: "Graph of this vault", icon: Network, run: async () => go(graphRoute(id)) },
             {
@@ -264,11 +265,16 @@ export function VaultTree({
               },
             },
             {
-              label: "Forget this vault…",
+              label: "Remove from the app…",
               icon: X,
               danger: true,
               run: async () => {
-                if (!confirm(`Stop showing “${vault.name}” here? Its folder and files stay as they are.`)) return;
+                if (
+                  !confirm(
+                    `Remove “${vault.name}” from the app? Its folder and files on your computer are not touched.`,
+                  )
+                )
+                  return;
                 if (vault.synced) await dropLinked(id);
                 await vaults.remove(id);
                 try {
@@ -410,10 +416,13 @@ export function RowMenu({
   label,
   items,
   button = "icon-button small",
+  className = "tree-folder-menu",
 }: {
   label: string;
   items: MenuItem[];
   button?: string;
+  /** The menu's place: a row's (shown on hover) by default. */
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const opener = useRef<HTMLButtonElement>(null);
@@ -425,7 +434,7 @@ export function RowMenu({
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: it only closes the menu when focus leaves it; the buttons inside are the controls
     <div
-      className="menu-host tree-folder-menu"
+      className={`menu-host ${className}`}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false);
       }}

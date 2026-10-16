@@ -180,13 +180,14 @@ function Missing({ vault, list, onForget }: { vault: VaultSummary; list: Panel; 
           type="button"
           className="button"
           onClick={async () => {
-            if (!confirm(`Forget “${vault.name}”? Nothing on disk is touched.`)) return;
+            if (!confirm(`Remove “${vault.name}” from the app? Its folder and files on your computer are not touched.`))
+              return;
             await vaults.remove(vault.id);
             onForget();
             go("#/notes");
           }}
         >
-          Forget this vault
+          Remove from the app
         </button>
       </div>
     </div>
