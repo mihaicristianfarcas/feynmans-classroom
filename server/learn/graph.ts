@@ -1,12 +1,13 @@
 /* The knowledge graph: books and documents (concepts, notes, annotations) as nodes, with the links
  * between them (the learner's own, accepted and suggested connections) and each concept's mastery as
- * a ring; and the notes of added vaults that link to any of them. */
+ * a ring; and the notes of added vaults, with their links to each other and to the app. */
 import { listBooks } from "../books/store.ts";
 import { listConnections } from "../vault/connections.ts";
 import { docs } from "../vault/index.ts";
 import { allEdges, type Edge, resolveLink } from "../vault/links.ts";
 import { appLinks } from "../vaults/app-links.ts";
-import { getVault } from "../vaults/index.ts";
+import { getVault, listVaults } from "../vaults/index.ts";
+import type { Vault } from "../vaults/vault.ts";
 import { conceptMastery } from "./context.ts";
 
 export interface GraphNode {
@@ -90,26 +91,33 @@ export function knowledgeGraph(): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const order: Edge["kind"][] = ["link", "embed", "ai", "related", "about", "concept", "mentions", "source"];
   const all = allEdges().filter((e) => e.to);
   for (const kind of order) for (const e of all) if (e.kind === kind) add({ from: e.from, to: e.to!, kind: e.kind });
-  // notes of added vaults that link to something here, with those links
-  for (const l of appLinks()) {
-    const id = `vnote:${l.vault}:${l.path}`;
-    if (!ids.has(id)) {
-      const entry = getVault(l.vault).files.get(l.path);
+  // the notes of added vaults, the links between them, and their links to things here
+  for (const v of listVaults()) {
+    let g: ReturnType<Vault["graph"]>;
+    try {
+      g = getVault(v.id).graph();
+    } catch {
+      continue; // a vault whose folder is missing
+    }
+    const vid = (path: string) => `vnote:${v.id}:${path}`;
+    for (const n of g.nodes) {
       nodes.push({
-        id,
+        id: vid(n.id),
         kind: "note",
-        label: l.title,
+        label: n.label,
         mastery: null,
         size: 0.8,
-        detail: l.vaultName,
-        path: l.path,
-        vault: l.vault,
-        created: entry?.mtime ?? Date.now(),
+        detail: v.name,
+        path: n.id,
+        vault: v.id,
+        created: n.mtime,
       });
-      ids.add(id);
+      ids.add(vid(n.id));
     }
-    add({ from: id, to: l.to.node, kind: l.property ? "about" : "link" });
+    for (const e of g.edges) add({ from: vid(e.from), to: vid(e.to), kind: "link" });
   }
+  for (const l of appLinks())
+    add({ from: `vnote:${l.vault}:${l.path}`, to: l.to.node, kind: l.property ? "about" : "link" });
   for (const c of listConnections()) {
     if (c.status !== "suggested") continue;
     const from = docs.at(c.from);

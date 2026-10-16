@@ -1,7 +1,7 @@
 // Vault notes and the rest of the app: a [[link]] or an `about` property naming the app's concept puts
 // the note on the concept's page and in the Brain's graph, the note's links say where they lead, [[
-// completes to the app's concepts, and ⌘K search finds vault notes.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+// completes to the app's concepts, ⌘K search finds vault notes, and removing the vault leaves its folder.
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -44,7 +44,7 @@ describe("vault notes in the app", () => {
     expect(c.vaultNotes.map((n: Json) => n.path).sort()).toEqual(["Heat engines.md", "Work.md"]);
   });
 
-  it("draws them in the Brain's graph, joined to the concept", async () => {
+  it("draws every vault note in the Brain's graph, joined to each other and to the concept", async () => {
     const g = await call("GET", "/api/graph");
     const node = g.nodes.find((n: Json) => n.id === `vnote:${vaultId}:Heat engines.md`);
     expect(node).toMatchObject({ kind: "note", vault: vaultId, path: "Heat engines.md" });
@@ -54,7 +54,10 @@ describe("vault notes in the app", () => {
     expect(g.edges).toContainEqual(
       expect.objectContaining({ from: `vnote:${vaultId}:Work.md`, to: `concept:${conceptId}`, kind: "about" }),
     );
-    expect(g.nodes.some((n: Json) => n.id === `vnote:${vaultId}:Lonely.md`)).toBe(false);
+    expect(g.edges).toContainEqual(
+      expect.objectContaining({ from: node.id, to: `vnote:${vaultId}:Work.md`, kind: "link" }),
+    );
+    expect(g.nodes.some((n: Json) => n.id === `vnote:${vaultId}:Lonely.md`)).toBe(true);
   });
 
   it("says where a note's links lead, and completes [[ to the app's concepts", async () => {
@@ -69,5 +72,13 @@ describe("vault notes in the app", () => {
   it("finds vault notes in the search of everything", async () => {
     const hits = await call("GET", "/api/search?q=flywheels");
     expect(hits[0]).toMatchObject({ kind: "vault", vault: vaultId, path: "Work.md", vaultName: "Physics" });
+  });
+
+  it("removing the vault takes it out of the app and leaves its folder as it is", async () => {
+    await call("DELETE", `/api/vaults/${vaultId}`);
+    expect(existsSync(join(root, "Heat engines.md"))).toBe(true);
+    expect(existsSync(join(root, "Work.md"))).toBe(true);
+    const g = await call("GET", "/api/graph");
+    expect(g.nodes.some((n: Json) => n.vault === vaultId)).toBe(false);
   });
 });
