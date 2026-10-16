@@ -8,6 +8,7 @@ import { go } from "../app/navigation";
 import { Spinner } from "../components/feedback";
 import { announce, useArrowKeys } from "../lib/a11y";
 import type { Panel } from "../lib/usePanel";
+import { OwnNotesMenu } from "../vaults/OwnNotesMenu";
 import { VaultSwitch } from "../vaults/VaultSwitch";
 
 export type Tree = Awaited<ReturnType<typeof learn.tree>>;
@@ -129,7 +130,9 @@ export function FileTree({
   );
   return (
     <aside className="file-tree" aria-label="Notes" id={panel.id} ref={panel.ref} style={panel.style}>
-      <VaultSwitch current={null} />
+      <VaultSwitch current={null}>
+        <OwnNotesMenu />
+      </VaultSwitch>
       <div className="tree-head">
         <input
           className="search"

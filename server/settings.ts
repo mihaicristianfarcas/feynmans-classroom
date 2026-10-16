@@ -1,5 +1,6 @@
 /* Settings a self-hoster changes from the app: which subscription does the thinking (Codex or
- * Claude Code), and which model and effort each tier uses. Stored in DATA_DIR/settings.json. */
+ * Claude Code), which model and effort each tier uses, and whether the Notes page shows the app's own
+ * notes. Stored in DATA_DIR/settings.json. */
 import { join } from "node:path";
 import { CODEX, DATA_DIR } from "./config.ts";
 import { readJson, writeJson } from "./fs.ts";
@@ -18,6 +19,8 @@ export interface Settings {
   concurrency: number;
   /** Links the agent finds between notes: "suggest" waits for the learner's OK; "auto" adds them (removable). */
   connections: "suggest" | "auto";
+  /** The Notes page leaves out the app's own notes (Classroom) while there are other vaults; nothing is deleted. */
+  hideOwnNotes: boolean;
 }
 
 const FILE = () => join(DATA_DIR, "settings.json");
@@ -39,6 +42,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   concurrency: Number(process.env.LLM_CONCURRENCY) || 3,
   connections: "suggest",
+  hideOwnNotes: false,
 };
 
 export function getSettings(): Settings {

@@ -1,5 +1,6 @@
-/* The top of the notes page's file list: which vault is open (the app's own notes first, then the
- * vaults added from folders), a button to add one, and the open vault's menu if it has one. */
+/* The top of the notes page's file list: which vault is open (the app's own notes first, unless they
+ * were removed from the page, then the vaults added from folders), a button to add one, and the open
+ * vault's menu. */
 import { Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { vaults } from "../api";
@@ -16,7 +17,10 @@ export const LAST_VAULT = "classroom-last-vault";
 export const OWN_VAULT = "Classroom";
 
 export function VaultSwitch({ current, children }: { current: string | null; children?: ReactNode }) {
-  const { data: list, reload } = useLoad(() => vaults.list());
+  const { data, reload } = useLoad(() => Promise.all([vaults.list(), vaults.own()]));
+  const [list, own] = data || [];
+  // the app's own notes stay listed while they're open (a link to one leads here)
+  const showOwn = !own?.hidden || current === null;
   useVaultChanges(null, (changes) => {
     if (changes.some((c) => !c.path)) reload();
   });
@@ -38,7 +42,7 @@ export function VaultSwitch({ current, children }: { current: string | null; chi
           go(to ? vaultRoute(to) : "#/notes");
         }}
       >
-        <option value="">{OWN_VAULT}</option>
+        {showOwn && <option value="">{OWN_VAULT}</option>}
         {(list || []).map((v) => (
           <option key={v.id} value={v.id}>
             {v.name}

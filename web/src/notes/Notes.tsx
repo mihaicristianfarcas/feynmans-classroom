@@ -2,10 +2,11 @@
  * tree on the left (vaults added from folders open in vaults/Vaults.tsx) and the open note beside
  * it (or a welcome when none is open), with its links on the right. Both sides can be resized from their
  * edge, or closed and opened again with the buttons above the note. It reopens the last note and reloads
- * when the vault changes. The tree, the note and its sidebar live beside this file. */
+ * when the vault changes; with the app's own notes removed from the page, it opens a vault instead. The
+ * tree, the note and its sidebar live beside this file. */
 import { SquarePen } from "lucide-react";
 import { useEffect, useState } from "react";
-import { learn } from "../api";
+import { learn, vaults } from "../api";
 import { go } from "../app/navigation";
 import { PanelEdge, PanelToggle } from "../components/Panel";
 import { useLoad } from "../lib/useLoad";
@@ -26,7 +27,14 @@ export function Notes({ theme }: { theme: "light" | "dark" }) {
   const route = hash.split("?")[0];
   const id = route.startsWith("#/notes/") ? decodeURIComponent(route.slice("#/notes/".length)) || null : null;
   const { data: tree, reload } = useLoad(() => learn.tree());
+  const { data: own } = useLoad(() => vaults.own());
   useEffect(() => {
+    if (!own) return;
+    // the app's own notes removed from the page: Notes opens a vault (a link to one of these notes still opens it)
+    if (own.hidden && !id) {
+      go("#/vaults");
+      return;
+    }
     // remember the vault and note open last, and go back to them when coming back to Notes
     try {
       const vault = localStorage.getItem(LAST_VAULT);
@@ -40,7 +48,7 @@ export function Notes({ theme }: { theme: "light" | "dark" }) {
         if (last) go(`#/notes/${last}`);
       }
     } catch {}
-  }, [id, route]);
+  }, [id, route, own]);
   useVaultEvents(reload, under("notes/"));
   const list = usePanel("notes-list", { initial: 260, min: 180, max: 480 });
   const links = usePanel("notes-links", { initial: 300, min: 220, max: 520 });

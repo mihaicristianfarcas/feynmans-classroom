@@ -91,8 +91,10 @@ of Markdown from your computer, your Obsidian vaults or any notes folder. Switch
 top of the file list. Add as many as you like: the + beside the vault's name, then **Choose folder…**, which opens
 Finder, File Explorer or your desktop's folder window. The server needn't be on your computer: the
 browser reads the folder and keeps the server's copy (`DATA_DIR/vaults/<id>/`) in step with it.
-The list is kept in `DATA_DIR/vaults.json`; forgetting a vault deletes the server's copy and leaves
-your folder as it is. Vaults are never put in jj (their history is kept apart, below).
+The list is kept in `DATA_DIR/vaults.json`; removing a vault from the app (its ⋯ menu) deletes the
+server's copy and leaves your folder as it is. Classroom can be removed from the Notes page the same
+way while there are other vaults: nothing is deleted (concepts, cards and links to its notes keep
+working), any vault's menu shows it again, and it comes back by itself when the last vault goes. Vaults are never put in jj (their history is kept apart, below).
 
 - **Chrome, Edge, Brave, Opera** keep the folder in sync both ways while the app is open: changes
   in the folder (Obsidian, a sync service) reach the app within a few seconds, and edits made in the

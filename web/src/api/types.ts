@@ -295,6 +295,7 @@ export interface SettingsInfo {
     claude: Tier;
     concurrency: number;
     connections?: "suggest" | "auto";
+    hideOwnNotes?: boolean;
   };
   active: "codex" | "claude";
   codex: { installed: boolean; version?: string; loggedIn: boolean; detail?: string };

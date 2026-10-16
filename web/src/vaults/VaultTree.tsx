@@ -1,11 +1,12 @@
 /* The file list of a vault added from a folder, on the notes page: which vault (VaultSwitch, with a menu
- * to rename it, scan it again, open its graph or forget it), a search of it ("#tag" for tags), its folders, notes and
+ * to rename it, scan it again, open its graph, show the app's own notes again or remove it), a search of it ("#tag" for tags), its folders, notes and
  * attachments as a tree (each with a menu: a new note or folder inside, rename or move, delete to the
  * vault's .trash), and its tags. */
 
 import {
   ChevronRight,
   Ellipsis,
+  Eye,
   File,
   FileAudio,
   FileImage,
@@ -31,7 +32,8 @@ import { graphRoute, noteRoute, searchRoute } from "./routes";
 import { SyncNotice } from "./SyncNotice";
 import { syncVault } from "./sync/engine";
 import { dropLinked } from "./sync/store";
-import { LAST_VAULT, VaultSwitch } from "./VaultSwitch";
+import { useVaultChanges } from "./useVaultChanges";
+import { LAST_VAULT, OWN_VAULT, VaultSwitch } from "./VaultSwitch";
 
 const ICON: Record<VaultFileKind, typeof File> = {
   note: FileText,
@@ -133,6 +135,10 @@ export function VaultTree({
   panel: Panel;
 }) {
   const id = vault.id;
+  const { data: own, reload: reloadOwn } = useLoad(() => vaults.own());
+  useVaultChanges(null, (changes) => {
+    if (changes.some((c) => !c.path)) reloadOwn();
+  });
   const [closed, setClosed] = useState<Set<string>>(() => {
     try {
       return new Set(JSON.parse(localStorage.getItem(`classroom-vault-closed-${id}`) || "[]") as string[]);
@@ -264,6 +270,18 @@ export function VaultTree({
                 announce(r.changes ? `${r.changes} change${r.changes === 1 ? "" : "s"} found` : "Up to date");
               },
             },
+            ...(own?.hidden
+              ? [
+                  {
+                    label: `Show ${OWN_VAULT} notes again`,
+                    icon: Eye,
+                    run: async () => {
+                      await vaults.hideOwn(false);
+                      announce(`${OWN_VAULT} is back on the Notes page`);
+                    },
+                  },
+                ]
+              : []),
             {
               label: "Remove from the app…",
               icon: X,

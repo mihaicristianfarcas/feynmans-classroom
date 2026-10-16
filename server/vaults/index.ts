@@ -1,5 +1,6 @@
 /* The outside vaults the learner added (Obsidian vaults, or any folder of Markdown): the list, kept in
- * DATA_DIR/vaults.json; adding, renaming and forgetting one (its files are never touched); and keeping
+ * DATA_DIR/vaults.json; adding, renaming and forgetting one (its files are never touched); whether the
+ * Notes page leaves out the app's own notes while there are other vaults; and keeping
  * each one's index in step with its folder, so edits made in Obsidian (or by sync, git, any editor)
  * show up in the app by themselves:
  *
@@ -17,6 +18,7 @@ import { DATA_DIR, VAULT_DIR } from "../config.ts";
 import { NotFound } from "../errors.ts";
 import { publish } from "../events.ts";
 import { readJson, writeJson } from "../fs.ts";
+import { getSettings, saveSettings } from "../settings.ts";
 import { dropMeta, noteChanged, startHistory } from "./history.ts";
 import { type Change, skipped, Vault } from "./vault.ts";
 
@@ -190,7 +192,20 @@ export function removeVault(id: string) {
   live.delete(id);
   if (info.synced) rmSync(rootOf(info), { recursive: true, force: true });
   dropMeta(id);
+  // with no vault left, the app's own notes show again, so the Notes page always has one
+  if (list.length === 1 && getSettings().hideOwnNotes) saveSettings({ hideOwnNotes: false });
   publish("global", { type: "vaults", data: { vault: id, path: "", change: "removed" } });
+}
+
+/** Whether the Notes page leaves out the app's own notes (only while there are other vaults). */
+export const ownNotesHidden = () => getSettings().hideOwnNotes && listVaults().length > 0;
+
+/** Leaves the app's own notes out of the Notes page, or shows them again; nothing is deleted. */
+export function hideOwnNotes(hidden: boolean) {
+  if (hidden && !listVaults().length) throw new Error("add a vault first: the Notes page needs one to show");
+  saveSettings({ hideOwnNotes: hidden });
+  publish("global", { type: "vaults", data: { vault: "", path: "", change: "own" } });
+  return { hidden: ownNotesHidden() };
 }
 
 /** Reads every vault and starts watching them, and checks them against their folders every so often. */

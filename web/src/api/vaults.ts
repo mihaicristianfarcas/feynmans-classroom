@@ -1,7 +1,7 @@
 /* Typed calls for outside vaults (Obsidian's, or any folder of Markdown): the list, a vault's files,
- * a note with its links, resolving links, saving and changing files, attachments, a note's versions
+ * whether the app's own notes show beside them, a note with its links, resolving links, saving and changing files, attachments, a note's versions
  * and suggested connections, tags, search, graph. */
-import { call, del, patch, post } from "./client";
+import { call, del, patch, post, put } from "./client";
 import type { SuggestedLink } from "./types";
 
 export type VaultFileKind = "note" | "image" | "pdf" | "audio" | "video" | "file";
@@ -101,6 +101,9 @@ export const vaults = {
   addSynced: (name: string) => post<VaultSummary>("/api/vaults", { name, synced: true }),
   rename: (id: string, name: string) => patch<VaultSummary>(`/api/vaults/${id}`, { name }),
   remove: (id: string) => del(`/api/vaults/${id}`),
+  /** Whether the Notes page leaves out the app's own notes (only while there are vaults); nothing is deleted. */
+  own: () => call<{ hidden: boolean }>("/api/vaults/own"),
+  hideOwn: (hidden: boolean) => put<{ hidden: boolean }>("/api/vaults/own", { hidden }),
   rescan: (id: string) => post<{ changes: number }>(`/api/vaults/${id}/rescan`),
   tree: (id: string) => call<VaultTree>(`/api/vaults/${id}/tree`),
   note: (id: string, path: string) => call<VaultNote>(`/api/vaults/${id}/note?${q({ path })}`),

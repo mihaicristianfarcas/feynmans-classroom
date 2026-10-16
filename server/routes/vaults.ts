@@ -1,9 +1,10 @@
 /* Routes for outside vaults (Obsidian's, or any folder of Markdown): the list (add, rename, forget),
- * each vault's files and folders, a note with its links and backlinks, resolving a link (for opening
- * and embedding), saving, making, renaming and deleting, attachments (served as content only, with
- * ranges so sound and video can seek), tags, search and the graph. Changes the app makes are announced
- * like the ones the watcher sees, so every open page follows both. A synced vault also has the routes its
- * browser uses to keep the server's copy and the learner's folder in step (vaults/sync.ts). */
+ * whether the Notes page shows the app's own notes beside them, each vault's files and folders, a note
+ * with its links and backlinks, resolving a link (for opening and embedding), saving, making, renaming
+ * and deleting, attachments (served as content only, with ranges so sound and video can seek), tags,
+ * search and the graph. Changes the app makes are announced like the ones the watcher sees, so every
+ * open page follows both. A synced vault also has the routes its browser uses to keep the server's copy
+ * and the learner's folder in step (vaults/sync.ts). */
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { extname } from "node:path";
 import { Readable } from "node:stream";
@@ -28,7 +29,9 @@ import {
   addVault,
   announceChanges,
   getVault,
+  hideOwnNotes,
   listVaults,
+  ownNotesHidden,
   removeVault,
   renameVault,
   vaultsWithStatus,
@@ -97,6 +100,10 @@ export function vaultRoutes(app: Hono) {
     const b = await readBody<{ path?: string; name?: string; synced?: boolean }>(c);
     return c.json(b.synced ? addSyncedVault(b.name || "") : addVault(b.path || "", b.name));
   });
+
+  /** Whether the Notes page shows the app's own notes (Classroom) beside the vaults. */
+  app.get("/api/vaults/own", (c) => c.json({ hidden: ownNotesHidden() }));
+  app.put("/api/vaults/own", async (c) => c.json(hideOwnNotes(!!(await readBody<{ hidden?: boolean }>(c)).hidden)));
 
   /** A synced vault's copy, file by file, for the browser that keeps it in step with the folder. */
   const synced = (c: Context) => {
