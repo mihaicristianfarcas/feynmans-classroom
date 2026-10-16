@@ -1,6 +1,8 @@
 /* What a sync does to each file, from the folder on disk, the server's copy, and the base (both sides as
  * they were after the last sync). A side changed if its size or time differs from the base. One changed
- * side wins; when both changed, the contents are compared ("compare": same is fine, different keeps both). */
+ * side wins; when both changed, the contents are compared ("compare": same is fine, different keeps both).
+ * An empty copy never deletes anything on disk: that's a copy gone (the vault removed from the app), not
+ * every file deleted. */
 import type { Base } from "./store";
 
 export type Stat = [size: number, mtime: number];
@@ -26,8 +28,9 @@ export function plan(disk: Map<string, Stat>, copy: Map<string, Stat>, base: Bas
     if (!dChanged && !cChanged) continue;
     if (!d && !c) out.push([path, "forget"]);
     else if (dChanged && !cChanged) out.push([path, d ? "upload" : "delete-copy"]);
-    else if (cChanged && !dChanged) out.push([path, c ? "download" : "delete-disk"]);
-    else if (d && c) out.push([path, "compare"]);
+    else if (cChanged && !dChanged) {
+      if (c || copy.size) out.push([path, c ? "download" : "delete-disk"]);
+    } else if (d && c) out.push([path, "compare"]);
     else out.push([path, d ? "upload" : "download"]);
   }
   return out;

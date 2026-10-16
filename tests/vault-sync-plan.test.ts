@@ -13,6 +13,11 @@ describe("sync plan", () => {
     ]);
   });
 
+  it("never deletes files on disk because the copy is empty", () => {
+    const base = { "a.md": { d: [1, 1] as Stat, c: [1, 10] as Stat } };
+    expect(plan(m({ "a.md": [1, 1] }), m({}), base)).toEqual([]);
+  });
+
   it("carries a change from whichever side made it", () => {
     const base = {
       "a.md": { d: [1, 1] as Stat, c: [1, 10] as Stat },
