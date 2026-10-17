@@ -1,9 +1,10 @@
 /* What the concept pages show: every concept with how well it's known right now, and one concept
- * with its cards, the notes that link to it, related concepts and the passages it came from. */
+ * with its cards, the notes that link to it (in any vault), related concepts and the passages it came from. */
 import type { Concept } from "../../shared/vault-types.ts";
 import { getBook } from "../books/store.ts";
 import { docs } from "../vault/index.ts";
 import { allEdges } from "../vault/links.ts";
+import { appLinks } from "../vaults/app-links.ts";
 import { viewCard } from "./cards.ts";
 import { conceptMastery } from "./context.ts";
 
@@ -40,6 +41,10 @@ export function conceptDetail(c: Concept) {
       .filter((k) => k.concepts.includes(c.id))
       .map((k) => viewCard(k)),
     notes: docs.list("note").filter((n) => n.concepts.includes(c.id) || linking.has(n.id)),
+    /** Vault notes that link to it. */
+    vaultNotes: appLinks()
+      .filter((l) => l.to.node === node)
+      .map((l) => ({ vault: l.vault, vaultName: l.vaultName, path: l.path, title: l.title })),
     related: related.filter((x): x is Concept => !!x).map(brief),
     backlinks: linkedFrom.filter((x): x is Concept => !!x).map(brief),
   };

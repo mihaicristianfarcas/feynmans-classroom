@@ -357,31 +357,9 @@
     opacity: 0.35;
   }
 }
-.note-mark {
-  position: absolute;
-  left: 7px;
-  width: 16px;
-  height: 3px;
-  margin-top: -1.5px;
-  padding: 0;
-  border: 0;
-  border-radius: 3px;
-  background: var(--sky);
-  cursor: pointer;
-  transition:
-    transform 160ms var(--ease-out),
-    background-color 150ms ease;
-}
-.note-mark[data-type="highlight"] {
-  background: var(--butter);
-}
 @media (hover: hover) and (pointer: fine) {
   .anchor:hover {
     transform: rotate(45deg) scale(1.3);
-  }
-  .note-mark:hover {
-    transform: scaleY(1.7);
-    background: var(--sky-ink);
   }
 }
 

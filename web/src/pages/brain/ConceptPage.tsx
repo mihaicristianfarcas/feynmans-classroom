@@ -3,22 +3,14 @@
 import { ArrowLeft, Shapes } from "lucide-react";
 import { useState } from "react";
 import { humanInterval } from "../../../../shared/fsrs.ts";
-import { type Concept, docs, learn, type Note } from "../../api";
+import { type Concept, docs, learn } from "../../api";
 import { bookLink, go } from "../../app/navigation";
 import { Mastery, Spinner } from "../../components/feedback";
 import { Markdown } from "../../components/Markdown";
 import { CardDrafter, Connector, ExplainBack, FigureMaker } from "../../components/tools";
 import { useLoad } from "../../lib/useLoad";
 import { under, useVaultEvents } from "../../lib/useVaultEvents";
-
-const TYPE_LABEL: Record<string, string> = {
-  note: "Note",
-  highlight: "Highlight",
-  explanation: "Explanation",
-  connection: "Connection",
-  answer: "Answer",
-  summary: "Summary",
-};
+import { noteRoute } from "../../vaults/routes";
 
 export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
   const { data: c, error, reload } = useLoad(() => learn.concept(id), [id]);
@@ -174,11 +166,11 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
               </li>
             ))}
           </ul>
-          <h2 className="section-title">Notes ({c.notes.length})</h2>
+          <h2 className="section-title">Notes ({c.vaultNotes.length})</h2>
           <ul className="plain">
-            {c.notes.map((n: Note) => (
-              <li key={n.id}>
-                <a href={`#/notes/${n.id}`}>{n.title}</a> <span className="fine">{TYPE_LABEL[n.type]}</span>
+            {c.vaultNotes.map((n) => (
+              <li key={`${n.vault}:${n.path}`}>
+                <a href={noteRoute(n.vault, n.path)}>{n.title}</a> <span className="fine">in {n.vaultName}</span>
               </li>
             ))}
           </ul>

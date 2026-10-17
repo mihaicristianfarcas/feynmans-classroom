@@ -1,12 +1,12 @@
 /* Sending a passage from the book to a note: as a link to it, as the quote (a callout that links
  * back to the passage), or as the whole annotation embedded. Every passage a note quotes is marked
- * in the book first, so the note and the book point at each other. */
+ * in the book first, so the note and the book point at each other. The note is a vault's: the one
+ * named, else the book's note in the first vault (vaults/reading.ts). */
 import type { Anchor, Annotation } from "../../shared/vault-types.ts";
 import { getBook } from "../books/store.ts";
-import { NotFound } from "../errors.ts";
-import { appendToDoc } from "../learn/docs.ts";
-import { bookNote } from "../learn/notes.ts";
 import { docs, whereOf } from "../vault/index.ts";
+import { defaultVault, getVault } from "../vaults/index.ts";
+import { appendToVaultNote, passageMarkdown, vaultBookNote } from "../vaults/reading.ts";
 import { createAnnotation } from "./index.ts";
 
 export type NoteMode = "reference" | "passage" | "embed";
@@ -32,8 +32,9 @@ export interface ToNoteRequest {
   /** An existing annotation to send; without one, `anchor` is highlighted first. */
   annotationId?: string;
   anchor?: Anchor;
-  /** The note to add to; the book's reading note by default. */
-  noteId?: string;
+  /** The vault note to add to; the book's reading note in the first vault by default. */
+  vault?: string;
+  path?: string;
   mode?: NoteMode;
   /** The learner's own words, added after the passage. */
   comment?: string;
@@ -46,8 +47,12 @@ export function sendToNote(bookId: string, request: ToNoteRequest) {
     if (!request.anchor?.quote?.trim()) throw new Error("select some text first");
     a = createAnnotation(bookId, { type: "highlight", anchor: request.anchor });
   }
-  const note = request.noteId ? docs.get(request.noteId) : bookNote(bookId);
-  if (!note) throw new NotFound("note not found");
-  const markdown = `${noteMarkdown(a, request.mode || "passage")}${request.comment?.trim() ? `\n\n${request.comment.trim()}` : ""}`;
-  return { note: appendToDoc(note.id, markdown), annotation: a, markdown };
+  const comment = request.comment?.trim() ? `\n\n${request.comment.trim()}` : "";
+  const target =
+    request.vault && request.path
+      ? { vault: request.vault, path: request.path }
+      : vaultBookNote(request.vault || defaultVault(), bookId);
+  const markdown = `${passageMarkdown(a, request.mode || "passage")}${comment}`;
+  const saved = appendToVaultNote(getVault(target.vault), target.path, markdown);
+  return { vaultNote: { vault: target.vault, path: saved.path }, annotation: a, markdown };
 }

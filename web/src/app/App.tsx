@@ -1,6 +1,6 @@
-/* The app: picks the page from the URL's hash (#/library, #/book/<id>, #/notes/<id>…), sends a new
- * learner to the welcome page first, and puts every page except the reader inside the Shell (Notes
- * and the Brain's graph fill the window below its bar; the rest scroll). The ⌘K palette and the agent
+/* The app: picks the page from the URL's hash (#/library, #/book/<id>, #/vaults/<id>…), sends a new
+ * learner to the welcome page first, and puts every page except the reader inside the Shell (Notes, for
+ * every vault, and the Brain's graph fill the window below its bar; the rest scroll). The ⌘K palette and the agent
  * (⌘J) sit over every page; old #/ask links open the agent. Each page but Today is its own chunk,
  * loaded on first visit (the reader's, with the PDF engine, is fetched ahead once the app is idle); a
  * page that fails to draw or load says so, with a way to reload. */
@@ -10,6 +10,7 @@ import { openAgent } from "../agent/store";
 import { learn } from "../api";
 import { Loading } from "../components/feedback";
 import { Today } from "../pages/Today";
+import { startVaultSync } from "../vaults/sync/engine";
 import { openLink } from "./navigation";
 import { PageBoundary } from "./PageBoundary";
 import { Palette } from "./Palette";
@@ -18,7 +19,7 @@ import { useTheme } from "./theme";
 
 const loadReader = () => import("../reader/Reader");
 const Reader = lazy(() => loadReader().then((m) => ({ default: m.Reader })));
-const Notes = lazy(() => import("../notes/Notes").then((m) => ({ default: m.Notes })));
+const Vaults = lazy(() => import("../vaults/Vaults").then((m) => ({ default: m.Vaults })));
 const Brain = lazy(() => import("../pages/brain/Brain").then((m) => ({ default: m.Brain })));
 const Gallery = lazy(() => import("../pages/Gallery").then((m) => ({ default: m.Gallery })));
 const Journey = lazy(() => import("../pages/Journey").then((m) => ({ default: m.Journey })));
@@ -35,6 +36,7 @@ type Route =
         | "today"
         | "library"
         | "notes"
+        | "vaults"
         | "review"
         | "brain"
         | "journey"
@@ -48,6 +50,7 @@ const TITLES: Record<Exclude<Route["name"], "book">, string> = {
   today: "Today",
   library: "Library",
   notes: "Notes",
+  vaults: "Notes",
   review: "Review",
   brain: "Brain",
   journey: "Journey",
@@ -63,9 +66,13 @@ function route(): Route {
   const book = hash.match(/^#\/book\/([a-z0-9]+)/i);
   if (book) return { name: "book", id: book[1] };
   const name = hash.replace(/^#\/?/, "").split("/")[0];
-  // pages that fill the window: Notes, and the Brain's graph (not a concept's own page)
-  const full = name === "notes" || (name === "brain" && !hash.startsWith("#/brain/concept/"));
-  if (["library", "notes", "review", "brain", "journey", "settings", "gallery", "welcome", "open"].includes(name))
+  // pages that fill the window: Notes (the vaults), and the Brain's graph (not a concept's own page)
+  const full = name === "notes" || name === "vaults" || (name === "brain" && !hash.startsWith("#/brain/concept/"));
+  if (
+    ["library", "notes", "vaults", "review", "brain", "journey", "settings", "gallery", "welcome", "open"].includes(
+      name,
+    )
+  )
     return { name: name as Route["name"], full } as Route;
   return { name: "today" };
 }
@@ -82,6 +89,8 @@ export function App() {
   const [current, setCurrent] = useState(route);
   const [theme, setTheme] = useTheme();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  // synced vaults follow their folders on this computer whichever page is open
+  useEffect(() => startVaultSync(), []);
   useEffect(() => {
     redirectAsk();
     const onHash = () => {
@@ -137,7 +146,7 @@ export function App() {
     );
   if (current.name === "welcome") page = <Welcome />;
   else if (current.name === "library") page = <Library theme={theme} />;
-  else if (current.name === "notes") page = <Notes theme={theme} />;
+  else if (current.name === "notes" || current.name === "vaults") page = <Vaults theme={theme} />;
   else if (current.name === "open") page = <OpenLink />;
   else if (current.name === "review") page = <Review theme={theme} />;
   else if (current.name === "brain") page = <Brain theme={theme} />;

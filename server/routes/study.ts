@@ -43,5 +43,7 @@ export function studyRoutes(app: Hono) {
     return c.json({ reply, session });
   });
   app.get("/api/books/:id/sessions", (c) => c.json(listSessions(c.req.param("id"))));
-  app.post("/api/sessions/:id/note", async (c) => c.json(await noteFromSession(c.req.param("id"))));
+  app.post("/api/sessions/:id/note", async (c) =>
+    c.json(await noteFromSession(c.req.param("id"), c.req.query("vault") || undefined)),
+  );
 }

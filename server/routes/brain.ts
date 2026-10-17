@@ -9,7 +9,7 @@ import { search } from "../learn/search.ts";
 export function brainRoutes(app: Hono) {
   app.get("/api/today", (c) => c.json(today()));
   app.get("/api/journey", (c) => c.json(journey()));
-  app.get("/api/graph", (c) => c.json(knowledgeGraph()));
+  app.get("/api/graph", (c) => c.json(knowledgeGraph(c.req.query("vault"))));
   app.get("/api/search", (c) => c.json(search(c.req.query("q") || "")));
 
   app.get("/api/events", (c) => eventStream(c, "global"));

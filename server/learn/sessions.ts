@@ -1,15 +1,18 @@
 /* Tutoring sessions: each conversation with the tutor about a book is a document beside it
  * (library/<book>/sessions/<date> <first question>.md), saved after every reply, so the learner can
  * look back on it, carry it on later, or link to it from a note. A session can also be written up as a
- * note of the learner's own (linked both ways); its cards are drafted in the browser (CardDrafter). */
+ * note of the learner's own in a vault (which the session remembers); its cards are drafted in the
+ * browser (CardDrafter). */
 import { linksInValue } from "../../shared/links.ts";
 import { transcript } from "../../shared/thread.ts";
-import type { Note, SourceRef, TutorSession } from "../../shared/vault-types.ts";
+import type { SourceRef, TutorSession } from "../../shared/vault-types.ts";
 import { getBook } from "../books/store.ts";
 import { NotFound } from "../errors.ts";
 import { structured } from "../llm/index.ts";
 import { docs } from "../vault/index.ts";
 import { resolveLink } from "../vault/links.ts";
+import { defaultVault, getVault } from "../vaults/index.ts";
+import { newVaultNote } from "../vaults/reading.ts";
 import { upsertConcept } from "./concepts.ts";
 import { learnerSummary } from "./context.ts";
 import { createDoc, updateDoc } from "./docs.ts";
@@ -22,6 +25,15 @@ const titleOf = (text: string) => {
 
 /** A session as the app shows it: with the note made from it (the first note it links to), while that note is there. */
 function live(session: TutorSession): TutorSession {
+  if (session.vaultNote) {
+    const at = session.vaultNote.indexOf("/");
+    const vault = session.vaultNote.slice(0, at);
+    const path = session.vaultNote.slice(at + 1);
+    try {
+      if (getVault(vault).files.get(path)?.kind === "note")
+        return { ...session, note: { vault, path, title: (path.split("/").pop() || path).replace(/\.md$/i, "") } };
+    } catch {}
+  }
   for (const target of linksInValue(session.related)) {
     const r = resolveLink(target);
     if (r?.kind === "note") return { ...session, note: { id: r.id, title: r.title } };
@@ -85,9 +97,12 @@ const NOTE_SCHEMA = {
   },
 };
 
-/** Writes what the learner worked out in a session as a note of their own (in notes/, linking back to the
- * session, which links to it in turn). */
-export async function noteFromSession(id: string): Promise<{ note: Note; session: TutorSession }> {
+/** Writes what the learner worked out in a session as a note of their own in vault `vault` (the first vault
+ * by default), linking the book and its concepts; the session remembers it. */
+export async function noteFromSession(
+  id: string,
+  vault = defaultVault(),
+): Promise<{ vaultNote: { vault: string; path: string; title: string }; session: TutorSession }> {
   const session = getSession(id);
   const book = getBook(session.source.bookId);
   if (!book) throw new NotFound("book not found");
@@ -115,16 +130,13 @@ Return JSON.`;
     tier: "fast",
     effort: "medium",
   });
-  const concepts = (data.concepts || []).slice(0, 4).map((name) => upsertConcept({ name, source }).id);
-  const note = createDoc({
-    kind: "note",
-    type: "session",
+  const concepts = (data.concepts || []).slice(0, 4).map((name) => upsertConcept({ name, source }));
+  const made = newVaultNote(vault, {
     title: data.title?.trim() || session.title,
-    body: `${data.body.trim()}\n\nFrom [[${session.path.replace(/\.md$/, "")}|a session with the tutor]] on [[${book.title}]].\n`,
-    tags: ["tutor"],
-    concepts,
-    source,
+    body: `${data.body.trim()}\n\nFrom a session with the tutor on [[${book.title}]].`,
+    bookId: book.id,
+    about: concepts.map((c) => c.title),
   });
-  const saved = updateDoc(session.id, { related: [...session.related, `[[${note.title}]]`] }) as TutorSession;
-  return { note: note as Note, session: live(saved) };
+  const saved = updateDoc(session.id, { vaultNote: `${made.vault}/${made.path}` }) as TutorSession;
+  return { vaultNote: made, session: live(saved) };
 }

@@ -1,11 +1,12 @@
-/* ⌘K (Ctrl K): search everything (concepts, notes, annotations, tutor sessions, cards, the books' text) and jump to
- * it; with no match, Enter hands the words to the agent instead. A combobox: type to search, arrow keys move
- * through the results, Enter opens one, Escape closes and gives focus back. */
+/* ⌘K (Ctrl K): search everything (concepts, notes in every vault, annotations, tutor sessions, cards, the
+ * books' text) and jump to it; with no match, Enter hands the words to the agent instead. A combobox: type
+ * to search, arrow keys move through the results, Enter opens one, Escape closes and gives focus back. */
 import { CornerDownLeft, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { openAgent } from "../agent/store";
 import { learn, type SearchHit } from "../api";
 import { announce, useFocusTrap } from "../lib/a11y";
+import { noteRoute } from "../vaults/routes";
 import { KIND_TONE } from "./kinds";
 import { bookLink, docRoute, go } from "./navigation";
 
@@ -49,6 +50,7 @@ export function Palette() {
     if (!h) {
       if (q.trim()) openAgent({ text: q.trim(), send: true });
     } else if (h.kind === "book") go(bookLink({ bookId: h.bookId, ...(h.loc || {}) }));
+    else if (h.kind === "vault") go(noteRoute(h.vault || "", h.path || ""));
     else
       go(
         docRoute({
@@ -106,8 +108,8 @@ export function Palette() {
                 onMouseEnter={() => setIndex(i)}
                 onClick={() => pick(h)}
               >
-                <span className="tag-pill" data-tone={KIND_TONE[h.kind] || undefined}>
-                  {h.kind}
+                <span className="tag-pill" data-tone={(h.kind === "vault" ? "sky" : KIND_TONE[h.kind]) || undefined}>
+                  {h.kind === "vault" ? h.vaultName : h.kind}
                 </span>
                 <span className="hit-text">
                   <span className="hit-title">{h.title}</span>

@@ -1,7 +1,9 @@
 /* The note editor: CodeMirror 6 (the editor Obsidian is built on) editing the Markdown text itself,
  * byte for byte, with a light live preview: headings sized, emphasis shown, and Markdown marks hidden
  * except on the line being edited; [[ completes to notes, concepts and books; pictures pasted or
- * dropped go to attachments/ and in as ![[picture.png]]. ⌘/Ctrl-click a link to follow it. */
+ * dropped go to attachments/ and in as ![[picture.png]]. ⌘/Ctrl-click a link to follow it. In a
+ * vault a LinkSource says what [[ completes to, where a link goes, and where a
+ * pasted or dropped file (a picture, PDF, sound, video) is saved. */
 import {
   autocompletion,
   type CompletionContext,
@@ -38,24 +40,34 @@ async function targets() {
   return targetsCache.list;
 }
 
-async function completeLinks(ctx: CompletionContext): Promise<CompletionResult | null> {
-  const before = ctx.matchBefore(/!?\[\[[^\]|#\n]*$/);
-  if (!before) return null;
-  const open = before.text.indexOf("[[") + 2;
-  const list = await targets();
-  const after = ctx.state.sliceDoc(ctx.pos, ctx.pos + 2);
-  return {
-    from: before.from + open,
-    options: list.map((x) => ({
-      label: x.title,
-      detail: x.kind,
-      info: x.detail,
-      apply: after === "]]" ? x.title : `${x.title}]]`,
-      boost: x.kind === "note" ? 1 : x.kind === "concept" ? 0.5 : 0,
-    })),
-    validFor: /^[^\]|#\n]*$/,
-  };
+/** Where links go and files are kept, for an editor that isn't on the app's own vault. */
+export interface LinkSource {
+  targets: () => Promise<{ title: string; kind: string; detail?: string }[]>;
+  follow: (target: string, sub?: string) => void;
+  /** Saves a pasted or dropped file; returns the text to put in (e.g. "![[photo.png]]"). */
+  attach: (file: File, data: string) => Promise<string>;
 }
+
+const completeLinks =
+  (source: { current?: LinkSource }) =>
+  async (ctx: CompletionContext): Promise<CompletionResult | null> => {
+    const before = ctx.matchBefore(/!?\[\[[^\]|#\n]*$/);
+    if (!before) return null;
+    const open = before.text.indexOf("[[") + 2;
+    const list = source.current ? await source.current.targets().catch(() => []) : await targets();
+    const after = ctx.state.sliceDoc(ctx.pos, ctx.pos + 2);
+    return {
+      from: before.from + open,
+      options: list.map((x) => ({
+        label: x.title,
+        detail: x.kind,
+        info: x.detail,
+        apply: after === "]]" ? x.title : `${x.title}]]`,
+        boost: x.kind === "note" ? 1 : x.kind === "concept" ? 0.5 : 0,
+      })),
+      validFor: /^[^\]|#\n]*$/,
+    };
+  };
 
 /* ---------------- live preview ---------------- */
 
@@ -204,41 +216,52 @@ function readAsDataUrl(file: File) {
   });
 }
 
-const pictures = EditorView.domEventHandlers({
-  paste(event, view) {
-    const file = [...(event.clipboardData?.files || [])].find((f) => f.type.startsWith("image/"));
-    if (!file) return false;
-    event.preventDefault();
-    void insertPicture(view, file, view.state.selection.main.from);
-    return true;
-  },
-  drop(event, view) {
-    const file = [...(event.dataTransfer?.files || [])].find((f) => f.type.startsWith("image/"));
-    if (!file) return false;
-    event.preventDefault();
-    const at = view.posAtCoords({ x: event.clientX, y: event.clientY }) ?? view.state.selection.main.from;
-    void insertPicture(view, file, at);
-    return true;
-  },
-  mousedown(event, view) {
-    if (!(event.metaKey || event.ctrlKey)) return false;
-    const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-    if (pos === null) return false;
-    const line = view.state.doc.lineAt(pos);
-    for (const m of line.text.matchAll(/!?\[\[([^\]|#\n]*)(?:#([^\]|\n]*))?(?:\|[^\]\n]*)?\]\]/g)) {
-      const a = line.from + m.index!;
-      if (pos >= a && pos <= a + m[0].length) {
-        event.preventDefault();
-        void openLink(m[1].trim(), m[2]?.trim());
-        return true;
-      }
-    }
-    return false;
-  },
-});
+/** Pictures only, in the app's vault; in an outside one, PDFs, sound and video too. */
+const attachable = (f: File, source?: LinkSource) =>
+  f.type.startsWith("image/") || (!!source && /^(application\/pdf|audio\/|video\/)/.test(f.type));
 
-async function insertPicture(view: EditorView, file: File, at: number) {
+const pictures = (source: { current?: LinkSource }) =>
+  EditorView.domEventHandlers({
+    paste(event, view) {
+      const file = [...(event.clipboardData?.files || [])].find((f) => attachable(f, source.current));
+      if (!file) return false;
+      event.preventDefault();
+      void insertPicture(view, file, view.state.selection.main.from, source.current);
+      return true;
+    },
+    drop(event, view) {
+      const file = [...(event.dataTransfer?.files || [])].find((f) => attachable(f, source.current));
+      if (!file) return false;
+      event.preventDefault();
+      const at = view.posAtCoords({ x: event.clientX, y: event.clientY }) ?? view.state.selection.main.from;
+      void insertPicture(view, file, at, source.current);
+      return true;
+    },
+    mousedown(event, view) {
+      if (!(event.metaKey || event.ctrlKey)) return false;
+      const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+      if (pos === null) return false;
+      const line = view.state.doc.lineAt(pos);
+      for (const m of line.text.matchAll(/!?\[\[([^\]|#\n]*)(?:#([^\]|\n]*))?(?:\|[^\]\n]*)?\]\]/g)) {
+        const a = line.from + m.index!;
+        if (pos >= a && pos <= a + m[0].length) {
+          event.preventDefault();
+          if (source.current) source.current.follow(m[1].trim(), m[2]?.trim());
+          else void openLink(m[1].trim(), m[2]?.trim());
+          return true;
+        }
+      }
+      return false;
+    },
+  });
+
+async function insertPicture(view: EditorView, file: File, at: number, source?: LinkSource) {
   try {
+    if (source) {
+      const insert = await source.attach(file, await readAsDataUrl(file));
+      view.dispatch({ changes: { from: at, insert } });
+      return;
+    }
     const saved = await learn.attach(
       await readAsDataUrl(file),
       file.name && file.name !== "image.png" ? file.name : undefined,
@@ -261,6 +284,7 @@ export function NoteEditor({
   autoFocus = false,
   onBlur,
   extensions = [],
+  links,
 }: {
   value: string;
   onChange: (text: string) => void;
@@ -270,6 +294,8 @@ export function NoteEditor({
   autoFocus?: boolean;
   onBlur?: () => void;
   extensions?: Extension[];
+  /** For a vault: what [[ completes to, where links go, where files are saved. */
+  links?: LinkSource;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
@@ -277,6 +303,8 @@ export function NoteEditor({
   change.current = onChange;
   const blur = useRef(onBlur);
   blur.current = onBlur;
+  const source = useRef<LinkSource | undefined>(links);
+  source.current = links;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the editor is made once; new values arrive through the effect below, as transactions
   useEffect(() => {
@@ -298,14 +326,14 @@ export function NoteEditor({
           ]),
           markdown({ base: markdownLanguage }),
           syntaxHighlighting(style),
-          autocompletion({ override: [completeLinks], icons: false }),
+          autocompletion({ override: [completeLinks(source)], icons: false }),
           highlightSelectionMatches(),
           EditorView.lineWrapping,
           // a named, multi-line text field, in the Tab order (CodeMirror's own element is a contenteditable)
           EditorView.contentAttributes.of({ "aria-label": label, "aria-multiline": "true", tabindex: "0" }),
           placeholderExt(placeholder),
           livePreview,
-          pictures,
+          pictures(source),
           theme,
           EditorView.updateListener.of((u) => {
             if (u.docChanged) change.current(u.state.doc.toString());

@@ -4,10 +4,12 @@
  * note (linked to its page), with or without a transcription (LaTeX for formulas, a Markdown table,
  * or a description of a figure, by the model looking at it). */
 import { useEffect, useRef, useState } from "react";
-import { type Book, docs, learn, type Note } from "../api";
+import { type Book, learn, vaults } from "../api";
 import { Spinner } from "../components/feedback";
 import { Markdown } from "../components/Markdown";
+import { noteRoute } from "../vaults/routes";
 import { pageEls } from "./anchoring";
+import type { VaultTarget } from "./session";
 
 interface Box {
   x: number;
@@ -45,18 +47,16 @@ export function CaptureLayer({
   book,
   root,
   theme,
-  note,
+  noteTitle,
   ensureNote,
-  onNote,
   onDone,
   say,
 }: {
   book: Book;
   root: HTMLElement | null;
   theme: "light" | "dark";
-  note: Note | null;
-  ensureNote: () => Promise<Note>;
-  onNote: (n: Note) => void;
+  noteTitle?: string;
+  ensureNote: () => Promise<VaultTarget>;
   onDone: () => void;
   say: (text: string, action?: { label: string; href: string }) => void;
 }) {
@@ -132,16 +132,19 @@ export function CaptureLayer({
   const addToNote = async (withText: boolean) => {
     setBusy({ what: "Adding to your note", at: Date.now() });
     try {
-      const pic = await save();
       const n = await ensureNote();
-      const pageLink =
-        book.folder && book.file
-          ? `[[library/${book.folder}/${book.file}#page=${shot!.page}|${book.title}, p. ${shot!.page}]]`
-          : `${book.title}, p. ${shot!.page}`;
-      const md = `![[${pic.name}]]\n*${pageLink}*${withText && text ? `\n\n${text}` : ""}`;
-      const updated = await docs.append<Note>(n.id, md);
-      onNote(updated);
-      say(`Added to “${updated.title}”.`, { label: "Open", href: `#/notes/${updated.id}` });
+      // the picture goes in the vault, where Obsidian keeps attachments
+      const stamp = new Date().toISOString().slice(11, 19).replace(/:/g, ".");
+      const pic = await vaults.attach(
+        n.vault,
+        shot!.data,
+        `${book.title.slice(0, 50)} p${shot!.page} ${stamp}.png`,
+        n.path,
+      );
+      const title = book.title.replace(/[[\]|#^]/g, "");
+      const md = `${pic.embed}\n*[[${title}#page=${shot!.page}|${title}, p. ${shot!.page}]]*${withText && text ? `\n\n${text}` : ""}`;
+      await vaults.append(n.vault, n.path, md);
+      say(`Added to “${n.title}”.`, { label: "Open", href: noteRoute(n.vault, n.path) });
       onDone();
     } catch (e) {
       say((e as Error).message);
@@ -222,7 +225,7 @@ export function CaptureLayer({
           {busy && <Spinner label={busy.what} since={busy.at} />}
           <div className="row gap">
             <button type="button" className="button primary" disabled={!!busy} onClick={() => addToNote(text !== null)}>
-              Add to {note ? `“${note.title.length > 24 ? `${note.title.slice(0, 22)}…` : note.title}”` : "your note"}
+              Add to {noteTitle ? `“${noteTitle.length > 24 ? `${noteTitle.slice(0, 22)}…` : noteTitle}”` : "your note"}
             </button>
             {text === null && (
               <button

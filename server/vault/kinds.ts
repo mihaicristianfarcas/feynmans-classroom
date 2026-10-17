@@ -243,7 +243,7 @@ const TURN = /^## (You|Tutor)[ \t]*$/m;
 const SESSION: KindSpec<TutorSession> = {
   folder: /^library\/[^/]+\/sessions\//,
   titleIsFileName: false,
-  keys: ["mode"],
+  keys: ["mode", "vault-note"],
   read: (doc, data, body) => {
     const parts = body.replace(QUOTE_CALLOUT, "").split(TURN);
     const messages: TutorSession["messages"] = [];
@@ -254,11 +254,12 @@ const SESSION: KindSpec<TutorSession> = {
       kind: "session",
       source: doc.source || { bookId: "" },
       mode: data.mode === "socratic" ? "socratic" : "answer",
+      vaultNote: data["vault-note"] ? asString(data["vault-note"]) : undefined,
       messages,
     };
   },
   write: (x) => ({
-    data: { mode: x.mode },
+    data: { mode: x.mode, "vault-note": x.vaultNote },
     body: `${quoteCallout(x.source)}${x.messages
       .map((m) => `## ${m.role === "user" ? "You" : "Tutor"}\n\n${m.text.trim()}`)
       .join("\n\n")}`,

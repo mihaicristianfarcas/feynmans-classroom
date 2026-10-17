@@ -3,11 +3,10 @@
  * each miss with what was answered and the correction. */
 import { createContext, useContext, useEffect, useState } from "react";
 import { attemptMarkdown, type NoteQuiz, quizFromData } from "../../../shared/quiz.ts";
-import { docs } from "../api";
 import { QuizRunner } from "./Quiz";
 
-/** The note a page is showing, so a quiz in it can add attempts to it. */
-export const NoteContext = createContext<{ id: string } | null>(null);
+/** The note a page is showing (the app's, or a vault's), so a quiz in it can add attempts to it. */
+export const NoteContext = createContext<{ append: (markdown: string) => Promise<unknown> } | null>(null);
 
 export function QuizBlock({ source, theme, depth = 0 }: { source: string; theme: "light" | "dark"; depth?: number }) {
   const note = useContext(NoteContext);
@@ -60,7 +59,7 @@ export function QuizBlock({ source, theme, depth = 0 }: { source: string; theme:
         saveAttempt={
           note && depth === 0
             ? async (answers) => {
-                await docs.append(note.id, attemptMarkdown(quiz, answers));
+                await note.append(attemptMarkdown(quiz, answers));
               }
             : undefined
         }

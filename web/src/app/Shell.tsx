@@ -1,17 +1,18 @@
-/* The frame around every page except the reader: a slim bar along the top (the pages, with the number
- * of cards due on Review; the agent, search, the theme switch and settings at the right end) and the
- * page itself. */
+/* The frame around every page except the reader: a slim bar along the top (the active vault beside the
+ * brand, once vaults are added; the pages, with the number of cards due on Review; the agent, search, the
+ * theme switch and settings at the right end) and the page itself. */
 import { Moon, Search, Settings, Sun } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AgentButton } from "../agent/AgentButton";
 import { learn } from "../api";
 import { openPalette, useIndicator } from "../components/ui";
 import { under, useVaultEvents } from "../lib/useVaultEvents";
+import { VaultPicker } from "../vaults/VaultPicker";
 
 const NAV: { route: string; label: string; match: RegExp }[] = [
   { route: "#/", label: "Today", match: /^#\/?$/ },
   { route: "#/library", label: "Library", match: /^#\/library/ },
-  { route: "#/notes", label: "Notes", match: /^#\/notes/ },
+  { route: "#/notes", label: "Notes", match: /^#\/(notes|vaults)/ },
   { route: "#/review", label: "Review", match: /^#\/review/ },
   { route: "#/brain", label: "Brain", match: /^#\/brain/ },
   { route: "#/journey", label: "Journey", match: /^#\/journey/ },
@@ -87,10 +88,13 @@ export function Shell({
     <div className="shell">
       <SkipLink />
       <header className="topnav" data-line={scrolled || full || undefined}>
-        <a className="brand" href="#/" title="Today">
-          <span className="brand-mark" aria-hidden="true" />
-          <span className="brand-name">Feynman’s Classroom</span>
-        </a>
+        <div className="topnav-start">
+          <a className="brand" href="#/" title="Today">
+            <span className="brand-mark" aria-hidden="true" />
+            <span className="brand-name">Feynman’s Classroom</span>
+          </a>
+          <VaultPicker />
+        </div>
         <nav className="topnav-nav" aria-label="Main">
           <ul className="topnav-links" ref={nav}>
             {NAV.map((item, i) => (

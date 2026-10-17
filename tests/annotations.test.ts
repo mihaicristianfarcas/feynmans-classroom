@@ -12,7 +12,6 @@ process.env.DATA_DIR = dir;
 let V: typeof import("../server/vault/index.ts");
 let A: typeof import("../server/annotations/index.ts");
 let R: typeof import("../server/annotations/to-note.ts");
-let N: typeof import("../server/learn/notes.ts");
 let D: typeof import("../server/learn/docs.ts");
 let book: import("../server/books/types.ts").Book;
 
@@ -23,7 +22,6 @@ beforeAll(async () => {
   const { exportBook } = await import("../server/vault/library.ts");
   A = await import("../server/annotations/index.ts");
   R = await import("../server/annotations/to-note.ts");
-  N = await import("../server/learn/notes.ts");
   D = await import("../server/learn/docs.ts");
   book = await ingestBook({
     name: "Tiny Physics.pdf",
@@ -102,7 +100,7 @@ describe("annotations", () => {
     expect(body).toMatch(/^## Energy\n\nHeight and speed trade\.\n\n```figure\n/);
     expect(A.figureOf({ body } as never)).toMatchObject({ title: "Energy" });
   });
-  it("go into notes as a reference, a quote, or embedded", () => {
+  it("go into notes as a reference, a quote, or embedded", async () => {
     const a = V.docs.list("annotation").find((x) => x.type === "highlight")!;
     const link = a.path.replace(/\.md$/, "");
     expect(R.noteMarkdown(a, "reference")).toBe(
@@ -112,11 +110,15 @@ describe("annotations", () => {
       `> [!quote] [[${link}|Tiny Physics · p. 1]]\n> A pendulum trades height for speed`,
     );
     expect(R.noteMarkdown(a, "embed")).toBe(`![[${link}]]`);
-    const note = N.bookNote(book.id);
-    expect(note.title).toBe("Tiny Physics — notes");
-    D.appendToDoc(note.id, R.noteMarkdown(a, "passage"));
-    expect(readFileSync(join(V.VAULT, note.path), "utf8")).toContain("> [!quote] [[library/tiny-physics/annotations/");
-    expect(N.bookNote(book.id).id).toBe(note.id);
+    // sent without a note named, into the book's note in the first vault (made when there's none)
+    const { listVaults, rootOf } = await import("../server/vaults/index.ts");
+    const first = R.sendToNote(book.id, { annotationId: a.id, mode: "passage" });
+    expect(first.vaultNote.path).toBe("Tiny Physics — notes.md");
+    const [info] = listVaults();
+    expect(readFileSync(join(rootOf(info), first.vaultNote.path), "utf8")).toContain(
+      "> [!quote] [[Tiny Physics#page=1|",
+    );
+    expect(R.sendToNote(book.id, { annotationId: a.id, mode: "reference" }).vaultNote).toEqual(first.vaultNote);
   });
   it("written outside the app are picked up and placed", async () => {
     const rel = "library/tiny-physics/annotations/p2-explain-agent.md";

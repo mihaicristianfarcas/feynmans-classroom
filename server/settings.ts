@@ -1,5 +1,6 @@
 /* Settings a self-hoster changes from the app: which subscription does the thinking (Codex or
- * Claude Code), and which model and effort each tier uses. Stored in DATA_DIR/settings.json. */
+ * Claude Code), which model and effort each tier uses, and whether the Notes page shows the app's own
+ * notes. Stored in DATA_DIR/settings.json. */
 import { join } from "node:path";
 import { CODEX, DATA_DIR } from "./config.ts";
 import { readJson, writeJson } from "./fs.ts";

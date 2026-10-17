@@ -3,10 +3,12 @@
  * pictures, figures), > [!callouts] (folded with `-` or `+`, as disclosures), ==highlights==, #tags;
  * plus the platform's own: ```figure blocks become interactive figures, ```manim blocks animations
  * (ManimGX, played in a sandboxed frame), ```quiz blocks quizzes to play, and {{cloze}} deletions
- * become blanks. Raw HTML is never rendered. KaTeX (half a megabyte) loads with the first text that
+ * become blanks. Inside a vault a MarkdownWorld says where links go, what embeds
+ * show (notes, sections, pictures, PDFs, sound, video), where a #tag leads, and lets task boxes be
+ * ticked. Raw HTML is never rendered. KaTeX (half a megabyte) loads with the first text that
  * has math in it; until then the math shows as its TeX. */
 import type { Blockquote, Paragraph, PhrasingContent, Root, Text } from "mdast";
-import { Children, isValidElement, memo, type ReactNode, useEffect, useState } from "react";
+import { Children, createContext, isValidElement, memo, type ReactNode, useContext, useEffect, useState } from "react";
 import ReactMarkdown, { type Components, type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -17,6 +19,29 @@ import { openLink } from "../app/navigation";
 import { ManimView, sceneTitle } from "../manim/ManimView";
 import { SceneView } from "../scene/SceneView";
 import { QuizBlock } from "./QuizBlock";
+
+/* ---------------- whose links: the app's vault, or an outside one ---------------- */
+
+/** How links, embeds and tags work in Markdown from a vault (left out: Markdown of the app's own, such as a concept's). */
+export interface MarkdownWorld {
+  /** Where a link leads, as an address (for a new tab, or to copy). `md`: a [text](path) link. */
+  href(target: string, sub?: string, md?: boolean): string;
+  open(target: string, sub?: string, md?: boolean): void;
+  /** Whether a link goes nowhere yet (it shows as such, and opening it makes the note). */
+  missing?(target: string, md?: boolean): boolean;
+  embed(e: {
+    target: string;
+    sub?: string;
+    alias?: string;
+    md?: boolean;
+    depth: number;
+    theme: "light" | "dark";
+  }): ReactNode;
+  tagHref?(tag: string): string;
+  /** A task's box was ticked or cleared, on this line of the text shown. */
+  toggleTask?(line: number): void;
+}
+export const MarkdownWorldContext = createContext<MarkdownWorld | null>(null);
 
 /* ---------------- Obsidian syntax, as a remark plugin ---------------- */
 
@@ -159,9 +184,51 @@ function makeComponents(
   depth: number,
   onLink?: (href: string) => boolean,
   base?: string,
+  world?: MarkdownWorld | null,
 ): Components {
   return {
     a({ href, children, node: _node, ...props }) {
+      if (world && href && !/^([a-z][a-z0-9+.-]*:|#\/open\?|#user-content-|#$)/i.test(href)) {
+        // a [text](path) link inside the vault
+        let target = href;
+        try {
+          target = decodeURIComponent(href);
+        } catch {}
+        const [path, sub] = [target.split("#")[0], target.split("#").slice(1).join("#") || undefined];
+        return (
+          <a
+            {...props}
+            href={world.href(path, sub, true)}
+            className="wikilink"
+            data-missing={(path && world.missing?.(path, true)) || undefined}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey) return;
+              e.preventDefault();
+              world.open(path, sub, true);
+            }}
+          >
+            {children}
+          </a>
+        );
+      }
+      if (world && href?.startsWith("#/open?")) {
+        const q = new URLSearchParams(href.slice(7));
+        const [target, sub] = [q.get("target") || "", q.get("sub") || undefined];
+        return (
+          <a
+            {...props}
+            href={world.href(target, sub)}
+            data-missing={(target && world.missing?.(target)) || undefined}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey) return;
+              e.preventDefault();
+              world.open(target, sub);
+            }}
+          >
+            {children}
+          </a>
+        );
+      }
       // a relative link (an agent's or Obsidian's [text](path.md)) points into the vault
       if (href && !/^([a-z][a-z0-9+.-]*:|#|\/)/i.test(href)) {
         const target = vaultPath(href, base).replace(/\.md$/i, "");
@@ -200,6 +267,26 @@ function makeComponents(
     },
     span({ node: _node, ...props }) {
       const p = props as Record<string, string> & { className?: string; children?: ReactNode };
+      if (p.className?.includes("md-embed") && world)
+        return depth > 3 ? (
+          <span className="fine">{p["data-target"]}</span>
+        ) : (
+          world.embed({
+            target: p["data-target"],
+            sub: p["data-sub"] || undefined,
+            alias: p["data-alias"] || undefined,
+            depth,
+            theme,
+          })
+        );
+      if (p.className === "tag" && world?.tagHref) {
+        const tag = String(textOf(p.children)).replace(/^#/, "");
+        return (
+          <a className="tag" href={world.tagHref(tag)}>
+            #{tag}
+          </a>
+        );
+      }
       if (p.className?.includes("md-embed"))
         return depth > 2 ? (
           <span className="fine">{p["data-target"]}</span>
@@ -225,6 +312,13 @@ function makeComponents(
       return <pre>{children}</pre>;
     },
     img({ src, alt, node: _node }) {
+      if (world && typeof src === "string" && !/^(https?:|data:image\/)/.test(src)) {
+        let target = src;
+        try {
+          target = decodeURIComponent(src);
+        } catch {}
+        return world.embed({ target, alias: alt || undefined, md: true, depth, theme });
+      }
       const url =
         typeof src === "string"
           ? /^(https?:|data:image\/)/.test(src)
@@ -233,7 +327,46 @@ function makeComponents(
           : "";
       return <img src={url} alt={alt || ""} loading="lazy" />;
     },
+    p({ node, children, ...props }) {
+      // a paragraph holding an embed of a note (which has paragraphs and headings of its own) can't be a <p>
+      const embeds =
+        world &&
+        node?.children.some(
+          (c) =>
+            c.type === "element" && (c.tagName === "img" || String(c.properties?.className ?? "").includes("md-embed")),
+        );
+      return embeds ? (
+        <div className="md-p" {...props}>
+          {children}
+        </div>
+      ) : (
+        <p {...props}>{children}</p>
+      );
+    },
+    li({ node, children, ...props }) {
+      // a task's box is ticked by its line (the box itself carries no place in the text)
+      const line = node?.position?.start.line;
+      if (!world?.toggleTask || !line || !String(props.className || "").includes("task-list-item"))
+        return <li {...props}>{children}</li>;
+      return (
+        <li {...props} data-line={line}>
+          {children}
+        </li>
+      );
+    },
     input({ node: _node, ...props }) {
+      if (world?.toggleTask && props.type === "checkbox")
+        return (
+          <input
+            {...props}
+            disabled={false}
+            aria-label={props.checked ? "Done: clear" : "Mark done"}
+            onChange={(e) => {
+              const line = Number(e.currentTarget.closest("li")?.dataset.line);
+              if (line) world.toggleTask?.(line);
+            }}
+          />
+        );
       // task list checkboxes: shown, not editable here
       return <input {...props} disabled />;
     },
@@ -283,12 +416,13 @@ export const Markdown = memo(function Markdown({
 }) {
   const source = normalizeMath(text || "");
   const math = useKatex(source.includes("$"));
+  const world = useContext(MarkdownWorldContext);
   return (
     <div className={`md ${hideCloze ? "hide-cloze" : ""} ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }], remarkObsidian]}
         rehypePlugins={math || undefined}
-        components={makeComponents(theme, depth, onLink, base)}
+        components={makeComponents(theme, depth, onLink, base, world)}
       >
         {source}
       </ReactMarkdown>

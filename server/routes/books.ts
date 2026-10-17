@@ -11,10 +11,11 @@ import { CONTENT_ONLY, eventStream, readBody, sendFile } from "../http.ts";
 import { detectChapters } from "../ingest/chapters.ts";
 import { formatOf, ingestBook } from "../ingest/index.ts";
 import { queue } from "../jobs.ts";
-import { bookNote } from "../learn/notes.ts";
 import { type ReadingPing, recordReading } from "../learn/reading.ts";
 import { logActivity } from "../vault/index.ts";
 import { exportBook } from "../vault/library.ts";
+import { defaultVault } from "../vaults/index.ts";
+import { vaultBookNote } from "../vaults/reading.ts";
 
 const MAX_UPLOAD = 200 * 1024 * 1024;
 
@@ -102,8 +103,11 @@ export function bookRoutes(app: Hono) {
   /** Asks a model where the chapters are, for books without a usable outline. */
   app.post("/api/books/:id/detect-chapters", (c) => c.json(detectChapters(c.req.param("id"))));
 
-  /** The note a book's reading session writes into ("<title> — notes", made on first use). */
-  app.post("/api/books/:id/note", (c) => c.json(bookNote(c.req.param("id"))));
+  /** The note a book's reading session writes into ("<title> — notes", made on first use), in vault
+   * `?vault=<id>` (the first vault without one). */
+  app.post("/api/books/:id/note", (c) =>
+    c.json(vaultBookNote(c.req.query("vault") || defaultVault(), c.req.param("id"))),
+  );
 
   app.get("/api/books/:id/events", (c) => eventStream(c, c.req.param("id")));
 

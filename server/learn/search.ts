@@ -1,21 +1,26 @@
-/* Searching the whole vault from the ⌘K palette: every document (concepts, notes, annotations, sessions
- * with the tutor, cards, figures) and the books' text, ranked by simple term scores with the titles
- * weighted up. */
+/* Searching everything from the ⌘K palette: every document (concepts, notes, annotations, sessions
+ * with the tutor, cards, figures), the notes of every vault, and the books' text, ranked by
+ * simple term scores with the titles weighted up. */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Doc, DocKind } from "../../shared/vault-types.ts";
 import { listBooks } from "../books/store.ts";
 import { docs, VAULT } from "../vault/index.ts";
 import { chapterFile } from "../vault/library.ts";
+import { getVault, listVaults } from "../vaults/index.ts";
 
 export interface SearchHit {
-  kind: DocKind | "book";
+  /** "vault": a vault note (`vault`, `path`). */
+  kind: DocKind | "book" | "vault";
   id: string;
   title: string;
   snippet: string;
   score: number;
   bookId?: string;
   loc?: { page?: number; block?: number };
+  vault?: string;
+  vaultName?: string;
+  path?: string;
 }
 
 const words = (q: string) =>
@@ -82,6 +87,29 @@ export function search(q: string, limit = 40): SearchHit[] {
       bookId: at?.bookId,
       loc: at?.page !== undefined ? { page: at.page } : at?.block !== undefined ? { block: at.block } : undefined,
     });
+  }
+  for (const v of listVaults()) {
+    let vault: ReturnType<typeof getVault>;
+    try {
+      vault = getVault(v.id);
+    } catch {
+      continue;
+    }
+    for (const e of vault.files.values()) {
+      if (e.kind !== "note" || !e.text) continue;
+      const s = scoreText(`${e.name} ${e.name} ${e.aliases.join(" ")} ${e.tags.join(" ")} ${e.text}`, terms);
+      if (!s) continue;
+      hits.push({
+        kind: "vault",
+        id: `${v.id}:${e.path}`,
+        title: e.name,
+        snippet: snippet(e.text.slice(e.bodyStart || 0), terms),
+        score: s * WEIGHT.note,
+        vault: v.id,
+        vaultName: v.name,
+        path: e.path,
+      });
+    }
   }
   // book text, by chapter file in the library
   for (const b of listBooks().filter((x) => x.status === "ready")) {

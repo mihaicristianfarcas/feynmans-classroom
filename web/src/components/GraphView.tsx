@@ -20,6 +20,7 @@ import { type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, use
 import type { GraphData } from "../api";
 import { go, openLink } from "../app/navigation";
 import { useArrowKeys } from "../lib/a11y";
+import { noteRoute } from "../vaults/routes";
 
 export type GraphNode = SimulationNodeDatum & GraphData["nodes"][number];
 type N = GraphNode;
@@ -182,11 +183,12 @@ export function NodeMark({
 }
 
 /** Opens an item's own page: a book in the reader, a concept's page, a note, an annotation in its book. */
-export function openNode(n: Pick<N, "kind" | "id" | "bookId" | "path">) {
+export function openNode(n: Pick<N, "kind" | "id" | "bookId" | "path" | "vault">) {
   if (n.kind === "book") go(`#/book/${n.bookId}`);
   else if (n.kind === "concept") go(`#/brain/concept/${n.id.slice(8)}`);
   else if (n.kind === "annotation" && n.path) openLink(n.path.replace(/\.md$/, ""));
-  else go(`#/notes/${n.id.slice(5)}`);
+  else if (n.vault && n.path) go(noteRoute(n.vault, n.path));
+  else go("#/vaults");
 }
 
 /**
@@ -207,6 +209,7 @@ export function GraphView({
   inset = 0,
   insetLeft = 0,
   tools,
+  onOpen = openNode,
 }: {
   data: GraphData;
   showNotes?: boolean;
@@ -226,6 +229,8 @@ export function GraphView({
   insetLeft?: number;
   /** More buttons for the cluster in the corner. */
   tools?: ReactNode;
+  /** Opens an item's page (on double-click): its own page in the app, unless the graph is of another vault. */
+  onOpen?: (node: N) => void;
 }) {
   // nodes keep where they were when the graph reloads (a link accepted, a note added)
   const previous = useRef<N[]>([]);
@@ -481,7 +486,7 @@ export function GraphView({
         onSelect?.(n, true);
       }
     },
-    onDoubleClick: () => openNode(n),
+    onDoubleClick: () => onOpen(n),
   });
   useArrowKeys(svg, { selector: "[data-node]", orientation: "both" });
   const counts = ["concept", "note", "book"]

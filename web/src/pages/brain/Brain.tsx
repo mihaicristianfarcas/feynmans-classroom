@@ -1,6 +1,6 @@
 /* The Brain (#/brain): your vault as one graph that fills the page (BrainGraph), and each concept's own
  * page (#/brain/concept/<id>). Older routes still land somewhere: the lists that were tabs here open
- * the graph, figures moved to the library, notes to #/notes, and #/brain/find/<target> opens a link. */
+ * the graph, figures moved to the library, notes to the vaults, and #/brain/find/<target> opens a link. */
 import { useEffect, useState } from "react";
 import { openLink } from "../../app/navigation";
 import { BrainGraph } from "./BrainGraph";
@@ -17,8 +17,7 @@ export function Brain({ theme }: { theme: "light" | "dark" }) {
   const path = hash.split("?")[0].replace(/^#\/brain\/?/, "");
   const [section, id] = [path.split("/")[0], decodeURIComponent(path.split("/").slice(1).join("/"))];
   if (section === "concept" && id) return <ConceptPage key={id} id={id} theme={theme} />;
-  if (section === "note" && id) return <Redirect to={`#/notes/${id}`} />;
-  if (section === "new") return <Redirect to="#/notes" />;
+  if (section === "note" || section === "new") return <Redirect to="#/vaults" />;
   if (section === "figures") return <Redirect to="#/library/figures" />;
   if (section === "find" && id) return <Find target={id} />;
   return <BrainGraph theme={theme} />;

@@ -11,12 +11,14 @@
  *      the learner's OK. Everything else lands at once, after whatever the learner did meanwhile, and
  *      only if it doesn't clash with it (vault/jj.ts).
  *   5. Undo: each run is one jj change, taken out again with one click. log/agents.jsonl records
- *      every run: the request, where, the model, the files, the change. */
+ *      every run: the request, where, the model, the files, the change.
+ *
+ * A request made in a vault works on a copy of that vault's notes instead, and lands in it (and
+ * is undone) through the vault's own history (vaults/agent-work.ts). */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentContext, AgentRun } from "../../shared/vault-types.ts";
 import { publish } from "../events.ts";
-import { createDoc } from "../learn/docs.ts";
 import { agent } from "../llm/index.ts";
 import {
   appendLog,
@@ -35,7 +37,18 @@ import {
 } from "../vault/index.ts";
 import { writeIndexes } from "../vault/indexes.ts";
 import { abandon, commitIdOf, describeIn, drop, land } from "../vault/jj.ts";
-import { agentPrompt, REPLY_SCHEMA, type Reply } from "./prompt.ts";
+import {
+  dropWork,
+  finishWork,
+  land as landInVault,
+  startWork,
+  unland,
+  diffOf as vaultDiff,
+  type Work,
+} from "../vaults/agent-work.ts";
+import { createNote } from "../vaults/edit.ts";
+import { announceChanges, defaultVault, getVault, listVaults } from "../vaults/index.ts";
+import { agentPrompt, REPLY_SCHEMA, type Reply, vaultAgentPrompt } from "./prompt.ts";
 import { isForbidden, needsReview, problemsIn } from "./review.ts";
 import { describeWhere } from "./where.ts";
 import { cleanUpWorkingCopies, createWorkingCopy, removeWorkingCopy, unlinkDerived } from "./workspace.ts";
@@ -95,9 +108,12 @@ export function startRun(input: {
   const previous = input.after ? runs.get(input.after) : undefined;
   const where = describeWhere(input.context);
   const id = shortId("r");
+  // a follow-up stays in the vault its conversation started in
+  const vault = previous ? previous.vault : listVaults().find((v) => v.id === input.context?.vault)?.id;
   const run = save({
     id,
     task,
+    vault,
     thread: previous ? previous.thread || previous.id : undefined,
     where: where.label || undefined,
     tier: input.tier === "smart" ? "smart" : "fast",
@@ -130,6 +146,7 @@ function reporter(id: string) {
 
 /** The run itself: a working copy, the agent, the checks; then it lands, waits for review, or fails. */
 async function execute(run: AgentRun, where: string[]) {
+  if (run.vault) return executeInVault(run, run.vault, where);
   const started = Date.now();
   const prompt = agentPrompt({ task: run.task, where, turns: turnsBefore(run) });
   const finish = (patch: Partial<AgentRun>) =>
@@ -192,6 +209,72 @@ async function execute(run: AgentRun, where: string[]) {
   }
 }
 
+/** A run in a vault: a copy of its notes, the agent, then its commit lands in the vault (or fails). */
+async function executeInVault(run: AgentRun, id: string, where: string[]) {
+  const started = Date.now();
+  const finish = (patch: Partial<AgentRun>) =>
+    save({ ...runs.get(run.id)!, activity: undefined, ms: Date.now() - started, ...patch });
+  let work: Work | null = null;
+  const vault = getVault(id);
+  try {
+    const name = listVaults().find((v) => v.id === id)?.name || "vault";
+    work = startWork(vault, run.id);
+    save({ ...runs.get(run.id)!, activity: "reading your notes" });
+    const result = await agent({
+      cwd: work.dir,
+      write: true,
+      readRoots: [vault.root, VAULT],
+      prompt: vaultAgentPrompt({
+        task: run.task,
+        where,
+        turns: turnsBefore(run),
+        name,
+        files: vault.root,
+        classroom: VAULT,
+      }),
+      schema: REPLY_SCHEMA,
+      tier: run.tier,
+      timeoutMs: (run.tier === "smart" ? 15 : 6) * 60 * 1000,
+      onActivity: reporter(run.id),
+    });
+    const reply = (result.data || {}) as Partial<Reply>;
+    const open = String(reply.open || "").replace(/^\/+/, "");
+    const base = {
+      provider: result.provider,
+      model: result.model,
+      answer: String(reply.reply || "").trim(),
+      open: open && !open.includes("..") ? open : undefined,
+    };
+    const done = finishWork(vault, work, run.id, `agent: ${run.task.split("\n")[0].slice(0, 100)}`);
+    work = null;
+    if (!done.commit) {
+      finish({
+        ...base,
+        status: "done",
+        files: [],
+        open: base.open && vault.files.has(base.open) ? base.open : undefined,
+      });
+      return;
+    }
+    const landed = landInVault(vault, done.commit);
+    if (!landed.ok) {
+      finish({
+        ...base,
+        status: "failed",
+        files: done.files,
+        commit: done.commit,
+        error: landed.clash ? `${landed.error}; ask again and it will start from your latest version` : landed.error,
+      });
+      return;
+    }
+    logActivity({ type: "ask", text: `Asked the agent: ${run.task.slice(0, 80)}` });
+    finish({ ...base, status: "merged", files: done.files, change: landed.commit, commit: landed.commit });
+  } catch (error) {
+    if (work) dropWork(vault, work);
+    finish({ status: "failed", error: (error as Error).message.slice(0, 600) });
+  }
+}
+
 /** jj is about to write these files: the watcher shouldn't take them for the learner's own edits. */
 function expect(files: AgentRun["files"]) {
   for (const f of files || []) wroteItself(f.path);
@@ -245,6 +328,14 @@ export function discardRun(id: string): AgentRun {
 export function undoRun(id: string): AgentRun {
   const run = get(id);
   if (run.status !== "merged" || !run.change) throw new Error("only a run that changed your vault can be undone");
+  if (run.vault) {
+    const out = unland(getVault(run.vault), run.change);
+    if (!out.ok)
+      throw new Error(
+        out.clash ? "can't undo it cleanly: you've changed the same lines since" : `can't undo it: ${out.error}`,
+      );
+    return save({ ...run, status: "undone" });
+  }
   expect(run.files);
   const dropped = drop(run.change);
   if (!dropped.ok) unexpect(run.files);
@@ -259,20 +350,23 @@ export function undoRun(id: string): AgentRun {
 /** The changes a run made (or proposes), as a unified diff. */
 export function runDiff(id: string): string {
   const run = get(id);
-  return run.commit ? diffOf(run.commit) : "";
+  if (!run.commit) return "";
+  return run.vault ? vaultDiff(getVault(run.vault), run.commit) : diffOf(run.commit);
 }
 
-/** Keeps an answer as a note (for a request that changed nothing). */
+/** Keeps an answer as a note (for a request that changed nothing), in the run's vault or the first one. */
 export function keepRun(id: string): AgentRun {
   const run = get(id);
   if (!run.answer) throw new Error("there's no answer to keep");
   if (run.kept) return run;
-  const note = createDoc({
-    kind: "note",
-    type: "answer",
-    title: run.task.split("\n")[0].slice(0, 80),
-    body: run.answer,
-    tags: ["ask"],
+  const vault = getVault(run.vault || defaultVault());
+  const made = createNote(vault, {
+    title: run.task
+      .split("\n")[0]
+      .slice(0, 80)
+      .replace(/[\\/:]/g, "-"),
+    text: run.answer,
   });
-  return save({ ...run, kept: note.path });
+  announceChanges(vault.id, [made]);
+  return save({ ...run, kept: made.path, keptIn: run.vault ? undefined : vault.id });
 }

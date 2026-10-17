@@ -1,7 +1,7 @@
 // Tutoring sessions: each conversation with the tutor about a book is a Markdown file beside it, saved
 // after every reply, read back as it was (by the app, by Obsidian, by an agent), written up as a note
 // that links both ways (with a stand-in model), and deletable.
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -122,30 +122,20 @@ describe("tutoring sessions", () => {
     expect(S.recordExchange({ messages: [{ role: "user", text: "x" }] })).toBeNull();
   });
 
-  it("are written up as a note that links back, and know their note while it's there", async () => {
-    const D = await import("../server/learn/docs.ts");
-    const { note, session } = await S.noteFromSession(id);
+  it("are written up as a note in the first vault (made when there's none), and know their note while it's there", async () => {
+    const vaults = await import("../server/vaults/index.ts");
+    const { vaultNote, session } = await S.noteFromSession(id);
     expect(prompts.at(-1)).toContain("Learner: And without air?");
     expect(prompts.at(-1)).toContain("<passage>\nA pendulum trades height for speed.");
-    expect(note).toMatchObject({ kind: "note", type: "session", title: "Why a pendulum stops", tags: ["tutor"] });
-    expect(note.path).toBe("notes/Why a pendulum stops.md");
-    expect(note.body).toContain(`From [[${session.path.replace(/\.md$/, "")}|a session with the tutor]]`);
-    // the session links to its note in its frontmatter, as any document can
-    const file = readFileSync(join(V.VAULT, session.path), "utf8");
-    expect(file).toMatch(/^related: \["\[\[Why a pendulum stops\]\]"\]$/m);
-    V.docs.load();
-    expect(S.getSession(id).note).toEqual({ id: note.id, title: "Why a pendulum stops" });
-    // the note's page names the session it links to, and lists the session's link back
-    const detail = D.docDetail(D.getDoc(note.id));
-    expect(detail.outgoing.map((o) => o.title)).toContain("Why does a pendulum slow down?");
-    expect(detail.backlinks).toContainEqual(
-      expect.objectContaining({ from: `session:${id}`, title: "Why does a pendulum slow down?" }),
-    );
-    // renamed, it is still the session's note (the link follows); deleted, it no longer is
-    D.updateDoc(note.id, { title: "Damping" });
-    expect(S.listSessions(book.id).find((s) => s.id === id)?.note?.title).toBe("Damping");
-    expect(readFileSync(join(V.VAULT, session.path), "utf8")).toMatch(/^related: \["\[\[Damping\]\]"\]$/m);
-    D.deleteDoc(note.id);
+    const [info] = vaults.listVaults();
+    expect(info).toMatchObject({ name: "Notes", app: true });
+    expect(vaultNote).toEqual({ vault: info.id, path: "Why a pendulum stops.md", title: "Why a pendulum stops" });
+    const full = join(vaults.rootOf(info), vaultNote.path);
+    expect(readFileSync(full, "utf8")).toContain(`From a session with the tutor on [[${book.title}]].`);
+    expect(session.note).toEqual({ vault: info.id, path: vaultNote.path, title: "Why a pendulum stops" });
+    // deleted, it no longer is the session's note
+    rmSync(full);
+    vaults.getVault(info.id).reconcile();
     expect(S.getSession(id).note).toBeUndefined();
   });
 

@@ -8,9 +8,11 @@ import { useEffect, useRef, useState } from "react";
 import { type AgentContext, type AgentRun, learn } from "../api";
 import { go, vaultLink } from "../app/navigation";
 import { Spinner } from "../components/feedback";
-import { Markdown } from "../components/Markdown";
+import { Markdown, MarkdownWorldContext } from "../components/Markdown";
 import { announce, useFocusTrap } from "../lib/a11y";
 import { timeAgo } from "../lib/time";
+import { noteRoute } from "../vaults/routes";
+import { useVaultWorld } from "../vaults/world";
 import { contextLabel, currentContext, withoutPlace } from "./context";
 import { onFinished, showThread, threadOf, upsert, useAgent } from "./store";
 
@@ -310,6 +312,8 @@ function Turn({
   retry: () => void;
 }) {
   const [diff, setDiff] = useState<string | null>(null);
+  // in a vault, the [[links]] of its reply are to that vault's notes
+  const world = useVaultWorld(run.vault || "", "");
   const [error, setError] = useState<string | null>(null);
   const act = async (action: "approve" | "discard" | "undo" | "keep") => {
     setError(null);
@@ -328,7 +332,7 @@ function Turn({
       setError((e as Error).message);
     }
   };
-  const openLink = run.open ? vaultLink(run.open) : null;
+  const openLink = run.open ? linkOf(run, run.open) : null;
   const files = run.files || [];
   return (
     <article className="agent-turn" data-status={run.status}>
@@ -342,7 +346,11 @@ function Turn({
       {run.status === "running" && (
         <Spinner label={run.activity || "Working"} since={new Date(run.started).getTime()} />
       )}
-      {run.answer && <Markdown text={run.answer} theme={theme} className="agent-reply" />}
+      {run.answer && (
+        <MarkdownWorldContext.Provider value={run.vault ? world : null}>
+          <Markdown text={run.answer} theme={theme} className="agent-reply" />
+        </MarkdownWorldContext.Provider>
+      )}
       {run.review && (
         <ul className="run-review">
           {run.review.map((r) => (
@@ -359,7 +367,7 @@ function Turn({
       {files.length > 0 && run.status !== "failed" && (
         <ul className="agent-files" aria-label="Files it changed">
           {files.map((f) => {
-            const href = f.change !== "D" && run.status === "merged" ? vaultLink(f.path) : null;
+            const href = f.change !== "D" && run.status === "merged" ? linkOf(run, f.path) : null;
             const name = f.path.split("/").pop()?.replace(/\.md$/, "") || f.path;
             return (
               <li key={`${f.change}${f.path}`} title={f.path} data-change={f.change}>
@@ -413,8 +421,8 @@ function Turn({
               Keep as a note
             </button>
           )}
-          {run.kept && vaultLink(run.kept) && (
-            <a className="button subtle small" href={vaultLink(run.kept)!} onClick={close}>
+          {run.kept && keptLink(run) && (
+            <a className="button subtle small" href={keptLink(run)!} onClick={close}>
               Kept · open the note
             </a>
           )}
@@ -444,9 +452,18 @@ function Turn({
   );
 }
 
+/** Where a file a run made or changed opens: in its vault, or the app's own. */
+const linkOf = (run: AgentRun, path: string) => (run.vault ? noteRoute(run.vault, path) : vaultLink(path));
+
+/** Where the note an answer was kept in opens (in a vault; older runs kept it among the app's files). */
+const keptLink = (run: AgentRun) => {
+  const vault = run.vault || run.keptIn;
+  return run.kept ? (vault ? noteRoute(vault, run.kept) : vaultLink(run.kept)) : null;
+};
+
 /** A request finished while the panel was closed: one line at the bottom of the window. */
 function Notice({ run, onShow, onClose }: { run: AgentRun; onShow: () => void; onClose: () => void }) {
-  const link = run.open && (run.status === "merged" || run.status === "done") ? vaultLink(run.open) : null;
+  const link = run.open && (run.status === "merged" || run.status === "done") ? linkOf(run, run.open) : null;
   const line = (run.status === "failed" ? run.error : run.answer || run.task)?.split("\n")[0] || "";
   return (
     <div className="toast agent-notice" role="status" data-status={run.status}>

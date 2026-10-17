@@ -1,7 +1,7 @@
-/* A note's saved versions (from the vault's jj history): pick one to read it as it was, see what that
- * version changed, and bring it back (as a new change, so the current text stays in the history). */
+/* A vault note's saved versions (its vault's history, see
+ * server/vaults/history.ts): pick one to read it as it was, see what that version changed, and bring
+ * it back (as a new change, so the current text stays in the history). */
 import { useEffect, useState } from "react";
-import { docs, type Note, type NoteDetail, type Version } from "../api";
 import { Spinner } from "../components/feedback";
 import { Markdown } from "../components/Markdown";
 import { Modal } from "../components/tools";
@@ -9,33 +9,54 @@ import { useIndicator } from "../components/ui";
 import { announce } from "../lib/a11y";
 import { timeAgo } from "../lib/time";
 
-export function Versions({
-  note,
+/** A saved version, as the history lists it. */
+interface Saved {
+  commit: string;
+  when: string;
+  subject: string;
+}
+
+/** Where a note's versions come from and how one is brought back. */
+export interface History<V extends Saved> {
+  list: () => Promise<V[]>;
+  open: (v: V) => Promise<{ body: string; diff: string }>;
+  restore: (v: V) => Promise<unknown>;
+}
+
+export function Versions<V extends Saved>({
+  title,
+  base,
+  history,
   theme,
   onClose,
   onRestored,
 }: {
-  note: NoteDetail;
+  title: string;
+  /** The note's path, for links and pictures in an old version. */
+  base: string;
+  history: History<V>;
   theme: "light" | "dark";
   onClose: () => void;
   onRestored: () => void;
 }) {
-  const [versions, setVersions] = useState<Version[] | null>(null);
-  const [picked, setPicked] = useState<Version | null>(null);
+  const [versions, setVersions] = useState<V[] | null>(null);
+  const [picked, setPicked] = useState<V | null>(null);
   const [shown, setShown] = useState<{ body: string; diff: string } | null>(null);
   const [view, setView] = useState<"text" | "changes">("text");
   const [error, setError] = useState<string | null>(null);
   const views = useIndicator<HTMLFieldSetElement>(`${view}:${picked?.commit}:${!!shown}`);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the history is read once, when the dialog opens
   useEffect(() => {
-    docs.versions(note.id).then(setVersions, (e) => setError((e as Error).message));
-  }, [note.id]);
+    history.list().then(setVersions, (e) => setError((e as Error).message));
+  }, []);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a version is opened when one is picked
   useEffect(() => {
     if (!picked) return;
     setShown(null);
-    docs.version(note.id, picked.commit).then(setShown, (e) => setError((e as Error).message));
-  }, [note.id, picked]);
+    history.open(picked).then(setShown, (e) => setError((e as Error).message));
+  }, [picked]);
   return (
-    <Modal title={`Versions of “${note.title}”`} eyebrow="History" onClose={onClose} wide>
+    <Modal title={`Versions of “${title}”`} eyebrow="History" onClose={onClose} wide>
       {error && <p className="form-error">{error}</p>}
       {!versions ? (
         <Spinner label="Reading the history" />
@@ -83,7 +104,7 @@ export function Versions({
                     className="button primary"
                     onClick={async () => {
                       try {
-                        await docs.restore<Note>(note.id, picked.commit);
+                        await history.restore(picked);
                         announce("Brought back that version");
                         onRestored();
                         onClose();
@@ -96,7 +117,7 @@ export function Versions({
                   </button>
                 </div>
                 {view === "text" ? (
-                  <Markdown text={shown.body} theme={theme} className="note-read versions-text" base={note.path} />
+                  <Markdown text={shown.body} theme={theme} className="note-read versions-text" base={base} />
                 ) : (
                   <pre className="run-diff">{shown.diff || "(no changes to this note in that version)"}</pre>
                 )}

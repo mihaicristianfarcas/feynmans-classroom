@@ -1,11 +1,13 @@
 /* Where the learner is when they ask the agent something: the page, the open document (a note, a
- * concept), the book with its chapter and page, the selected text. The prompt gets the paths to start from (so
- * "summarise this chapter" needs no explaining); the run keeps a short label for the panel. */
+ * concept, or a vault and the note open in it), the book with its chapter and page, the
+ * selected text. The prompt gets the paths to start from (so "summarise this chapter" needs no
+ * explaining); the run keeps a short label for the panel. */
 import type { AgentContext } from "../../shared/vault-types.ts";
 import { chapterAt } from "../books/locate.ts";
 import { getBook } from "../books/store.ts";
 import { docs } from "../vault/index.ts";
 import { bookSlug, chapterFile } from "../vault/library.ts";
+import { getVault, listVaults } from "../vaults/index.ts";
 
 const PAGES: Record<string, string> = {
   "": "Today (their start page)",
@@ -22,9 +24,17 @@ export function describeWhere(context: AgentContext = {}): { label: string; line
   const lines: string[] = [];
   const labels: string[] = [];
   const page = (context.route || "").replace(/^#\/?/, "").split(/[/?]/)[0];
-  if (PAGES[page] && !context.docId) {
+  if (PAGES[page] && !context.docId && !context.vault) {
     lines.push(`They are on ${PAGES[page]}.`);
     labels.push(page ? page[0].toUpperCase() + page.slice(1) : "Today");
+  }
+
+  const vault = context.vault ? listVaults().find((v) => v.id === context.vault) : undefined;
+  if (vault) {
+    const note = context.vaultPath && getVault(vault.id).files.get(context.vaultPath);
+    lines.push(`They are in their vault "${vault.name}" (your working folder).`);
+    if (note) lines.push(`They have this note open: ${note.path} ("${note.name}").`);
+    labels.push(note ? `${vault.name} · ${note.name}` : vault.name);
   }
 
   const doc = context.docId ? docs.get(context.docId) : undefined;

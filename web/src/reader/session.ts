@@ -1,40 +1,52 @@
-/* The reading session's hooks: the note it writes into, remembering the place and the zoom, and
+/* The reading session's hooks: the note it writes into (in the active vault), remembering the place and the zoom, and
  * logging reading time while the reader is actually reading. */
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
-import { type Book, docs, learn, type Note, type TocEntry } from "../api";
+import { type Book, learn, type TocEntry } from "../api";
+import { activeVault, useActiveVault } from "../vaults/active";
 import { savePos } from "./position";
 
-/** The note this session writes into: remembered per book, else the book's own note (made on first use). */
+/** A vault note, as the note a reading session writes into. */
+export interface VaultTarget {
+  vault: string;
+  path: string;
+  title: string;
+}
+
+const VAULT_KEY = /^vault:([^:]+):(.+)$/;
+const titleOf = (path: string) => (path.split("/").pop() || path).replace(/\.md$/i, "");
+
+/** The note this session writes into: remembered per book and active vault, else the book's own note in
+ * the active vault (made on first use). */
 export function useWorkingNote(bookId: string) {
-  const [note, setNote] = useState<Note | null>(null);
+  const [vaultNote, setVaultNote] = useState<VaultTarget | null>(null);
+  const { active } = useActiveVault();
+  const key = `notes-book-${bookId}@${active}`;
   useEffect(() => {
+    setVaultNote(null);
+    if (active === null) return;
     try {
-      const id = localStorage.getItem(`classroom-note-${bookId}`);
-      if (id)
-        docs.get<Note>(id).then(
-          (n) => setNote(n),
-          () => {},
-        );
+      const v = localStorage.getItem(key)?.match(VAULT_KEY);
+      if (v) setVaultNote({ vault: v[1], path: v[2], title: titleOf(v[2]) });
     } catch {}
-  }, [bookId]);
-  const choose = useCallback(
-    (n: Note | null) => {
-      setNote(n);
+  }, [key, active]);
+  const chooseVault = useCallback(
+    (v: { vault: string; path: string } | null) => {
+      setVaultNote(v ? { ...v, title: titleOf(v.path) } : null);
       try {
-        if (n) localStorage.setItem(`classroom-note-${bookId}`, n.id);
-        else localStorage.removeItem(`classroom-note-${bookId}`);
+        if (v) localStorage.setItem(key, `vault:${v.vault}:${v.path}`);
+        else localStorage.removeItem(key);
       } catch {}
     },
-    [bookId],
+    [key],
   );
-  /** The working note, making the book's note the working one if none is chosen yet. */
-  const ensure = useCallback(async () => {
-    if (note) return note;
-    const n = await learn.bookNote(bookId);
-    choose(n);
-    return n;
-  }, [note, bookId, choose]);
-  return { note, choose, ensure };
+  /** The working note, making the active vault's note for the book the working one if none is chosen yet. */
+  const ensure = useCallback(async (): Promise<VaultTarget> => {
+    if (vaultNote) return vaultNote;
+    const v = await learn.vaultBookNote(bookId, active ?? (await activeVault()));
+    chooseVault(v);
+    return v;
+  }, [vaultNote, bookId, active, chooseVault]);
+  return { vaultNote, chooseVault, ensure, active };
 }
 
 /** Saves the place a moment after scrolling stops (once the book is back where it was left). */

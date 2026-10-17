@@ -1,14 +1,16 @@
 /* Moving around the app: hash routes, where each kind of document opens, opening what a [[link]] points
  * at, links into a book, and the page that shows a file of the vault. */
-import { docs, learn } from "../api";
+import { learn, vaults } from "../api";
 import type { DocKind, SourceRef } from "../api/types";
+import { activeVault } from "../vaults/active";
 
 /** Navigates to a hash route. */
 export const go = (route: string) => {
   location.hash = route.startsWith("#") ? route : `#${route}`;
 };
 
-/** Opens what a [[link]] points at; a link to nothing yet creates that note (as Obsidian does). */
+/** Opens what a [[link]] points at; a link to nothing yet creates that note in the active vault (as
+ * Obsidian does). */
 export async function openLink(target: string, sub?: string) {
   try {
     const r = await learn.resolve(target, sub);
@@ -20,16 +22,17 @@ export async function openLink(target: string, sub?: string) {
     return go(docRoute({ kind: r.kind, id: r.id, source: r.source, bookId: r.bookId }));
   } catch {
     if (!target.trim() || target.includes("/")) return;
-    const note = await docs.create({ title: target.trim(), body: "" });
-    go(`#/notes/${note.id}`);
+    const vault = await activeVault();
+    const made = await vaults.create(vault, { title: target.trim().replace(/[\\/:]/g, "-") });
+    go(`#/vaults/${vault}/note/${encodeURIComponent(made.path)}`);
   }
 }
 
-/** The page a document opens on: a note in Notes, a concept on its page, an annotation or a session in
+/** The page a document opens on: a note in the vaults, a concept on its page, an annotation or a session in
  * its book (at its passage), a card in Review, a figure in the Figures gallery. */
 export function docRoute(d: { kind: DocKind; id: string; source?: Partial<SourceRef>; bookId?: string }): string {
   const bookId = d.source?.bookId || d.bookId;
-  if (d.kind === "note") return `#/notes/${d.id}`;
+  if (d.kind === "note") return "#/vaults";
   if (d.kind === "concept") return `#/brain/concept/${d.id}`;
   if ((d.kind === "annotation" || d.kind === "session") && bookId) {
     const link = bookLink({ ...d.source, bookId });
