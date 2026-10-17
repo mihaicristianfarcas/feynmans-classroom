@@ -188,7 +188,7 @@ export function openNode(n: Pick<N, "kind" | "id" | "bookId" | "path" | "vault">
   else if (n.kind === "concept") go(`#/brain/concept/${n.id.slice(8)}`);
   else if (n.kind === "annotation" && n.path) openLink(n.path.replace(/\.md$/, ""));
   else if (n.vault && n.path) go(noteRoute(n.vault, n.path));
-  else go(`#/notes/${n.id.slice(5)}`);
+  else go("#/vaults");
 }
 
 /**

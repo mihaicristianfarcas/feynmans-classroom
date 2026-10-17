@@ -19,8 +19,6 @@ export interface Settings {
   concurrency: number;
   /** Links the agent finds between notes: "suggest" waits for the learner's OK; "auto" adds them (removable). */
   connections: "suggest" | "auto";
-  /** The Notes page leaves out the app's own notes (Classroom) while there are other vaults; nothing is deleted. */
-  hideOwnNotes: boolean;
 }
 
 const FILE = () => join(DATA_DIR, "settings.json");
@@ -42,7 +40,6 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   concurrency: Number(process.env.LLM_CONCURRENCY) || 3,
   connections: "suggest",
-  hideOwnNotes: false,
 };
 
 export function getSettings(): Settings {

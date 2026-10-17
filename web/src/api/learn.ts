@@ -18,7 +18,6 @@ import type {
   GraphData,
   IdeaConnection,
   Journey,
-  Note,
   Profile,
   Quiz,
   Resolved,
@@ -52,17 +51,16 @@ export const learn = {
     }>("/api/vault"),
   today: () => call<Today>("/api/today"),
   journey: () => call<Journey>("/api/journey"),
-  graph: () => call<GraphData>("/api/graph"),
+  /** The graph with one vault's notes (and the app's items), or with every vault's. */
+  graph: (vault?: string) =>
+    call<GraphData>(vault === undefined ? "/api/graph" : `/api/graph?vault=${encodeURIComponent(vault)}`),
   search: (q: string) => call<SearchHit[]>(`/api/search?q=${encodeURIComponent(q)}`),
   readPing: (body: { bookId: string; chapter?: string; chapterId?: string; position?: number; page?: number }) =>
     post("/api/activity", { type: "read", ...body }),
-  createFolder: (path: string) => post<{ folder: string }>("/api/folders", { path }),
-  moveFolder: (from: string, to: string) => post<{ folder: string }>("/api/folders/move", { from, to }),
-  deleteFolder: (path: string) => post<{ notes: number }>("/api/folders/delete", { path }),
-  bookNote: (bookId: string) => post<Note>(`/api/books/${bookId}/note`),
-  tree: () =>
-    call<{ notes: { id: string; path: string; title: string; type: string; updated: string }[]; folders: string[] }>(
-      "/api/vault/tree",
+  /** The note a book's reading writes into in `vault` (made on first use). */
+  vaultBookNote: (bookId: string, vault: string) =>
+    post<{ vault: string; path: string; title: string }>(
+      `/api/books/${bookId}/note?vault=${encodeURIComponent(vault)}`,
     ),
   linkTargets: () => call<{ title: string; kind: string; path?: string; detail?: string }[]>("/api/links/targets"),
   resolve: (target: string, sub?: string) =>
@@ -93,15 +91,14 @@ export const learn = {
     input: {
       annotationId?: string;
       anchor?: Anchor;
-      noteId?: string;
-      /** Or a note of an added vault. */
+      /** The vault note to add to (the book's note in the first vault by default). */
       vault?: string;
       path?: string;
       mode?: "reference" | "passage" | "embed";
       comment?: string;
     },
   ) =>
-    post<{ note?: Note; vaultNote?: { vault: string; path: string }; annotation: Annotation; markdown: string }>(
+    post<{ vaultNote: { vault: string; path: string }; annotation: Annotation; markdown: string }>(
       `/api/books/${bookId}/to-note`,
       input,
     ),
@@ -164,7 +161,8 @@ export const learn = {
     score: number;
     feedback: string;
     source?: SourceRef;
-  }) => post<Note>("/api/explain/save", input),
+    vault?: string;
+  }) => post<{ vault: string; path: string; title: string }>("/api/explain/save", input),
   connect: (input: { passage: string; source?: SourceRef; question?: string }) =>
     post<IdeaConnection[]>("/api/connect", input),
   /** The tutor's reply; the conversation is saved as a session of the book (`sessionId` carries one on). */
@@ -177,7 +175,11 @@ export const learn = {
   }) => post<{ reply: string; session: TutorSession | null }>("/api/tutor", input),
   sessions: (bookId: string) => call<TutorSession[]>(`/api/books/${bookId}/sessions`),
   /** Writes a session up as a note of the learner's own (a model call, ~15 s). */
-  sessionNote: (id: string) => post<{ note: Note; session: TutorSession }>(`/api/sessions/${id}/note`),
+  /** Writes a session up as a note in `vault` (the first vault without one). */
+  sessionNote: (id: string, vault?: string) =>
+    post<{ vaultNote: { vault: string; path: string; title: string }; session: TutorSession }>(
+      `/api/sessions/${id}/note${vault ? `?vault=${encodeURIComponent(vault)}` : ""}`,
+    ),
   makeFigure: (input: {
     passage: string;
     request?: string;

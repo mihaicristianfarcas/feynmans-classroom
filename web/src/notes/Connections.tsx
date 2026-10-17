@@ -1,4 +1,4 @@
-/* A note's Connections section (the app's own notes and a vault's alike): links an agent suggests,
+/* A note's Connections section: links an agent suggests,
  * each with its reason, to accept or reject; the ones accepted, to remove later; and the button that
  * asks for more. Where the suggestions come from and where a link opens are the caller's. */
 import { X } from "lucide-react";

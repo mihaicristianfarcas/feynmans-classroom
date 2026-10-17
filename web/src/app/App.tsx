@@ -1,4 +1,4 @@
-/* The app: picks the page from the URL's hash (#/library, #/book/<id>, #/notes/<id>…), sends a new
+/* The app: picks the page from the URL's hash (#/library, #/book/<id>, #/vaults/<id>…), sends a new
  * learner to the welcome page first, and puts every page except the reader inside the Shell (Notes, for
  * every vault, and the Brain's graph fill the window below its bar; the rest scroll). The ⌘K palette and the agent
  * (⌘J) sit over every page; old #/ask links open the agent. Each page but Today is its own chunk,
@@ -19,7 +19,6 @@ import { useTheme } from "./theme";
 
 const loadReader = () => import("../reader/Reader");
 const Reader = lazy(() => loadReader().then((m) => ({ default: m.Reader })));
-const Notes = lazy(() => import("../notes/Notes").then((m) => ({ default: m.Notes })));
 const Vaults = lazy(() => import("../vaults/Vaults").then((m) => ({ default: m.Vaults })));
 const Brain = lazy(() => import("../pages/brain/Brain").then((m) => ({ default: m.Brain })));
 const Gallery = lazy(() => import("../pages/Gallery").then((m) => ({ default: m.Gallery })));
@@ -67,7 +66,7 @@ function route(): Route {
   const book = hash.match(/^#\/book\/([a-z0-9]+)/i);
   if (book) return { name: "book", id: book[1] };
   const name = hash.replace(/^#\/?/, "").split("/")[0];
-  // pages that fill the window: Notes (the app's own and added vaults), and the Brain's graph (not a concept's own page)
+  // pages that fill the window: Notes (the vaults), and the Brain's graph (not a concept's own page)
   const full = name === "notes" || name === "vaults" || (name === "brain" && !hash.startsWith("#/brain/concept/"));
   if (
     ["library", "notes", "vaults", "review", "brain", "journey", "settings", "gallery", "welcome", "open"].includes(
@@ -147,8 +146,7 @@ export function App() {
     );
   if (current.name === "welcome") page = <Welcome />;
   else if (current.name === "library") page = <Library theme={theme} />;
-  else if (current.name === "notes") page = <Notes theme={theme} />;
-  else if (current.name === "vaults") page = <Vaults theme={theme} />;
+  else if (current.name === "notes" || current.name === "vaults") page = <Vaults theme={theme} />;
   else if (current.name === "open") page = <OpenLink />;
   else if (current.name === "review") page = <Review theme={theme} />;
   else if (current.name === "brain") page = <Brain theme={theme} />;

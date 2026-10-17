@@ -41,7 +41,7 @@ export function conceptDetail(c: Concept) {
       .filter((k) => k.concepts.includes(c.id))
       .map((k) => viewCard(k)),
     notes: docs.list("note").filter((n) => n.concepts.includes(c.id) || linking.has(n.id)),
-    /** Notes of added vaults that link to it. */
+    /** Vault notes that link to it. */
     vaultNotes: appLinks()
       .filter((l) => l.to.node === node)
       .map((l) => ({ vault: l.vault, vaultName: l.vaultName, path: l.path, title: l.title })),

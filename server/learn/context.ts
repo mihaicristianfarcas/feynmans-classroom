@@ -6,17 +6,24 @@ import type { SourceRef } from "../../shared/vault-types.ts";
 import { chapterRange } from "../books/locate.ts";
 import { getBook } from "../books/store.ts";
 import { chapterText, findChapter, passageAround } from "../ingest/index.ts";
-import { docs, getProfile } from "../vault/index.ts";
+import { activity, docs, getProfile } from "../vault/index.ts";
 import { cardState } from "./cards.ts";
 
-/** Mastery of a concept, 0–1: recall of its cards now, else its best explanation score. Null when unknown. */
+/** Mastery of a concept, 0–1: recall of its cards now, else its best explanation score (from the activity
+ * log; older ones were kept on a note of the app's). Null when unknown. */
 export function conceptMastery(conceptId: string, now = Date.now()): number | null {
   const linked = docs.list("card").filter((c) => c.concepts.includes(conceptId) && !c.suspended);
   const reviewed = linked.map((c) => cardState(c.id)).filter(Boolean);
-  const explained = docs
-    .list("note")
-    .filter((n) => n.type === "explanation" && n.concepts.includes(conceptId) && typeof n.score === "number");
-  const fromExplain = explained.length ? Math.max(...explained.map((n) => n.score!)) / 100 : null;
+  const scores = [
+    ...activity()
+      .filter((a) => a.type === "explain" && a.concepts?.includes(conceptId) && typeof a.data?.score === "number")
+      .map((a) => a.data!.score as number),
+    ...docs
+      .list("note")
+      .filter((n) => n.type === "explanation" && n.concepts.includes(conceptId) && typeof n.score === "number")
+      .map((n) => n.score!),
+  ];
+  const fromExplain = scores.length ? Math.max(...scores) / 100 : null;
   if (!reviewed.length) return fromExplain;
   const recall = reviewed.reduce((sum, s) => sum + retrievability(s, now), 0) / linked.length;
   return fromExplain === null ? recall : Math.max(recall, fromExplain * 0.8);

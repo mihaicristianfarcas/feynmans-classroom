@@ -1,4 +1,4 @@
-/* Hears about files changing in an outside vault (edited in Obsidian, by another app, or here) from the
+/* Hears about files changing in a vault (edited in Obsidian, by another app, or here) from the
  * server's event stream, which the server's watcher feeds, so the vaults page follows them as they land. */
 import { useEffect, useRef } from "react";
 import { onServerEvent } from "../api/events";

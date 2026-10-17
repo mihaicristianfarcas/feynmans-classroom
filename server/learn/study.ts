@@ -7,9 +7,10 @@
 import type { SourceRef } from "../../shared/vault-types.ts";
 import { structured, text } from "../llm/index.ts";
 import { docs, logActivity, shortId } from "../vault/index.ts";
+import { defaultVault } from "../vaults/index.ts";
+import { newVaultNote } from "../vaults/reading.ts";
 import { upsertConcept } from "./concepts.ts";
 import { type BookContext, bookContext, chapterContext, learnerSummary, sourceLine } from "./context.ts";
-import { createDoc } from "./docs.ts";
 
 const obj = (properties: Record<string, unknown>) => ({
   type: "object",
@@ -189,32 +190,30 @@ Return JSON.`;
   ).data;
 }
 
+/** Keeps an explanation and the tutor's grade as a note in vault `vault` (the first vault by default). */
 export function saveExplanation(input: {
   concept: string;
   explanation: string;
   score: number;
   feedback: string;
   source?: SourceRef;
+  vault?: string;
 }) {
   const concept = upsertConcept({ name: input.concept, source: input.source });
-  const note = createDoc(
-    {
-      kind: "note",
-      type: "explanation",
-      title: `Explaining ${input.concept} ${new Date().toISOString().slice(0, 10)}`,
-      body: `${input.explanation.trim()}\n\n---\n\n**Tutor (${input.score}/100):** ${input.feedback.trim()}\n\nAbout [[${concept.title}]].`,
-      tags: ["feynman"],
-      concepts: [concept.id],
-      source: input.source,
-      score: input.score,
-    },
-    { log: false },
-  );
+  const note = newVaultNote(input.vault || defaultVault(), {
+    title: `Explaining ${input.concept} ${new Date().toISOString().slice(0, 10)}`,
+    body: `${input.explanation.trim()}\n\n---\n\n**Tutor (${input.score}/100):** ${input.feedback.trim()}`,
+    bookId: input.source?.bookId,
+    about: [concept.title],
+    tags: ["feynman"],
+  });
   logActivity({
     type: "explain",
     bookId: input.source?.bookId,
     concepts: [concept.id],
     text: `Explained ${input.concept} · ${input.score}/100`,
+    // the grade counts toward the concept's mastery (learn/context.ts); the note is the learner's
+    data: { score: input.score, note: `${note.vault}/${note.path}` },
   });
   return note;
 }

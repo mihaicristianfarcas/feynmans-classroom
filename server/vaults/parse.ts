@@ -1,4 +1,4 @@
-/* Reading a note of an outside vault (Obsidian's, or any folder of Markdown) the way Obsidian reads it:
+/* Reading a note of a vault (Obsidian's, or any folder of Markdown) the way Obsidian reads it:
  * its properties (frontmatter: tags, aliases), its links (both [[wiki links]] and [text](path.md)
  * Markdown links, embeds of either kind, links written in properties), its #tags, its headings, and
  * the part of it a "#heading" or "#^block" link points at. */

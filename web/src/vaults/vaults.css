@@ -1,5 +1,5 @@
 /* Styles for vaults added from folders; they reuse the notes page's layout (notes.css): the file tree,
- * the note, its sidebar. Here: the vault switcher, attachments in the tree, search hits, tags, properties, and
+ * the note, its sidebar. Here: the vault switcher and the top bar's picker, attachments in the tree, search hits, tags, properties, and
  * embedded pictures, PDFs, sound and video; the add-vault dialog and sync status. */
 .vault-switch {
   padding-bottom: 0;
@@ -20,6 +20,33 @@
 .vault-pick:focus-visible {
   outline: 2px solid var(--focus, var(--sky-ink));
   outline-offset: 1px;
+}
+/* the top bar's picker of the active vault */
+.topnav-vault {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink-3);
+}
+.topnav-vault > svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+.topnav-vault .vault-pick {
+  max-width: 200px;
+  height: 30px;
+  margin: 0;
+  font-weight: 500;
+}
+@media (max-width: 760px) {
+  .topnav-vault > svg {
+    display: none;
+  }
+  .topnav-vault .vault-pick {
+    max-width: 110px;
+  }
 }
 .vault-file .vault-file-icon,
 .vault-tags .vault-file-icon {
@@ -187,6 +214,20 @@
 }
 .add-vault > .button {
   justify-self: start;
+}
+.add-vault-make {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.add-vault-make .field {
+  flex: 1;
+}
+.add-vault-or {
+  width: 100%;
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
 }
 .vault-sync-note {
   display: flex;

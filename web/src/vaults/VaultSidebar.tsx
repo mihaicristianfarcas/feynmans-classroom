@@ -1,4 +1,4 @@
-/* The sidebar of a note in an outside vault, as Obsidian's: what links here (backlinks, with the line
+/* The sidebar of a note in a vault, as Obsidian's: what links here (backlinks, with the line
  * around each), where it's mentioned without a link (one click links it), what it links to (links to
  * nothing yet marked as such), the connections an agent suggests, its tags, and its outline (jump to
  * a heading). */

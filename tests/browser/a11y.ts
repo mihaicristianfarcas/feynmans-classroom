@@ -99,18 +99,20 @@ async function serve() {
   );
   await fetch(`${BASE}api/books`, { method: "POST", body: book });
   await seedMargin();
-  await json("api/docs", "POST", {
-    title: "Small quantities",
-    body: "A [[Derivative]] compares two small quantities.",
-    concepts: ["Derivative"],
-  });
   await seedOutsideVault(json);
   await json("api/docs", "POST", { kind: "card", front: "What is dx?", back: "A little bit of x.", deck: "Calculus" });
-  await json("api/docs", "POST", {
+  await json("api/docs", "POST", { kind: "concept", title: "Derivative", summary: "How fast a thing changes." });
+  // in the vault kept in the app (made when the server started)
+  const [notes] = (await (await fetch(`${BASE}api/vaults`)).json()) as { id: string }[];
+  await json(`api/vaults/${notes.id}/notes`, "POST", {
+    title: "Small quantities",
+    body: "A [[Derivative]] compares two small quantities.",
+    about: ["Derivative"],
+  });
+  await json(`api/vaults/${notes.id}/notes`, "POST", {
     title: "Smallness, check yourself",
-    type: "quiz",
     folder: "Calculus/Quizzes",
-    about: ["[[Calculus Made Easy]]"],
+    bookId: (await (await fetch(`${BASE}api/books`)).json())[0]?.id,
     body: [
       "```quiz",
       "title: Degrees of smallness",
@@ -130,7 +132,7 @@ async function serve() {
   });
 }
 
-/** An Obsidian vault beside the app's own: a note with properties, links (one to nothing yet), an embedded
+/** An Obsidian vault beside the one kept in the app: a note with properties, links (one to nothing yet), an embedded
  * section, tasks and a tag, and the note it links to. */
 async function seedOutsideVault(json: (path: string, method: string, body: unknown) => Promise<unknown>) {
   const root = join(dataDir!, "outside-vault");
@@ -210,7 +212,6 @@ async function seedMargin() {
 async function routes(): Promise<string[]> {
   const get = (path: string) => fetch(BASE + path).then((r) => r.json());
   const books = (await get("api/books")) as { id: string }[];
-  const notes = (await get("api/docs?kind=note")) as { id: string }[];
   const concepts = (await get("api/concepts")) as { id: string }[];
   const list = [
     "#/",
@@ -224,13 +225,13 @@ async function routes(): Promise<string[]> {
     "#/welcome",
     "#/gallery",
   ];
-  if (notes[0]) list.push(`#/notes/${notes[0].id}`);
-  const quiz = (notes as { id: string; type?: string }[]).find((n) => n.type === "quiz");
-  if (quiz && quiz.id !== notes[0]?.id) list.push(`#/notes/${quiz.id}`);
   if (concepts[0]) list.push(`#/brain/concept/${concepts[0].id}`);
-  const outside = (await get("api/vaults")) as { id: string }[];
-  if (outside[0])
-    list.push(`#/vaults/${outside[0].id}`, `#/vaults/${outside[0].id}/note/Home.md`, `#/vaults/${outside[0].id}/graph`);
+  const vaultList = (await get("api/vaults")) as { id: string; name: string; app?: boolean }[];
+  const own = vaultList.find((v) => v.app);
+  if (own) list.push(`#/vaults/${own.id}/note/${encodeURIComponent("Calculus/Quizzes/Smallness, check yourself.md")}`);
+  const outside = vaultList.find((v) => v.name === "Physics");
+  if (outside)
+    list.push(`#/vaults/${outside.id}`, `#/vaults/${outside.id}/note/Home.md`, `#/vaults/${outside.id}/graph`);
   if (books[0]) list.push(`#/book/${books[0].id}`);
   const only = arg("only");
   return only ? list.filter((r) => r.includes(only)) : list;
@@ -578,8 +579,7 @@ try {
     }
   }
   // the agent's panel, a note's versions and the Brain's legend and card, open, in both themes
-  const quizNote = ((await fetch(`${BASE}api/docs?kind=note&type=quiz`).then((r) => r.json())) as { id: string }[])[0];
-  const note = quizNote ? `#/notes/${quizNote.id}` : list.find((r) => r.startsWith("#/notes/"));
+  const note = list.find((r) => r.includes("/note/"));
   for (const theme of ["light", "dark"] as const) {
     if (arg("only") && !"agent".includes(arg("only")!)) break;
     await open(page, "#/", theme);

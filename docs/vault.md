@@ -5,7 +5,8 @@ data/vault/
   AGENTS.md                 the layout and rules, for AI agents (CLAUDE.md imports it)
   INDEX.md                  generated: counts, recent changes, where to look
   profile.md                who you are and how you learn
-  notes/**.md               your notes, in any folders (notes/INDEX.md: generated table of them)
+  notes/                    empty: your notes are in your vaults (below); anything left here moves
+                            into a vault kept in the app when the server starts
   concepts/<Name>.md        one page per concept (concepts/INDEX.md: with mastery)
   cards/*.md                flashcards (## Front / ## Back)
   figures/*.md              kept figures (the spec in a ```figure block)
@@ -50,9 +51,9 @@ schedule is replayed from `log/reviews.jsonl`.
 
 ## Notes, folders, and what they're about
 
-Notes go in any folders you like under `notes/` (by subject, by book, by topic) and folders can be
-made, renamed, moved (links to the notes in them follow) and deleted (to `.trash/`) from the file
-tree, by you or by the agent. A note says what it's **about** in its properties: links to books,
+Notes live in your vaults (below), in any folders you like (by subject, by book, by topic), and
+folders can be made, renamed, moved (links to the notes in them follow) and deleted (to the vault's
+`.trash/`) from the file tree, by you or by the agent. A note says what it's **about** in its properties: links to books,
 concepts or other notes (`about: ["[[Calculus Made Easy]]", "[[Derivative]]"]`). A book's notes
 (in the reader) and a concept's page list the notes about them.
 
@@ -84,17 +85,22 @@ yours doesn't matter.
 - **From the command line**: `jj log`, `jj diff -r <change>`, `jj undo` and `jj op log` all work in
   the vault (stop the app first if you rewrite history yourself).
 
-## Your other vaults (Obsidian, or any folder of Markdown)
+## Your vaults (kept in the app, or Obsidian, or any folder of Markdown)
 
-The **Notes** page holds every vault: the app's own (**Classroom**, this folder's `notes/`) and folders
-of Markdown from your computer, your Obsidian vaults or any notes folder. Switch between them at the
-top of the file list. Add as many as you like: the + beside the vault's name, then **Choose folder…**, which opens
+Every note is in a vault, and the **Notes** page holds them all. A vault is either **kept in the app**
+(its files only in `DATA_DIR/vaults/<id>/`, nowhere else on your computer) or a folder of Markdown
+from your computer: an Obsidian vault or any notes folder. There's always one: a new app starts with
+an empty vault kept in the app, "Notes", and notes from before (when the app's own `notes/` showed as
+a vault called Classroom) move into it once, folders, attachments and all. Switch between vaults at
+the top of the file list, or with the active-vault picker beside the brand in the top bar: it picks
+the vault the Notes page opens, the Brain draws and the reader writes into. Make as many as you like:
+the + beside the vault's name, then a name and **Make vault**, or **Choose folder…**, which opens
 Finder, File Explorer or your desktop's folder window. The server needn't be on your computer: the
 browser reads the folder and keeps the server's copy (`DATA_DIR/vaults/<id>/`) in step with it.
-The list is kept in `DATA_DIR/vaults.json`; removing a vault from the app (its ⋯ menu) deletes the
-server's copy and leaves your folder as it is. Classroom can be removed from the Notes page the same
-way while there are other vaults: nothing is deleted (concepts, cards and links to its notes keep
-working), any vault's menu shows it again, and it comes back by itself when the last vault goes. Vaults are never put in jj (their history is kept apart, below).
+The list is kept in `DATA_DIR/vaults.json`. Removing a folder's vault from the app (its ⋯ menu)
+deletes the server's copy and leaves your folder as it is; deleting a vault kept in the app puts its
+files aside in `DATA_DIR/vaults/.removed/`, its only copy. Removing the last vault makes a fresh,
+empty "Notes". Vaults are never put in jj (their history is kept apart, below).
 
 - **Chrome, Edge, Brave, Opera** keep the folder in sync both ways while the app is open: changes
   in the folder (Obsidian, a sync service) reach the app within a few seconds, and edits made in the
@@ -152,10 +158,14 @@ have, kept where Obsidian won't trip over it (`DATA_DIR/vault-meta/<id>/`), neve
   answer as a note in that vault.
 - **Links to the app.** A [[link]] (or a property such as `about`) that names nothing in the vault
   but names one of the app's concepts, books or notes leads there. Those notes are listed on the
-  concept's page and drawn in the Brain's graph, and `[[` completes to the app's concepts and books.
+  concept's page and drawn in the Brain's graph (the app's books and concepts, with the active vault's
+  notes), and `[[` completes to the app's concepts and books.
 - **Reading.** The reader's Note tab can write in a vault note (or make one, its `source` property
   linking the book): passages and captured pictures land at its end, quoted under
   `[[Book title#page=12|Book title, p. 12]]`, and the vault notes that link to a book are listed with
-  its notes.
+  its notes. The book's own note ("<Book title> — notes") is made in the active vault, and so are a
+  tutor session's note, a connection saved as a note and a scored explanation (Explain it back),
+  linking the book in `source` and their concepts in `about`. An explanation's grade is kept in
+  `log/activity.jsonl`, where it counts toward the concept's mastery.
 - **Quizzes and search.** A quiz in a vault note adds each attempt under it, and ⌘K finds vault
   notes along with everything else.

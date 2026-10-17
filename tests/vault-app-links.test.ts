@@ -1,6 +1,7 @@
 // Vault notes and the rest of the app: a [[link]] or an `about` property naming the app's concept puts
 // the note on the concept's page and in the Brain's graph, the note's links say where they lead, [[
-// completes to the app's concepts, ⌘K search finds vault notes, and removing the vault leaves its folder.
+// completes to the app's concepts, ⌘K search finds vault notes, the graph narrows to one vault, and removing
+// the vault leaves its folder.
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -58,6 +59,20 @@ describe("vault notes in the app", () => {
       expect.objectContaining({ from: node.id, to: `vnote:${vaultId}:Work.md`, kind: "link" }),
     );
     expect(g.nodes.some((n: Json) => n.id === `vnote:${vaultId}:Lonely.md`)).toBe(true);
+  });
+
+  it("narrows the graph to one vault: the app's items and that vault's notes", async () => {
+    const g = await call("GET", `/api/graph?vault=${vaultId}`);
+    expect(
+      g.nodes
+        .filter((n: Json) => n.vault)
+        .map((n: Json) => n.id)
+        .sort(),
+    ).toEqual(["Heat engines.md", "Lonely.md", "Work.md"].map((p) => `vnote:${vaultId}:${p}`));
+    expect(g.nodes.some((n: Json) => n.id === `concept:${conceptId}`)).toBe(true);
+    const other = await call("GET", "/api/graph?vault=elsewhere");
+    expect(other.nodes.some((n: Json) => n.vault)).toBe(false);
+    expect(other.nodes.some((n: Json) => n.id === `concept:${conceptId}`)).toBe(true);
   });
 
   it("says where a note's links lead, and completes [[ to the app's concepts", async () => {

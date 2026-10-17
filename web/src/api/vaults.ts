@@ -1,7 +1,7 @@
-/* Typed calls for outside vaults (Obsidian's, or any folder of Markdown): the list, a vault's files,
- * whether the app's own notes show beside them, a note with its links, resolving links, saving and changing files, attachments, a note's versions
+/* Typed calls for the vaults (kept in the app, or a folder: Obsidian's, or any folder of Markdown): the
+ * list, a vault's files, a note with its links, resolving links, saving and changing files, attachments, a note's versions
  * and suggested connections, tags, search, graph. */
-import { call, del, patch, post, put } from "./client";
+import { call, del, patch, post } from "./client";
 import type { SuggestedLink } from "./types";
 
 export type VaultFileKind = "note" | "image" | "pdf" | "audio" | "video" | "file";
@@ -23,11 +23,13 @@ export class VaultMissing extends Error {
 export interface VaultSummary {
   id: string;
   name: string;
-  /** The folder on the server; "" for a synced vault. */
+  /** The folder on the server; "" for a synced vault or one kept in the app. */
   path: string;
   added: string;
   /** Kept in sync with a folder on the learner's computer by their browser. */
   synced?: boolean;
+  /** Kept only in the app, with no folder anywhere else. */
+  app?: boolean;
   status: "ready" | "missing";
   obsidian: boolean;
   notes: number;
@@ -99,11 +101,10 @@ export const vaults = {
   list: () => call<VaultSummary[]>("/api/vaults"),
   add: (path: string, name?: string) => post<VaultSummary>("/api/vaults", { path, name }),
   addSynced: (name: string) => post<VaultSummary>("/api/vaults", { name, synced: true }),
+  /** Makes a vault kept only in the app. */
+  addApp: (name: string) => post<VaultSummary>("/api/vaults", { name, app: true }),
   rename: (id: string, name: string) => patch<VaultSummary>(`/api/vaults/${id}`, { name }),
   remove: (id: string) => del(`/api/vaults/${id}`),
-  /** Whether the Notes page leaves out the app's own notes (only while there are vaults); nothing is deleted. */
-  own: () => call<{ hidden: boolean }>("/api/vaults/own"),
-  hideOwn: (hidden: boolean) => put<{ hidden: boolean }>("/api/vaults/own", { hidden }),
   rescan: (id: string) => post<{ changes: number }>(`/api/vaults/${id}/rescan`),
   tree: (id: string) => call<VaultTree>(`/api/vaults/${id}/tree`),
   note: (id: string, path: string) => call<VaultNote>(`/api/vaults/${id}/note?${q({ path })}`),
@@ -138,8 +139,11 @@ export const vaults = {
     if (!res.ok) throw new Error(data.error || `${res.status} ${res.statusText}`);
     return data as { path: string; mtime: number };
   },
-  create: (id: string, opts: { title?: string; folder?: string; from?: string }) =>
-    post<{ path: string }>(`/api/vaults/${id}/notes`, opts),
+  /** A new note; `body`, `bookId` and `about` (concept names) fill it, linking the book and the concepts. */
+  create: (
+    id: string,
+    opts: { title?: string; folder?: string; from?: string; body?: string; bookId?: string; about?: string[] },
+  ) => post<{ path: string }>(`/api/vaults/${id}/notes`, opts),
   folder: (id: string, path: string) => post<{ path: string }>(`/api/vaults/${id}/folders`, { path }),
   move: (id: string, from: string, to: string) => post<{ path: string }>(`/api/vaults/${id}/move`, { from, to }),
   trash: (id: string, path: string) => post<{ changes: number }>(`/api/vaults/${id}/trash`, { path }),

@@ -421,8 +421,8 @@ function Turn({
               Keep as a note
             </button>
           )}
-          {run.kept && linkOf(run, run.kept) && (
-            <a className="button subtle small" href={linkOf(run, run.kept)!} onClick={close}>
+          {run.kept && keptLink(run) && (
+            <a className="button subtle small" href={keptLink(run)!} onClick={close}>
               Kept · open the note
             </a>
           )}
@@ -454,6 +454,12 @@ function Turn({
 
 /** Where a file a run made or changed opens: in its vault, or the app's own. */
 const linkOf = (run: AgentRun, path: string) => (run.vault ? noteRoute(run.vault, path) : vaultLink(path));
+
+/** Where the note an answer was kept in opens (in a vault; older runs kept it among the app's files). */
+const keptLink = (run: AgentRun) => {
+  const vault = run.vault || run.keptIn;
+  return run.kept ? (vault ? noteRoute(vault, run.kept) : vaultLink(run.kept)) : null;
+};
 
 /** A request finished while the panel was closed: one line at the bottom of the window. */
 function Notice({ run, onShow, onClose }: { run: AgentRun; onShow: () => void; onClose: () => void }) {

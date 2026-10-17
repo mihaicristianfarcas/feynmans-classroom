@@ -1,8 +1,7 @@
-/* The outside vaults the learner added (Obsidian vaults, or any folder of Markdown): the list, kept in
- * DATA_DIR/vaults.json; adding, renaming and forgetting one (its files are never touched); whether the
- * Notes page leaves out the app's own notes while there are other vaults; and keeping
- * each one's index in step with its folder, so edits made in Obsidian (or by sync, git, any editor)
- * show up in the app by themselves:
+/* The learner's vaults: ones kept only in the app, and ones from a folder (Obsidian vaults, or any folder
+ * of Markdown). The list, kept in DATA_DIR/vaults.json, always has one; making, adding, renaming and
+ * removing one (a folder's files are never touched); and keeping each one's index in step with its
+ * files, so edits made in Obsidian (or by sync, git, any editor) show up in the app by themselves:
  *
  *   - a watcher on each folder re-reads what changed a moment after it settles (atomic saves, sync
  *     tools writing in steps), and announces it on the app's event stream ("vaults");
@@ -11,25 +10,26 @@
  *   - at start, each vault is read afresh, so what changed while the app was closed is there too.
  * Changed notes are snapshotted into the vault's history (history.ts). */
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, type FSWatcher, mkdirSync, realpathSync, rmSync, statSync, watch } from "node:fs";
+import { existsSync, type FSWatcher, mkdirSync, realpathSync, renameSync, rmSync, statSync, watch } from "node:fs";
 import { homedir } from "node:os";
 import { basename, isAbsolute, join, resolve, sep } from "node:path";
 import { DATA_DIR, VAULT_DIR } from "../config.ts";
 import { NotFound } from "../errors.ts";
 import { publish } from "../events.ts";
 import { readJson, writeJson } from "../fs.ts";
-import { getSettings, saveSettings } from "../settings.ts";
 import { dropMeta, noteChanged, startHistory } from "./history.ts";
 import { type Change, skipped, Vault } from "./vault.ts";
 
 export interface VaultInfo {
   id: string;
   name: string;
-  /** The folder on the server; "" for a synced vault. */
+  /** The folder on the server; "" for a synced vault or one kept in the app. */
   path: string;
   added: string;
   /** Kept in sync with a folder on the learner's computer by their browser (web/src/vaults/sync/). */
   synced?: boolean;
+  /** Kept only in the app (DATA_DIR/vaults/<id>/), with no folder anywhere else. */
+  app?: boolean;
 }
 
 export type VaultStatus = "ready" | "missing";
@@ -40,8 +40,9 @@ const SETTLE_MS = 200;
 
 export const listVaults = (): VaultInfo[] => readJson<VaultInfo[]>(FILE(), []);
 
-/** Where a vault's files are on the server: its own folder, or for a synced vault the server's copy. */
-export const rootOf = (v: VaultInfo) => (v.synced ? join(DATA_DIR, "vaults", v.id) : v.path);
+/** Where a vault's files are on the server: its own folder, or the app's copy (a synced vault's, or the
+ * only one of a vault kept in the app). */
+export const rootOf = (v: VaultInfo) => (v.synced || v.app ? join(DATA_DIR, "vaults", v.id) : v.path);
 
 const live = new Map<string, { vault: Vault; watcher: FSWatcher | null; timers: Map<string, NodeJS.Timeout> }>();
 let poller: NodeJS.Timeout | null = null;
@@ -149,14 +150,19 @@ export function addVault(input: string, name?: string): VaultInfo {
 }
 
 /** Adds a vault whose files the browser copies here from a folder on the learner's computer and keeps in sync. */
-export function addSyncedVault(name: string): VaultInfo {
+export const addSyncedVault = (name: string) => addCopied(name, { synced: true });
+
+/** Makes a vault kept only in the app: an empty folder of its own under DATA_DIR/vaults/. */
+export const addAppVault = (name: string) => addCopied(name, { app: true });
+
+function addCopied(name: string, kind: { synced: true } | { app: true }): VaultInfo {
   if (!name.trim()) throw new Error("give it a name");
   const info: VaultInfo = {
     id: randomBytes(5).toString("hex"),
     name: name.trim(),
     path: "",
     added: new Date().toISOString(),
-    synced: true,
+    ...kind,
   };
   mkdirSync(rootOf(info), { recursive: true });
   writeJson(FILE(), [...listVaults(), info]);
@@ -176,8 +182,10 @@ export function renameVault(id: string, name: string): VaultInfo {
   return info;
 }
 
-/** Forgets a vault: the app stops showing and watching it. Its folder stays as it is; a synced vault's
- * copy on the server is deleted (the learner's folder is untouched). */
+/** Removes a vault: the app stops showing and watching it. A folder's vault leaves the folder as it is, and
+ * a synced vault's copy on the server is deleted (the learner's folder is untouched); a vault kept in the
+ * app is put aside in DATA_DIR/vaults/.removed/, its only copy. There's always a vault: removing the last
+ * makes an empty one ("Notes", kept in the app). */
 export function removeVault(id: string) {
   const list = listVaults();
   const info = list.find((v) => v.id === id);
@@ -191,22 +199,18 @@ export function removeVault(id: string) {
   for (const t of state?.timers.values() || []) clearTimeout(t);
   live.delete(id);
   if (info.synced) rmSync(rootOf(info), { recursive: true, force: true });
+  if (info.app && existsSync(rootOf(info))) {
+    const aside = join(DATA_DIR, "vaults", ".removed", `${info.id} ${new Date().toISOString().replace(/[:.]/g, "-")}`);
+    mkdirSync(join(aside, ".."), { recursive: true });
+    renameSync(rootOf(info), aside);
+  }
   dropMeta(id);
-  // with no vault left, the app's own notes show again, so the Notes page always has one
-  if (list.length === 1 && getSettings().hideOwnNotes) saveSettings({ hideOwnNotes: false });
   publish("global", { type: "vaults", data: { vault: id, path: "", change: "removed" } });
+  if (list.length === 1) addAppVault("Notes");
 }
 
-/** Whether the Notes page leaves out the app's own notes (only while there are other vaults). */
-export const ownNotesHidden = () => getSettings().hideOwnNotes && listVaults().length > 0;
-
-/** Leaves the app's own notes out of the Notes page, or shows them again; nothing is deleted. */
-export function hideOwnNotes(hidden: boolean) {
-  if (hidden && !listVaults().length) throw new Error("add a vault first: the Notes page needs one to show");
-  saveSettings({ hideOwnNotes: hidden });
-  publish("global", { type: "vaults", data: { vault: "", path: "", change: "own" } });
-  return { hidden: ownNotesHidden() };
-}
+/** The vault notes go to when no vault is named: the first one, made ("Notes", kept in the app) if there's none. */
+export const defaultVault = (): string => listVaults()[0]?.id ?? addAppVault("Notes").id;
 
 /** Reads every vault and starts watching them, and checks them against their folders every so often. */
 export function startVaults() {

@@ -1,5 +1,5 @@
 /* Where the learner is when they ask the agent something: the page, the open document (a note, a
- * concept, or an added vault and the note open in it), the book with its chapter and page, the
+ * concept, or a vault and the note open in it), the book with its chapter and page, the
  * selected text. The prompt gets the paths to start from (so "summarise this chapter" needs no
  * explaining); the run keeps a short label for the panel. */
 import type { AgentContext } from "../../shared/vault-types.ts";

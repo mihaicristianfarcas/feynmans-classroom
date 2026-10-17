@@ -1,4 +1,4 @@
-/* Where things in an outside vault open: the hash routes of the vaults page (a vault, a note or file
+/* Where things in a vault open: the hash routes of the vaults page (a vault, a note or file
  * in it at a heading, a link to open, the graph, a search), and opening a link the way Obsidian does
  * (to what it names, or, when nothing has that name yet, to a new note made for it). */
 import { learn, vaults } from "../api";
@@ -20,7 +20,8 @@ export interface VaultRoute {
 export function parseVaultRoute(hash: string): VaultRoute {
   const [route, query = ""] = hash.split("?");
   const params = new URLSearchParams(query);
-  const parts = route.replace(/^#\/vaults\/?/, "").split("/");
+  // #/notes (and the links to the app's own notes from before vaults held every note) open the active vault
+  const parts = route.startsWith("#/vaults") ? route.replace(/^#\/vaults\/?/, "").split("/") : [];
   const id = parts[0] || null;
   const q = params.get("q") ?? undefined;
   const sub = params.get("sub") ?? undefined;

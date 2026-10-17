@@ -1,6 +1,7 @@
 /* The knowledge graph: books and documents (concepts, notes, annotations) as nodes, with the links
  * between them (the learner's own, accepted and suggested connections) and each concept's mastery as
- * a ring; and the notes of added vaults, with their links to each other and to the app. */
+ * a ring; and the notes of the vaults, with their links to each other and to the app. Narrowed to one
+ * vault, it draws the app's items (books, concepts…) and that vault's notes. */
 import { listBooks } from "../books/store.ts";
 import { listConnections } from "../vault/connections.ts";
 import { docs } from "../vault/index.ts";
@@ -20,7 +21,7 @@ export interface GraphNode {
   detail?: string;
   bookId?: string;
   path?: string;
-  /** A note of an added vault: the vault's id. */
+  /** A vault note: the vault's id. */
   vault?: string;
   /** When it entered the brain (ms), for replaying the graph's growth. */
   created: number;
@@ -36,8 +37,16 @@ export interface GraphEdge {
   why?: string;
 }
 
-/** The knowledge graph, from the vault's links (see vault/links.ts). */
-export function knowledgeGraph(): { nodes: GraphNode[]; edges: GraphEdge[] } {
+/** The knowledge graph, from the vault's links (see vault/links.ts); `vault` leaves out the other vaults' notes. */
+export function knowledgeGraph(vault?: string): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  const all = knowledgeGraphOf();
+  if (!vault) return all;
+  const nodes = all.nodes.filter((n) => !n.vault || n.vault === vault);
+  const ids = new Set(nodes.map((n) => n.id));
+  return { nodes, edges: all.edges.filter((e) => ids.has(e.from) && ids.has(e.to)) };
+}
+
+function knowledgeGraphOf(): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const nodes: GraphNode[] = [];
   const books = listBooks().filter((b) => b.status === "ready");
   for (const b of books)
@@ -91,7 +100,7 @@ export function knowledgeGraph(): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const order: Edge["kind"][] = ["link", "embed", "ai", "related", "about", "concept", "mentions", "source"];
   const all = allEdges().filter((e) => e.to);
   for (const kind of order) for (const e of all) if (e.kind === kind) add({ from: e.from, to: e.to!, kind: e.kind });
-  // the notes of added vaults, the links between them, and their links to things here
+  // the vaults' notes, the links between them, and their links to things here
   for (const v of listVaults()) {
     let g: ReturnType<Vault["graph"]>;
     try {

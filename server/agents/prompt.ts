@@ -45,7 +45,7 @@ function history(turns: AgentRun[]) {
     .join("\n");
 }
 
-/** The prompt for a request made in an added vault: it works on a copy of that vault's notes. */
+/** The prompt for a request made in a vault: it works on a copy of that vault's notes. */
 export function vaultAgentPrompt(input: {
   task: string;
   where: string[];

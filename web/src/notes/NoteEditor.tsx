@@ -1,8 +1,8 @@
 /* The note editor: CodeMirror 6 (the editor Obsidian is built on) editing the Markdown text itself,
  * byte for byte, with a light live preview: headings sized, emphasis shown, and Markdown marks hidden
  * except on the line being edited; [[ completes to notes, concepts and books; pictures pasted or
- * dropped go to attachments/ and in as ![[picture.png]]. ⌘/Ctrl-click a link to follow it. In an
- * outside vault (Obsidian's) a LinkSource says what [[ completes to, where a link goes, and where a
+ * dropped go to attachments/ and in as ![[picture.png]]. ⌘/Ctrl-click a link to follow it. In a
+ * vault a LinkSource says what [[ completes to, where a link goes, and where a
  * pasted or dropped file (a picture, PDF, sound, video) is saved. */
 import {
   autocompletion,
@@ -294,7 +294,7 @@ export function NoteEditor({
   autoFocus?: boolean;
   onBlur?: () => void;
   extensions?: Extension[];
-  /** For an outside vault: what [[ completes to, where links go, where files are saved. */
+  /** For a vault: what [[ completes to, where links go, where files are saved. */
   links?: LinkSource;
 }) {
   const host = useRef<HTMLDivElement>(null);

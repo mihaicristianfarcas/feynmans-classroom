@@ -1,20 +1,19 @@
-/* The notes page for a vault added from a folder (#/vaults/<id>…: an Obsidian vault, or any folder of
- * Markdown; the app's own notes are notes/Notes.tsx). The vault's files on the left, the open note (or
- * file) beside them, its links on the right; or the vault's graph. It follows the files as they change.
- * Routes are in routes.ts. */
+/* The Notes page (#/notes, #/vaults/<id>…): a vault, kept in the app or from a folder (an Obsidian vault,
+ * or any folder of Markdown). The vault's files on the left, the open note (or file) beside them, its
+ * links on the right; or the vault's graph. It follows the files as they change. Routes are in routes.ts. */
 import { FolderOpen, SquarePen } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type VaultTree as Tree, type VaultSummary, vaults } from "../api";
 import { go } from "../app/navigation";
 import { PanelEdge, PanelToggle } from "../components/Panel";
 import { useLoad } from "../lib/useLoad";
 import { type Panel, usePanel } from "../lib/usePanel";
+import { setActiveVault, storedVault } from "./active";
 import { noteRoute, openVaultLink, parseVaultRoute, vaultRoute } from "./routes";
 import { SyncNotice } from "./SyncNotice";
 import { useVaultChanges } from "./useVaultChanges";
 import { VaultGraph } from "./VaultGraph";
 import { VaultPane } from "./VaultPane";
-import { LAST_VAULT } from "./VaultSwitch";
 import { newVaultNote, VaultTree } from "./VaultTree";
 
 export function Vaults({ theme }: { theme: "light" | "dark" }) {
@@ -47,22 +46,25 @@ export function Vaults({ theme }: { theme: "light" | "dark" }) {
     if (changes.some((c) => c.vault === id)) reloadTree();
   });
 
+  // a vault the list doesn't have yet (one just made) is looked for again once before giving up on it
+  const recheck = useRef<string | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reloadList is new on every draw; the list, the route and the vault say when to look again
   useEffect(() => {
     if (!list) return;
     if (id && vault) {
-      try {
-        localStorage.setItem(LAST_VAULT, id);
-      } catch {}
+      setActiveVault(id);
       return;
     }
-    // #/vaults alone: the vault open last, or the first; a vault that's gone: the app's own notes
-    let last: string | null = null;
-    try {
-      last = localStorage.getItem(LAST_VAULT);
-      if (id) localStorage.removeItem(LAST_VAULT);
-    } catch {}
-    const to = id ? undefined : (list.find((v) => v.id === last) ?? list[0]);
-    history.replaceState(null, "", to ? vaultRoute(to.id) : "#/notes");
+    if (id && recheck.current !== id) {
+      recheck.current = id;
+      reloadList();
+      return;
+    }
+    // #/notes or #/vaults alone, or a vault that's gone: the vault open last, or the first
+    const last = storedVault();
+    const to = list.find((v) => v.id === last) ?? list[0];
+    if (!to) return;
+    history.replaceState(null, "", vaultRoute(to.id));
     window.dispatchEvent(new HashChangeEvent("hashchange"));
   }, [list, id, vault]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the route is parsed from the hash on each draw; the hash says when it changed
@@ -78,6 +80,8 @@ export function Vaults({ theme }: { theme: "light" | "dark" }) {
   }, [hash]);
 
   if (error) return <div className="center-note">{error}</div>;
+  if (list && !list.length)
+    return <div className="center-note">There's no vault yet: restart the server to make one.</div>;
   if (!list || !vault) return <div className="center-note">Opening the vault…</div>;
 
   const path = route.view === "note" ? route.path : undefined;
@@ -135,6 +139,8 @@ function VaultHome({ vault, tree, list }: { vault: VaultSummary; tree: Tree | nu
         <h1 className="empty-title">{vault.name}</h1>
         {vault.synced ? (
           <SyncNotice id={vault.id} name={vault.name} />
+        ) : vault.app ? (
+          <p className="fine">Kept in the app.</p>
         ) : (
           <p className="fine vault-where" title={vault.path}>
             <FolderOpen aria-hidden="true" /> {vault.path}
@@ -182,9 +188,14 @@ function Missing({ vault, list, onForget }: { vault: VaultSummary; list: Panel; 
           onClick={async () => {
             if (!confirm(`Remove “${vault.name}” from the app? Its folder and files on your computer are not touched.`))
               return;
-            await vaults.remove(vault.id);
+            try {
+              await vaults.remove(vault.id);
+            } catch (e) {
+              alert((e as Error).message);
+              return;
+            }
             onForget();
-            go("#/notes");
+            go("#/vaults");
           }}
         >
           Remove from the app

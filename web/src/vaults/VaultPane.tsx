@@ -1,4 +1,4 @@
-/* A note of an outside vault, opened on the notes page: its title (renaming the file, links to it
+/* A note of a vault, opened on the notes page: its title (renaming the file, links to it
  * follow), the whole file to edit (properties included, as Obsidian's source mode shows it) or to read
  * (properties as a table, links and embeds working, task boxes ticking), and its links in the sidebar.
  * Edits are written to the file itself; changes made to it elsewhere (in Obsidian, say) show at once,
@@ -68,7 +68,7 @@ export function VaultPane({
   const [title, setTitle] = useState("");
   const [mode, setMode] = useState<"edit" | "read">(() => {
     try {
-      return (localStorage.getItem("classroom-vault-mode") as "edit" | "read") || "read";
+      return (localStorage.getItem("notes-mode") as "edit" | "read") || "read";
     } catch {
       return "read";
     }
@@ -286,7 +286,7 @@ export function VaultPane({
                     onClick={() => {
                       setMode(m);
                       try {
-                        localStorage.setItem("classroom-vault-mode", m);
+                        localStorage.setItem("notes-mode", m);
                       } catch {}
                     }}
                   >

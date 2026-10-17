@@ -5,15 +5,16 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   type DraftCard,
-  docs,
   type ExplainFeedback,
   type IdeaConnection,
   learn,
   type SavedFigure,
   type SourceRef,
+  vaults,
 } from "../api";
 import { useFocusTrap } from "../lib/a11y";
 import { SceneView } from "../scene/SceneView";
+import { activeVault } from "../vaults/active";
 import { Spinner } from "./feedback";
 import { Markdown } from "./Markdown";
 
@@ -292,6 +293,7 @@ export function ExplainBack({
               disabled={saved}
               onClick={async () => {
                 await learn.saveExplanation({
+                  vault: await activeVault(),
                   concept,
                   explanation: text,
                   score: feedback.score,
@@ -388,14 +390,19 @@ export function Connector({
             className="button"
             disabled={saved.has(i)}
             onClick={async () => {
-              await docs.create({
-                type: "connection",
-                title: c.title,
-                body: `${c.body}\n\n> ${passage.slice(0, 400)}`,
-                concepts: c.concepts,
-                source,
-              });
-              setSaved((s) => new Set(s).add(i));
+              const body = `${c.body}\n\n> ${passage.slice(0, 400)}`;
+              // in the active vault, linking the book and the concepts
+              try {
+                await vaults.create(await activeVault(), {
+                  title: c.title,
+                  body,
+                  bookId: source?.bookId,
+                  about: c.concepts,
+                });
+                setSaved((s) => new Set(s).add(i));
+              } catch (e) {
+                setError((e as Error).message);
+              }
             }}
           >
             {saved.has(i) ? "Saved" : "Save as a note"}

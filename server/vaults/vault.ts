@@ -1,4 +1,4 @@
-/* One outside vault, indexed in memory: every note (its text, properties, tags, links, headings) and
+/* One vault, indexed in memory: every note (its text, properties, tags, links, headings) and
  * every other file in it (pictures, PDFs, sound, video: its attachments), and its folders. Hidden
  * folders (.obsidian, .trash, .git) are left out. Links resolve the way Obsidian resolves them, and
  * from that come backlinks, mentions without a link, tags, search and the graph.

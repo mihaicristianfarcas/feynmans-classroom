@@ -1,10 +1,11 @@
-/* The reading session's hooks: the note it writes into, remembering the place and the zoom, and
+/* The reading session's hooks: the note it writes into (in the active vault), remembering the place and the zoom, and
  * logging reading time while the reader is actually reading. */
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
-import { type Book, docs, learn, type Note, type TocEntry } from "../api";
+import { type Book, learn, type TocEntry } from "../api";
+import { activeVault, useActiveVault } from "../vaults/active";
 import { savePos } from "./position";
 
-/** A note of an added vault, as the note a reading session writes into. */
+/** A vault note, as the note a reading session writes into. */
 export interface VaultTarget {
   vault: string;
   path: string;
@@ -14,62 +15,39 @@ export interface VaultTarget {
 const VAULT_KEY = /^vault:([^:]+):(.+)$/;
 const titleOf = (path: string) => (path.split("/").pop() || path).replace(/\.md$/i, "");
 
-/** The note this session writes into: remembered per book (one of the app's notes, or a vault's),
- * else the book's own note (made on first use). */
+/** The note this session writes into: remembered per book and active vault, else the book's own note in
+ * the active vault (made on first use). */
 export function useWorkingNote(bookId: string) {
-  const [note, setNote] = useState<Note | null>(null);
   const [vaultNote, setVaultNote] = useState<VaultTarget | null>(null);
+  const { active } = useActiveVault();
+  const key = `notes-book-${bookId}@${active}`;
   useEffect(() => {
-    setNote(null);
     setVaultNote(null);
+    if (active === null) return;
     try {
-      const id = localStorage.getItem(`classroom-note-${bookId}`);
-      const v = id?.match(VAULT_KEY);
+      const v = localStorage.getItem(key)?.match(VAULT_KEY);
       if (v) setVaultNote({ vault: v[1], path: v[2], title: titleOf(v[2]) });
-      else if (id)
-        docs.get<Note>(id).then(
-          (n) => setNote(n),
-          () => {},
-        );
     } catch {}
-  }, [bookId]);
-  const remember = useCallback(
-    (key: string | null) => {
-      try {
-        if (key) localStorage.setItem(`classroom-note-${bookId}`, key);
-        else localStorage.removeItem(`classroom-note-${bookId}`);
-      } catch {}
-    },
-    [bookId],
-  );
-  const choose = useCallback(
-    (n: Note | null) => {
-      setNote(n);
-      setVaultNote(null);
-      remember(n ? n.id : null);
-    },
-    [remember],
-  );
+  }, [key, active]);
   const chooseVault = useCallback(
     (v: { vault: string; path: string } | null) => {
-      setNote(null);
       setVaultNote(v ? { ...v, title: titleOf(v.path) } : null);
-      remember(v ? `vault:${v.vault}:${v.path}` : null);
+      try {
+        if (v) localStorage.setItem(key, `vault:${v.vault}:${v.path}`);
+        else localStorage.removeItem(key);
+      } catch {}
     },
-    [remember],
+    [key],
   );
-  /** The working note, making the book's note the working one if none is chosen yet. */
-  const ensure = useCallback(async (): Promise<Note | VaultTarget> => {
+  /** The working note, making the active vault's note for the book the working one if none is chosen yet. */
+  const ensure = useCallback(async (): Promise<VaultTarget> => {
     if (vaultNote) return vaultNote;
-    if (note) return note;
-    const n = await learn.bookNote(bookId);
-    choose(n);
-    return n;
-  }, [note, vaultNote, bookId, choose]);
-  return { note, vaultNote, choose, chooseVault, ensure };
+    const v = await learn.vaultBookNote(bookId, active ?? (await activeVault()));
+    chooseVault(v);
+    return v;
+  }, [vaultNote, bookId, active, chooseVault]);
+  return { vaultNote, chooseVault, ensure, active };
 }
-
-export const isVaultTarget = (n: Note | VaultTarget): n is VaultTarget => "vault" in n && "path" in n && !("id" in n);
 
 /** Saves the place a moment after scrolling stops (once the book is back where it was left). */
 export function useSavedPosition(book: Book | null, pos: number, restored: RefObject<boolean>) {

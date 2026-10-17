@@ -159,8 +159,11 @@ describe("the agent on a jj vault", () => {
     const first = await settled(A.startRun({ task: "What is replication lag?", context: { route: "#/review" } }));
     expect(first.status).toBe("done");
     expect(first.where).toBe("Review");
+    // kept in the first vault (made, kept in the app, when there's none)
     const kept = A.keepRun(first.id);
-    expect(kept.kept && existsSync(join(vault, kept.kept))).toBe(true);
+    const { listVaults, rootOf } = await import("../server/vaults/index.ts");
+    const info = listVaults().find((v) => v.id === kept.keptIn)!;
+    expect(kept.kept && existsSync(join(rootOf(info), kept.kept))).toBe(true);
     const second = await settled(A.startRun({ task: "Shorter, please", after: first.id }));
     expect(second.thread).toBe(first.id);
     expect(prompts.at(-1)).toContain("They asked: What is replication lag?");

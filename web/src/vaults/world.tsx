@@ -1,4 +1,4 @@
-/* How Markdown from an outside vault behaves on the page: its [[links]] and [text](path) links open in
+/* How Markdown from a vault behaves on the page: its [[links]] and [text](path) links open in
  * that vault (a link to nothing yet is shown as such), its #tags search it, its task boxes can be ticked,
  * and its embeds show what they name: a note or one section or block of it (framed, with its own links
  * working from where it lives), a picture (at the width "|300" asks for), a PDF (at "#page=3"), sound or

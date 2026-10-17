@@ -13,7 +13,6 @@ import {
   type FindHit,
   type Loc,
   learn,
-  type Note,
   posOf,
   type SourceRef,
   type TutorSession,
@@ -27,14 +26,13 @@ import { CardDrafter, Connector, ExplainBack } from "../components/tools";
 import { useIndicator } from "../components/ui";
 import { useArrowKeys } from "../lib/a11y";
 import { usePanel } from "../lib/usePanel";
-import { under, useVaultEvents } from "../lib/useVaultEvents";
 import { noteRoute } from "../vaults/routes";
 import { CaptureLayer } from "./Capture";
 import { FigureLightbox } from "./FigureLightbox";
 import { FiguresIndex } from "./FiguresIndex";
 import { FindBar } from "./FindBar";
 import { type FigureEntry, figureEntries } from "./figures";
-import { type DemoMarker, demoMarkers, Gutter, type NoteMarker, noteMarkers, sameMarkers } from "./Gutter";
+import { type DemoMarker, demoMarkers, Gutter, sameMarkers } from "./Gutter";
 import { Margin, type MarginItem } from "./Margin";
 import { chapterAt, LINE, locOfAnchor, locOfPos, savedPos, sourceRef } from "./position";
 import { ReaderHelp } from "./ReaderHelp";
@@ -44,15 +42,7 @@ import { HtmlReader, MarksContext, PdfReader, type ReaderHandle, type Zoom } fro
 import { type SelectionAction, SelectionMenu } from "./SelectionMenu";
 import { StudyTab } from "./StudyPanel";
 import { readSelection, type Selection } from "./selection";
-import {
-  isVaultTarget,
-  savedZoom,
-  saveZoom,
-  stepZoom,
-  useReadingTime,
-  useSavedPosition,
-  useWorkingNote,
-} from "./session";
+import { savedZoom, saveZoom, stepZoom, useReadingTime, useSavedPosition, useWorkingNote } from "./session";
 import { NEW_CONVERSATION, pinnedOf, type TutorConversation, TutorTab } from "./Tutor";
 
 type Tab = "margin" | "figures" | "note" | "tutor" | "study";
@@ -108,8 +98,6 @@ export function Reader({
   const [autoQuiz] = useState<"check" | null>(query.get("quiz") ? "check" : null);
   const [focused, setFocused] = useState<string | null>(query.get("focus"));
   const [hovered, setHovered] = useState<string | null>(null);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [noteMarks, setNoteMarks] = useState<NoteMarker[]>([]);
   const [conversation, setConversation] = useState<TutorConversation>(NEW_CONVERSATION);
   const [pinned, setPinned] = useState<{ text: string; source: SourceRef } | null>(null);
   const [tool, setTool] = useState<{ kind: Tool; text: string; source: SourceRef } | null>(null);
@@ -133,13 +121,7 @@ export function Reader({
   useEffect(() => {
     if (book && book.format !== "pdf") api.blocks(bookId).then(setBlocks, (e) => setFailed(e.message));
   }, [book, bookId]);
-  const loadNotes = useCallback(() => docs.list("note", { book: bookId }).then(setNotes, () => {}), [bookId]);
-  // notes about this book made elsewhere (the agent, another editor) show up as they land
-  useVaultEvents(loadNotes, under("notes/"));
-  useEffect(() => {
-    loadNotes();
-  }, [loadNotes]);
-  const { note: workingNote, vaultNote, choose: chooseNote, chooseVault, ensure: ensureNote } = useWorkingNote(bookId);
+  const { vaultNote, chooseVault, ensure: ensureNote } = useWorkingNote(bookId);
   // a link to a session with the tutor (from ⌘K, a note): the Tutor pane, with that conversation
   // biome-ignore lint/correctness/useExhaustiveDependencies: opens the session in the link once, when the reader opens
   useEffect(() => {
@@ -180,11 +162,9 @@ export function Reader({
     if (p !== null) setPos(p);
     const nextDemos = demoMarkers(r, box, demos);
     setMarkers((old) => sameMarkers(old, nextDemos));
-    const nextNotes = noteMarkers(r, box, notes);
-    setNoteMarks((old) => sameMarkers(old, nextNotes));
     lastScroll.current = Date.now();
     bus.dispatchEvent(new Event("scroll"));
-  }, [demos, notes, bus]);
+  }, [demos, bus]);
 
   useEffect(() => {
     measure();
@@ -392,19 +372,13 @@ export function Reader({
     async (input: { annotationId?: string; anchor?: Anchor }, mode: "embed" | "passage" | "reference") => {
       try {
         const note = await ensureNote();
-        if (isVaultTarget(note)) {
-          await learn.toNote(bookId, { ...input, vault: note.vault, path: note.path, mode });
-          say(`Added to “${note.title}”.`, { label: "Open", href: noteRoute(note.vault, note.path) });
-          return;
-        }
-        const out = await learn.toNote(bookId, { ...input, noteId: note.id, mode });
-        if (out.note) chooseNote(out.note);
-        say(`Added to “${out.note?.title}”.`, { label: "Open", href: `#/notes/${out.note?.id}` });
+        await learn.toNote(bookId, { ...input, vault: note.vault, path: note.path, mode });
+        say(`Added to “${note.title}”.`, { label: "Open", href: noteRoute(note.vault, note.path) });
       } catch (error) {
         say((error as Error).message);
       }
     },
-    [bookId, ensureNote, chooseNote, say],
+    [bookId, ensureNote, say],
   );
 
   const onAction = useCallback(
@@ -579,15 +553,10 @@ export function Reader({
             ) : tab === "note" ? (
               <ReaderNote
                 book={book}
-                note={workingNote}
                 vaultNote={vaultNote}
-                onChoose={chooseNote}
                 onChooseVault={chooseVault}
                 ensureNote={ensureNote}
-                bookNotes={notes}
                 theme={theme}
-                onJump={(loc) => jumpTo(loc)}
-                reload={loadNotes}
               />
             ) : tab === "tutor" ? (
               <TutorTab
@@ -609,9 +578,7 @@ export function Reader({
         <section className="book-pane" ref={pane} aria-label="Book">
           <Gutter
             demos={markers}
-            notes={noteMarks}
             activeId={focused || undefined}
-            onNote={() => show("note")}
             onDemo={(id) => {
               const entry = figures.find((f) => f.id === id);
               if (entry) goToFigure(entry);
@@ -654,7 +621,7 @@ export function Reader({
               y={selection.y}
               side={selection.side}
               onAction={onAction}
-              noteTitle={vaultNote?.title ?? workingNote?.title}
+              noteTitle={vaultNote?.title}
               takeFocus={selection.byKeyboard}
               onClose={() => {
                 setSelection(null);
@@ -667,9 +634,8 @@ export function Reader({
               book={book}
               root={pane.current}
               theme={theme}
-              noteTitle={vaultNote?.title ?? workingNote?.title}
+              noteTitle={vaultNote?.title}
               ensureNote={ensureNote}
-              onNote={chooseNote}
               onDone={() => setCapturing(false)}
               say={say}
             />
@@ -684,15 +650,7 @@ export function Reader({
         <ExplainBack passage={tool.text} source={tool.source} theme={theme} onClose={() => setTool(null)} />
       )}
       {tool?.kind === "connect" && (
-        <Connector
-          passage={tool.text}
-          source={tool.source}
-          theme={theme}
-          onClose={() => {
-            setTool(null);
-            loadNotes();
-          }}
-        />
+        <Connector passage={tool.text} source={tool.source} theme={theme} onClose={() => setTool(null)} />
       )}
       {help && <ReaderHelp onClose={() => setHelp(false)} />}
       {lightboxEntry && (

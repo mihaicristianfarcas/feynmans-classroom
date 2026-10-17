@@ -1,4 +1,4 @@
-/* Changing an outside vault, the way Obsidian would: saving a note (refused, with the text on disk,
+/* Changing a vault, the way Obsidian would: saving a note (refused, with the text on disk,
  * if it changed there since it was opened), making a note or a folder where Obsidian's settings put
  * new ones, saving a pasted picture where its settings put attachments, renaming or moving a note,
  * a file or a folder (every link to it follows, as with Obsidian's "update links"), and deleting to

@@ -12,6 +12,7 @@ import { resumeFigures } from "./scene/figures.ts";
 import { initVault, onVaultChange } from "./vault/index.ts";
 import { startIndexing } from "./vault/indexes.ts";
 import { exportMissingBooks } from "./vault/library.ts";
+import { adoptOwnNotes } from "./vaults/adopt.ts";
 import { startVaults } from "./vaults/index.ts";
 
 // a stop signal (Ctrl-C, a restart, a test that is done with it) ends the server, whoever else listens
@@ -33,7 +34,8 @@ resumeAnnotations();
 resumeInterrupted();
 resumeFigures();
 prepareAgents();
-// the learner's other vaults (Obsidian's): read afresh, then followed as they change
+// the learner's vaults: always one, holding every note; read afresh, then followed as they change
+adoptOwnNotes();
 startVaults();
 
 serve({ fetch: createApp().fetch, port: PORT, hostname: process.env.HOST || "127.0.0.1" }, (info) => {

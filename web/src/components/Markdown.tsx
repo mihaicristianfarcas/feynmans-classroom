@@ -3,7 +3,7 @@
  * pictures, figures), > [!callouts] (folded with `-` or `+`, as disclosures), ==highlights==, #tags;
  * plus the platform's own: ```figure blocks become interactive figures, ```manim blocks animations
  * (ManimGX, played in a sandboxed frame), ```quiz blocks quizzes to play, and {{cloze}} deletions
- * become blanks. Inside an outside vault (Obsidian's) a MarkdownWorld says where links go, what embeds
+ * become blanks. Inside a vault a MarkdownWorld says where links go, what embeds
  * show (notes, sections, pictures, PDFs, sound, video), where a #tag leads, and lets task boxes be
  * ticked. Raw HTML is never rendered. KaTeX (half a megabyte) loads with the first text that
  * has math in it; until then the math shows as its TeX. */
@@ -22,7 +22,7 @@ import { QuizBlock } from "./QuizBlock";
 
 /* ---------------- whose links: the app's vault, or an outside one ---------------- */
 
-/** How links, embeds and tags work in Markdown from an outside vault (left out: the app's own vault). */
+/** How links, embeds and tags work in Markdown from a vault (left out: Markdown of the app's own, such as a concept's). */
 export interface MarkdownWorld {
   /** Where a link leads, as an address (for a new tab, or to copy). `md`: a [text](path) link. */
   href(target: string, sub?: string, md?: boolean): string;

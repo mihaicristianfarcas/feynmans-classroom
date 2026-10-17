@@ -1,6 +1,5 @@
-/* The strip between the panes and the book: a mark beside each passage your notes come from, and a
- * mark beside each figure's anchor (lit for the active one). */
-import type { Demo, Loc, Note } from "../api";
+/* The strip between the panes and the book: a mark beside each figure's anchor (lit for the active one). */
+import type { Demo, Loc } from "../api";
 import type { ReaderHandle } from "./readers";
 
 export interface DemoMarker {
@@ -8,12 +7,6 @@ export interface DemoMarker {
   top: number;
   status: Demo["status"];
   fig: string;
-  title: string;
-}
-export interface NoteMarker {
-  id: string;
-  top: number;
-  type: Note["type"];
   title: string;
 }
 
@@ -32,16 +25,6 @@ export function demoMarkers(reader: ReaderHandle, box: DOMRect, demos: Demo[]): 
   });
 }
 
-export function noteMarkers(reader: ReaderHandle, box: DOMRect, notes: Note[]): NoteMarker[] {
-  return notes.flatMap((note) => {
-    const src = note.source;
-    const loc: Loc | null =
-      src?.page !== undefined ? { page: src.page, y: src.y } : src?.block !== undefined ? { block: src.block } : null;
-    const top = loc && topOf(reader, box, loc);
-    return top == null ? [] : [{ id: note.id, top, type: note.type, title: note.title }];
-  });
-}
-
 /** Keeps the old list when nothing visibly moved, so scrolling doesn't re-render for nothing. */
 export function sameMarkers<T extends { id: string; top: number; status?: string }>(old: T[], next: T[]): T[] {
   return old.length === next.length &&
@@ -52,31 +35,15 @@ export function sameMarkers<T extends { id: string; top: number; status?: string
 
 export function Gutter({
   demos,
-  notes,
   activeId,
-  onNote,
   onDemo,
 }: {
   demos: DemoMarker[];
-  notes: NoteMarker[];
   activeId: string | undefined;
-  onNote: () => void;
   onDemo: (id: string) => void;
 }) {
   return (
     <div className="gutter">
-      {notes.map((m) => (
-        <button
-          type="button"
-          key={m.id}
-          className="note-mark"
-          data-type={m.type}
-          style={{ top: m.top }}
-          title={`${m.type}: ${m.title}`}
-          aria-label={`${m.type}: ${m.title}`}
-          onClick={onNote}
-        />
-      ))}
       {demos.map((m) => (
         <button
           type="button"

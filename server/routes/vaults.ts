@@ -1,5 +1,5 @@
-/* Routes for outside vaults (Obsidian's, or any folder of Markdown): the list (add, rename, forget),
- * whether the Notes page shows the app's own notes beside them, each vault's files and folders, a note
+/* Routes for the vaults (kept in the app, or a folder: Obsidian's, or any folder of Markdown): the list
+ * (make, add, rename, remove), each vault's files and folders, a note
  * with its links and backlinks, resolving a link (for opening and embedding), saving, making, renaming
  * and deleting, attachments (served as content only, with ranges so sound and video can seek), tags,
  * search and the graph. Changes the app makes are announced like the ones the watcher sees, so every
@@ -25,17 +25,17 @@ import {
   trash,
 } from "../vaults/edit.ts";
 import {
+  addAppVault,
   addSyncedVault,
   addVault,
   announceChanges,
   getVault,
-  hideOwnNotes,
   listVaults,
-  ownNotesHidden,
   removeVault,
   renameVault,
   vaultsWithStatus,
 } from "../vaults/index.ts";
+import { noteText } from "../vaults/reading.ts";
 import { deleteFile, manifest, readPath, writeFile } from "../vaults/sync.ts";
 import { cleanRel, kindOf } from "../vaults/vault.ts";
 
@@ -97,13 +97,10 @@ function serveFile(c: Context, full: string) {
 export function vaultRoutes(app: Hono) {
   app.get("/api/vaults", (c) => c.json(vaultsWithStatus()));
   app.post("/api/vaults", async (c) => {
-    const b = await readBody<{ path?: string; name?: string; synced?: boolean }>(c);
+    const b = await readBody<{ path?: string; name?: string; synced?: boolean; app?: boolean }>(c);
+    if (b.app) return c.json(addAppVault(b.name || ""));
     return c.json(b.synced ? addSyncedVault(b.name || "") : addVault(b.path || "", b.name));
   });
-
-  /** Whether the Notes page shows the app's own notes (Classroom) beside the vaults. */
-  app.get("/api/vaults/own", (c) => c.json({ hidden: ownNotesHidden() }));
-  app.put("/api/vaults/own", async (c) => c.json(hideOwnNotes(!!(await readBody<{ hidden?: boolean }>(c)).hidden)));
 
   /** A synced vault's copy, file by file, for the browser that keeps it in step with the folder. */
   const synced = (c: Context) => {
@@ -237,8 +234,16 @@ export function vaultRoutes(app: Hono) {
 
   app.post("/api/vaults/:id/notes", async (c) => {
     const vault = getVault(c.req.param("id"));
-    const b = await readBody<{ title?: string; folder?: string; from?: string }>(c);
-    const change = createNote(vault, b);
+    const b = await readBody<{
+      title?: string;
+      folder?: string;
+      from?: string;
+      body?: string;
+      bookId?: string;
+      about?: string[];
+    }>(c);
+    const filled = b.body !== undefined || b.bookId || b.about?.length;
+    const change = createNote(vault, { ...b, text: filled ? noteText(b.body || "", b) : undefined });
     announceChanges(vault.id, [change]);
     return c.json(change);
   });

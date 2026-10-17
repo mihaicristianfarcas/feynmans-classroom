@@ -129,8 +129,11 @@ export interface TutorSession extends DocBase {
   source: SourceRef;
   mode: "answer" | "socratic";
   messages: { role: "user" | "tutor"; text: string }[];
-  /** The note made from it (Save as note): the first of its `related` links that is a note (read live). */
-  note?: { id: string; title: string };
+  /** The note made from it in a vault ("<vault id>/<path>"), kept as `vault-note`. */
+  vaultNote?: string;
+  /** The note made from it (Save as note), read live: the vault note while it's there, else the first of
+   * its `related` links that is a note. */
+  note?: { id?: string; title: string; vault?: string; path?: string };
 }
 
 /** A figure kept in the brain (figures/*.md): its scene spec in a ```figure block. */
@@ -217,7 +220,7 @@ export interface AgentContext {
   route?: string;
   /** The document open on the page (a note, a concept). */
   docId?: string;
-  /** An added vault open on the page, and the note open in it. */
+  /** A vault open on the page, and the note open in it. */
   vault?: string;
   vaultPath?: string;
   bookId?: string;
@@ -237,7 +240,7 @@ export interface AgentRun {
   where?: string;
   /** "fast": the quick model (Enter); "smart": the careful one (⌘Enter). */
   tier?: "fast" | "smart";
-  /** It worked in this added vault (its paths are the vault's); otherwise in the app's own vault. */
+  /** It worked in this vault (its paths are the vault's); otherwise in the app's data vault. */
   vault?: string;
   status: "running" | "review" | "merged" | "discarded" | "failed" | "undone" | "done";
   started: string;
@@ -256,8 +259,10 @@ export interface AgentRun {
   answer?: string;
   /** The vault path of the main thing it made or changed, to open from the reply. */
   open?: string;
-  /** The note an answer was kept in. */
+  /** The note an answer was kept in (in the run's vault, or in `keptIn`). */
   kept?: string;
+  /** The vault it was kept in, for a run on the app's whole vault. */
+  keptIn?: string;
   error?: string;
   activity?: string;
 }

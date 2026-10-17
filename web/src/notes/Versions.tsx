@@ -1,4 +1,4 @@
-/* A note's saved versions (the app's own notes: the vault's jj history; a vault's: its history, see
+/* A vault note's saved versions (its vault's history, see
  * server/vaults/history.ts): pick one to read it as it was, see what that version changed, and bring
  * it back (as a new change, so the current text stays in the history). */
 import { useEffect, useState } from "react";

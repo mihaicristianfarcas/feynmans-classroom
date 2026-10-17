@@ -4,12 +4,12 @@
  * note (linked to its page), with or without a transcription (LaTeX for formulas, a Markdown table,
  * or a description of a figure, by the model looking at it). */
 import { useEffect, useRef, useState } from "react";
-import { type Book, docs, learn, type Note, vaults } from "../api";
+import { type Book, learn, vaults } from "../api";
 import { Spinner } from "../components/feedback";
 import { Markdown } from "../components/Markdown";
 import { noteRoute } from "../vaults/routes";
 import { pageEls } from "./anchoring";
-import { isVaultTarget, type VaultTarget } from "./session";
+import type { VaultTarget } from "./session";
 
 interface Box {
   x: number;
@@ -49,7 +49,6 @@ export function CaptureLayer({
   theme,
   noteTitle,
   ensureNote,
-  onNote,
   onDone,
   say,
 }: {
@@ -57,8 +56,7 @@ export function CaptureLayer({
   root: HTMLElement | null;
   theme: "light" | "dark";
   noteTitle?: string;
-  ensureNote: () => Promise<Note | VaultTarget>;
-  onNote: (n: Note) => void;
+  ensureNote: () => Promise<VaultTarget>;
   onDone: () => void;
   say: (text: string, action?: { label: string; href: string }) => void;
 }) {
@@ -135,31 +133,18 @@ export function CaptureLayer({
     setBusy({ what: "Adding to your note", at: Date.now() });
     try {
       const n = await ensureNote();
-      if (isVaultTarget(n)) {
-        // the picture goes in the vault, where Obsidian keeps attachments
-        const stamp = new Date().toISOString().slice(11, 19).replace(/:/g, ".");
-        const pic = await vaults.attach(
-          n.vault,
-          shot!.data,
-          `${book.title.slice(0, 50)} p${shot!.page} ${stamp}.png`,
-          n.path,
-        );
-        const title = book.title.replace(/[[\]|#^]/g, "");
-        const md = `${pic.embed}\n*[[${title}#page=${shot!.page}|${title}, p. ${shot!.page}]]*${withText && text ? `\n\n${text}` : ""}`;
-        await vaults.append(n.vault, n.path, md);
-        say(`Added to “${n.title}”.`, { label: "Open", href: noteRoute(n.vault, n.path) });
-        onDone();
-        return;
-      }
-      const pic = await save();
-      const pageLink =
-        book.folder && book.file
-          ? `[[library/${book.folder}/${book.file}#page=${shot!.page}|${book.title}, p. ${shot!.page}]]`
-          : `${book.title}, p. ${shot!.page}`;
-      const md = `![[${pic.name}]]\n*${pageLink}*${withText && text ? `\n\n${text}` : ""}`;
-      const updated = await docs.append<Note>(n.id, md);
-      onNote(updated);
-      say(`Added to “${updated.title}”.`, { label: "Open", href: `#/notes/${updated.id}` });
+      // the picture goes in the vault, where Obsidian keeps attachments
+      const stamp = new Date().toISOString().slice(11, 19).replace(/:/g, ".");
+      const pic = await vaults.attach(
+        n.vault,
+        shot!.data,
+        `${book.title.slice(0, 50)} p${shot!.page} ${stamp}.png`,
+        n.path,
+      );
+      const title = book.title.replace(/[[\]|#^]/g, "");
+      const md = `${pic.embed}\n*[[${title}#page=${shot!.page}|${title}, p. ${shot!.page}]]*${withText && text ? `\n\n${text}` : ""}`;
+      await vaults.append(n.vault, n.path, md);
+      say(`Added to “${n.title}”.`, { label: "Open", href: noteRoute(n.vault, n.path) });
       onDone();
     } catch (e) {
       say((e as Error).message);

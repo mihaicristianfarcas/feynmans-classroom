@@ -1,4 +1,4 @@
-/* The graph of an outside vault, as Obsidian's graph view: every note, joined where one links to
+/* The graph of a vault, as Obsidian's graph view: every note, joined where one links to
  * another (pictures and other files too, if you choose), sized by how many links it has; find one by
  * name, double-click (or Enter) to open it. It redraws as the vault changes. */
 import { useMemo, useState } from "react";

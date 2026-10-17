@@ -289,13 +289,23 @@ try {
 
   // notes, the graph, agents
   await page.goto(`${BASE}#/notes`, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".file-tree .tree", { timeout: 10000 }).catch(() => null);
-  check("the Notes page shows the vault's notes", !!(await page.$(".file-tree .tree")));
-  const tree = (await (await fetch(`${BASE}api/vault/tree`)).json()) as { notes: { id: string }[] };
-  if (tree.notes[0]) {
-    await page.goto(`${BASE}#/notes/${tree.notes[0].id}`, { waitUntil: "domcontentloaded" });
-    await page.waitForSelector(".note-editor .cm-content", { timeout: 10000 });
-    check("a note opens in the editor with its links beside it", !!(await page.$(".note-side")));
+  await page.waitForSelector(".vault-tree", { timeout: 10000 }).catch(() => null);
+  check("the Notes page opens a vault", !!(await page.$(".vault-tree")));
+  const [vault] = (await (await fetch(`${BASE}api/vaults`)).json()) as { id: string }[];
+  const files = vault
+    ? (
+        (await (await fetch(`${BASE}api/vaults/${vault.id}/tree`)).json()) as {
+          files: { path: string; kind: string }[];
+        }
+      ).files
+    : [];
+  const opened = files.find((f) => f.kind === "note");
+  if (vault && opened) {
+    await page.goto(`${BASE}#/vaults/${vault.id}/note/${encodeURIComponent(opened.path)}`, {
+      waitUntil: "domcontentloaded",
+    });
+    await page.waitForSelector(".note-pane", { timeout: 10000 });
+    check("a vault note opens", !!(await page.$(".note-pane")));
   }
   await page.goto(`${BASE}#/brain`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".graph, .empty-state", { timeout: 10000 });

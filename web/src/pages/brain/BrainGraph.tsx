@@ -1,4 +1,4 @@
-/* The Brain's graph, filling the page: a field at the top to find an item (⌘K goes to it here; pressed
+/* The Brain's graph of the active vault, filling the page: a field at the top to find an item (⌘K goes to it here; pressed
  * again, the search of everything opens), the graph, and a card at the left for whatever you pick (Escape
  * closes it and gives focus back to the item; its edge resizes it). In the graph's corner: the legend (a
  * card like it at the right, saying what the marks mean), the links the agent suggests (with how many
@@ -12,6 +12,8 @@ import { focusToggle, PanelEdge } from "../../components/Panel";
 import { useLoad } from "../../lib/useLoad";
 import { usePanel } from "../../lib/usePanel";
 import { under, useVaultEvents } from "../../lib/useVaultEvents";
+import { useActiveVault } from "../../vaults/active";
+import { useVaultChanges } from "../../vaults/useVaultChanges";
 import { Legend } from "./Legend";
 import { CARD_PANEL, NodeCard, SuggestionsCard } from "./NodeCard";
 
@@ -36,9 +38,17 @@ function useNarrow() {
 }
 
 export function BrainGraph({ theme }: { theme: "light" | "dark" }) {
-  const { data, reload } = useLoad(() => learn.graph());
-  // notes and concepts made or linked elsewhere (the agent, another editor) join the graph as they land
+  // the active vault's graph (the top bar picks it)
+  const { active } = useActiveVault();
+  const { data, reload } = useLoad(
+    () => (active === null ? new Promise<never>(() => {}) : learn.graph(active)),
+    [active],
+  );
+  // notes and concepts made or linked elsewhere (the agent, another editor, Obsidian) join the graph as they land
   useVaultEvents(reload, under("notes/", "concepts/", "brain/connections"));
+  useVaultChanges(null, (changes) => {
+    if (active && changes.some((c) => c.vault === active)) reload();
+  });
   const narrow = useNarrow();
   const legend = usePanel("brain-legend", { initial: 300, min: 240, max: 440, closed: true });
   const cardSize = usePanel(CARD_PANEL, { initial: 380, min: 300, max: 640 });

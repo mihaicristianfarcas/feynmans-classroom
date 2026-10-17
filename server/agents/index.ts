@@ -13,13 +13,12 @@
  *   5. Undo: each run is one jj change, taken out again with one click. log/agents.jsonl records
  *      every run: the request, where, the model, the files, the change.
  *
- * A request made in an added vault works on a copy of that vault's notes instead, and lands in it (and
+ * A request made in a vault works on a copy of that vault's notes instead, and lands in it (and
  * is undone) through the vault's own history (vaults/agent-work.ts). */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentContext, AgentRun } from "../../shared/vault-types.ts";
 import { publish } from "../events.ts";
-import { createDoc } from "../learn/docs.ts";
 import { agent } from "../llm/index.ts";
 import {
   appendLog,
@@ -48,7 +47,7 @@ import {
   type Work,
 } from "../vaults/agent-work.ts";
 import { createNote } from "../vaults/edit.ts";
-import { announceChanges, getVault, listVaults } from "../vaults/index.ts";
+import { announceChanges, defaultVault, getVault, listVaults } from "../vaults/index.ts";
 import { agentPrompt, REPLY_SCHEMA, type Reply, vaultAgentPrompt } from "./prompt.ts";
 import { isForbidden, needsReview, problemsIn } from "./review.ts";
 import { describeWhere } from "./where.ts";
@@ -210,7 +209,7 @@ async function execute(run: AgentRun, where: string[]) {
   }
 }
 
-/** A run in an added vault: a copy of its notes, the agent, then its commit lands in the vault (or fails). */
+/** A run in a vault: a copy of its notes, the agent, then its commit lands in the vault (or fails). */
 async function executeInVault(run: AgentRun, id: string, where: string[]) {
   const started = Date.now();
   const finish = (patch: Partial<AgentRun>) =>
@@ -355,26 +354,19 @@ export function runDiff(id: string): string {
   return run.vault ? vaultDiff(getVault(run.vault), run.commit) : diffOf(run.commit);
 }
 
-/** Keeps an answer as a note (for a request that changed nothing). */
+/** Keeps an answer as a note (for a request that changed nothing), in the run's vault or the first one. */
 export function keepRun(id: string): AgentRun {
   const run = get(id);
   if (!run.answer) throw new Error("there's no answer to keep");
   if (run.kept) return run;
-  if (run.vault) {
-    const vault = getVault(run.vault);
-    const made = createNote(vault, {
-      title: run.task.split("\n")[0].slice(0, 80).replace(/\//g, "-"),
-      text: run.answer,
-    });
-    announceChanges(vault.id, [made]);
-    return save({ ...run, kept: made.path });
-  }
-  const note = createDoc({
-    kind: "note",
-    type: "answer",
-    title: run.task.split("\n")[0].slice(0, 80),
-    body: run.answer,
-    tags: ["ask"],
+  const vault = getVault(run.vault || defaultVault());
+  const made = createNote(vault, {
+    title: run.task
+      .split("\n")[0]
+      .slice(0, 80)
+      .replace(/[\\/:]/g, "-"),
+    text: run.answer,
   });
-  return save({ ...run, kept: note.path });
+  announceChanges(vault.id, [made]);
+  return save({ ...run, kept: made.path, keptIn: run.vault ? undefined : vault.id });
 }

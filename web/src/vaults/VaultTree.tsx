@@ -1,12 +1,11 @@
-/* The file list of a vault added from a folder, on the notes page: which vault (VaultSwitch, with a menu
- * to rename it, scan it again, open its graph, show the app's own notes again or remove it), a search of it ("#tag" for tags), its folders, notes and
+/* The file list of a vault, on the notes page: which vault (VaultSwitch, with a menu to rename it, scan
+ * it again, open its graph, or remove it: a vault kept in the app is deleted), a search of it ("#tag" for tags), its folders, notes and
  * attachments as a tree (each with a menu: a new note or folder inside, rename or move, delete to the
  * vault's .trash), and its tags. */
 
 import {
   ChevronRight,
   Ellipsis,
-  Eye,
   File,
   FileAudio,
   FileImage,
@@ -32,8 +31,7 @@ import { graphRoute, noteRoute, searchRoute } from "./routes";
 import { SyncNotice } from "./SyncNotice";
 import { syncVault } from "./sync/engine";
 import { dropLinked } from "./sync/store";
-import { useVaultChanges } from "./useVaultChanges";
-import { LAST_VAULT, OWN_VAULT, VaultSwitch } from "./VaultSwitch";
+import { VaultSwitch } from "./VaultSwitch";
 
 const ICON: Record<VaultFileKind, typeof File> = {
   note: FileText,
@@ -135,13 +133,9 @@ export function VaultTree({
   panel: Panel;
 }) {
   const id = vault.id;
-  const { data: own, reload: reloadOwn } = useLoad(() => vaults.own());
-  useVaultChanges(null, (changes) => {
-    if (changes.some((c) => !c.path)) reloadOwn();
-  });
   const [closed, setClosed] = useState<Set<string>>(() => {
     try {
-      return new Set(JSON.parse(localStorage.getItem(`classroom-vault-closed-${id}`) || "[]") as string[]);
+      return new Set(JSON.parse(localStorage.getItem(`notes-closed-${id}`) || "[]") as string[]);
     } catch {
       return new Set();
     }
@@ -152,7 +146,7 @@ export function VaultTree({
       if (next.has(path)) next.delete(path);
       else next.add(path);
       try {
-        localStorage.setItem(`classroom-vault-closed-${id}`, JSON.stringify([...next]));
+        localStorage.setItem(`notes-closed-${id}`, JSON.stringify([...next]));
       } catch {}
       return next;
     });
@@ -255,7 +249,10 @@ export function VaultTree({
               label: "Rename in the app…",
               icon: SquarePen,
               run: async () => {
-                const name = prompt("Name for this vault (its folder keeps its name):", vault.name);
+                const name = prompt(
+                  vault.app ? "Name for this vault:" : "Name for this vault (its folder keeps its name):",
+                  vault.name,
+                );
                 if (!name?.trim() || name.trim() === vault.name) return;
                 await vaults.rename(id, name.trim());
                 onChanged();
@@ -270,36 +267,29 @@ export function VaultTree({
                 announce(r.changes ? `${r.changes} change${r.changes === 1 ? "" : "s"} found` : "Up to date");
               },
             },
-            ...(own?.hidden
-              ? [
-                  {
-                    label: `Show ${OWN_VAULT} notes again`,
-                    icon: Eye,
-                    run: async () => {
-                      await vaults.hideOwn(false);
-                      announce(`${OWN_VAULT} is back on the Notes page`);
-                    },
-                  },
-                ]
-              : []),
             {
-              label: "Remove from the app…",
-              icon: X,
+              label: vault.app ? "Delete vault…" : "Remove from the app…",
+              icon: vault.app ? Trash2 : X,
               danger: true,
               run: async () => {
                 if (
                   !confirm(
-                    `Remove “${vault.name}” from the app? Its folder and files on your computer are not touched.`,
+                    vault.app
+                      ? `Delete “${vault.name}” and its ${vault.notes} note${vault.notes === 1 ? "" : "s"}? It's kept only in the app, so this removes them (the server keeps a copy aside in vaults/.removed/).`
+                      : `Remove “${vault.name}” from the app? Its folder and files on your computer are not touched.`,
                   )
                 )
                   return;
-                if (vault.synced) await dropLinked(id);
-                await vaults.remove(id);
                 try {
-                  localStorage.removeItem(LAST_VAULT);
-                } catch {}
+                  await vaults.remove(id);
+                } catch (e) {
+                  alert((e as Error).message);
+                  return;
+                }
+                if (vault.synced) await dropLinked(id);
+                announce(`${vault.name} ${vault.app ? "deleted" : "removed from the app"}`);
                 onChanged();
-                go("#/notes");
+                go("#/vaults");
               },
             },
           ]}

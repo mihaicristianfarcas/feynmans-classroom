@@ -1,5 +1,5 @@
 /* Searching everything from the ⌘K palette: every document (concepts, notes, annotations, sessions
- * with the tutor, cards, figures), the notes of every added vault, and the books' text, ranked by
+ * with the tutor, cards, figures), the notes of every vault, and the books' text, ranked by
  * simple term scores with the titles weighted up. */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -10,7 +10,7 @@ import { chapterFile } from "../vault/library.ts";
 import { getVault, listVaults } from "../vaults/index.ts";
 
 export interface SearchHit {
-  /** "vault": a note of an added vault (`vault`, `path`). */
+  /** "vault": a vault note (`vault`, `path`). */
   kind: DocKind | "book" | "vault";
   id: string;
   title: string;

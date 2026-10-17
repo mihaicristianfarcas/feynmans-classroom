@@ -1,7 +1,7 @@
 /* The reader's tutor: a conversation about the chapter, or a passage pinned to it, in the same chat as a
  * margin card's follow-ups, answering directly or Socratically. Each conversation is a session kept with
  * the book (server/learn/sessions.ts): saved after every reply, listed when a new one starts, and opened
- * again to read or carry on. A session can be written up as a note, or made into cards. */
+ * again to read or carry on. A session can be written up as a note (in the active vault), or made into cards. */
 import { Layers, NotebookPen, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { transcript } from "../../../shared/thread.ts";
@@ -13,8 +13,14 @@ import { announce } from "../lib/a11y";
 import { timeAgo } from "../lib/time";
 import { useLoad } from "../lib/useLoad";
 import { useVaultEvents } from "../lib/useVaultEvents";
+import { activeVault } from "../vaults/active";
+import { noteRoute } from "../vaults/routes";
 
 export type TutorMessage = ChatMessage;
+
+/** Where a session's note opens: in its vault (older sessions' notes were moved into one). */
+const noteHref = (n: { vault?: string; path?: string }) =>
+  n.vault && n.path ? noteRoute(n.vault, n.path) : "#/vaults";
 
 /** The conversation on screen: its messages, and the session file it is saved in (once there is one). */
 export interface TutorConversation {
@@ -99,9 +105,9 @@ export function TutorTab({
     setWriting(true);
     announce("Writing a note from this session.");
     try {
-      const { note } = await learn.sessionNote(conversation.sessionId);
+      const { vaultNote } = await learn.sessionNote(conversation.sessionId, await activeVault());
       reload();
-      say(`Saved as “${note.title}”.`, { label: "Open", href: `#/notes/${note.id}` });
+      say(`Saved as “${vaultNote.title}”.`, { label: "Open", href: noteHref(vaultNote) });
     } catch (e) {
       say((e as Error).message);
     } finally {
@@ -117,7 +123,7 @@ export function TutorTab({
             <span className="spacer" />
             {conversation.sessionId &&
               (current?.note ? (
-                <a className="button subtle" href={`#/notes/${current.note.id}`} title={current.note.title}>
+                <a className="button subtle" href={noteHref(current.note)} title={current.note.title}>
                   <NotebookPen aria-hidden="true" />
                   Open note
                 </a>

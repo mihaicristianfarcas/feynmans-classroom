@@ -176,7 +176,7 @@ export type ConceptDetail = Omit<Concept, "sources" | "related"> & {
   mastery: number | null;
   cards: CardView[];
   notes: Note[];
-  /** Notes of added vaults that link to it. */
+  /** Vault notes that link to it. */
   vaultNotes: { vault: string; vaultName: string; path: string; title: string }[];
   related: { id: string; title: string; mastery: number | null }[];
   backlinks: { id: string; title: string; mastery: number | null }[];
@@ -246,14 +246,14 @@ export interface GraphData {
     detail?: string;
     bookId?: string;
     path?: string;
-    /** A note of an added vault: the vault's id. */
+    /** A vault note: the vault's id. */
     vault?: string;
     created: number;
   }[];
   edges: { from: string; to: string; kind: string; id?: string; why?: string }[];
 }
 export interface SearchHit {
-  /** "vault": a note of an added vault (`vault`, `path`). */
+  /** "vault": a vault note (`vault`, `path`). */
   kind: DocKind | "book" | "vault";
   id: string;
   title: string;
@@ -295,7 +295,6 @@ export interface SettingsInfo {
     claude: Tier;
     concurrency: number;
     connections?: "suggest" | "auto";
-    hideOwnNotes?: boolean;
   };
   active: "codex" | "claude";
   codex: { installed: boolean; version?: string; loggedIn: boolean; detail?: string };
