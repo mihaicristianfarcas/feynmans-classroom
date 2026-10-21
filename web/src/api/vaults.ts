@@ -1,6 +1,7 @@
 /* Typed calls for the vaults (kept in the app, or a folder: Obsidian's, or any folder of Markdown): the
  * list, a vault's files, a note with its links, resolving links, saving and changing files, attachments, a note's versions
  * and suggested connections, tags, search, graph. */
+import { mutateNotePath } from "../vaults/editSessions";
 import { call, del, patch, post } from "./client";
 import type { SuggestedLink } from "./types";
 
@@ -145,8 +146,10 @@ export const vaults = {
     opts: { title?: string; folder?: string; from?: string; body?: string; bookId?: string; about?: string[] },
   ) => post<{ path: string }>(`/api/vaults/${id}/notes`, opts),
   folder: (id: string, path: string) => post<{ path: string }>(`/api/vaults/${id}/folders`, { path }),
-  move: (id: string, from: string, to: string) => post<{ path: string }>(`/api/vaults/${id}/move`, { from, to }),
-  trash: (id: string, path: string) => post<{ changes: number }>(`/api/vaults/${id}/trash`, { path }),
+  move: (id: string, from: string, to: string) =>
+    mutateNotePath(id, from, () => post<{ path: string }>(`/api/vaults/${id}/move`, { from, to })),
+  trash: (id: string, path: string) =>
+    mutateNotePath(id, path, () => post<{ changes: number }>(`/api/vaults/${id}/trash`, { path })),
   attach: (id: string, data: string, name?: string, note?: string) =>
     post<{ path: string; link: string; embed: string; kind: VaultFileKind }>(`/api/vaults/${id}/attachments`, {
       data,
@@ -166,7 +169,7 @@ export const vaults = {
   restore: (id: string, path: string, commit: string) =>
     post<{ path: string }>(`/api/vaults/${id}/restore`, { path, commit }),
   connections: (id: string, path: string) => call<SuggestedLink[]>(`/api/vaults/${id}/connections?${q({ path })}`),
-  suggestConnections: (id: string, path: string) =>
+  suggestConnections: (id: string, path?: string) =>
     post<{ suggested: SuggestedLink[] }>(`/api/vaults/${id}/connections/suggest`, { path }),
   decideConnection: (id: string, cid: string, decision: "accept" | "reject" | "remove") =>
     post<SuggestedLink>(`/api/vaults/${id}/connections/${cid}/${decision}`),

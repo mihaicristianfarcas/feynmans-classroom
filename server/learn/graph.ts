@@ -7,6 +7,7 @@ import { listConnections } from "../vault/connections.ts";
 import { docs } from "../vault/index.ts";
 import { allEdges, type Edge, resolveLink } from "../vault/links.ts";
 import { appLinks } from "../vaults/app-links.ts";
+import { listConnections as vaultConnections } from "../vaults/connections.ts";
 import { getVault, listVaults } from "../vaults/index.ts";
 import type { Vault } from "../vaults/vault.ts";
 import { conceptMastery } from "./context.ts";
@@ -35,6 +36,7 @@ export interface GraphEdge {
   /** For suggestions: the connection's id and why it was suggested. */
   id?: string;
   why?: string;
+  vault?: string;
 }
 
 /** The knowledge graph, from the vault's links (see vault/links.ts); `vault` leaves out the other vaults' notes. */
@@ -108,13 +110,17 @@ function knowledgeGraphOf(): { nodes: GraphNode[]; edges: GraphEdge[] } {
     } catch {
       continue; // a vault whose folder is missing
     }
+    const vault = getVault(v.id);
     const vid = (path: string) => `vnote:${v.id}:${path}`;
     for (const n of g.nodes) {
       nodes.push({
         id: vid(n.id),
         kind: "note",
         label: n.label,
-        mastery: null,
+        mastery:
+          typeof vault.files.get(n.id)?.data?.score === "number"
+            ? (vault.files.get(n.id)!.data!.score as number) / 100
+            : null,
         size: 0.8,
         detail: v.name,
         path: n.id,
@@ -124,6 +130,11 @@ function knowledgeGraphOf(): { nodes: GraphNode[]; edges: GraphEdge[] } {
       ids.add(vid(n.id));
     }
     for (const e of g.edges) add({ from: vid(e.from), to: vid(e.to), kind: "link" });
+    for (const c of vaultConnections(vault)) {
+      if (c.status !== "suggested") continue;
+      const to = vault.resolve(c.to, c.from);
+      if (to) add({ from: vid(c.from), to: vid(to), kind: "suggested", id: c.id, why: c.why, vault: v.id });
+    }
   }
   for (const l of appLinks())
     add({ from: `vnote:${l.vault}:${l.path}`, to: l.to.node, kind: l.property ? "about" : "link" });

@@ -14,10 +14,11 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { SKIP, visit } from "unist-util-visit";
 import { codeRanges } from "../../../shared/links.ts";
-import { type Doc, docs, learn, type Resolved } from "../api";
+import { type Doc, docs, learn, type Resolved, vaults } from "../api";
 import { openLink } from "../app/navigation";
 import { ManimView, sceneTitle } from "../manim/ManimView";
 import { SceneView } from "../scene/SceneView";
+import { vaultWorld } from "../vaults/world";
 import { QuizBlock } from "./QuizBlock";
 
 /* ---------------- whose links: the app's vault, or an outside one ---------------- */
@@ -291,7 +292,7 @@ function makeComponents(
         return depth > 2 ? (
           <span className="fine">{p["data-target"]}</span>
         ) : (
-          <Embed target={p["data-target"]} sub={p["data-sub"]} alias={p["data-alias"]} theme={theme} depth={depth} />
+          <AppEmbed target={p["data-target"]} sub={p["data-sub"]} alias={p["data-alias"]} theme={theme} depth={depth} />
         );
       return <span {...props} />;
     },
@@ -446,7 +447,7 @@ function FigureBlock({ source, theme }: { source: string; theme: "light" | "dark
   );
 }
 
-function Embed({
+export function AppEmbed({
   target,
   sub,
   alias,
@@ -518,7 +519,11 @@ function EmbeddedFile({
     learn.resolve(target, sub).then(
       async (resolved) => {
         const body =
-          resolved.kind === "book" || resolved.kind === "attachment" ? "" : embedBody(await docs.get(resolved.id));
+          resolved.vault && resolved.path
+            ? (await vaults.note(resolved.vault, resolved.path)).text || ""
+            : resolved.kind === "book" || resolved.kind === "attachment"
+              ? ""
+              : embedBody(await docs.get(resolved.id));
         if (alive) setState({ resolved, body });
       },
       (e) => alive && setState({ error: (e as Error).message }),
@@ -560,7 +565,11 @@ function EmbeddedFile({
           {r.kind === "annotation" ? "Open in the book ↗" : r.title}
         </a>
       </span>
-      {state.body ? <Markdown text={state.body} theme={theme} depth={depth + 1} /> : null}
+      {state.body ? (
+        <MarkdownWorldContext.Provider value={r.vault && r.path ? vaultWorld(r.vault, r.path) : null}>
+          <Markdown text={state.body} theme={theme} depth={depth + 1} />
+        </MarkdownWorldContext.Provider>
+      ) : null}
     </span>
   );
 }

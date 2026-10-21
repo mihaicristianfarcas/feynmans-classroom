@@ -50,7 +50,8 @@ export function saveNote(vault: Vault, rel: string, text: string, base?: string)
   const full = must(vault, clean);
   const exists = existsSync(full);
   const now = exists ? readFileSync(full, "utf8") : undefined;
-  if (base !== undefined && now !== undefined && now !== base && now !== text) throw new Conflict(now);
+  if (base !== undefined && now === undefined) throw new Error("this note was moved or deleted");
+  if (base !== undefined && now !== base && now !== text) throw new Conflict(now!);
   // the same text again (an editor echoing a change from disk): the file, and Obsidian, are left alone
   if (now === text) return { path: clean, change: "changed" };
   atomicWrite(full, text);

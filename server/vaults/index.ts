@@ -135,7 +135,7 @@ export function addVault(input: string, name?: string): VaultInfo {
   if (within(path, own) || within(own, path))
     throw new Error("that's the app's own vault (or holds it): it's already in Notes");
   const list = listVaults();
-  const same = list.find((v) => !v.synced && (within(path, v.path) || within(v.path, path)));
+  const same = list.find((v) => !v.synced && !v.app && (within(path, v.path) || within(v.path, path)));
   if (same) throw new Error(`that folder is already part of the vault “${same.name}”`);
   const info: VaultInfo = {
     id: createHash("sha1").update(path).digest("hex").slice(0, 10),

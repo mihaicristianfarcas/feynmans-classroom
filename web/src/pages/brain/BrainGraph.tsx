@@ -304,6 +304,8 @@ export function BrainGraph({ theme }: { theme: "light" | "dark" }) {
         {shown &&
           ("suggestions" in shown ? (
             <SuggestionsCard
+              key={active}
+              vault={active!}
               data={data}
               focus={byKeyboard.current}
               leaving={!card}

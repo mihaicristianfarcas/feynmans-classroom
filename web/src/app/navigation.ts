@@ -14,6 +14,10 @@ export const go = (route: string) => {
 export async function openLink(target: string, sub?: string) {
   try {
     const r = await learn.resolve(target, sub);
+    if (r.vault && r.path)
+      return go(
+        `#/vaults/${r.vault}/note/${encodeURIComponent(r.path)}${sub ? `?sub=${encodeURIComponent(sub)}` : ""}`,
+      );
     if (r.kind === "book") return go(`#/book/${r.id}${r.page ? `?at=${r.page}` : ""}`);
     if (r.kind === "attachment") {
       if (r.path) window.open(`/api/vault/attachment?path=${encodeURIComponent(r.path)}`, "_blank", "noopener");

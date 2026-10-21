@@ -5,6 +5,7 @@
  * taken out again the same way for Undo. */
 import { rmSync } from "node:fs";
 import { join } from "node:path";
+import { problemsIn } from "../agents/review.ts";
 import { RUNS_DIR } from "../config.ts";
 import { git, gitOut, head, snapshot } from "./history.ts";
 import { announceChanges } from "./index.ts";
@@ -45,6 +46,8 @@ export function finishWork(vault: Vault, work: Work, id: string, message: string
         return { path, change: status === "A" ? "A" : status === "D" ? "D" : "M" };
       });
     if (!files.length) return { files, commit: null };
+    const problems = problemsIn(work.dir, files);
+    if (problems.length) throw new Error(problems.join("; "));
     gitOut(vault, ["commit", "-q", "--no-verify", "-m", message], { cwd: work.dir });
     const commit = gitOut(vault, ["rev-parse", "HEAD"], { cwd: work.dir }).trim();
     gitOut(vault, ["update-ref", `refs/agent/${id}`, commit]);

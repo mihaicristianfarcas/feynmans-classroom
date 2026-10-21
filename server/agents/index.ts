@@ -13,8 +13,9 @@
  *   5. Undo: each run is one jj change, taken out again with one click. log/agents.jsonl records
  *      every run: the request, where, the model, the files, the change.
  *
- * A request made in a vault works on a copy of that vault's notes instead, and lands in it (and
- * is undone) through the vault's own history (vaults/agent-work.ts). */
+ * New requests work on a copy of a visible vault's notes (the default vault when no vault is named),
+ * and land in it (and are undone) through its own history (vaults/agent-work.ts). The app-vault
+ * history operations below also support reviewing and undoing runs made before this change. */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentContext, AgentRun } from "../../shared/vault-types.ts";
@@ -109,7 +110,7 @@ export function startRun(input: {
   const where = describeWhere(input.context);
   const id = shortId("r");
   // a follow-up stays in the vault its conversation started in
-  const vault = previous ? previous.vault : listVaults().find((v) => v.id === input.context?.vault)?.id;
+  const vault = previous?.vault || input.context?.vault || defaultVault();
   const run = save({
     id,
     task,
@@ -215,8 +216,9 @@ async function executeInVault(run: AgentRun, id: string, where: string[]) {
   const finish = (patch: Partial<AgentRun>) =>
     save({ ...runs.get(run.id)!, activity: undefined, ms: Date.now() - started, ...patch });
   let work: Work | null = null;
-  const vault = getVault(id);
+  let vault: ReturnType<typeof getVault> | undefined;
   try {
+    vault = getVault(id);
     const name = listVaults().find((v) => v.id === id)?.name || "vault";
     work = startWork(vault, run.id);
     save({ ...runs.get(run.id)!, activity: "reading your notes" });
@@ -270,7 +272,7 @@ async function executeInVault(run: AgentRun, id: string, where: string[]) {
     logActivity({ type: "ask", text: `Asked the agent: ${run.task.slice(0, 80)}` });
     finish({ ...base, status: "merged", files: done.files, change: landed.commit, commit: landed.commit });
   } catch (error) {
-    if (work) dropWork(vault, work);
+    if (work && vault) dropWork(vault, work);
     finish({ status: "failed", error: (error as Error).message.slice(0, 600) });
   }
 }

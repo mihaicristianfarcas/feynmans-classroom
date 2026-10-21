@@ -177,7 +177,15 @@ export function VaultTree({
                   run: () => newVaultNote(id, { folder: sub.path }),
                 },
                 { label: "New folder inside", icon: FolderPlus, run: () => newFolder(id, `${sub.path}/`) },
-                { label: "Rename or move…", icon: FolderInput, run: () => moveItem(id, sub.path, true) },
+                {
+                  label: "Rename or move…",
+                  icon: FolderInput,
+                  run: async () => {
+                    const to = await moveItem(id, sub.path, true);
+                    if (to && current?.startsWith(`${sub.path}/`))
+                      go(noteRoute(id, to + current.slice(sub.path.length)));
+                  },
+                },
                 {
                   label: "Delete folder…",
                   icon: Trash2,

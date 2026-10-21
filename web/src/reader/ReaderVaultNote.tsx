@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { VaultConflict, type VaultNote, vaults } from "../api";
 import { Markdown, MarkdownWorldContext } from "../components/Markdown";
 import { NoteEditor } from "../notes/NoteEditor";
+import { useVaultEditorLinks } from "../vaults/editorLinks";
+import { registerEditSession } from "../vaults/editSessions";
 import { useVaultChanges } from "../vaults/useVaultChanges";
 import { useVaultWorld } from "../vaults/world";
 
@@ -28,6 +30,8 @@ export function ReaderVaultNote({
   const [clash, setClash] = useState<string | null>(null);
   const base = useRef<string | undefined>(undefined);
   const dirty = useRef(false);
+  const blocked = useRef(false);
+  const pending = useRef(new Set<Promise<unknown>>());
   const textRef = useRef(text);
   textRef.current = text;
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -59,9 +63,12 @@ export function ReaderVaultNote({
 
   const save = useCallback(
     async (next: string, force = false) => {
+      if (blocked.current && !force) return;
       onState("saving");
+      const request = vaults.save(vault, path, next, force ? undefined : base.current);
+      pending.current.add(request);
       try {
-        await vaults.save(vault, path, next, force ? undefined : base.current);
+        await request;
         base.current = next;
         if (textRef.current === next) dirty.current = false;
         setClash(null);
@@ -69,11 +76,15 @@ export function ReaderVaultNote({
       } catch (e) {
         onState("idle");
         if (e instanceof VaultConflict) setClash(e.text);
+      } finally {
+        pending.current.delete(request);
       }
     },
     [vault, path, onState],
   );
   const onText = (next: string) => {
+    if (blocked.current) return;
+    textRef.current = next;
     setText(next);
     // the editor echoing text loaded from the file
     if (next === base.current && !dirty.current) return;
@@ -85,11 +96,38 @@ export function ReaderVaultNote({
   useEffect(
     () => () => {
       clearTimeout(timer.current);
-      if (dirty.current) void vaults.save(vault, path, textRef.current, base.current).catch(() => {});
+      if (dirty.current && !blocked.current)
+        void vaults.save(vault, path, textRef.current, base.current).catch(() => {});
     },
     [vault, path],
   );
 
+  const clashRef = useRef(clash);
+  clashRef.current = clash;
+  useEffect(
+    () =>
+      registerEditSession(vault, path, async () => {
+        blocked.current = true;
+        clearTimeout(timer.current);
+        try {
+          await Promise.allSettled([...pending.current]);
+          if (clashRef.current !== null) throw new Error("Resolve this note's conflicting edits first");
+          if (dirty.current) {
+            await vaults.save(vault, path, textRef.current, base.current);
+            base.current = textRef.current;
+            dirty.current = false;
+          }
+          return () => {
+            blocked.current = false;
+          };
+        } catch (error) {
+          blocked.current = false;
+          throw error;
+        }
+      }),
+    [vault, path],
+  );
+  const source = useVaultEditorLinks(vault, path);
   const world = useVaultWorld(vault, path, note?.outgoing);
   const body = note?.bodyStart !== undefined ? text.slice(note.bodyStart) : text;
   return (
@@ -117,6 +155,7 @@ export function ReaderVaultNote({
       {mode === "edit" ? (
         <NoteEditor
           key={`${vault}:${path}`}
+          links={source}
           value={text}
           onChange={onText}
           placeholder="Your thoughts as you read… Select a passage and press N to add it here."

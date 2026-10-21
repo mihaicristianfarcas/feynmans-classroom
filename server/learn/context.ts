@@ -7,6 +7,8 @@ import { chapterRange } from "../books/locate.ts";
 import { getBook } from "../books/store.ts";
 import { chapterText, findChapter, passageAround } from "../ingest/index.ts";
 import { activity, docs, getProfile } from "../vault/index.ts";
+import { appLinks } from "../vaults/app-links.ts";
+import { getVault } from "../vaults/index.ts";
 import { cardState } from "./cards.ts";
 
 /** Mastery of a concept, 0–1: recall of its cards now, else its best explanation score (from the activity
@@ -15,6 +17,11 @@ export function conceptMastery(conceptId: string, now = Date.now()): number | nu
   const linked = docs.list("card").filter((c) => c.concepts.includes(conceptId) && !c.suspended);
   const reviewed = linked.map((c) => cardState(c.id)).filter(Boolean);
   const scores = [
+    ...appLinks()
+      .filter((l) => l.to.kind === "concept" && l.to.id === conceptId)
+      .map((l) => getVault(l.vault).files.get(l.path)?.data)
+      .filter((data) => data?.type === "explanation" && typeof data.score === "number")
+      .map((data) => data!.score as number),
     ...activity()
       .filter((a) => a.type === "explain" && a.concepts?.includes(conceptId) && typeof a.data?.score === "number")
       .map((a) => a.data!.score as number),

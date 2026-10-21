@@ -27,8 +27,9 @@ const SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["to", "why"],
+        required: ["from", "to", "why"],
         properties: {
+          from: { type: "string", description: "the path of the existing note to add the link to" },
           to: { type: "string", description: "the path of an existing note in this folder, e.g. Physics/Energy.md" },
           why: { type: "string", description: "one specific sentence: what following this link gives the learner" },
         },
@@ -56,6 +57,7 @@ export function listConnections(vault: Vault): Connection[] {
 function save(vault: Vault, list: Connection[]) {
   mkdirSync(metaDir(vault.id), { recursive: true });
   atomicWrite(file(vault), list.map((c) => JSON.stringify(c)).join("\n") + (list.length ? "\n" : ""));
+  announceChanges(vault.id, [{ path: "", change: "changed" }]);
 }
 
 /** Changes the note at `path` with `edit` and announces it. */
@@ -66,18 +68,24 @@ function edit(vault: Vault, path: string, change: (text: string) => string) {
   if (next !== text) announceChanges(vault.id, [saveNote(vault, path, next)]);
 }
 
-export async function suggestConnections(vault: Vault, path: string): Promise<Connection[]> {
-  const note = vault.files.get(path);
-  if (note?.kind !== "note") throw new Error("note not found");
+export async function suggestConnections(vault: Vault, path?: string): Promise<Connection[]> {
+  if (path && vault.files.get(path)?.kind !== "note") throw new Error("note not found");
+  const sources = path
+    ? [path]
+    : [...vault.files.values()]
+        .filter((e) => e.kind === "note")
+        .sort((a, b) => b.mtime - a.mtime)
+        .slice(0, 12)
+        .map((e) => e.path);
+  if (!sources.length) return [];
   const list = listConnections(vault);
-  const linked = new Set(vault.outgoing(path).map((o) => o.path));
-  const decided = list.filter((c) => c.from === path).map((c) => `- ${c.to} (${c.status})`);
+  const decided = list.filter((c) => sources.includes(c.from)).map((c) => `- ${c.from} → ${c.to} (${c.status})`);
   const prompt = `You are the learner's librarian, working in their notes (this folder: a vault of Markdown notes, as Obsidian keeps them, with [[links]] between them). Use rg to search the notes for related ideas, and open only the files you need.
 
-Task: suggest links from the note \`${path}\` to other notes that already exist in this folder, where following the link would genuinely help the learner: the same idea in another context, a prerequisite, a contrast, an application, an example of it.
+Task: suggest links from these notes: ${sources.map((p) => JSON.stringify(p)).join(", ")} to other notes that already exist in this folder, where following the link would genuinely help the learner: the same idea in another context, a prerequisite, a contrast, an application, an example of it.
 
 Rules:
-- Only link to notes that exist: give their paths.
+- Only link to notes that exist: give their paths as from and to.
 - Skip notes it already links to.
 ${decided.length ? `- Skip these, already suggested or decided:\n${decided.join("\n")}\n` : ""}- At most 6 suggestions, the most useful first; none is better than a weak one.
 - Each "why" is one sentence about the actual content, not "both are about X".
@@ -89,20 +97,23 @@ ${learnerSummary()}
 
 Return JSON.`;
   const result = await agent({ cwd: vault.root, prompt, schema: SCHEMA, tier: "smart", effort: "low" });
-  const data = result.data as { suggestions: { to: string; why: string }[] };
-  const taken = new Set(list.filter((c) => c.from === path).map((c) => c.to.toLowerCase()));
+  const data = result.data as { suggestions: { from?: string; to: string; why: string }[] };
+  const taken = new Set(list.map((c) => `${c.from}|${vault.resolve(c.to, c.from) || c.to}`));
   const auto = getSettings().connections === "auto";
   const added: Connection[] = [];
   for (const s of data.suggestions || []) {
-    const target = vault.resolve(String(s.to || "").replace(/^\.\//, ""), path);
+    const from = path || s.from || "";
+    if (!sources.includes(from)) continue;
+    const linked = new Set(vault.outgoing(from).map((o) => o.path));
+    const target = vault.resolve(String(s.to || "").replace(/^\.\//, ""), from);
     const entry = target ? vault.files.get(target) : undefined;
-    if (!target || !entry || entry.kind !== "note" || target === path || linked.has(target)) continue;
-    if (taken.has(entry.name.toLowerCase())) continue;
-    taken.add(entry.name.toLowerCase());
+    if (!target || !entry || entry.kind !== "note" || target === from || linked.has(target)) continue;
+    if (taken.has(`${from}|${target}`)) continue;
+    taken.add(`${from}|${target}`);
     added.push({
       id: shortId("c"),
-      from: path,
-      to: entry.name,
+      from,
+      to: vault.linkTo(target, from),
       why: String(s.why || "")
         .trim()
         .slice(0, 300),
@@ -112,7 +123,7 @@ Return JSON.`;
       ...(auto ? { decided: now() } : {}),
     });
   }
-  if (auto) for (const c of added) edit(vault, path, (t) => addLink(t, "related", c.to));
+  if (auto) for (const c of added) edit(vault, c.from, (t) => addLink(t, "related", c.to));
   if (added.length) save(vault, [...list, ...added]);
   return added;
 }

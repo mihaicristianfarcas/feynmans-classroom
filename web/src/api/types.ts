@@ -158,6 +158,7 @@ export interface Rect {
 /** A link the agent suggested between notes, and what the learner decided. */
 /** What a [[link]] points at: a document (of any kind), a book, a picture. */
 export interface Resolved {
+  vault?: string;
   node: string;
   kind: DocKind | "book" | "attachment";
   id: string;
@@ -250,7 +251,7 @@ export interface GraphData {
     vault?: string;
     created: number;
   }[];
-  edges: { from: string; to: string; kind: string; id?: string; why?: string }[];
+  edges: { from: string; to: string; kind: string; id?: string; why?: string; vault?: string }[];
 }
 export interface SearchHit {
   /** "vault": a vault note (`vault`, `path`). */

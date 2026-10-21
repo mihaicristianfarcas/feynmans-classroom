@@ -63,6 +63,103 @@ describe("vaults kept in the app", () => {
     expect(V.listVaults().length).toBe(1);
   });
 
+  it("keeps every collision, even across repeated adoptions", () => {
+    const info = V.listVaults()[0];
+    const root = V.rootOf(info);
+    const own = join(dir, "vault", "notes");
+    writeFileSync(join(root, "Explanation.md"), "original");
+    writeFileSync(join(root, "Explanation (moved).md"), "previous migration");
+    writeFileSync(join(own, "Explanation.md"), "next migration");
+    adopt.adoptOwnNotes();
+    writeFileSync(join(own, "Explanation.md"), "another migration");
+    adopt.adoptOwnNotes();
+    expect(readFileSync(join(root, "Explanation.md"), "utf8")).toBe("original");
+    expect(readFileSync(join(root, "Explanation (moved).md"), "utf8")).toBe("previous migration");
+    expect(readFileSync(join(root, "Explanation (moved 2).md"), "utf8")).toContain("next migration");
+    expect(readFileSync(join(root, "Explanation (moved 3).md"), "utf8")).toContain("another migration");
+  });
+
+  it("keeps legacy concept membership, book sources and grades in the files", async () => {
+    const { createDoc } = await import("../server/learn/docs.ts");
+    const { conceptMastery } = await import("../server/learn/context.ts");
+    const { appLinks } = await import("../server/vaults/app-links.ts");
+    const { saveBook } = await import("../server/books/store.ts");
+    const { vaultNotesOfBook } = await import("../server/vaults/reading.ts");
+    const concept = createDoc({ kind: "concept", title: "Legacy heat" });
+    saveBook({
+      id: "booklegacy",
+      title: "Thermodynamics",
+      file: "source.pdf",
+      format: "pdf",
+      status: "ready",
+      pageCount: 10,
+      blockCount: 0,
+      toc: [],
+      createdAt: new Date().toISOString(),
+    });
+    const note = createDoc({
+      title: "Old explanation",
+      type: "explanation",
+      score: 85,
+      concepts: [concept.id],
+      source: { bookId: "booklegacy", page: 3 },
+      body: "An explanation.",
+    });
+    expect(conceptMastery(concept.id)).toBe(0.85);
+    const id = adopt.adoptOwnNotes()!;
+    const vault = V.getVault(id);
+    // Rebuild both indexes to prove there is no dependency on the removed legacy note index.
+    docs.load();
+    vault.files.clear();
+    vault.reconcile();
+    expect(docs.list("note")).toEqual([]);
+    expect(conceptMastery(concept.id)).toBe(0.85);
+    expect(appLinks()).toContainEqual(
+      expect.objectContaining({
+        vault: id,
+        path: "Old explanation.md",
+        to: expect.objectContaining({ id: concept.id }),
+      }),
+    );
+    expect(vaultNotesOfBook("booklegacy")).toContainEqual(
+      expect.objectContaining({ vault: id, path: "Old explanation.md", page: 3 }),
+    );
+    expect(vault.files.get("Old explanation.md")?.data).toMatchObject({
+      score: 85,
+      concepts: [concept.id],
+      source: { book: "booklegacy", page: 3 },
+    });
+    expect(vault.resolve(note.id)).toBe("Old explanation.md");
+  });
+
+  it("resolves old note paths from migrated and app-owned documents after rebuilding indexes", async () => {
+    const { createDoc } = await import("../server/learn/docs.ts");
+    const { resolveLink } = await import("../server/vault/links.ts");
+    const b = createDoc({ title: "B", body: "# Details\nOriginal target." });
+    createDoc({ title: "A", body: "[[notes/B#Details|the target]]" });
+    const concept = createDoc({ kind: "concept", title: "Outside link", body: "[[notes/B]]" });
+    const id = adopt.adoptOwnNotes()!;
+    docs.load();
+    const vault = V.getVault(id);
+    vault.reconcile();
+    expect(vault.resolve("notes/B.md")).toBe("B.md");
+    expect(vault.resolve("notes/B.md", "A.md", true)).toBe("B.md");
+    expect(vault.outgoing("A.md")[0]).toMatchObject({ path: "B.md", sub: "Details" });
+    expect(resolveLink("notes/B")).toMatchObject({ vault: id, path: "B.md" });
+    expect(resolveLink(b.id)).toMatchObject({ vault: id, path: "B.md" });
+    expect(docs.get(concept.id)?.body).toContain("[[notes/B]]");
+    expect((await call("GET", "/api/links/resolve?target=notes%2FB")).data).toMatchObject({ vault: id, path: "B.md" });
+  });
+
+  it("allows server folders alongside the default app vault and still rejects overlaps", async () => {
+    const folder = join(dir, "External");
+    mkdirSync(folder);
+    const made = await call("POST", "/api/vaults", { path: folder });
+    expect(made.status).toBe(200);
+    expect((await call("POST", "/api/vaults", { path: folder })).status).toBe(400);
+    await call("DELETE", `/api/vaults/${made.data.id}`);
+  });
+
   it("are made with a name, and work like any vault", async () => {
     const made = (await call("POST", "/api/vaults", { name: "Physics", app: true })).data;
     expect(made).toMatchObject({ name: "Physics", app: true, path: "" });

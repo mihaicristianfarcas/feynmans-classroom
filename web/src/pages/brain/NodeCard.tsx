@@ -8,12 +8,13 @@ import { docs, type GraphData, learn, type Note, vaults } from "../../api";
 import { bookLink } from "../../app/navigation";
 import { Mastery, Spinner } from "../../components/feedback";
 import { levelOf, openNode } from "../../components/GraphView";
-import { Markdown } from "../../components/Markdown";
+import { Markdown, MarkdownWorldContext } from "../../components/Markdown";
 import { ExplainBack } from "../../components/tools";
 import { announce } from "../../lib/a11y";
 import { useLoad } from "../../lib/useLoad";
 import { panelId } from "../../lib/usePanel";
 import { bodyOf } from "../../vaults/text";
+import { vaultWorld } from "../../vaults/world";
 
 type Node = GraphData["nodes"][number];
 
@@ -220,7 +221,9 @@ export function NodeCard({
           (!n ? (
             <Spinner label="Opening" />
           ) : n.body.trim() ? (
-            <Markdown text={n.body} theme={theme} className="node-card-md" base={n.path} />
+            <MarkdownWorldContext.Provider value={node.vault && node.path ? vaultWorld(node.vault, node.path) : null}>
+              <Markdown text={n.body} theme={theme} className="node-card-md" base={n.path} />
+            </MarkdownWorldContext.Provider>
           ) : (
             <p className="fine">This note is empty.</p>
           ))}
@@ -278,7 +281,8 @@ function Suggestion({ edge, byId, onChanged }: { edge: Edge; byId: Map<string, N
   const decide = async (decision: "accept" | "reject") => {
     setBusy(true);
     try {
-      await learn.decideConnection(edge.id!, decision);
+      if (edge.vault) await vaults.decideConnection(edge.vault, edge.id!, decision);
+      else await learn.decideConnection(edge.id!, decision);
       announce(decision === "accept" ? "Linked" : "Turned down");
       onChanged();
     } finally {
@@ -306,12 +310,14 @@ function Suggestion({ edge, byId, onChanged }: { edge: Edge; byId: Map<string, N
 
 /** Every link the agent suggests, and a way to ask it to read recent notes for more. */
 export function SuggestionsCard({
+  vault,
   data,
   focus,
   leaving,
   onClose,
   onChanged,
 }: {
+  vault: string;
   data: GraphData;
   focus: boolean;
   leaving?: boolean;
@@ -339,7 +345,7 @@ export function SuggestionsCard({
             setBusy(Date.now());
             setError(null);
             try {
-              await learn.suggestConnections();
+              await vaults.suggestConnections(vault);
               onChanged();
             } catch (e) {
               setError((e as Error).message);

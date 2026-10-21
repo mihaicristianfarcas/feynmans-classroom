@@ -10,6 +10,7 @@ import { linkKey, linksInValue, pageOf, parseWikiLinks, rewriteLinks, type WikiL
 import type { Doc, DocKind, SourceRef } from "../../shared/vault-types.ts";
 import { bookFolder, listBooks } from "../books/store.ts";
 import type { Book } from "../books/types.ts";
+import { getVault, listVaults } from "../vaults/index.ts";
 import { listConnections } from "./connections.ts";
 import { changed, docs, onVaultChange, VAULT } from "./index.ts";
 import { withBody } from "./kinds.ts";
@@ -22,6 +23,7 @@ export interface Resolved {
   id: string;
   /** Vault-relative file, when it is one. */
   path?: string;
+  vault?: string;
   title: string;
   page?: number;
   bookId?: string;
@@ -138,6 +140,24 @@ export function resolveLink(target: string, sub?: string): Resolved | null {
       const chapter = /^text\/(\d+)-/.exec(m![2]);
       const entry = chapter ? book.toc[Number(chapter[1]) - 1] : undefined;
       found = { ...bookNode(book), page: entry?.start.page };
+    }
+  }
+  if (!found) {
+    // Migrated notes keep old paths and IDs as aliases in their frontmatter.
+    for (const info of listVaults()) {
+      const vault = getVault(info.id);
+      const path = vault.resolve(t);
+      const entry = path ? vault.files.get(path) : undefined;
+      if (entry?.kind !== "note") continue;
+      found = {
+        node: `vnote:${vault.id}:${entry.path}`,
+        kind: "note",
+        id: String(entry.data?.id || entry.path),
+        path: entry.path,
+        vault: vault.id,
+        title: entry.name,
+      };
+      break;
     }
   }
   if (!found) return null;

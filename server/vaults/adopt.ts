@@ -3,11 +3,13 @@
  * into the first vault kept in the app (a new one, "Notes", if there's none: never into a folder of the
  * learner's), folders and all, with a copy of the attachments they may embed; jj keeps them in the app
  * vault's history as they were. */
-import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, statSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { VAULT_DIR } from "../config.ts";
+import { atomicWrite } from "../fs.ts";
 import { changed, docs, isGenerated, touched } from "../vault/index.ts";
 import { addAppVault, getVault, listVaults, rootOf } from "./index.ts";
+import { listProperty, setListProperty } from "./properties.ts";
 
 /** The files under notes/ to move (relative to it): everything but hidden files and the generated index. */
 function ownFiles(): string[] {
@@ -39,7 +41,21 @@ export function adoptOwnNotes(): string | null {
   for (const rel of files) {
     // a name already taken there keeps both: the moved one gets " (moved)"
     let to = join(root, rel);
-    if (existsSync(to)) to = to.replace(/(\.[^./]+)?$/, (ext) => ` (moved)${ext}`);
+    for (let n = 1; existsSync(to); n++)
+      to = join(root, rel).replace(/(\.[^./]+)?$/, (ext) => ` (moved${n > 1 ? ` ${n}` : ""})${ext}`);
+    // Persist former identities in the file so references survive restarts and reindexing.
+    if (/\.md$/i.test(rel)) {
+      const from = join(VAULT_DIR, "notes", rel);
+      const doc = docs.at(`notes/${rel}`);
+      const text = readFileSync(from, "utf8");
+      const aliases = new Set([
+        ...listProperty(text, "aliases"),
+        ...(doc?.aliases || []),
+        `notes/${rel.replace(/\.md$/i, "")}`,
+      ]);
+      if (doc) aliases.add(doc.id);
+      atomicWrite(from, setListProperty(text, "aliases", [...aliases]));
+    }
     mkdirSync(dirname(to), { recursive: true });
     renameSync(join(VAULT_DIR, "notes", rel), to);
   }

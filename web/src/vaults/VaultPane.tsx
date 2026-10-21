@@ -15,9 +15,11 @@ import { useIndicator } from "../components/ui";
 import { announce } from "../lib/a11y";
 import { timeAgo } from "../lib/time";
 import type { Panel } from "../lib/usePanel";
-import { type LinkSource, NoteEditor } from "../notes/NoteEditor";
+import { NoteEditor } from "../notes/NoteEditor";
 import { Versions } from "../notes/Versions";
-import { noteRoute, openVaultLink } from "./routes";
+import { useVaultEditorLinks } from "./editorLinks";
+import { registerEditSession } from "./editSessions";
+import { noteRoute } from "./routes";
 import { bodyOf, toggleTaskAt } from "./text";
 import { useVaultChanges } from "./useVaultChanges";
 import { VaultSidebar } from "./VaultSidebar";
@@ -81,6 +83,8 @@ export function VaultPane({
   /** The file's text as last read or written: saves are refused if the file no longer has it. */
   const base = useRef<string | undefined>(undefined);
   const dirty = useRef(false);
+  const blocked = useRef(false);
+  const pending = useRef(new Set<Promise<unknown>>());
   const textRef = useRef(text);
   textRef.current = text;
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -122,9 +126,12 @@ export function VaultPane({
   const save = useCallback(
     async (next: string, force = false) => {
       clearTimeout(timer.current);
+      if (blocked.current && !force) return;
       setSaving("saving");
+      const request = vaults.save(id, path, next, force ? undefined : base.current);
+      pending.current.add(request);
       try {
-        await vaults.save(id, path, next, force ? undefined : base.current);
+        await request;
         base.current = next;
         if (textRef.current === next) dirty.current = false;
         setSaving("saved");
@@ -132,6 +139,8 @@ export function VaultPane({
         setSaving("idle");
         if (e instanceof VaultConflict) setClash(e.text);
         else setError((e as Error).message);
+      } finally {
+        pending.current.delete(request);
       }
     },
     [id, path],
@@ -139,6 +148,8 @@ export function VaultPane({
   const clashRef = useRef(clash);
   clashRef.current = clash;
   const onText = (next: string) => {
+    if (blocked.current) return;
+    textRef.current = next;
     setText(next);
     dirty.current = true;
     setSaving("idle");
@@ -148,10 +159,33 @@ export function VaultPane({
   // leaving the note with changes still waiting: save them now (unless the file changed meanwhile)
   useEffect(
     () => () => {
-      if (!dirty.current || clashRef.current) return;
       clearTimeout(timer.current);
+      if (!dirty.current || clashRef.current || blocked.current) return;
       void vaults.save(id, path, textRef.current, base.current).catch(() => {});
     },
+    [id, path],
+  );
+  useEffect(
+    () =>
+      registerEditSession(id, path, async () => {
+        blocked.current = true;
+        clearTimeout(timer.current);
+        try {
+          await Promise.allSettled([...pending.current]);
+          if (clashRef.current !== null) throw new Error("Resolve this note's conflicting edits first");
+          if (dirty.current) {
+            await vaults.save(id, path, textRef.current, base.current);
+            base.current = textRef.current;
+            dirty.current = false;
+          }
+          return () => {
+            blocked.current = false;
+          };
+        } catch (error) {
+          blocked.current = false;
+          throw error;
+        }
+      }),
     [id, path],
   );
   // biome-ignore lint/correctness/useExhaustiveDependencies: switching between editing and reading draws the text anew, so it scrolls again
@@ -172,27 +206,14 @@ export function VaultPane({
   const world = useVaultWorld(id, path, note?.outgoing, toggleTask);
   // a quiz in the note adds its attempts at the note's end
   const quizNote = useMemo(() => ({ append: (md: string) => vaults.append(id, path, md) }), [id, path]);
-  const source = useMemo<LinkSource>(
-    () => ({
-      targets: () => vaults.targets(id),
-      follow: (target, s) => void openVaultLink(id, target, { sub: s, from: path }),
-      attach: async (file, data) => {
-        const named = file.name && !/^image\.\w+$/.test(file.name) ? file.name : undefined;
-        const saved = await vaults.attach(id, data, named, path);
-        announce(`Saved ${saved.path}`);
-        return saved.embed;
-      },
-    }),
-    [id, path],
-  );
+  const source = useVaultEditorLinks(id, path);
 
   const rename = async () => {
     const name = title.trim();
     if (!name || !note || name === note.name) return;
     const dir = path.split("/").slice(0, -1).join("/");
-    const ext = note.kind === "note" ? ".md" : `.${path.split(".").pop()}`;
+    const ext = note.kind === "note" ? ".md" : "";
     try {
-      if (dirty.current) await save(textRef.current);
       const moved = await vaults.move(id, path, `${dir ? `${dir}/` : ""}${name}${ext}`);
       announce(`Renamed to ${name}`);
       history.replaceState(null, "", noteRoute(id, moved.path));
@@ -325,7 +346,11 @@ export function VaultPane({
               title="Move to the vault’s .trash folder"
               aria-label="Delete"
               onClick={async () => {
-                if (await trashItem(id, path)) go(`#/vaults/${id}`);
+                try {
+                  if (await trashItem(id, path)) go(`#/vaults/${id}`);
+                } catch (error) {
+                  alert((error as Error).message);
+                }
               }}
             >
               <Trash2 aria-hidden="true" />

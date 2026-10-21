@@ -5,7 +5,7 @@
  * video to play, or any other file to download. */
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { type VaultNote, type VaultResolved, vaultFileUrl, vaults } from "../api";
-import { Markdown, type MarkdownWorld, MarkdownWorldContext } from "../components/Markdown";
+import { AppEmbed, Markdown, type MarkdownWorld, MarkdownWorldContext } from "../components/Markdown";
 import { linkRoute, noteRoute, openVaultLink, searchRoute } from "./routes";
 
 /** The world for the text of note `from` in vault `id`; `outgoing` (its links, resolved) marks the missing ones. */
@@ -18,7 +18,7 @@ export function useVaultWorld(
   return useMemo(() => vaultWorld(id, from, outgoing, toggleTask), [id, from, outgoing, toggleTask]);
 }
 
-function vaultWorld(
+export function vaultWorld(
   id: string,
   from: string,
   outgoing?: VaultNote["outgoing"],
@@ -65,6 +65,7 @@ export function VaultEmbed({
   const [state, setState] = useState<{ resolved?: VaultResolved; error?: boolean }>({});
   useEffect(() => {
     let alive = true;
+    setState({});
     vaults.resolve(vault, target, { from, sub, md, body: true }).then(
       (resolved) => alive && setState({ resolved }),
       () => alive && setState({ error: true }),
@@ -89,9 +90,9 @@ export function VaultEmbed({
 
   if (state.error)
     return (
-      <span className="md-embed-box missing">
-        {link(target)} <span className="fine">doesn't exist yet</span>
-      </span>
+      <MarkdownWorldContext.Provider value={null}>
+        <AppEmbed target={target} sub={sub} alias={alias} theme={theme} depth={depth} />
+      </MarkdownWorldContext.Provider>
     );
   const r = state.resolved;
   if (!r) return <span className="md-embed-box fine">Loading {target}…</span>;

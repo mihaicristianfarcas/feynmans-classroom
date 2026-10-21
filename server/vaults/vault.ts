@@ -6,8 +6,8 @@
  * The files stay the only source of truth: `reconcile()` brings the index up to date with the folder
  * (at start, after a watcher's event, and every so often in case one was missed), re-reading only
  * what changed. */
-import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { extname, join, posix, sep } from "node:path";
+import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { dirname, extname, join, posix, sep } from "node:path";
 import type { Heading, VaultLink } from "./parse.ts";
 import { parseNote, sectionOf } from "./parse.ts";
 
@@ -98,16 +98,25 @@ export class Vault {
     if (clean === null) return null;
     const full = join(this.root, clean);
     try {
-      const real = realpathSync(full);
       const root = realpathSync(this.root);
+      // Find the nearest existing ancestor, including symlinks whose target is missing.
+      // Only ENOENT permits walking up: unreadable paths must fail closed.
+      let ancestor = full;
+      for (;;) {
+        try {
+          lstatSync(ancestor);
+          break;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") return null;
+          const parent = dirname(ancestor);
+          if (parent === ancestor) return null;
+          ancestor = parent;
+        }
+      }
+      const real = realpathSync(ancestor);
       if (real !== root && !real.startsWith(root + sep)) return null;
     } catch {
-      // doesn't exist yet: its folder must be inside the vault
-      try {
-        const parent = realpathSync(join(this.root, dirOf(clean)));
-        const root = realpathSync(this.root);
-        if (parent !== root && !parent.startsWith(root + sep)) return null;
-      } catch {}
+      return null;
     }
     return full;
   }
@@ -278,7 +287,13 @@ export class Vault {
       const hit = exact(path) || (/\.md$/i.test(path) ? null : exact(`${path}.md`));
       if (hit) return hit;
     }
-    if (md) return null;
+    if (md) {
+      for (const path of [relative, t]) {
+        const aliases = this.byAlias.get(noteKey(path));
+        if (aliases?.size) return this.pick(aliases, from);
+      }
+      return null;
+    }
     // a name: notes first ([[Note.v2]] is a note), then other files ([[picture.png]])
     const key = noteKey(t);
     const name = key.split("/").pop()!;
@@ -290,7 +305,7 @@ export class Vault {
       (p) => this.files.get(p)?.kind !== "note",
     );
     if (files.length) return this.pick(files, from);
-    const aliased = [...(this.byAlias.get(lower(t)) || [])];
+    const aliased = [...(this.byAlias.get(lower(t)) || this.byAlias.get(noteKey(t)) || [])];
     return aliased.length ? this.pick(aliased, from) : null;
   }
 

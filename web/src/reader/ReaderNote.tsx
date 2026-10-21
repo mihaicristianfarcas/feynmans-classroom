@@ -114,6 +114,7 @@ export function ReaderNote({
       {vaultNote ? (
         <div className="reader-note-body">
           <ReaderVaultNote
+            key={vaultKey(vaultNote)}
             vault={vaultNote.vault}
             path={vaultNote.path}
             mode={mode}

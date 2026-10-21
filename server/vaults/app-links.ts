@@ -1,6 +1,7 @@
 /* Links from a vault's notes to the rest of the app: a [[link]] (in the text, or a property such as
  * `about`) that names nothing in its own vault but names a concept, a book or a note of the app's
  * own vault leads there. These put vault notes on the concept's page and in the Brain's graph. */
+import { docs, sourceFromYaml } from "../vault/index.ts";
 import { type Resolved, resolveLink } from "../vault/links.ts";
 import { getVault, listVaults } from "./index.ts";
 import type { Vault } from "./vault.ts";
@@ -38,6 +39,23 @@ export function appLinksOf(vault: Vault, name: string): AppLink[] {
       seen.add(to.node);
       out.push({ vault: vault.id, vaultName: name, path: e.path, title: e.name, to, property: e.links[i].line === -1 });
     });
+    // Older notes store concept IDs and a structured source in frontmatter.
+    // Read them from the file just like wiki properties; no migration-only index is needed.
+    const concepts = Array.isArray(e.data?.concepts) ? e.data.concepts : [];
+    const source = sourceFromYaml(e.data?.source);
+    const targets = [
+      ...concepts.filter((id): id is string => typeof id === "string" && !!docs.get(id, "concept")),
+      ...(source?.bookId ? [source.bookId] : []),
+    ];
+    for (const target of targets) {
+      const to = appTarget(
+        target,
+        target === source?.bookId && source.page !== undefined ? `page=${source.page}` : undefined,
+      );
+      if (!to || seen.has(to.node)) continue;
+      seen.add(to.node);
+      out.push({ vault: vault.id, vaultName: name, path: e.path, title: e.name, to, property: true });
+    }
   }
   return out;
 }

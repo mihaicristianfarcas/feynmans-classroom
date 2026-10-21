@@ -48,7 +48,8 @@ export function vaultNoteRoutes(app: Hono) {
   });
   app.post("/api/vaults/:id/connections/suggest", async (c) => {
     const vault = getVault(c.req.param("id"));
-    const path = noteAt(vault, (await readBody<{ path: string }>(c)).path);
+    const input = await readBody<{ path?: string }>(c);
+    const path = input.path ? noteAt(vault, input.path) : undefined;
     return c.json({ suggested: await suggestConnections(vault, path) });
   });
   app.post("/api/vaults/:id/connections/:cid/:decision", (c) => {

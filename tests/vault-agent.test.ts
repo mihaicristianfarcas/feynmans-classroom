@@ -100,4 +100,25 @@ describe("the agent in an added vault", () => {
     expect(kept.kept).toBe("what is in this note.md");
     expect(read(kept.kept!)).toContain("Done.");
   });
+  it("routes requests without vault context into a visible vault, with working Open and Undo", async () => {
+    const { defaultVault, getVault } = await import("../server/vaults/index.ts");
+    work = (cwd) => writeFileSync(join(cwd, "Soil.md"), "A summary from Today.\n");
+    const done = await settled(A.startRun({ task: "Make a summary", context: { route: "#/" } }));
+    expect(done).toMatchObject({ status: "merged", vault: defaultVault(), open: "Soil.md" });
+    expect(getVault(done.vault!).files.get(done.open!)?.text).toContain("summary from Today");
+    expect(existsSync(join(dir, "data", "vault", "notes", "Soil.md"))).toBe(false);
+    A.undoRun(done.id);
+    expect(getVault(done.vault!).files.has("Soil.md")).toBe(false);
+  });
+
+  it("fails a follow-up to a removed vault without an unhandled rejection", async () => {
+    work = () => {};
+    const first = await settled(ask("Remember this conversation"));
+    (await import("../server/vaults/index.ts")).removeVault(vaultId);
+    const done = await settled(A.startRun({ task: "Continue", after: first.id }));
+    expect(done).toMatchObject({ status: "failed", vault: vaultId, error: "no such vault" });
+    expect(done.activity).toBeUndefined();
+    // Another request can still run on the remaining default vault.
+    expect((await settled(A.startRun({ task: "Still there?" }))).status).toBe("done");
+  });
 });

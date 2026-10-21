@@ -16,6 +16,7 @@ import { join } from "node:path";
 import puppeteer, { type Browser, type Page } from "puppeteer-core";
 import { chromePath } from "../../server/config.ts";
 import { EXAMPLES } from "../../shared/scene/examples.ts";
+import { vaultFlow } from "./vault-flow.ts";
 
 const require = createRequire(import.meta.url);
 const AXE = require.resolve("axe-core/axe.min.js");
@@ -624,6 +625,10 @@ try {
       page,
       list.find((r) => r.startsWith("#/book/")),
     );
+  if (dataDir && (!arg("only") || arg("only") === "vault-flow")) {
+    const books = (await fetch(`${BASE}api/books`).then((r) => r.json())) as { id: string }[];
+    await vaultFlow(page, BASE, dataDir, seededBook || `#/book/${books[0].id}`, check);
+  }
   check("no page errors", errors.length === 0, [...new Set(errors)].join("\n"));
 } finally {
   await browser?.close();
