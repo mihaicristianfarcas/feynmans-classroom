@@ -4,7 +4,7 @@
 import { ArrowLeft, Shapes } from "lucide-react";
 import { useState } from "react";
 import { humanInterval } from "../../../../shared/fsrs.ts";
-import { type Concept, type ConceptBrief, docs, learn, type Note } from "../../api";
+import { type Concept, type ConceptBrief, docs, type Note } from "../../api";
 import { bookLink, go } from "../../app/navigation";
 import { Loading, Mastery } from "../../components/feedback";
 import { levelOf } from "../../components/GraphView";
@@ -13,6 +13,7 @@ import { PracticeSession } from "../../components/Practice";
 import { CardDrafter, Connector, ExplainBack, FigureMaker } from "../../components/tools";
 import { useLoad } from "../../lib/useLoad";
 import { under, useVaultEvents } from "../../lib/useVaultEvents";
+import { loadConcept } from "./loadConcept";
 
 const TYPE_LABEL: Record<string, string> = {
   note: "Note",
@@ -37,7 +38,7 @@ function ConceptChips({ list }: { list: ConceptBrief[] }) {
 }
 
 export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
-  const { data: c, error, reload } = useLoad(() => learn.concept(id), [id], `concept:${id}`);
+  const { data: c, error, reload } = useLoad(() => loadConcept(id), [id], `concept:${id}`);
   useVaultEvents(reload, under("notes/", "concepts/", "cards/"));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ summary: "", body: "" });
