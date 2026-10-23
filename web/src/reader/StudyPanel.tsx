@@ -1,7 +1,9 @@
-/* The reader's Study pane: the chapter's study tools (pretest, quiz, concept map, explain it back). */
+/* The reader's Study pane: the chapter's study tools (pretest, quiz, concept map, explain it back), and
+ * a word when the chapter builds on something the learner is forgetting, with a refresher. */
 import { CircleHelp, MessageCircleQuestion, Waypoints } from "lucide-react";
 import { useEffect, useState } from "react";
 import { type Book, type ConceptView, learn, type Quiz, type TocEntry } from "../api";
+import { Foundations } from "../components/Foundations";
 import { Mastery, Spinner } from "../components/feedback";
 import { QuizRunner } from "../components/Quiz";
 import { ExplainBack } from "../components/tools";
@@ -67,6 +69,13 @@ export function StudyTab({
     <div className="study-tab">
       <div className="eyebrow">{chapter.title}</div>
       {chapter.subtitle && <h2 className="chapter-title">{chapter.subtitle}</h2>}
+      <Foundations
+        concepts={(concepts || []).map((c) => c.id)}
+        lead="This chapter builds on"
+        onRefresh={(ids) =>
+          run("Writing a refresher", async () => setQuiz(await learn.quiz({ mode: "review", concepts: ids, count: 3 })))
+        }
+      />
       <div className="study-actions stagger">
         <button type="button" className="study-action" disabled={!!busy} onClick={() => startQuiz("pretest")}>
           <span className="well" data-tone="sky" aria-hidden="true">

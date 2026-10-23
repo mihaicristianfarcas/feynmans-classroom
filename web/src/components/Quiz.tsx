@@ -1,10 +1,11 @@
 /* Quizzes and pretests: one question at a time, multiple choice or short answer, with feedback right
- * after each answer; misses can become flashcards in one click, and a quiz kept in a note can have the
- * attempt added to it. An answer the grader couldn't check is never scored: it can be checked again,
+ * after each answer; misses can become flashcards in one click (and what they build on that is fading
+ * is named), and a quiz kept in a note can have the attempt added to it. An answer the grader couldn't check is never scored: it can be checked again,
  * or skipped and left out of the score. */
 import { useEffect, useState } from "react";
 import { learn, type Question, type Quiz } from "../api";
 import { announce } from "../lib/a11y";
+import { Foundations } from "./Foundations";
 import { Spinner } from "./feedback";
 import { Markdown } from "./Markdown";
 
@@ -111,6 +112,10 @@ export function QuizRunner({
         </div>
         {missed.length > 0 && (
           <>
+            <Foundations
+              concepts={[...new Set(missed.map(({ qq }) => qq.concept).filter(Boolean))]}
+              lead="What you missed builds on"
+            />
             <h3 className="sub-title">To revisit</h3>
             <ul className="missed">
               {missed.map(({ qq, i }) => (

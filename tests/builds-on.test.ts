@@ -1,6 +1,6 @@
 // What a concept builds on: kept as `builds-on` in its file, found when a chapter's concepts are mapped
 // (a stand-in model), moved over from `related`, drawn as its own kind of link, carried along by renames,
-// and shown as what it builds on and leads to.
+// shown as what it builds on and leads to, and read back as the fading foundations to refresh first.
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -32,10 +32,13 @@ let C: typeof import("../server/learn/concepts.ts");
 let D: typeof import("../server/learn/docs.ts");
 let L: typeof import("../server/vault/links.ts");
 let views: typeof import("../server/learn/concept-views.ts");
+let S: typeof import("../server/learn/study.ts");
 let graph: typeof import("../server/learn/graph.ts").knowledgeGraph;
 let book: import("../server/books/types.ts").Book;
 
 const id = (name: string) => C.findConcept(name)!.id;
+const quiz = (concept: string, score: number) =>
+  S.recordQuiz({ title: "Q", mode: "check", score, total: 1, concepts: [], answers: [{ concept, score }] });
 
 beforeAll(async () => {
   V = await import("../server/vault/index.ts");
@@ -44,6 +47,7 @@ beforeAll(async () => {
   D = await import("../server/learn/docs.ts");
   L = await import("../server/vault/links.ts");
   views = await import("../server/learn/concept-views.ts");
+  S = await import("../server/learn/study.ts");
   ({ knowledgeGraph: graph } = await import("../server/learn/graph.ts"));
   const { ingestBook } = await import("../server/ingest/index.ts");
   book = await ingestBook({
@@ -123,5 +127,35 @@ describe("what a concept builds on", () => {
     expect(C.findConcept("Bayes' rule")!.buildsOn).toEqual(["[[Conditioning]]"]);
     L.invalidateLinks();
     expect(views.conceptDetail(C.findConcept("Bayes' rule")!).buildsOn.map((c) => c.title)).toEqual(["Conditioning"]);
+  });
+
+  it("gives the foundations to refresh, weakest first, untested last, leaving out the ones asked about", () => {
+    C.upsertConcept({ name: "Posterior", buildsOn: ["Bayes' rule", "Conditioning", "Prior", "Likelihood"] });
+    C.upsertConcept({ name: "Prior" });
+    C.upsertConcept({ name: "Likelihood" });
+    quiz("Conditioning", 0);
+    quiz("Prior", 1);
+    quiz("Bayes' rule", 0.5);
+    L.invalidateLinks();
+    expect(views.foundations(["Posterior", "Prior"]).map((c) => c.title)).toEqual([
+      "Conditioning",
+      "Bayes' rule",
+      "Likelihood",
+    ]);
+    expect(views.foundations(["Nothing like it"])).toEqual([]);
+    // a link to a concept that doesn't exist (yet) is nothing to refresh
+    C.upsertConcept({ name: "Evidence", buildsOn: ["Marginal likelihood"] });
+    L.invalidateLinks();
+    expect(views.foundations(["Evidence"])).toEqual([]);
+  });
+
+  it("can be refreshed with a quiz on just those concepts", async () => {
+    reply = { title: "Refresher", questions: [] };
+    await S.makeQuiz({ mode: "review", concepts: ["Conditioning", "bayes-rule"], count: 3 });
+    const listed = prompts
+      .at(-1)!
+      .split("\n")
+      .filter((l) => l.startsWith("- "));
+    expect(listed.map((l) => l.slice(2).split(":")[0])).toEqual(["Conditioning", "Bayes' rule"]);
   });
 });
