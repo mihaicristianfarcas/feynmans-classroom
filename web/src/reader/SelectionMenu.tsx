@@ -14,6 +14,7 @@ import {
   Link2,
   MessageCircleQuestion,
   MessagesSquare,
+  NotebookPen,
   Plus,
   Quote,
   Search,
@@ -35,6 +36,7 @@ export type SelectionAction =
   | { kind: "cards" }
   | { kind: "connect" }
   | { kind: "teach" }
+  | { kind: "practice" }
   | { kind: "tutor" }
   | { kind: "copy" };
 
@@ -258,6 +260,10 @@ export function SelectionMenu({
           <button type="button" role="menuitem" onClick={() => onAction({ kind: "teach" })}>
             <GraduationCap aria-hidden="true" />
             Teach it back (Feynman)
+          </button>
+          <button type="button" role="menuitem" onClick={() => onAction({ kind: "practice" })}>
+            <NotebookPen aria-hidden="true" />
+            Practice this (worked example)
           </button>
           <button type="button" role="menuitem" onClick={() => onAction({ kind: "connect" })}>
             <Waypoints aria-hidden="true" />

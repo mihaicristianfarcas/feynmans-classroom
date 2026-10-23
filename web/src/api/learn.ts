@@ -20,6 +20,7 @@ import type {
   IdeaConnection,
   Journey,
   Note,
+  Practice,
   Profile,
   Quiz,
   Resolved,
@@ -144,6 +145,11 @@ export const learn = {
     /** review: only these concepts (names or ids). */
     concepts?: string[];
   }) => post<Quiz>("/api/quiz", input),
+  /** A worked example and practice problems, from a passage or a concept (its name). */
+  practice: (input: { passage?: string; source?: SourceRef; concept?: string }) =>
+    post<Practice>("/api/practice", input),
+  /** Keeps a practice session as a note of exercises. */
+  savePractice: (practice: Practice) => post<Note>("/api/practice/save", practice),
   gradeShort: (items: { question: string; ideal: string; answer: string }[]) =>
     post<{ score: number; feedback: string }[]>("/api/quiz/grade", { items }),
   recordQuiz: (input: {

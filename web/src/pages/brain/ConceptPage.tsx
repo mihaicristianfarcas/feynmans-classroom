@@ -1,6 +1,6 @@
 /* A concept's page (#/brain/concept/<id>): what it is, how well you know it, what it builds on and
- * leads to, its cards, notes and sources, and tools to explain it back, draft cards, connect it or draw
- * a figure of it. */
+ * leads to, its cards, notes and sources, and tools to explain it back, practise it, draft cards,
+ * connect it or draw a figure of it. */
 import { ArrowLeft, Shapes } from "lucide-react";
 import { useState } from "react";
 import { humanInterval } from "../../../../shared/fsrs.ts";
@@ -9,6 +9,7 @@ import { bookLink, go } from "../../app/navigation";
 import { Mastery, Spinner } from "../../components/feedback";
 import { levelOf } from "../../components/GraphView";
 import { Markdown } from "../../components/Markdown";
+import { PracticeSession } from "../../components/Practice";
 import { CardDrafter, Connector, ExplainBack, FigureMaker } from "../../components/tools";
 import { useLoad } from "../../lib/useLoad";
 import { under, useVaultEvents } from "../../lib/useVaultEvents";
@@ -40,7 +41,7 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
   useVaultEvents(reload, under("notes/", "concepts/", "cards/"));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ summary: "", body: "" });
-  const [tool, setTool] = useState<"explain" | "cards" | "connect" | "figure" | null>(
+  const [tool, setTool] = useState<"explain" | "practice" | "cards" | "connect" | "figure" | null>(
     new URLSearchParams(location.hash.split("?")[1] || "").get("explain") ? "explain" : null,
   );
   if (error) return <div className="center-note">{error}</div>;
@@ -66,6 +67,9 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
       <div className="concept-actions">
         <button type="button" className="button primary" aria-haspopup="dialog" onClick={() => setTool("explain")}>
           Explain it back
+        </button>
+        <button type="button" className="button subtle" aria-haspopup="dialog" onClick={() => setTool("practice")}>
+          Practice it
         </button>
         <button type="button" className="button subtle" aria-haspopup="dialog" onClick={() => setTool("cards")}>
           Make cards
@@ -222,6 +226,17 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
         <ExplainBack
           concept={c.title}
           passage={c.summary}
+          source={source}
+          theme={theme}
+          onClose={() => {
+            setTool(null);
+            reload();
+          }}
+        />
+      )}
+      {tool === "practice" && (
+        <PracticeSession
+          concept={c.title}
           source={source}
           theme={theme}
           onClose={() => {
