@@ -22,7 +22,7 @@ you need, instead of listing everything.
 | `attachments/` | pictures in notes |
 | `brain/links.tsv` | generated: every link, `from<TAB>to<TAB>kind<TAB>line`; backlinks of X: `rg -F "<TAB>X<TAB>" brain/links.tsv` |
 | `brain/connections.jsonl` | links suggested between notes and the learner's decisions (`suggested`, `accepted`, `rejected`, `removed`); one with `kind: "builds-on"` proposes what a concept builds on (accepted, it goes into its `builds-on`) |
-| `log/reviews.jsonl` | every flashcard review `{card, ts, rating 1–4}`, with `variant: true` when the card was asked a new way (a card's schedule is replayed from it; the card's file never changes) |
+| `log/reviews.jsonl` | every flashcard review `{card, ts, rating 1–4}`, with `variant: true` when the card was asked a new way (a card's schedule is replayed from it, with part of a review for the cards on what a recalled card's concepts build on; the card's file never changes) |
 | `log/activity.jsonl` | the learning journey `{ts, type, text, bookId?}` |
 
 ## One shape for every document

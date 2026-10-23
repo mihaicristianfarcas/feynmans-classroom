@@ -4,7 +4,9 @@
  * Each review updates both from the rating and from how likely recall was at that moment (R).
  * The next review is scheduled for when R is predicted to drop to the desired retention.
  * Formulas and default weights: github.com/open-spaced-repetition (FSRS-6, 21 parameters).
- * The state is a pure function of the review log, so replaying the log rebuilds every card. */
+ * The state is a pure function of the review log, so replaying the log rebuilds every card. On top of
+ * FSRS, `credit` gives part of a review to a memory used without being reviewed (Math Academy's
+ * implicit repetitions). */
 
 export type Rating = 1 | 2 | 3 | 4; // again, hard, good, easy
 export const RATINGS: Rating[] = [1, 2, 3, 4];
@@ -31,7 +33,7 @@ export interface MemoryState {
   lapses: number;
 }
 
-const DAY = 86400000;
+export const DAY = 86400000;
 const MIN = 60000;
 /** Learning steps for new cards, and the relearning step after a lapse. */
 const LEARN = [1 * MIN, 10 * MIN];
@@ -146,6 +148,22 @@ export function review(state: MemoryState | null, g: Rating, now = Date.now(), r
   if (g === 4 || state.phase === "relearning" || state.step + 1 >= LEARN.length)
     return graduate(s, d, state.reps + 1, state.lapses);
   return { ...state, s, d, last: now, due: now + LEARN[state.step + 1], step: state.step + 1, reps: state.reps + 1 };
+}
+
+/** The share of a Good review that using a memory, without reviewing it, is worth. */
+export const CREDIT = 0.3;
+
+/** Part of a review, for a memory used without being reviewed (a card on an idea that builds on this
+ * one, recalled after a wait): `share` of the stability a Good review now would add. The clock isn't
+ * reset, so a card coming due is put off, while one long overdue stays due. Only a known card (in
+ * review), and not on the day of its last review. */
+export function credit(state: MemoryState, now: number, share = CREDIT, retention = 0.9, w = W): MemoryState {
+  const days = (now - state.last) / DAY;
+  if (state.phase !== "review" || days < 1) return state;
+  const good = recallS(state.s, state.d, forgetting(days, state.s, w), 3, w);
+  const s = state.s + share * Math.max(0, good - state.s);
+  const due = state.last + Math.max(1, Math.round(intervalDays(s, retention, w))) * DAY;
+  return { ...state, s, due: Math.max(state.due, due) };
 }
 
 /** What each button would do now, for labels like "1m · 6m · 10m · 4d". */

@@ -1,12 +1,14 @@
 /* Flashcards and spaced repetition (retrieval practice + spacing, the two techniques with the
  * strongest evidence behind them: Dunlosky et al. 2013). Cards are documents (cards/*.md); their
  * memory state is replayed from the review log with FSRS-6, so a review never changes the file.
- * Review sessions interleave decks, and now and then ask a card known for weeks a new way
- * (variants.ts). */
-import { type MemoryState, preview, type Rating, review } from "../../shared/fsrs.ts";
+ * Recalling a known card after a wait also gives part of a review to the cards on the concepts its
+ * own build on, since it used them. Review sessions interleave decks, and now and then ask a card
+ * known for weeks a new way (variants.ts). */
+import { CREDIT, credit, DAY, type MemoryState, preview, type Rating, review } from "../../shared/fsrs.ts";
 import type { Card, SourceRef } from "../../shared/vault-types.ts";
 import { structured } from "../llm/index.ts";
-import { docs, getProfile, logActivity, logReview, reviews } from "../vault/index.ts";
+import { docs, getProfile, logActivity, logReview, onVaultChange, reviews } from "../vault/index.ts";
+import { allEdges } from "../vault/links.ts";
 import { upsertConcept } from "./concepts.ts";
 import { bookContext, learnerSummary, sourceLine } from "./context.ts";
 import { createDoc, updateDoc } from "./docs.ts";
@@ -15,14 +17,56 @@ import { asksNewWay, type CardVariant, forgetVariant, variantOf, writeVariants }
 /* ---------------- memory state ---------------- */
 
 let cache: { count: number; retention: number; states: Map<string, MemoryState | null> } | null = null;
+// what the concepts build on, and which cards test which, live in these folders
+onVaultChange((rel) => {
+  if (rel.startsWith("concepts/") || rel.startsWith("cards/")) cache = null;
+});
+
+/** For each card, the cards on the concepts its own concepts build on directly (not their foundations). */
+function foundations(): Map<string, string[]> {
+  const cardsOn = new Map<string, string[]>();
+  const conceptsOf = new Map<string, string[]>();
+  const buildsOn = new Map<string, string[]>();
+  const add = (map: Map<string, string[]>, key: string, value: string) =>
+    (map.get(key) || map.set(key, []).get(key)!).push(value);
+  for (const e of allEdges()) {
+    if (!e.to?.startsWith("concept:")) continue;
+    if (e.kind === "mentions" && e.from.startsWith("card:")) {
+      add(cardsOn, e.to, e.from.slice(5));
+      add(conceptsOf, e.from.slice(5), e.to);
+    } else if (e.kind === "builds-on" && e.from.startsWith("concept:")) add(buildsOn, e.from, e.to);
+  }
+  const under = new Map<string, string[]>();
+  for (const [card, own] of conceptsOf) {
+    const bases = own.flatMap((c) => buildsOn.get(c) || []).filter((c) => !own.includes(c));
+    const ids = new Set(bases.flatMap((c) => cardsOn.get(c) || []));
+    ids.delete(card);
+    if (ids.size) under.set(card, [...ids]);
+  }
+  return under;
+}
 
 function states(): Map<string, MemoryState | null> {
   const log = reviews();
   const retention = getProfile().retention;
   if (cache && cache.count === log.length && cache.retention === retention) return cache.states;
+  const under = foundations();
   const map = new Map<string, MemoryState | null>();
-  for (const r of [...log].sort((a, b) => a.ts - b.ts))
-    map.set(r.card, review(map.get(r.card) || null, r.rating, r.ts, retention));
+  const credited = new Map<string, number>();
+  for (const r of [...log].sort((a, b) => a.ts - b.ts)) {
+    const before = map.get(r.card) || null;
+    map.set(r.card, review(before, r.rating, r.ts, retention));
+    // a known card recalled after a wait: what its ideas build on was used, so gets part of a review
+    if (r.rating < 3 || before?.phase !== "review" || r.ts - before.last < DAY) continue;
+    for (const id of under.get(r.card) || []) {
+      const state = map.get(id);
+      if (!state || r.ts - (credited.get(id) ?? -Infinity) < DAY) continue; // once a day at most
+      const next = credit(state, r.ts, CREDIT, retention);
+      if (next === state) continue;
+      map.set(id, next);
+      credited.set(id, r.ts);
+    }
+  }
   cache = { count: log.length, retention, states: map };
   return map;
 }
