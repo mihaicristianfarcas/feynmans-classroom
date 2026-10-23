@@ -2,7 +2,8 @@
  * first, then rg and the files it needs) and proposes links worth following, each with a reason.
  * The learner accepts (the link goes into the note's `related` property, so Obsidian and agents see
  * it), rejects, or later removes one; every decision is kept in brain/connections.jsonl, so nothing
- * turned down is suggested again. With the "auto" setting the links are added straight away. */
+ * turned down is suggested again. With the "auto" setting the links are added straight away. What a
+ * concept builds on is suggested the same way (builds-on.ts) and decided here, into `builds-on`. */
 import { linkKey, parseWikiLinks } from "../../shared/links.ts";
 import type { Connection } from "../../shared/vault-types.ts";
 import { agent } from "../llm/index.ts";
@@ -11,6 +12,7 @@ import { listConnections, saveConnections } from "../vault/connections.ts";
 import { changed, docs, logActivity, now, shortId, VAULT } from "../vault/index.ts";
 import { writeIndexes } from "../vault/indexes.ts";
 import { resolveLink } from "../vault/links.ts";
+import { upsertConcept } from "./concepts.ts";
 import { learnerSummary } from "./context.ts";
 import { updateDoc } from "./docs.ts";
 
@@ -132,15 +134,17 @@ export function decideConnection(id: string, decision: "accept" | "reject" | "re
   const c = list.find((x) => x.id === id);
   if (!c) throw new Error("connection not found");
   const note = docs.at(c.from);
+  const other = (r: string) => linkKey(r.replace(/^\[\[|\]\]$/g, "").split("|")[0]) !== linkKey(c.to);
   if (decision === "accept") {
-    if (!note) throw new Error("the note is gone");
-    addRelated(note.id, c.to);
+    if (!note) throw new Error(c.kind === "builds-on" ? "the concept is gone" : "the note is gone");
+    // what a concept builds on goes into its builds-on (out of related, if it was there)
+    if (c.kind === "builds-on" && note.kind === "concept") upsertConcept({ name: note.title, buildsOn: [c.to] });
+    else addRelated(note.id, c.to);
     c.status = "accepted";
   } else if (decision === "remove") {
-    if (note)
-      updateDoc(note.id, {
-        related: note.related.filter((r) => linkKey(r.replace(/^\[\[|\]\]$/g, "").split("|")[0]) !== linkKey(c.to)),
-      });
+    if (note?.kind === "concept" && c.kind === "builds-on")
+      updateDoc(note.id, { buildsOn: note.buildsOn.filter(other) });
+    else if (note) updateDoc(note.id, { related: note.related.filter(other) });
     c.status = "removed";
   } else c.status = "rejected";
   c.decided = now();

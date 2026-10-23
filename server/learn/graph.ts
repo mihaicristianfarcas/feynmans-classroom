@@ -27,9 +27,11 @@ export interface GraphEdge {
    * suggested: one waiting for a decision; builds-on: from a concept to one it needs first; concept:
    * concept to concept; mentions: note to concept; source: to its book. */
   kind: "source" | "related" | "about" | "mentions" | "link" | "embed" | "ai" | "suggested" | "builds-on" | "concept";
-  /** For suggestions: the connection's id and why it was suggested. */
+  /** For suggestions: the connection's id and why it was suggested, and what it says (builds-on: that
+   * `from` needs `to` first). */
   id?: string;
   why?: string;
+  suggests?: "builds-on";
 }
 
 /** The knowledge graph, from the vault's links (see vault/links.ts). */
@@ -99,15 +101,22 @@ export function knowledgeGraph(): { nodes: GraphNode[]; edges: GraphEdge[] } {
   ];
   const all = allEdges().filter((e) => e.to);
   for (const kind of order) for (const e of all) if (e.kind === kind) add({ from: e.from, to: e.to!, kind: e.kind });
-  // a suggestion is always there to decide on: it takes the place of a weaker link between the same two,
-  // or goes beside a stronger one
+  // a suggestion is always there to decide on: it takes the place of a weaker link between the same two
+  // (that a related concept is needed first, say), or goes beside a stronger one
   const weaker = new Set<GraphEdge["kind"]>(["related", "about", "concept", "mentions", "source"]);
   for (const c of listConnections()) {
     if (c.status !== "suggested") continue;
     const from = docs.at(c.from);
     const to = resolveLink(c.to);
     if (!from || !to) continue;
-    const e: GraphEdge = { from: `${from.kind}:${from.id}`, to: to.node, kind: "suggested", id: c.id, why: c.why };
+    const e: GraphEdge = {
+      from: `${from.kind}:${from.id}`,
+      to: to.node,
+      kind: "suggested",
+      id: c.id,
+      why: c.why,
+      ...(c.kind ? { suggests: c.kind } : {}),
+    };
     if (!valid(e)) continue;
     const i = at.get(pair(e));
     if (i === undefined) add(e);

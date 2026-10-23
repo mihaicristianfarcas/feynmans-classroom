@@ -1,7 +1,8 @@
 /* The card at the left of the Brain's graph, for the item you picked: a concept's summary, recall and
  * sources (with a way to explain it back), a note's text, a book or an annotation in brief. Its links
  * pick other items in the graph, and links the agent suggests can be accepted or turned down there.
- * SuggestionsCard lists every suggested link, and asks the agent for more. */
+ * SuggestionsCard lists every suggested link, and asks the agent for more: links from recent notes,
+ * or what concepts without builds-on links build on. */
 import { X } from "lucide-react";
 import { type ReactNode, type Ref, useEffect, useId, useRef, useState } from "react";
 import { docs, type GraphData, learn, type Note } from "../../api";
@@ -266,9 +267,11 @@ export function NodeCard({
   );
 }
 
-/** One link the agent suggests: both ends, why, and Link / Not related. */
+/** One link the agent suggests: both ends, why, and Link / Not related (for what a concept builds on:
+ * Link / Not needed first). */
 function Suggestion({ edge, byId, onChanged }: { edge: Edge; byId: Map<string, Node>; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
+  const builds = edge.suggests === "builds-on";
   const decide = async (decision: "accept" | "reject") => {
     setBusy(true);
     try {
@@ -282,8 +285,16 @@ function Suggestion({ edge, byId, onChanged }: { edge: Edge; byId: Map<string, N
   return (
     <li className="suggestion-item">
       <span className="suggestion-ends">
-        {byId.get(edge.from)?.label || edge.from} <span aria-hidden="true">→</span>
-        <span className="visually-hidden"> to </span> {byId.get(edge.to)?.label || edge.to}
+        {byId.get(edge.from)?.label || edge.from}{" "}
+        {builds ? (
+          "builds on"
+        ) : (
+          <>
+            <span aria-hidden="true">→</span>
+            <span className="visually-hidden"> to </span>
+          </>
+        )}{" "}
+        {byId.get(edge.to)?.label || edge.to}
       </span>
       {edge.why && <span className="fine">{edge.why}</span>}
       <span className="row gap">
@@ -291,14 +302,14 @@ function Suggestion({ edge, byId, onChanged }: { edge: Edge; byId: Map<string, N
           Link
         </button>
         <button type="button" className="link" disabled={busy} onClick={() => decide("reject")}>
-          Not related
+          {builds ? "Not needed first" : "Not related"}
         </button>
       </span>
     </li>
   );
 }
 
-/** Every link the agent suggests, and a way to ask it to read recent notes for more. */
+/** Every link the agent suggests, and ways to ask for more: from recent notes, or what concepts build on. */
 export function SuggestionsCard({
   data,
   focus,
@@ -315,8 +326,25 @@ export function SuggestionsCard({
   const titleRef = useTitleFocus("suggestions", focus);
   const byId = new Map(data.nodes.map((n) => [n.id, n]));
   const pending = data.edges.filter((e) => e.kind === "suggested");
-  const [busy, setBusy] = useState<number | null>(null);
+  const [busy, setBusy] = useState<{ since: number; reading: "notes" | "concepts" } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const look = async (reading: "notes" | "concepts") => {
+    setBusy({ since: Date.now(), reading });
+    setError(null);
+    try {
+      const { suggested } = reading === "notes" ? await learn.suggestConnections() : await learn.suggestBuildsOn();
+      announce(
+        suggested.length
+          ? `${suggested.length} new suggestion${suggested.length === 1 ? "" : "s"}`
+          : "Nothing new to suggest",
+      );
+      onChanged();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
   return (
     <Frame
       eyebrow="The agent"
@@ -325,29 +353,27 @@ export function SuggestionsCard({
       onClose={onClose}
       leaving={leaving}
       actions={
-        <button
-          type="button"
-          className="button"
-          disabled={!!busy}
-          onClick={async () => {
-            setBusy(Date.now());
-            setError(null);
-            try {
-              await learn.suggestConnections();
-              onChanged();
-            } catch (e) {
-              setError((e as Error).message);
-            } finally {
-              setBusy(null);
-            }
-          }}
-        >
-          {busy ? "Reading your notes…" : "Look for more"}
-        </button>
+        <>
+          <button type="button" className="button" disabled={!!busy} onClick={() => look("notes")}>
+            {busy?.reading === "notes" ? "Reading your notes…" : "Look for more"}
+          </button>
+          <button type="button" className="button" disabled={!!busy} onClick={() => look("concepts")}>
+            {busy?.reading === "concepts" ? "Reading your concepts…" : "Find what builds on what"}
+          </button>
+        </>
       }
     >
       <div className="node-card-content">
-        {busy && <Spinner label="The agent is reading your recent notes" since={busy} />}
+        {busy && (
+          <Spinner
+            label={
+              busy.reading === "notes"
+                ? "The agent is reading your recent notes"
+                : "Reading your concepts for what each builds on"
+            }
+            since={busy.since}
+          />
+        )}
         {error && (
           <p className="form-error" role="alert">
             {error}
@@ -355,7 +381,8 @@ export function SuggestionsCard({
         )}
         {pending.length === 0 ? (
           <p className="fine">
-            None waiting. The agent reads your recent notes and proposes links worth following; you decide on each.
+            None waiting. The agent reads your recent notes and proposes links worth following, and can go through your
+            concepts for what each one builds on; you decide on each.
           </p>
         ) : (
           <ul className="plain suggestion-list">
