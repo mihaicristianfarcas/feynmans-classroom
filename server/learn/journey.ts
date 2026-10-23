@@ -138,14 +138,17 @@ export function today() {
     .filter((b) => b.status === "ready")
     .map((b) => {
       const last = [...acts].reverse().find((a) => a.bookId === b.id);
+      // where you were is where you last read (a highlight or a question since doesn't move it)
+      const read = [...acts].reverse().find((a) => a.bookId === b.id && a.type === "read");
       return {
         id: b.id,
         title: b.title,
         author: b.author,
         format: b.format,
         lastTs: last?.ts || new Date(b.createdAt).getTime(),
-        position: (last?.data?.position as number | undefined) ?? null,
-        chapter: (last?.data?.chapter as string | undefined) || null,
+        position: (read?.data?.position as number | undefined) ?? null,
+        chapter: (read?.data?.chapter as string | undefined) || null,
+        progress: bookProgress(b.id),
       };
     })
     .sort((a, b) => b.lastTs - a.lastTs);
@@ -179,7 +182,7 @@ export function today() {
     suggestions.push({
       kind: "read",
       title: `Continue ${lastRead.title}`,
-      detail: whereYouAre(lastRead.chapter, bookProgress(lastRead.id)),
+      detail: whereYouAre(lastRead.chapter, lastRead.progress),
       action: { route: `#/book/${lastRead.id}` },
     });
   // spaced quiz on a chapter read a few days ago
