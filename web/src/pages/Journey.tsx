@@ -18,8 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { type Activity, type Journey as JourneyData, learn } from "../api";
-import { Mastery } from "../components/feedback";
-import { PageSkeleton } from "../components/Skeletons";
+import { Loading, Mastery } from "../components/feedback";
 import { announce } from "../lib/a11y";
 import { timeAgo } from "../lib/time";
 import { useLoad } from "../lib/useLoad";
@@ -105,7 +104,7 @@ function StreakPause({ until, onPaused }: { until: string | null; onPaused: (jou
 
 export function Journey() {
   const { data, setData } = useLoad(() => learn.journey(), [], "journey");
-  if (!data) return <PageSkeleton page="journey" title="Journey" />;
+  if (!data) return <Loading label="Opening your journey" />;
   const weeks = 26;
   const end = new Date();
   end.setHours(0, 0, 0, 0);

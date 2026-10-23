@@ -1,5 +1,5 @@
 /* Small status pieces used across pages: a spinner that says what it's waiting for (and for how long),
- * a page whose code is still loading, and a concept's mastery as a bar. */
+ * something local still on its way, and a concept's mastery as a bar. */
 import { useEffect, useState } from "react";
 
 /** Something is being worked on: an announced status with a label and, given `since`, the seconds so far. */
@@ -19,18 +19,26 @@ export function Spinner({ label, since }: { label: string; since?: number }) {
   );
 }
 
-/** A page whose code is on its way: nothing for a moment (it's usually quicker), then a spinner. */
-export function Loading({ label = "Loading" }: { label?: string }) {
+/**
+ * Something on its way from this computer (a page's code, its data, a book being opened): nothing for a
+ * moment, since it's nearly always quicker than that, then a spinner saying what it waits for, in the
+ * middle of the space or, `inline`, where it stands. Nothing pretends to be the content in the meantime.
+ */
+export function Loading({ label = "Loading", inline = false }: { label?: string; inline?: boolean }) {
   const [shown, setShown] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setShown(true), 300);
+    // a deadline, not a poll: the spinner shows only once the wait is long enough to notice
+    const t = setTimeout(() => setShown(true), 400);
     return () => clearTimeout(t);
   }, []);
-  return shown ? (
+  if (!shown) return null;
+  return inline ? (
+    <Spinner label={label} />
+  ) : (
     <div className="center-note">
       <Spinner label={label} />
     </div>
-  ) : null;
+  );
 }
 
 /** Mastery as a small bar (null: not studied yet). */

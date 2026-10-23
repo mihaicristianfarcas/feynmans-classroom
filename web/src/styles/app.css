@@ -906,13 +906,13 @@
   font-size: var(--text-xs);
 }
 /* a book being read in: its name on a blank cover that breathes until it opens */
-.sk-cover-live {
+.cover-live {
   background: var(--sunken);
   color: var(--ink-3);
   box-shadow: inset 0 0 0 1px var(--line);
-  animation: sk-breathe 1.6s ease-in-out infinite;
+  animation: breathe 1.6s ease-in-out infinite;
 }
-.sk-cover-live::before {
+.cover-live::before {
   background: var(--line-strong);
 }
 /* no book yet: a place to drop one, and the button that does the same */

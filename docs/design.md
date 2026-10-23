@@ -57,12 +57,15 @@ card like it at its right; each item is its kind's icon in a circle, with its na
 Secondary controls stay quiet (subtle buttons, a disclosure for advanced settings) and explanations
 are one line.
 
-Loading never shows a blank page or a lone spinner: each page has a skeleton laid out as the page is
-(`components/Skeletons.tsx`), its title at once and quiet shapes that fade in after a moment, used
-both while the page's code arrives and while its data does. Every page's code is fetched once the
-app is idle, and pointing at (or focusing) a link to a page fetches its code and first data
-(`app/pages.ts`); what a page loaded is kept for the visit (`useLoad`'s key, `lib/cache.ts`), so a
-page opened again shows it at once and quietly loads it anew.
+Everything a page shows comes from this computer, so nothing pretends to be on its way: no skeletons
+or placeholder shapes. A page appears when its data is there (a few milliseconds), fading in; only a
+wait long enough to notice (a big book opening) shows a spinner saying what it waits for, after a
+moment (`Loading` in `components/feedback.tsx`). Every page's code is fetched once the app is idle,
+and pointing at (or focusing) a link to a page fetches its code and first data (`app/pages.ts`);
+what a page loaded is kept for the visit (`useLoad`'s key, `lib/cache.ts`), so a page opened again
+shows it at once and quietly loads it anew. Moving between items of one page (notes, say) keeps the
+one on show until the next is ready, so nothing blanks or jumps; a note pointed at in the list
+starts loading before the click (`notes/kept.ts`).
 
 Side panels (the notes' list and links, the reader's study panel, the Brain's legend and card) are as
 wide as you drag their inner edge, within a default, a narrowest and a widest width (`usePanel` and

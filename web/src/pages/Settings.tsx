@@ -9,8 +9,8 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { learn, type SettingsInfo } from "../api";
 import { DEFAULT_READING, type Reading, savedReading, saveReading } from "../app/reading";
 import { type ThemeChoice, themeChoice } from "../app/theme";
+import { Loading } from "../components/feedback";
 import { ProfileForm } from "../components/ProfileForm";
-import { PageSkeleton } from "../components/Skeletons";
 import { useIndicator } from "../components/ui";
 import { announce } from "../lib/a11y";
 import { timeAgo } from "../lib/time";
@@ -228,7 +228,7 @@ export function Settings({ theme, setTheme }: { theme: "light" | "dark"; setThem
       behavior: still ? "auto" : "smooth",
     });
   }, [active]);
-  if (!info || !profile) return <PageSkeleton page="settings" title="Settings" />;
+  if (!info || !profile) return <Loading label="Opening settings" />;
   const s = info.settings;
   const save = async (patch: Partial<SettingsInfo["settings"]>) => {
     await learn.saveSettings(patch);

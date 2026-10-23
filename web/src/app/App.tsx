@@ -2,13 +2,14 @@
  * learner to the welcome page first, and puts every page except the reader inside the Shell (Notes
  * and the Brain's graph fill the window below its bar; the rest scroll). The ⌘K palette and the agent
  * (⌘J) sit over every page; old #/ask links open the agent. Each page but Today is its own chunk
- * (app/pages.ts), all fetched ahead once the app is idle; while one arrives its skeleton stands in.
+ * (app/pages.ts), all fetched ahead once the app is idle; one that isn't here yet shows nothing (or,
+ * after a moment, a spinner).
  * A page that fails to draw or load says so, with a way to reload. */
 import { type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import { AgentPanel } from "../agent/AgentPanel";
 import { openAgent } from "../agent/store";
 import { learn } from "../api";
-import { PageSkeleton, ReaderSkeleton } from "../components/Skeletons";
+import { Loading } from "../components/feedback";
 import { Today } from "../pages/Today";
 import { openLink } from "./navigation";
 import { PageBoundary } from "./PageBoundary";
@@ -120,7 +121,7 @@ export function App() {
     return (
       <>
         <PageBoundary key={current.id}>
-          <Suspense fallback={<ReaderSkeleton />}>
+          <Suspense fallback={<Loading label="Opening the book" />}>
             <Reader key={current.id} bookId={current.id} theme={theme} setTheme={setTheme} />
           </Suspense>
         </PageBoundary>
@@ -142,7 +143,7 @@ export function App() {
     <>
       <Shell theme={theme} setTheme={setTheme} full={current.full}>
         <PageBoundary key={current.name}>
-          <Suspense fallback={<PageSkeleton page={current.name} title={TITLES[current.name]} />}>{page}</Suspense>
+          <Suspense fallback={<Loading label={`Opening ${TITLES[current.name].toLowerCase()}`} />}>{page}</Suspense>
         </PageBoundary>
       </Shell>
       <Palette />

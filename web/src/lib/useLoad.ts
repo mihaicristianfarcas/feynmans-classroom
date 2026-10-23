@@ -1,6 +1,6 @@
 /* Loading data for a page: the result, the error message, a reload, and setData for optimistic edits.
- * Given a key, the last answer is kept (lib/cache.ts): a page opened again shows it at once and quietly
- * loads it anew. */
+ * Given a key, the last answer is kept (lib/cache.ts): a page (or an item, when the key follows it)
+ * opened again shows it at once and quietly loads it anew. */
 import { useEffect, useState } from "react";
 import { cached, fresh, keep, prime } from "./cache";
 
@@ -17,15 +17,18 @@ export function useLoad<T>(
   useEffect(() => {
     let alive = true;
     setError(null);
-    if (key && tick === 0 && fresh(key)) {
-      setState(cached<T>(key) ?? null);
-      return;
+    if (key && tick === 0) {
+      // what was kept under this key shows while it loads anew (unless it was loaded a moment ago)
+      const kept = cached<T>(key);
+      if (kept !== undefined) setState(kept);
+      if (fresh(key)) return;
     }
     // the first load joins one already started ahead (pointing at the page's link); a reload asks again
     (key && tick === 0 ? prime(key, load) : load()).then(
       (d) => {
         if (key) keep(key, d);
-        if (alive) setState(d);
+        // an answer the same as the one shown changes nothing (a graph isn't laid out again, say)
+        if (alive) setState((old) => (old !== null && JSON.stringify(old) === JSON.stringify(d) ? old : d));
       },
       (e) => alive && setError((e as Error).message),
     );
