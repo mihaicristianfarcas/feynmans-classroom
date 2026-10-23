@@ -5,7 +5,7 @@
  * or what concepts without builds-on links build on. */
 import { X } from "lucide-react";
 import { type ReactNode, type Ref, useEffect, useId, useRef, useState } from "react";
-import { docs, type GraphData, learn, type Note } from "../../api";
+import { type GraphData, learn } from "../../api";
 import { bookLink } from "../../app/navigation";
 import { Loading, Mastery, Spinner } from "../../components/feedback";
 import { levelOf, openNode } from "../../components/GraphView";
@@ -14,6 +14,8 @@ import { ExplainBack } from "../../components/tools";
 import { announce } from "../../lib/a11y";
 import { useLoad } from "../../lib/useLoad";
 import { panelId } from "../../lib/usePanel";
+import { fetchNote } from "../../notes/kept";
+import { loadConcept } from "./loadConcept";
 
 type Node = GraphData["nodes"][number];
 
@@ -120,12 +122,12 @@ export function NodeCard({
   const [explaining, setExplaining] = useState(false);
   // kept under the keys a concept's page and the notes page read them by (concept:<id>, note:<id>)
   const { data: concept } = useLoad(
-    () => (node.kind === "concept" ? learn.concept(node.id.slice(8)) : Promise.resolve(null)),
+    () => (node.kind === "concept" ? loadConcept(node.id.slice(8)) : Promise.resolve(null)),
     [node.id],
     node.kind === "concept" ? node.id : undefined,
   );
   const { data: note } = useLoad(
-    () => (node.kind === "note" ? docs.get<Note>(node.id.slice(5)) : Promise.resolve(null)),
+    () => (node.kind === "note" ? fetchNote(node.id.slice(5)) : Promise.resolve(null)),
     [node.id],
     node.kind === "note" ? node.id : undefined,
   );

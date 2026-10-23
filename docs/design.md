@@ -68,6 +68,11 @@ shows it at once and quietly loads it anew. Moving between items of one page (no
 one on show until the next is ready, so nothing blanks or jumps; a note pointed at in the list
 starts loading before the click (`notes/kept.ts`).
 
+A note (or a concept) counts as loaded once what it shows from elsewhere is in too: its pictures with
+their sizes, KaTeX and its faces if it has math, and its embedded notes and figures (`prepareMarkdown`
+in `components/markdownReady.ts`), so it is drawn whole, and a picture always gets a space of its own
+shape before it arrives.
+
 Side panels (the notes' list and links, the reader's study panel, the Brain's legend and card) are as
 wide as you drag their inner edge, within a default, a narrowest and a widest width (`usePanel` and
 `PanelEdge`); there is no handle, just a line that lights when you rest on the edge. Dragging well past

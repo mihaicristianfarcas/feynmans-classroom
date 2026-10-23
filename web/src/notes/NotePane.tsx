@@ -15,7 +15,7 @@ import { useIndicator } from "../components/ui";
 import { timeAgo } from "../lib/time";
 import type { Panel } from "../lib/usePanel";
 import { useVaultEvents } from "../lib/useVaultEvents";
-import { keepNote } from "./kept";
+import { fetchNote, keepNote } from "./kept";
 import { NoteEditor } from "./NoteEditor";
 import { NoteSidebar } from "./NoteSidebar";
 import { Versions } from "./Versions";
@@ -65,7 +65,7 @@ export function NotePane({
 
   const load = useCallback(
     () =>
-      docs.get<Note>(id).then(
+      fetchNote(id).then(
         (n) => {
           keepNote(n);
           setNote(n);
