@@ -1,10 +1,11 @@
 /* The learning journey and today's plan: study days and recall over time, what's due, what's
- * fading, and what to do next. */
+ * fading, and what to do next (with how far through the last book you are, and your pace). */
 import { retrievability } from "../../shared/fsrs.ts";
 import { getBook, listBooks, listDemos } from "../books/store.ts";
 import { activity, docs, getProfile, reviews } from "../vault/index.ts";
 import { cardState, reviewQueue } from "./cards.ts";
 import { conceptMastery, learnerSummary } from "./context.ts";
+import { type BookProgress, bookProgress } from "./progress.ts";
 
 const dayKey = (ts: number) => {
   const d = new Date(ts - 4 * 3600000);
@@ -70,6 +71,21 @@ export function journey() {
   };
 }
 
+/** Where the learner is in the book they last read, and when they'd finish it at their recent pace. */
+function whereYouAre(chapter: string | null, progress: BookProgress | null): string {
+  if (progress?.fraction === 1) return "You've reached the end of it.";
+  const percent = progress ? `${Math.round(progress.fraction * 100)}%` : "";
+  const place =
+    chapter && percent
+      ? `You were in ${chapter}, ${percent} of the way through.`
+      : chapter
+        ? `You were in ${chapter}.`
+        : percent
+          ? `You're ${percent} of the way through.`
+          : "Pick up where you left off.";
+  return progress?.finishIn ? `${place} At your pace over the last two weeks, ${progress.finishIn} to the end.` : place;
+}
+
 export function today() {
   const queue = reviewQueue({ limit: 0 });
   const acts = activity();
@@ -118,7 +134,7 @@ export function today() {
     suggestions.push({
       kind: "read",
       title: `Continue ${lastRead.title}`,
-      detail: lastRead.chapter ? `You were in ${lastRead.chapter}.` : "Pick up where you left off.",
+      detail: whereYouAre(lastRead.chapter, bookProgress(lastRead.id)),
       action: { route: `#/book/${lastRead.id}` },
     });
   // spaced quiz on a chapter read a few days ago

@@ -28,7 +28,7 @@ Each tool below puts one of them where it's easiest to use.
 | a note with `[!exercise]` and folded `[!solution]-` callouts | exercises whose answers stay hidden until you open them | practice testing, generation |
 | the **agent** (⌘J) | anything else, in your words: "quiz me on my highlights", "summarise this chapter", "exercises on this note" | whichever you ask for |
 | **Review → Mixed quiz** | a quiz across everything you've studied, weakest first | interleaving |
-| **Today** | what's due, what's fading (explain it back), what to quiz a few days after reading | spacing |
+| **Today** | what's due, what's fading (explain it back), what to quiz a few days after reading, how far through your book you are and, at your pace over the last two weeks, roughly when you'd finish it | spacing, metacognition |
 | **Brain**, **Journey** | the knowledge graph (each item an icon in a circle that shows what you recall; a legend says what the marks mean; click an item to read it in a card beside the graph); study days, recall, concepts from solid to fading | metacognition |
 
 Concept mastery is the FSRS-predicted recall of a concept right now, from its cards and from the
