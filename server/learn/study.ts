@@ -8,7 +8,14 @@ import type { SourceRef } from "../../shared/vault-types.ts";
 import { structured, text } from "../llm/index.ts";
 import { docs, logActivity, shortId } from "../vault/index.ts";
 import { upsertConcept } from "./concepts.ts";
-import { type BookContext, bookContext, chapterContext, learnerSummary, sourceLine } from "./context.ts";
+import {
+  type BookContext,
+  bookContext,
+  chapterContext,
+  conceptMastery,
+  learnerSummary,
+  sourceLine,
+} from "./context.ts";
 import { createDoc } from "./docs.ts";
 
 const obj = (properties: Record<string, unknown>) => ({
@@ -70,9 +77,13 @@ export async function makeQuiz(input: {
 }) {
   let ctx: BookContext = { source: {}, context: "" };
   if (input.mode === "review") {
-    // interleaved review across everything the learner has met, weakest first
-    const known = docs.list("concept").slice(0, 60);
-    ctx = { source: {}, context: known.map((c) => `- ${c.title}: ${c.summary}`).join("\n") };
+    // interleaved review across everything the learner has met, weakest first (then what hasn't been tested)
+    const known = docs
+      .list("concept")
+      .map((c) => ({ c, m: conceptMastery(c.id) }))
+      .sort((a, b) => (a.m ?? 2) - (b.m ?? 2))
+      .slice(0, 60);
+    ctx = { source: {}, context: known.map(({ c }) => `- ${c.title}: ${c.summary}`).join("\n") };
   } else if (input.bookId && input.chapterId) ctx = chapterContext(input.bookId, input.chapterId, 35000);
   else ctx = bookContext(input.source, 8000);
   const how = {
@@ -81,7 +92,7 @@ export async function makeQuiz(input: {
     pretest:
       "This is a PRETEST before reading: questions about the chapter's key ideas that the learner probably can't answer yet. Guessing primes curiosity and makes the reading stick (the pretesting effect). Keep them answerable from the chapter, and make the explanations teach.",
     review:
-      "This is an INTERLEAVED review across different topics the learner has studied (listed below): mix topics, prefer questions that make them tell similar ideas apart and apply them to new situations.",
+      "This is an INTERLEAVED review across different topics the learner has studied (listed below, the ones they know least first: give those most of the questions): mix topics, prefer questions that make them tell similar ideas apart and apply them to new situations.",
   }[input.mode];
   const prompt = `Write a quiz of ${input.count ?? 5} questions (mostly multiple choice, one or two short answer). ${how}
 
@@ -128,6 +139,7 @@ Return JSON with one result per answer, in order.`;
   return results.map((r) => ({ ...r, score: Math.max(0, Math.min(1, r.score)) }));
 }
 
+/** Logs a finished quiz, with each answer's concept and score: the evidence `answers.ts` reads. */
 export function recordQuiz(input: {
   title: string;
   mode: string;
@@ -135,14 +147,23 @@ export function recordQuiz(input: {
   score: number;
   total: number;
   concepts: string[];
+  /** One per question that was scored, by concept name. */
+  answers?: { concept: string; score: number }[];
 }) {
-  const ids = input.concepts.map((name) => upsertConcept({ name }).id);
+  const answered = (input.answers || []).filter((a) => a.concept?.trim() && Number.isFinite(a.score));
+  const names = [...new Set([...(input.concepts || []), ...answered.map((a) => a.concept)].filter((n) => n?.trim()))];
+  const ids = new Map(names.map((name) => [name, upsertConcept({ name }).id]));
   return logActivity({
     type: "quiz",
     bookId: input.bookId,
-    concepts: ids,
+    concepts: [...new Set(ids.values())],
     text: `${input.mode === "pretest" ? "Pretest" : "Quiz"}: ${input.title} · ${input.score}/${input.total}`,
-    data: { score: input.score, total: input.total, mode: input.mode },
+    data: {
+      score: input.score,
+      total: input.total,
+      mode: input.mode,
+      answers: answered.map((a) => ({ concept: ids.get(a.concept)!, score: Math.max(0, Math.min(1, a.score)) })),
+    },
   });
 }
 

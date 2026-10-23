@@ -124,7 +124,7 @@ export function Legend({
           </h3>
           <ul className="legend-list">
             <Row mark={<Mark kind="concept" />} name="Not studied yet">
-              Dotted until you review a card or explain it.
+              Dotted until you review a card, answer a quiz question on it or explain it.
             </Row>
             <Row mark={<Mark kind="concept" mastery={0.35} />} name="Fading, under 55%">
               The ring shows how much you would recall today.

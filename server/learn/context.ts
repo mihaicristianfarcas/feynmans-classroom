@@ -7,9 +7,11 @@ import { chapterRange } from "../books/locate.ts";
 import { getBook } from "../books/store.ts";
 import { chapterText, findChapter, passageAround } from "../ingest/index.ts";
 import { docs, getProfile } from "../vault/index.ts";
+import { answerRecall } from "./answers.ts";
 import { cardState } from "./cards.ts";
 
-/** Mastery of a concept, 0–1: recall of its cards now, else its best explanation score. Null when unknown. */
+/** Mastery of a concept, 0–1: what you would recall of it now, from its cards and from the quiz
+ * questions you've answered on it (the two weigh the same), else its best explanation score. Null when unknown. */
 export function conceptMastery(conceptId: string, now = Date.now()): number | null {
   const linked = docs.list("card").filter((c) => c.concepts.includes(conceptId) && !c.suspended);
   const reviewed = linked.map((c) => cardState(c.id)).filter(Boolean);
@@ -17,8 +19,12 @@ export function conceptMastery(conceptId: string, now = Date.now()): number | nu
     .list("note")
     .filter((n) => n.type === "explanation" && n.concepts.includes(conceptId) && typeof n.score === "number");
   const fromExplain = explained.length ? Math.max(...explained.map((n) => n.score!)) / 100 : null;
-  if (!reviewed.length) return fromExplain;
-  const recall = reviewed.reduce((sum, s) => sum + retrievability(s, now), 0) / linked.length;
+  const recalls = [
+    reviewed.length ? reviewed.reduce((sum, s) => sum + retrievability(s, now), 0) / linked.length : null,
+    answerRecall(conceptId, now),
+  ].filter((r) => r !== null);
+  if (!recalls.length) return fromExplain;
+  const recall = recalls.reduce((sum, r) => sum + r, 0) / recalls.length;
   return fromExplain === null ? recall : Math.max(recall, fromExplain * 0.8);
 }
 

@@ -148,6 +148,8 @@ export const learn = {
     score: number;
     total: number;
     concepts: string[];
+    /** One per question that was scored, by concept name. */
+    answers: { concept: string; score: number }[];
   }) => post("/api/quiz/record", input),
   explain: (input: { concept: string; explanation: string; passage?: string; source?: SourceRef }) =>
     post<ExplainFeedback>("/api/explain", input),

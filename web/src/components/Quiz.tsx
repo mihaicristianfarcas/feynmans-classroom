@@ -79,6 +79,10 @@ export function QuizRunner({
           score: Math.round(score * 10) / 10,
           total,
           concepts: [...new Set(quiz.questions.map((x) => x.concept).filter(Boolean))],
+          answers: quiz.questions.flatMap((x, i) => {
+            const a = answers[i];
+            return a && !a.unchecked && x.concept ? [{ concept: x.concept, score: a.score }] : [];
+          }),
         })
         .catch(() => {});
     }
