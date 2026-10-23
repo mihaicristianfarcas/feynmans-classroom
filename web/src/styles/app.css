@@ -1143,6 +1143,14 @@
   stroke: color-mix(in srgb, var(--sky-ink) 75%, var(--line-strong));
   stroke-width: 1.2;
 }
+/* from a concept to one that builds on it: darker than a plain link, with an arrowhead at the end */
+.g-edge[data-kind="builds-on"] {
+  stroke: var(--ink-3);
+  stroke-width: 1.3;
+}
+.g-arrow {
+  fill: var(--ink-3);
+}
 .g-edge[data-kind="ai"] {
   stroke: var(--lavender-ink);
   stroke-width: 1.2;

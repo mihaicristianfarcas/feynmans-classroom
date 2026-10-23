@@ -1,11 +1,13 @@
-/* A concept's page (#/brain/concept/<id>): what it is, how well you know it, its cards, notes and
- * sources, and tools to explain it back, draft cards, connect it or draw a figure of it. */
+/* A concept's page (#/brain/concept/<id>): what it is, how well you know it, what it builds on and
+ * leads to, its cards, notes and sources, and tools to explain it back, draft cards, connect it or draw
+ * a figure of it. */
 import { ArrowLeft, Shapes } from "lucide-react";
 import { useState } from "react";
 import { humanInterval } from "../../../../shared/fsrs.ts";
-import { type Concept, docs, learn, type Note } from "../../api";
+import { type Concept, type ConceptBrief, docs, learn, type Note } from "../../api";
 import { bookLink, go } from "../../app/navigation";
 import { Mastery, Spinner } from "../../components/feedback";
+import { levelOf } from "../../components/GraphView";
 import { Markdown } from "../../components/Markdown";
 import { CardDrafter, Connector, ExplainBack, FigureMaker } from "../../components/tools";
 import { useLoad } from "../../lib/useLoad";
@@ -19,6 +21,19 @@ const TYPE_LABEL: Record<string, string> = {
   answer: "Answer",
   summary: "Summary",
 };
+
+/** Concepts as chips that open their pages, each tinted by how well it's known. */
+function ConceptChips({ list }: { list: ConceptBrief[] }) {
+  return (
+    <div className="chips">
+      {list.map((r) => (
+        <a key={r.id} className="chip concept-chip" href={`#/brain/concept/${r.id}`} data-level={levelOf(r.mastery)}>
+          {r.title}
+        </a>
+      ))}
+    </div>
+  );
+}
 
 export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark" }) {
   const { data: c, error, reload } = useLoad(() => learn.concept(id), [id]);
@@ -141,22 +156,30 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
           ) : (
             <p className="fine">Not linked to a passage yet.</p>
           )}
-          <h2 className="section-title">Connected to</h2>
-          <div className="chips">
-            {[...c.related, ...c.backlinks.filter((b) => !c.related.some((r) => r.id === b.id))].map((r) => (
-              <a
-                key={r.id}
-                className="chip concept-chip"
-                href={`#/brain/concept/${r.id}`}
-                data-level={
-                  r.mastery === null ? "none" : r.mastery >= 0.8 ? "strong" : r.mastery >= 0.55 ? "ok" : "weak"
-                }
-              >
-                {r.title}
-              </a>
-            ))}
-            {!c.related.length && !c.backlinks.length && <span className="fine">No links yet.</span>}
-          </div>
+          {c.buildsOn.length > 0 && (
+            <>
+              <h2 className="section-title">Builds on</h2>
+              <ConceptChips list={c.buildsOn} />
+            </>
+          )}
+          {c.leadsTo.length > 0 && (
+            <>
+              <h2 className="section-title">Leads to</h2>
+              <ConceptChips list={c.leadsTo} />
+            </>
+          )}
+          {(c.related.length > 0 || c.backlinks.length > 0 || !(c.buildsOn.length || c.leadsTo.length)) && (
+            <>
+              <h2 className="section-title">Connected to</h2>
+              {c.related.length || c.backlinks.length ? (
+                <ConceptChips
+                  list={[...c.related, ...c.backlinks.filter((b) => !c.related.some((r) => r.id === b.id))]}
+                />
+              ) : (
+                <p className="fine">No links yet.</p>
+              )}
+            </>
+          )}
         </section>
         <section>
           <h2 className="section-title">Cards ({c.cards.length})</h2>

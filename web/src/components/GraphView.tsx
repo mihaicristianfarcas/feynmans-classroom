@@ -192,7 +192,8 @@ export function openNode(n: Pick<N, "kind" | "id" | "bookId" | "path">) {
 /**
  * The knowledge graph: books, concepts, notes (and, if shown, annotations), joined by their links.
  * Each concept's ring shows how well it's known. Links you wrote are solid, connections you accepted
- * from the agent dashed, its pending suggestions dotted. The selected item (and whatever is hovered)
+ * from the agent dashed, its pending suggestions dotted; an arrow runs from a concept to one that
+ * builds on it. The selected item (and whatever is hovered)
  * lights its neighbourhood and dims the rest.
  */
 export function GraphView({
@@ -573,6 +574,19 @@ export function GraphView({
               </symbol>
             );
           })}
+          {/* the head of a "builds on" line, at the idea that needs the one it starts from */}
+          <marker
+            id={`${icons}-arrow`}
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerWidth="7"
+            markerHeight="7"
+            markerUnits="userSpaceOnUse"
+            orient="auto"
+          >
+            <path className="g-arrow" d="M0 1 L9 5 L0 9 z" />
+          </marker>
         </defs>
         <g
           className="g-view"
@@ -585,18 +599,24 @@ export function GraphView({
               b = l.target as N;
             if (a.x === undefined || b.x === undefined || !born(a) || !born(b)) return null;
             const lit = focus?.has(a.id) && focus.has(b.id) && (a.id === lead || b.id === lead);
+            // "a builds on b" runs from b, the foundation, to the edge of a's circle, where its arrow points
+            const arrow = l.kind === "builds-on";
+            const [from, to] = arrow ? [b, a] : [a, b];
+            const length = Math.hypot(to.x! - from.x!, to.y! - from.y!) || 1;
+            const short = arrow ? radius(to) + 2 : 0;
             return (
               <line
                 // biome-ignore lint/suspicious/noArrayIndexKey: edges are rebuilt whole with the graph
                 key={i}
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
+                x1={from.x}
+                y1={from.y}
+                x2={to.x! - ((to.x! - from.x!) * short) / length}
+                y2={to.y! - ((to.y! - from.y!) * short) / length}
                 className="g-edge"
                 data-kind={l.kind}
                 data-lit={lit || undefined}
                 data-dim={(focus ? !lit : !!q) || undefined}
+                markerEnd={arrow ? `url(#${icons}-arrow)` : undefined}
               />
             );
           })}

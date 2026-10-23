@@ -170,14 +170,23 @@ export interface Resolved {
 }
 /** A concept with how well it is known right now, and how many cards it has. */
 export type ConceptView = Concept & { mastery: number | null; cards?: number };
+/** A concept named with how well it is known. */
+export interface ConceptBrief {
+  id: string;
+  title: string;
+  mastery: number | null;
+}
 /** A concept's page. */
-export type ConceptDetail = Omit<Concept, "sources" | "related"> & {
+export type ConceptDetail = Omit<Concept, "sources" | "related" | "buildsOn"> & {
   sources: (SourceRef & { title?: string })[];
   mastery: number | null;
   cards: CardView[];
   notes: Note[];
-  related: { id: string; title: string; mastery: number | null }[];
-  backlinks: { id: string; title: string; mastery: number | null }[];
+  /** What it needs first, and what needs it. */
+  buildsOn: ConceptBrief[];
+  leadsTo: ConceptBrief[];
+  related: ConceptBrief[];
+  backlinks: ConceptBrief[];
 };
 export interface MemoryState {
   s: number;

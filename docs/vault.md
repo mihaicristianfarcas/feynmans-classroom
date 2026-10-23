@@ -35,7 +35,7 @@ are not (`.gitignore` keeps a managed block).
 Notes, concepts, flashcards, annotations, sessions with the tutor and kept figures are all
 **documents**: a Markdown file with the same frontmatter (`id`, `kind`, `type`, `title`, `tags`,
 `aliases`, `about`, `related`, `concepts`, `source`, `created`, `updated`), plus a few fields of the
-kind's own (a concept's `summary`, a card's `deck`, an annotation's `request`…). The vault's
+kind's own (a concept's `summary` and `builds-on`, a card's `deck`, an annotation's `request`…). The vault's
 `AGENTS.md` lists them all. Because they share one shape, they share everything built on it:
 links and backlinks, renames that carry links along, search, the generated indexes, version history,
 and one API (`/api/docs`) to list, read, make, change and delete them. What a kind does beyond that

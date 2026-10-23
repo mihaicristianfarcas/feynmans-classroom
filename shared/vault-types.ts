@@ -81,13 +81,16 @@ export interface Note extends DocBase {
   score?: number;
 }
 
-/** Concepts: one page per idea (concepts/<Name>.md); `related` links the concepts it builds on. */
+/** Concepts: one page per idea (concepts/<Name>.md); `builds-on` links the concepts it needs first,
+ * `related` the ones it is close to or contrasts with. */
 export interface Concept extends DocBase {
   kind: "concept";
   /** One or two sentences. */
   summary: string;
   /** Where in the books it comes up. */
   sources: SourceRef[];
+  /** The concepts a learner needs first ("[[Bayes' rule]]"), kept as `builds-on`. */
+  buildsOn: string[];
 }
 
 /** Flashcards (cards/*.md): the body is "## Front" and "## Back". Their memory state is replayed from

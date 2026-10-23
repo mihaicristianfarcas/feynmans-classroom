@@ -36,7 +36,8 @@ export interface Edge {
   to: string | null;
   toPath?: string;
   target: string;
-  kind: "link" | "embed" | "related" | "about" | "ai" | "mentions" | "source" | "concept";
+  /** builds-on: from a concept to one it needs first. */
+  kind: "link" | "embed" | "related" | "about" | "ai" | "mentions" | "source" | "concept" | "builds-on";
   line: number;
 }
 
@@ -203,8 +204,8 @@ function conceptOf(ref: string): Doc | undefined {
   return r?.kind === "concept" ? docs.get(r.id) : undefined;
 }
 
-/** Every link in the vault: written in bodies, kept in frontmatter (related, about), to the concepts a
- * document is about, and to the books it comes from. */
+/** Every link in the vault: written in bodies, kept in frontmatter (related, about, a concept's
+ * builds-on), to the concepts a document is about, and to the books it comes from. */
 export function allEdges(): Edge[] {
   if (edgesCache) return edgesCache;
   const edges: Edge[] = [];
@@ -230,6 +231,11 @@ export function allEdges(): Edge[] {
       const r = resolveLink(target);
       edges.push({ from, fromPath, to: r?.node ?? null, toPath: r?.path, target, kind: "about", line: 1 });
     }
+    if (d.kind === "concept")
+      for (const target of linksInValue(d.buildsOn)) {
+        const r = resolveLink(target);
+        edges.push({ from, fromPath, to: r?.node ?? null, toPath: r?.path, target, kind: "builds-on", line: 1 });
+      }
     for (const ref of d.concepts) {
       const concept = conceptOf(ref);
       if (concept && concept.id !== d.id)
@@ -275,7 +281,7 @@ export function backlinks(
     }
     const lines = files.get(e.fromPath)!;
     // a link kept in the frontmatter has no line of text around it worth showing
-    const inProperties = ["about", "related", "ai", "mentions", "source", "concept"].includes(e.kind);
+    const inProperties = ["about", "related", "ai", "mentions", "source", "concept", "builds-on"].includes(e.kind);
     out.push({
       from: e.from,
       path: e.fromPath,
@@ -335,8 +341,21 @@ export function carryLinks(oldKeys: string[], next: { name: string; path: string
     const body = rewriteLinks(d.body, rename);
     const related = d.related.map((r) => rewriteLinks(r, rename));
     const about = d.about.map((r) => rewriteLinks(r, rename));
-    if (body !== d.body || related.some((r, i) => r !== d.related[i]) || about.some((r, i) => r !== d.about[i])) {
-      docs.save(Object.assign(d, body !== d.body ? withBody(d, body) : {}, { related, about }));
+    const buildsOn = d.kind === "concept" ? d.buildsOn.map((r) => rewriteLinks(r, rename)) : [];
+    if (
+      body !== d.body ||
+      related.some((r, i) => r !== d.related[i]) ||
+      about.some((r, i) => r !== d.about[i]) ||
+      (d.kind === "concept" && buildsOn.some((r, i) => r !== d.buildsOn[i]))
+    ) {
+      docs.save(
+        Object.assign(
+          d,
+          body !== d.body ? withBody(d, body) : {},
+          { related, about },
+          d.kind === "concept" ? { buildsOn } : {},
+        ),
+      );
       count++;
     }
   }

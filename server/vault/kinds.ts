@@ -159,16 +159,20 @@ const NOTE: KindSpec<Note> = {
 const CONCEPT: KindSpec<Concept> = {
   folder: /^concepts\//,
   titleIsFileName: true,
-  keys: ["summary", "sources"],
+  keys: ["summary", "builds-on", "sources"],
   read: (doc, data) => ({
     ...doc,
     kind: "concept",
     summary: asString(data.summary),
+    buildsOn: asArray(data["builds-on"]),
     sources: Array.isArray(data.sources)
       ? (data.sources as unknown[]).map(sourceFromYaml).filter((s): s is SourceRef => !!s)
       : [],
   }),
-  write: (c) => ({ data: { summary: c.summary, sources: c.sources.map(sourceToYaml) }, body: c.body }),
+  write: (c) => ({
+    data: { summary: c.summary, "builds-on": c.buildsOn, sources: c.sources.map(sourceToYaml) },
+    body: c.body,
+  }),
   place: (c) => `concepts/${fileNameOf(c.title)}`,
 };
 
