@@ -1,7 +1,8 @@
 /* Flashcards and spaced repetition (retrieval practice + spacing, the two techniques with the
  * strongest evidence behind them: Dunlosky et al. 2013). Cards are documents (cards/*.md); their
  * memory state is replayed from the review log with FSRS-6, so a review never changes the file.
- * Review sessions interleave decks. */
+ * Review sessions interleave decks, and now and then ask a card known for weeks a new way
+ * (variants.ts). */
 import { type MemoryState, preview, type Rating, review } from "../../shared/fsrs.ts";
 import type { Card, SourceRef } from "../../shared/vault-types.ts";
 import { structured } from "../llm/index.ts";
@@ -9,6 +10,7 @@ import { docs, getProfile, logActivity, logReview, reviews } from "../vault/inde
 import { upsertConcept } from "./concepts.ts";
 import { bookContext, learnerSummary, sourceLine } from "./context.ts";
 import { createDoc, updateDoc } from "./docs.ts";
+import { asksNewWay, type CardVariant, forgetVariant, variantOf, writeVariants } from "./variants.ts";
 
 /* ---------------- memory state ---------------- */
 
@@ -65,8 +67,14 @@ function interleave(list: Card[]): Card[] {
   return out;
 }
 
+/** A card in the review queue: one known for weeks is asked a new way, once its question is written. */
+export interface QueuedCard extends CardView {
+  askNewWay?: boolean;
+  variant?: CardVariant;
+}
+
 export interface Queue {
-  cards: CardView[];
+  cards: QueuedCard[];
   due: number;
   fresh: number;
   learning: number;
@@ -92,7 +100,11 @@ export function reviewQueue(opts: { deck?: string; limit?: number; at?: number }
   );
   const ordered = [...learning, ...due, ...fresh].slice(0, opts.limit ?? 200);
   return {
-    cards: ordered.map((c) => viewCard(c, at)),
+    cards: ordered.map((c) =>
+      asksNewWay(c, s.get(c.id) || null)
+        ? { ...viewCard(c, at), askNewWay: true, variant: variantOf(c) }
+        : viewCard(c, at),
+    ),
     due: due.length,
     fresh: fresh.length,
     learning: learning.length,
@@ -100,12 +112,20 @@ export function reviewQueue(opts: { deck?: string; limit?: number; at?: number }
   };
 }
 
-export function rateCard(id: string, rating: Rating, took?: number) {
+/** Rates a review; `variant` when the card was asked a new way. */
+export function rateCard(id: string, rating: Rating, took?: number, variant?: boolean) {
   const card = docs.get(id, "card");
   if (!card) throw new Error("card not found");
   if (![1, 2, 3, 4].includes(rating)) throw new Error("rating must be 1–4");
-  logReview({ card: id, ts: Date.now(), rating, took });
+  logReview({ card: id, ts: Date.now(), rating, took, ...(variant && { variant: true }) });
+  if (variant) forgetVariant(id);
   return viewCard(card);
+}
+
+/** Writes the new questions for those of these cards that are asked a new way, and returns the ready ones. */
+export function cardVariants(ids: string[]): Promise<Record<string, CardVariant>> {
+  const cards = ids.map((id) => docs.get(id, "card")).filter((c): c is Card => !!c && asksNewWay(c, cardState(c.id)));
+  return writeVariants(cards);
 }
 
 /* ---------------- editing ---------------- */

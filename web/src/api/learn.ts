@@ -9,6 +9,7 @@ import type {
   Anchor,
   Annotation,
   AnnotationType,
+  CardVariant,
   CardView,
   Concept,
   ConceptBrief,
@@ -22,6 +23,7 @@ import type {
   Note,
   Practice,
   Profile,
+  QueuedCard,
   Quiz,
   Resolved,
   SavedFigure,
@@ -131,10 +133,14 @@ export const learn = {
   }) => post<CardView[]>("/api/cards/save-drafts", input),
   decks: () => call<{ name: string; count: number }[]>("/api/decks"),
   queue: (deck?: string) =>
-    call<{ cards: CardView[]; due: number; fresh: number; learning: number; total: number }>(
+    call<{ cards: QueuedCard[]; due: number; fresh: number; learning: number; total: number }>(
       `/api/review${deck ? `?deck=${encodeURIComponent(deck)}` : ""}`,
     ),
-  rate: (id: string, rating: 1 | 2 | 3 | 4, took?: number) => post<CardView>(`/api/review/${id}`, { rating, took }),
+  /** The new questions for these cards, once written (cards known for weeks only). */
+  variants: (ids: string[]) => post<Record<string, CardVariant>>("/api/review/variants", { ids }),
+  /** `variant`: the card was asked a new way. */
+  rate: (id: string, rating: 1 | 2 | 3 | 4, took?: number, variant?: boolean) =>
+    post<CardView>(`/api/review/${id}`, { rating, took, variant }),
   quiz: (input: {
     bookId?: string;
     chapterId?: string;

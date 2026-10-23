@@ -1,13 +1,16 @@
 /* Review: flashcards due today, one at a time, interleaved across decks and scheduled with FSRS-6.
  * Space reveals the answer, 1–4 rate it; a quiet bar above picks the deck, asks you to type answers
- * first, or starts the mixed quiz. */
+ * first, or starts the mixed quiz. A card known for weeks is now and then asked a new way (a fresh
+ * question on its idea, written while the first cards are reviewed), its own face shown with the answer
+ * or instead, if the learner asks. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { humanInterval } from "../../../shared/fsrs.ts";
-import { type CardView, learn, type Quiz } from "../api";
+import { learn, type QueuedCard, type Quiz } from "../api";
 import { bookLink } from "../app/navigation";
 import { Spinner } from "../components/feedback";
 import { Markdown } from "../components/Markdown";
 import { QuizRunner } from "../components/Quiz";
+import { announce } from "../lib/a11y";
 import { useLoad } from "../lib/useLoad";
 import { under, useVaultEvents } from "../lib/useVaultEvents";
 
@@ -18,38 +21,67 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
   const [deck, setDeck] = useState(query.get("deck") || "");
   const { data: decks, reload: reloadDecks } = useLoad(() => learn.decks());
   useVaultEvents(reloadDecks, under("cards/"));
-  const [queue, setQueue] = useState<CardView[] | null>(null);
+  const [queue, setQueue] = useState<QueuedCard[] | null>(null);
   const [stats, setStats] = useState({ done: 0, again: 0 });
   const [revealed, setRevealed] = useState(false);
   const [typing, setTyping] = useState(() => localStorage.getItem("classroom-type-answers") === "1");
   const [typed, setTyped] = useState("");
+  /** Show the card itself, not the new question. */
+  const [plain, setPlain] = useState(false);
+  const revealButton = useRef<HTMLButtonElement>(null);
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [quizLoading, setQuizLoading] = useState(false);
   const shownAt = useRef(Date.now());
 
-  const load = useCallback(() => {
+  useEffect(() => {
+    let current = true; // a deck picked since (or the effect undone) drops what this one asked for
     setQueue(null);
-    learn.queue(deck || undefined).then((q) => setQueue(q.cards));
+    learn.queue(deck || undefined).then((q) => {
+      if (!current) return;
+      setQueue(q.cards);
+      // the new questions are written while the first cards are reviewed; the card on screen keeps its face
+      const ids = q.cards
+        .slice(1)
+        .filter((c) => c.askNewWay && !c.variant)
+        .map((c) => c.id);
+      if (ids.length)
+        learn
+          .variants(ids)
+          .then((found) => {
+            if (!current) return;
+            setQueue(
+              (list) =>
+                list?.map((c, i) =>
+                  i > 0 && c.askNewWay && !c.variant && found[c.id] ? { ...c, variant: found[c.id] } : c,
+                ) ?? null,
+            );
+          })
+          .catch(() => {}); // they are asked by their face
+    });
+    return () => {
+      current = false;
+    };
   }, [deck]);
-  useEffect(load, [load]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs once, for the query the page was opened with
   useEffect(() => {
     if (query.get("mixed")) startMixed();
   }, []);
 
   const card = queue?.[0];
+  const asked = card?.variant && !plain ? card.variant : undefined;
   // biome-ignore lint/correctness/useExhaustiveDependencies: resets the answer state when the next card comes up
   useEffect(() => {
     shownAt.current = Date.now();
     setRevealed(false);
     setTyped("");
+    setPlain(false);
   }, [card?.id]);
 
   const rate = useCallback(
     async (rating: 1 | 2 | 3 | 4) => {
       if (!card) return;
       const took = Math.round((Date.now() - shownAt.current) / 1000);
-      const updated = await learn.rate(card.id, rating, took);
+      const updated = await learn.rate(card.id, rating, took, !!asked);
       setStats((s) => ({ done: s.done + 1, again: s.again + (rating === 1 ? 1 : 0) }));
       setQueue((q) => {
         if (!q) return q;
@@ -61,7 +93,7 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
       });
       window.dispatchEvent(new Event("classroom:reviewed"));
     },
-    [card],
+    [card, asked],
   );
 
   useEffect(() => {
@@ -169,8 +201,31 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
             >
               {card.deck}
             </span>
+            {asked && (
+              <span className="flash-asked fine">
+                Known for weeks, so asked a new way
+                {!revealed && (
+                  <button
+                    type="button"
+                    className="button subtle small"
+                    onClick={() => {
+                      setPlain(true);
+                      revealButton.current?.focus();
+                      announce("The card itself");
+                    }}
+                  >
+                    Show the card
+                  </button>
+                )}
+              </span>
+            )}
           </div>
-          <Markdown text={card.front} theme={theme} className="flash-front" hideCloze={!revealed} />
+          <Markdown
+            text={asked ? asked.question : card.front}
+            theme={theme}
+            className="flash-front"
+            hideCloze={!revealed}
+          />
           {typing && !revealed && (
             <textarea
               className="flash-typed"
@@ -194,8 +249,15 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
                 </div>
               )}
               <div className="flash-back">
-                <Markdown text={card.back} theme={theme} />
+                <Markdown text={asked ? asked.answer : card.back} theme={theme} />
               </div>
+              {asked && (
+                <div className="flash-card">
+                  <span className="eyebrow">The card</span>
+                  <Markdown text={card.front} theme={theme} />
+                  <Markdown text={card.back} theme={theme} className="flash-card-back" />
+                </div>
+              )}
               {card.source?.bookId && (
                 <a className="fine" href={bookLink(card.source)}>
                   From the book{card.source.quote ? `: “${card.source.quote.slice(0, 90)}…”` : ""}
@@ -212,7 +274,12 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
               </div>
             </>
           ) : (
-            <button type="button" className="button primary reveal" onClick={() => setRevealed(true)}>
+            <button
+              type="button"
+              className="button primary reveal"
+              ref={revealButton}
+              onClick={() => setRevealed(true)}
+            >
               Show answer <kbd>space</kbd>
             </button>
           )}

@@ -1,11 +1,21 @@
 /* Routes for flashcards and review: browsing them with their memory state, making them (by hand, or
- * drafted from a passage by a model), the review queue and ratings (scheduled with FSRS-6), and the
- * decks. (Changing or deleting one is what every document does: routes/docs.ts.) */
+ * drafted from a passage by a model), the review queue and ratings (scheduled with FSRS-6), the new
+ * questions for cards known for weeks, and the decks. (Changing or deleting one is what every
+ * document does: routes/docs.ts.) */
 import type { Hono } from "hono";
 import type { Card, Note } from "../../shared/vault-types.ts";
 import { getBook } from "../books/store.ts";
 import { readBody } from "../http.ts";
-import { deckCounts, draftCards, listCards, rateCard, reviewQueue, saveDrafts, saveNewCards } from "../learn/cards.ts";
+import {
+  cardVariants,
+  deckCounts,
+  draftCards,
+  listCards,
+  rateCard,
+  reviewQueue,
+  saveDrafts,
+  saveNewCards,
+} from "../learn/cards.ts";
 
 type NewCard = Partial<Card> & { front: string; back: string };
 
@@ -31,9 +41,14 @@ export function cardRoutes(app: Hono) {
   });
 
   app.get("/api/review", (c) => c.json(reviewQueue({ deck: c.req.query("deck") || undefined })));
+  /** Answers once the questions are written (the page goes on reviewing meanwhile). */
+  app.post("/api/review/variants", async (c) => {
+    const b = await readBody<{ ids?: string[] }>(c);
+    return c.json(await cardVariants(b.ids || []));
+  });
   app.post("/api/review/:id", async (c) => {
-    const b = await readBody<{ rating: 1 | 2 | 3 | 4; took?: number }>(c);
-    return c.json(rateCard(c.req.param("id"), b.rating, b.took));
+    const b = await readBody<{ rating: 1 | 2 | 3 | 4; took?: number; variant?: boolean }>(c);
+    return c.json(rateCard(c.req.param("id"), b.rating, b.took, b.variant === true));
   });
   app.get("/api/decks", (c) => c.json(deckCounts()));
 }
