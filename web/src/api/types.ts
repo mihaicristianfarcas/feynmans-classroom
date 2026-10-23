@@ -202,6 +202,13 @@ export type CardView = Card & {
   state: MemoryState | null;
   next?: Record<1 | 2 | 3 | 4, number>;
 };
+/** A fresh question on a card's idea, for a card known for weeks (server/learn/variants.ts). */
+export interface CardVariant {
+  question: string;
+  answer: string;
+}
+/** A card in the review queue: one known for weeks is asked a new way, once its question is written. */
+export type QueuedCard = CardView & { askNewWay?: boolean; variant?: CardVariant };
 export interface DraftCard {
   front: string;
   back: string;

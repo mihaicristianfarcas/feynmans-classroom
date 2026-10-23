@@ -152,6 +152,8 @@ export interface ReviewLog {
   rating: 1 | 2 | 3 | 4;
   /** Seconds to answer. */
   took?: number;
+  /** Asked a new way (a fresh question on the card's idea), not by its face. */
+  variant?: boolean;
 }
 
 export type ActivityType =
