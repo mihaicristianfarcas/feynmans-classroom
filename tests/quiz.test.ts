@@ -52,4 +52,18 @@ describe("quizzes in notes", () => {
     expect(md).toContain(">    - Correct: Leaderless. Writes go to several replicas directly.");
     expect(md).toContain("> 2. ✓ What is replication lag?");
   });
+  it("leave an answer the grader couldn't check out of the score", () => {
+    const quiz = quizFromData(parse(quizBlocks(NOTE)[0]));
+    const md = attemptMarkdown(
+      quiz,
+      [
+        { choice: 2, score: 1 },
+        { text: "lag", score: 0, unchecked: true },
+      ],
+      new Date("2026-10-13T10:00:00Z"),
+    );
+    expect(md.split("\n")[0]).toBe("> [!attempt]- 2026-10-13 · 1/1 · Replication, check yourself");
+    expect(md).toContain("> 2. – What is replication lag? (not checked)");
+    expect(md).toContain(">    - Mine: lag");
+  });
 });

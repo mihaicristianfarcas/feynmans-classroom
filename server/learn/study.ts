@@ -119,9 +119,13 @@ export async function gradeShortAnswers(items: { question: string; ideal: string
 ${items.map((it, i) => `${i + 1}. Question: ${it.question}\n   Model answer: ${it.ideal}\n   Learner's answer: ${it.answer || "(blank)"}`).join("\n\n")}
 
 Return JSON with one result per answer, in order.`;
-  return (
+  const { results } = (
     await structured<{ results: { score: number; feedback: string }[] }>({ prompt, schema: GRADE_SCHEMA, tier: "fast" })
-  ).data.results;
+  ).data;
+  // a reply that doesn't grade every answer is the grader failing, not the learner: say so, score nothing
+  if (results.length !== items.length || results.some((r) => !Number.isFinite(r.score)))
+    throw new Error("The grader's reply didn't score every answer. Try again.");
+  return results.map((r) => ({ ...r, score: Math.max(0, Math.min(1, r.score)) }));
 }
 
 export function recordQuiz(input: {
