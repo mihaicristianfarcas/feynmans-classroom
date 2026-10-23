@@ -76,11 +76,13 @@ export function knowledgeGraph(): { nodes: GraphNode[]; edges: GraphEdge[] } {
   }
   const ids = new Set(nodes.map((n) => n.id));
   const edges: GraphEdge[] = [];
-  const seen = new Set<string>();
+  /** Where the edge between two things is in the list. */
+  const at = new Map<string, number>();
+  const pair = (e: GraphEdge) => [e.from, e.to].sort().join("|");
+  const valid = (e: GraphEdge) => e.from !== e.to && ids.has(e.from) && ids.has(e.to);
   const add = (e: GraphEdge) => {
-    const key = [e.from, e.to].sort().join("|");
-    if (e.from === e.to || !ids.has(e.from) || !ids.has(e.to) || seen.has(key)) return;
-    seen.add(key);
+    if (!valid(e) || at.has(pair(e))) return;
+    at.set(pair(e), edges.length);
     edges.push(e);
   };
   // the strongest kind of link between two things is the one drawn: written links first
@@ -97,11 +99,20 @@ export function knowledgeGraph(): { nodes: GraphNode[]; edges: GraphEdge[] } {
   ];
   const all = allEdges().filter((e) => e.to);
   for (const kind of order) for (const e of all) if (e.kind === kind) add({ from: e.from, to: e.to!, kind: e.kind });
+  // a suggestion is always there to decide on: it takes the place of a weaker link between the same two,
+  // or goes beside a stronger one
+  const weaker = new Set<GraphEdge["kind"]>(["related", "about", "concept", "mentions", "source"]);
   for (const c of listConnections()) {
     if (c.status !== "suggested") continue;
     const from = docs.at(c.from);
     const to = resolveLink(c.to);
-    if (from && to) add({ from: `${from.kind}:${from.id}`, to: to.node, kind: "suggested", id: c.id, why: c.why });
+    if (!from || !to) continue;
+    const e: GraphEdge = { from: `${from.kind}:${from.id}`, to: to.node, kind: "suggested", id: c.id, why: c.why };
+    if (!valid(e)) continue;
+    const i = at.get(pair(e));
+    if (i === undefined) add(e);
+    else if (weaker.has(edges[i].kind)) edges[i] = e;
+    else edges.push(e);
   }
   return { nodes, edges };
 }
