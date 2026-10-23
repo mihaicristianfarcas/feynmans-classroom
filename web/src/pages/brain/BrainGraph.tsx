@@ -1,10 +1,11 @@
 /* The Brain's graph, filling the page: a field at the top to find an item (⌘K goes to it here; pressed
  * again, the search of everything opens), the graph, and a card at the left for whatever you pick (Escape
- * closes it and gives focus back to the item; its edge resizes it). In the graph's corner: the legend (a
- * card like it at the right, saying what the marks mean), the links the agent suggests (with how many
- * wait), a replay of how the graph grew, and zoom. */
+ * closes it and gives focus back to the item; its edge resizes it), with the item moved to the middle of
+ * the graph left in view (above the card, on a phone, where it's a sheet). In the graph's corner: the
+ * legend (a card like it at the right, saying what the marks mean), the links the agent suggests (with
+ * how many wait), a replay of how the graph grew, and zoom. */
 import { Info, Pause, Play, Sparkles } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { learn } from "../../api";
 import { Loading } from "../../components/feedback";
 import { GraphView } from "../../components/GraphView";
@@ -107,6 +108,26 @@ export function BrainGraph({ theme }: { theme: "light" | "dark" }) {
         document.querySelector<SVGElement>(`[data-node="${CSS.escape(selected)}"]`)?.focus({ preventScroll: true }),
       );
   };
+
+  // on a phone the card (or the legend) is a sheet along the bottom: how much of the graph it covers
+  const [sheet, setSheet] = useState(0);
+  const sheetOf = !narrow ? null : card ? ("node" in card ? "item" : "suggestions") : legend.open ? "legend" : null;
+  useLayoutEffect(() => {
+    // each kind of card is its own element: found again when the kind changes
+    const el = sheetOf
+      ? document.querySelector<HTMLElement>(".brain-stage > :is(.node-card, .legend-card):not([data-leaving])")
+      : null;
+    if (!el) {
+      setSheet(0);
+      return;
+    }
+    // its height, and the gap under it (as in .node-card)
+    const measure = () => setSheet(el.offsetHeight + 8);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [sheetOf]);
 
   // the replay: how the graph grew, from its first item to now
   const [until, setUntil] = useState<number | null>(null);
@@ -230,6 +251,7 @@ export function BrainGraph({ theme }: { theme: "light" | "dark" }) {
           selected={selected}
           inset={legend.open && !narrow ? legend.width + CARD_GAP : 0}
           insetLeft={card && !narrow ? cardSize.width + CARD_GAP : 0}
+          insetBottom={sheet}
           onSelect={(n, keyboard) => (n ? open({ node: n.id }, keyboard) : close())}
           tools={
             <>
