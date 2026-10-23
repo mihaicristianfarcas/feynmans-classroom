@@ -12,26 +12,33 @@ import { detectChapters } from "../ingest/chapters.ts";
 import { formatOf, ingestBook } from "../ingest/index.ts";
 import { queue } from "../jobs.ts";
 import { bookNote } from "../learn/notes.ts";
+import { bookProgress, lastTouched } from "../learn/progress.ts";
 import { type ReadingPing, recordReading } from "../learn/reading.ts";
-import { logActivity } from "../vault/index.ts";
+import { activity, docs, logActivity } from "../vault/index.ts";
 import { exportBook } from "../vault/library.ts";
 
 const MAX_UPLOAD = 200 * 1024 * 1024;
 
 export function bookRoutes(app: Hono) {
-  /** Every book, with how many of its figures are ready and how many are being made. */
-  app.get("/api/books", (c) =>
-    c.json(
+  /** Every book, with how many of its figures are ready (the chapter's and those drawn in the margin) and
+   * how many are being made, how far through it the learner is, and when they last did anything with it. */
+  app.get("/api/books", (c) => {
+    const acts = activity();
+    const drawn = docs.list("annotation").filter((a) => a.type === "visualize" && a.status === "ready");
+    return c.json(
       listBooks().map((book) => {
         const demos = listDemos(book.id);
         return {
           ...book,
-          demoCount: demos.filter((d) => d.status === "ready").length,
+          demoCount:
+            demos.filter((d) => d.status === "ready").length + drawn.filter((a) => a.source.bookId === book.id).length,
           building: demos.filter((d) => !["ready", "failed"].includes(d.status)).length,
+          progress: bookProgress(book.id),
+          lastOpened: lastTouched(book.id, acts),
         };
       }),
-    ),
-  );
+    );
+  });
 
   /** Titles and chapters only, for pickers. */
   app.get("/api/books-lite", (c) =>

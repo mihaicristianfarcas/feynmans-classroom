@@ -1,9 +1,10 @@
 /* Progress through a book, and an honest pace: how far through it the learner's place is, and when
  * they'd reach the end at the pace of the last two weeks, said roughly ("about 5 weeks") and never as a
- * promise. Mathua's lesson: pace from recent real work, not from a plan. It comes from the reading
+ * promise; and when the learner last did anything with it (for the library's "recent" order). Mathua's lesson: pace from recent real work, not from a plan. It comes from the reading
  * sittings in the activity log (reading.ts), each ending at a position in the book; with too little
  * recent reading to go on, there is no estimate. */
 
+import type { Activity } from "../../shared/vault-types.ts";
 import { getBook } from "../books/store.ts";
 import type { Book } from "../books/types.ts";
 import { activity } from "../vault/index.ts";
@@ -63,4 +64,11 @@ export function bookProgress(bookId: string, now = Date.now()): BookProgress | n
   const gained = last.at - from;
   if (gained < 0.005) return { fraction: last.at }; // no headway to speak of: no estimate
   return { fraction: last.at, finishIn: roughly((1 - last.at) / (gained / WINDOW)) };
+}
+
+/** When the learner last did anything with a book (read it, highlighted, asked, drew), from the activity
+ * log (pass it in when asking about many books); null when nothing was done with it yet. */
+export function lastTouched(bookId: string, acts: Activity[] = activity()): number | null {
+  for (let i = acts.length - 1; i >= 0; i--) if (acts[i].bookId === bookId) return acts[i].ts;
+  return null;
 }

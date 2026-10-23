@@ -1,6 +1,7 @@
 // Progress through a book and an honest pace: how far a position is through a PDF or a reflowable book,
 // rough durations, an estimate only from two or more days of recent reading that got somewhere (and a
-// slower one for a book begun since), the end of a book, and the line Today shows.
+// slower one for a book begun since), the end of a book, the line Today shows and the progress beside each of
+// its books, and when a book was last touched.
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -127,5 +128,29 @@ describe("Today", () => {
       detail:
         "You were in Chapter 3, 40% of the way through. At your pace over the last two weeks, about 6 weeks to the end.",
     });
+    expect(today().books.find((b) => b.id === "latest")?.progress).toEqual({
+      fraction: 0.4,
+      finishIn: "about 6 weeks",
+    });
+  });
+});
+
+describe("where you were in a book", () => {
+  it("is where you last read, whatever was done with the book since", () => {
+    book("since", { title: "Optics" });
+    read("since", 2, 0.3, "Chapter 4");
+    V.logActivity({ type: "highlight", bookId: "since", ts: Date.now() - 1000, text: "Highlighted" });
+    expect(today().books.find((b) => b.id === "since")).toMatchObject({ chapter: "Chapter 4", position: 31 });
+  });
+});
+
+describe("when a book was last touched", () => {
+  it("is the latest thing done with it, of any kind", () => {
+    book("touched");
+    expect(P.lastTouched("touched")).toBeNull();
+    read("touched", 3, 0.1);
+    const ts = Date.now() - DAY;
+    V.logActivity({ type: "highlight", bookId: "touched", ts, text: "Highlighted" });
+    expect(P.lastTouched("touched")).toBe(ts);
   });
 });
