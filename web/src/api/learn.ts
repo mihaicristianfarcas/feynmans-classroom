@@ -11,6 +11,7 @@ import type {
   AnnotationType,
   CardView,
   Concept,
+  ConceptBrief,
   ConceptDetail,
   ConceptView,
   DraftCard,
@@ -112,6 +113,8 @@ export const learn = {
   agentDiff: (id: string) => call<{ diff: string }>(`/api/agents/${id}/diff`),
   concepts: () => call<ConceptView[]>("/api/concepts"),
   concept: (id: string) => call<ConceptDetail>(`/api/concepts/${id}`),
+  /** What these concepts (names or ids) build on, weakest first. */
+  foundations: (concepts: string[]) => post<ConceptBrief[]>("/api/concepts/foundations", { concepts }),
   extractConcepts: (bookId: string, chapterId: string) =>
     post<Concept[]>(`/api/books/${bookId}/chapters/${chapterId}/concepts`),
   cards: (filter: { deck?: string; concept?: string } = {}) =>
@@ -138,6 +141,8 @@ export const learn = {
     source?: SourceRef;
     mode: "check" | "pretest" | "review";
     count?: number;
+    /** review: only these concepts (names or ids). */
+    concepts?: string[];
   }) => post<Quiz>("/api/quiz", input),
   gradeShort: (items: { question: string; ideal: string; answer: string }[]) =>
     post<{ score: number; feedback: string }[]>("/api/quiz/grade", { items }),

@@ -7,7 +7,7 @@
 import type { SourceRef } from "../../shared/vault-types.ts";
 import { structured, text } from "../llm/index.ts";
 import { docs, logActivity, shortId } from "../vault/index.ts";
-import { upsertConcept } from "./concepts.ts";
+import { findConcept, upsertConcept } from "./concepts.ts";
 import {
   type BookContext,
   bookContext,
@@ -74,12 +74,19 @@ export async function makeQuiz(input: {
   source?: SourceRef;
   mode: "check" | "pretest" | "review";
   count?: number;
+  /** review: only these concepts (names or ids), as a refresher before what builds on them. */
+  concepts?: string[];
 }) {
   let ctx: BookContext = { source: {}, context: "" };
   if (input.mode === "review") {
-    // interleaved review across everything the learner has met, weakest first (then what hasn't been tested)
+    // interleaved review across everything the learner has met (or the concepts asked for), weakest
+    // first (then what hasn't been tested)
+    const only = input.concepts?.length
+      ? new Set(input.concepts.map((name) => findConcept(name)?.id).filter(Boolean))
+      : null;
     const known = docs
       .list("concept")
+      .filter((c) => !only || only.has(c.id))
       .map((c) => ({ c, m: conceptMastery(c.id) }))
       .sort((a, b) => (a.m ?? 2) - (b.m ?? 2))
       .slice(0, 60);

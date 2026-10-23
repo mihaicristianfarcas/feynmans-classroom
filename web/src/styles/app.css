@@ -907,6 +907,10 @@
   font-size: 14px;
   color: var(--ink-2);
 }
+/* in the results' grid, its gap spaces the line on what the misses build on */
+.quiz-done .notice {
+  margin: 0;
+}
 .missed {
   list-style: none;
   padding: 0;

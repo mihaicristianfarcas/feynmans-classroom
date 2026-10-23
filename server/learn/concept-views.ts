@@ -1,11 +1,12 @@
 /* What the concept pages show: every concept with how well it's known right now, and one concept
  * with its cards, the notes that link to it, what it builds on and leads to, related concepts and the
- * passages it came from. */
+ * passages it came from; and what a set of concepts builds on, to refresh before them. */
 import type { Concept } from "../../shared/vault-types.ts";
 import { getBook } from "../books/store.ts";
 import { docs } from "../vault/index.ts";
 import { allEdges } from "../vault/links.ts";
 import { viewCard } from "./cards.ts";
+import { findConcept } from "./concepts.ts";
 import { conceptMastery } from "./context.ts";
 
 /** Every concept, by name, with its mastery and how many cards it has. */
@@ -56,4 +57,17 @@ export function conceptDetail(c: Concept) {
     related: related.filter((x) => !directed.has(x.id)).map(brief),
     backlinks: linkedFrom.filter((x) => !directed.has(x.id)).map(brief),
   };
+}
+
+/** What these concepts (names, aliases or ids) build on, besides each other, weakest first: what to
+ * refresh before them. Never-studied ones come last. */
+export function foundations(refs: string[]) {
+  const ids = new Set(refs.map((r) => findConcept(r)?.id).filter((id): id is string => !!id));
+  const out = new Map<string, Concept>();
+  for (const e of allEdges()) {
+    if (e.kind !== "builds-on" || !e.to || !ids.has(e.from.replace(/^concept:/, ""))) continue;
+    const c = concept(e.to);
+    if (c && !ids.has(c.id)) out.set(c.id, c);
+  }
+  return [...out.values()].map(brief).sort((a, b) => (a.mastery ?? 2) - (b.mastery ?? 2));
 }
