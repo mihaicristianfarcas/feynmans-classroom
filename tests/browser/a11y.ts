@@ -584,12 +584,13 @@ try {
     }
     await open(page, "#/brain", theme);
     await page.click('.graph-tools [aria-label="Legend"]');
-    await page.evaluate(() =>
-      document.querySelector("[data-node] .g-disc")?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })),
-    );
-    await page.evaluate(() =>
-      document.querySelector("[data-node] .g-disc")?.dispatchEvent(new PointerEvent("pointerup", { bubbles: true })),
-    );
+    // a press on an item, as it comes: down, up, then the click that picks it
+    await page.evaluate(() => {
+      const disc = document.querySelector("[data-node] .g-disc");
+      disc?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      disc?.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+      disc?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
     await wait(500);
     check(
       `axe: the Brain's legend and a card (${theme})`,

@@ -53,7 +53,8 @@ opens at one. Notes on a phone are the list or the note, with a way back to the 
 The agent is one field over any page (⌘J), never a page or a form of its own: a request, a short
 reply, the change shown where it lands. The Brain is the graph alone, filling the window, with Find
 at the top (⌘K there), the item you pick in a card at its left and, if you open it, the legend in a
-card like it at its right; each item is its kind's icon in a circle, with its name beside it.
+card like it at its right; each item is its kind's icon in a circle, with its name beside it. The item
+you pick glides to the middle of the graph the cards leave in view (above the card, on a phone).
 Secondary controls stay quiet (subtle buttons, a disclosure for advanced settings) and explanations
 are one line.
 
