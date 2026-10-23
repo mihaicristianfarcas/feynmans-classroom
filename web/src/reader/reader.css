@@ -1,5 +1,6 @@
 /* The reader: the book on the right, the study panel on the left (margin, figures, note, tutor,
- * study), the selection menu, marks on the page and the capture tool. Tokens from styles.css. */
+ * study), the selection menu, marks on the page and the capture tool. The book's text follows the
+ * reading settings (--read-font, --read-size, --read-measure). Tokens from styles.css. */
 
 .reader-app {
   height: 100%;
@@ -12,28 +13,29 @@
 .topbar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 52px;
-  padding: 0 10px;
+  gap: var(--space-2xs);
+  height: var(--nav-h);
+  padding: 0 var(--space-sm);
   border-bottom: 1px solid var(--line);
   background: var(--bg);
   min-width: 0;
 }
 .book-name {
   flex: 0 1 auto;
-  max-width: 24vw;
-  margin: 0 6px 0 2px;
+  max-width: 26vw;
+  margin: 0 var(--space-xs) 0 var(--space-2xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 600 14.5px / 1.2 var(--serif);
+  font: 600 1.0625rem / 1.2 var(--serif);
+  letter-spacing: -0.01em;
   color: var(--ink);
 }
 .topbar-sep {
   width: 1px;
   height: 20px;
-  margin: 0 4px;
-  background: var(--line);
+  margin: 0 var(--space-xs);
+  background: var(--line-strong);
   flex: none;
 }
 .toc-select {
@@ -41,21 +43,21 @@
   max-width: 30vw;
   min-width: 0;
   height: 32px !important;
-  box-shadow: none !important;
   background-color: transparent !important;
   font-weight: 500 !important;
-  font-size: 13.5px !important;
+  font-size: var(--text-sm) !important;
   color: var(--ink-2) !important;
 }
 .toc-select:focus-visible {
-  box-shadow: 0 0 0 3px var(--focus) !important;
+  outline: 2px solid var(--focus);
+  outline-offset: 0;
 }
 .toc-select.narrow {
   max-width: 17vw;
 }
 .page-label {
-  padding: 0 6px;
-  font: 500 12.5px var(--sans);
+  padding: 0 var(--space-xs);
+  font: 500 var(--text-xs) var(--sans);
   color: var(--ink-3);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -64,50 +66,50 @@
 .page-jump {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-2xs);
 }
+/* the page: a small field, its edge drawn (3:1) so it reads as one you can type a page into */
 .page-jump input,
 .page-jump input:focus {
   height: 26px;
   width: auto;
-  padding: 0 5px;
+  padding: 0 var(--space-2xs);
   text-align: center;
-  font: 500 12.5px var(--sans);
+  font: 500 var(--text-xs) var(--sans);
   font-variant-numeric: tabular-nums;
-  color: var(--ink-2);
-  background: transparent;
-  box-shadow: none;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--field-edge);
   field-sizing: content;
   min-width: 2.2em;
-}
-.page-jump input:hover {
-  box-shadow: inset 0 0 0 1px var(--line);
 }
 .page-jump input:focus-visible,
 .page-jump input:focus {
   background: var(--surface);
-  box-shadow:
-    inset 0 0 0 1px var(--accent-ink),
-    0 0 0 3px var(--focus);
+  outline: 2px solid var(--focus);
+  outline-offset: 0;
 }
-/* the zoom: smaller, the scale (fit to the pane), bigger */
+/* the zoom: smaller, the scale (fit to the pane), bigger, on one quiet tray */
 .zoom-group {
   display: inline-flex;
   align-items: center;
   gap: 0;
-  margin: 0;
-  padding: 0;
+  margin: 0 var(--space-2xs);
+  padding: var(--space-3xs);
   border: 0;
+  border-radius: var(--r-lg);
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .zoom-value {
   appearance: none;
   min-width: 46px;
   height: 26px;
-  padding: 0 4px;
+  padding: 0 var(--space-2xs);
   border: 0;
   border-radius: 7px;
   background: none;
-  font: 500 12.5px var(--sans);
+  font: 500 var(--text-xs) var(--sans);
   font-variant-numeric: tabular-nums;
   color: var(--ink-3);
   cursor: pointer;
@@ -130,9 +132,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-3xs);
   width: min(420px, calc(100% - 60px));
-  padding: 6px;
+  padding: var(--space-xs);
   border-radius: var(--r-lg);
   background: var(--raised);
   box-shadow: var(--shadow-lg);
@@ -154,9 +156,9 @@
 }
 .find-count {
   min-width: 62px;
-  padding: 0 6px;
+  padding: 0 var(--space-xs);
   text-align: right;
-  font: 500 12px var(--sans);
+  font: 500 var(--text-xs) var(--sans);
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -165,7 +167,7 @@
 .find-list {
   flex-basis: 100%;
   max-height: min(52vh, 440px);
-  margin: 4px 0 0;
+  margin: var(--space-2xs) 0 0;
   padding: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -175,12 +177,12 @@
 .find-chapter {
   position: sticky;
   top: 0;
-  padding: 8px 8px 4px;
+  padding: var(--space-xs) var(--space-xs) var(--space-2xs);
   overflow: hidden;
   background: var(--raised);
   white-space: nowrap;
   text-overflow: ellipsis;
-  font: 600 11px var(--sans);
+  font: 600 var(--text-2xs) var(--sans);
   letter-spacing: 0.02em;
   color: var(--ink-3);
 }
@@ -188,18 +190,18 @@
   appearance: none;
   display: grid;
   grid-template-columns: 3.4em 1fr;
-  gap: 8px;
+  gap: var(--space-xs);
   width: 100%;
-  padding: 6px 8px;
+  padding: var(--space-xs) var(--space-xs);
   border: 0;
   border-radius: var(--r);
   background: none;
   text-align: left;
   cursor: pointer;
-  transition: background-color 150ms ease;
+  transition: background-color 150ms ease-out;
 }
 .find-at {
-  font: 500 12px / 1.45 var(--sans);
+  font: 500 var(--text-xs) / 1.45 var(--sans);
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
@@ -208,7 +210,7 @@
   overflow: hidden;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  font: 13px / 1.45 var(--serif);
+  font: var(--text-sm) / 1.45 var(--serif);
   color: var(--ink-2);
 }
 .find-context mark {
@@ -229,11 +231,11 @@
 }
 .find-where {
   flex-basis: 100%;
-  padding: 2px 6px 0;
+  padding: var(--space-3xs) var(--space-xs) 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font: 12px var(--sans);
+  font: var(--text-xs) var(--sans);
   color: var(--ink-3);
 }
 @media (hover: hover) and (pointer: fine) {
@@ -265,24 +267,37 @@
 .demo-pane[hidden] {
   display: none;
 }
+/* the panel's tabs: underlined like the page's, the line along the head's hairline */
 .pane-head {
   flex: none;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+  align-items: flex-end;
+  gap: var(--space-xs);
+  padding: 0 var(--space-md);
   border-bottom: 1px solid var(--line);
+}
+.pane-head .tabs {
+  margin: 0 0 -1px;
+  border-bottom: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.pane-head .tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-xs) var(--space-sm);
 }
 .pane-tabs .tab-count {
   min-width: 17px;
   height: 17px;
-  padding: 0 5px;
+  padding: 0 var(--space-2xs);
   border-radius: 999px;
   display: inline-grid;
   place-items: center;
   background: var(--accent-soft);
   color: var(--accent-ink);
-  font: 600 10.5px / 1 var(--sans);
+  font: 600 0.6875rem / 1 var(--sans);
   font-variant-numeric: tabular-nums;
 }
 .pane-body {
@@ -319,7 +334,7 @@
 /* the gutter: figure anchors and note marks */
 .gutter {
   position: relative;
-  width: 30px;
+  width: 32px;
   flex: none;
   z-index: 2;
   overflow: hidden;
@@ -329,7 +344,7 @@
   left: 10px;
   width: 10px;
   height: 10px;
-  margin-top: -5px;
+  margin-top: calc(var(--space-2xs) * -1);
   padding: 0;
   border: 1.5px solid var(--peach-ink);
   border-radius: 2px;
@@ -337,7 +352,7 @@
   transform: rotate(45deg);
   cursor: pointer;
   transition:
-    background-color 200ms ease,
+    background-color 200ms ease-out,
     transform 200ms var(--ease-out);
 }
 .anchor[data-active] {
@@ -362,7 +377,7 @@
   left: 7px;
   width: 16px;
   height: 3px;
-  margin-top: -1.5px;
+  margin-top: calc(var(--space-3xs) * -1);
   padding: 0;
   border: 0;
   border-radius: 3px;
@@ -370,7 +385,7 @@
   cursor: pointer;
   transition:
     transform 160ms var(--ease-out),
-    background-color 150ms ease;
+    background-color 150ms ease-out;
 }
 .note-mark[data-type="highlight"] {
   background: var(--butter);
@@ -413,18 +428,18 @@
   }
 }
 .pdf-strip-list {
-  padding: 8px 0;
+  padding: var(--space-xs) 0;
 }
 .pdf-strip-list [data-thumbnail-page] {
   display: grid;
   justify-items: center;
   align-content: start;
-  gap: 4px;
-  padding-top: 8px;
+  gap: var(--space-2xs);
+  padding-top: var(--space-xs);
 }
 .pdf-strip-list [data-thumbnail-page]::after {
   content: attr(data-thumbnail-page);
-  font: 500 11px var(--sans);
+  font: 500 var(--text-2xs) var(--sans);
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
@@ -468,25 +483,43 @@
   pointer-events: none;
 }
 .textLayer ::selection {
-  background: color-mix(in srgb, var(--lavender) 55%, transparent);
+  background: color-mix(in oklab, var(--lavender) 55%, transparent);
 }
 
 /* reflowable books */
+/* the sheet sits centred beside the panel: the right padding answers the gutter on the left */
 .html-reader {
   height: 100%;
   overflow: auto;
+  padding: 0 calc(32px + var(--space-md)) 0 var(--space-md);
 }
+/* a reflowable book: a sheet on the desk, set in the learner's reading face, size and measure */
 .html-book {
-  max-width: calc(700px * var(--book-scale, 1));
+  max-width: calc(var(--read-measure) * var(--book-scale, 1) + 112px);
   min-height: 100%;
   margin: 0 auto;
-  padding: 48px 52px 50vh;
+  padding: 56px 56px 50vh;
   background: var(--surface);
   color: var(--ink);
-  font: calc(18px * var(--book-scale, 1)) / 1.7 var(--serif);
+  font: 400 calc(var(--read-size) * var(--book-scale, 1)) / var(--read-leading) var(--read-font);
+  font-optical-sizing: auto;
+  hanging-punctuation: first;
   box-shadow:
     0 0 0 1px var(--line),
     var(--shadow-sm);
+}
+@media (max-width: 1360px) {
+  .html-book {
+    padding-inline: var(--space-xl);
+  }
+}
+@media (max-width: 600px) {
+  .html-reader {
+    padding: 0;
+  }
+  .html-book {
+    padding: var(--space-lg) 20px 50vh;
+  }
 }
 .html-book p {
   margin: 0 0 0.95em;
@@ -494,7 +527,8 @@
 /* a book's headings look as the book made them (by its own level, the class), whatever level they
    take in the page's outline */
 .html-book :is(h1, h2, h3, h4, h5, h6) {
-  font-family: var(--serif);
+  font-family: var(--read-font);
+  text-wrap: balance;
   font-size: 1em;
   font-weight: 600;
   line-height: 1.25;
@@ -535,10 +569,10 @@
   color: var(--ink-2);
 }
 .html-book pre {
-  font: 13px / 1.5 var(--mono);
+  font: var(--text-sm) / 1.5 var(--mono);
   white-space: pre-wrap;
   background: var(--sunken);
-  padding: 12px;
+  padding: var(--space-sm);
   border-radius: var(--r);
 }
 .html-book img {
@@ -556,7 +590,7 @@
 .html-book td,
 .html-book th {
   border: 1px solid var(--line);
-  padding: 4px 8px;
+  padding: var(--space-2xs) var(--space-xs);
 }
 .html-book .ln {
   text-decoration: underline;
@@ -574,8 +608,8 @@
   position: absolute;
   border-radius: 2px;
   transition:
-    background-color 180ms ease,
-    box-shadow 180ms ease;
+    background-color 180ms ease-out,
+    box-shadow 180ms ease-out;
 }
 .page-marks .mark[data-style="fill"] {
   background: var(--hl-yellow);
@@ -594,21 +628,21 @@
   background: var(--hl-purple);
 }
 .page-marks .mark[data-style="line"] {
-  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--lavender-ink) 70%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in oklab, var(--lavender-ink) 70%, transparent);
 }
 .page-marks .mark[data-style="line"][data-kind="visualize"] {
   box-shadow: inset 0 -2px 0 var(--peach-ink);
 }
 .page-marks .mark[data-state="hovered"] {
-  background: color-mix(in srgb, var(--lavender) 30%, transparent);
+  background: color-mix(in oklab, var(--lavender) 30%, transparent);
 }
 .page-marks .mark[data-state="focused"] {
-  background: color-mix(in srgb, var(--lavender) 40%, transparent);
+  background: color-mix(in oklab, var(--lavender) 40%, transparent);
   box-shadow: inset 0 -2px 0 var(--lavender-ink);
 }
 /* the place the find bar is on */
 .page-marks .mark[data-style="found"] {
-  background: color-mix(in srgb, var(--butter) 75%, transparent);
+  background: color-mix(in oklab, var(--butter) 75%, transparent);
   box-shadow: 0 0 0 2px var(--butter-ink);
   mix-blend-mode: var(--hl-blend);
 }
@@ -620,7 +654,7 @@
   z-index: 3;
 }
 .pdf-page .annotationLayer .linkAnnotation > a:hover {
-  background: color-mix(in srgb, var(--sky) 35%, transparent);
+  background: color-mix(in oklab, var(--sky) 35%, transparent);
 }
 ::highlight(anno-yellow) {
   background-color: var(--hl-yellow);
@@ -638,14 +672,14 @@
   background-color: var(--hl-purple);
 }
 ::highlight(anno-line) {
-  text-decoration: underline 2px color-mix(in srgb, var(--lavender-ink) 70%, transparent);
+  text-decoration: underline 2px color-mix(in oklab, var(--lavender-ink) 70%, transparent);
   text-underline-offset: 3px;
 }
 ::highlight(find-hit) {
-  background-color: color-mix(in srgb, var(--butter) 80%, transparent);
+  background-color: color-mix(in oklab, var(--butter) 80%, transparent);
 }
 ::highlight(anno-focused) {
-  background-color: color-mix(in srgb, var(--lavender) 40%, transparent);
+  background-color: color-mix(in oklab, var(--lavender) 40%, transparent);
   text-decoration: underline 2px var(--lavender-ink);
   text-underline-offset: 3px;
 }
@@ -654,7 +688,7 @@
 .sel-menu {
   position: absolute;
   z-index: 30;
-  font: 13px var(--sans);
+  font: var(--text-sm) var(--sans);
   transform-origin: 50% 100%;
   transition:
     opacity 150ms var(--ease-out),
@@ -676,7 +710,7 @@
   display: flex;
   align-items: center;
   gap: 1px;
-  padding: 4px;
+  padding: var(--space-2xs);
   border-radius: 11px;
   background: var(--menu);
   color: var(--menu-ink);
@@ -690,14 +724,14 @@
   color: inherit;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-xs);
   height: 32px;
-  padding: 0 9px;
+  padding: 0 var(--space-xs);
   border-radius: 7px;
-  font: 500 13px / 1 var(--sans);
+  font: 500 var(--text-sm) / 1 var(--sans);
   cursor: pointer;
   transition:
-    background-color 120ms ease,
+    background-color 120ms ease-out,
     transform 160ms var(--ease-out);
 }
 .sel-btn svg {
@@ -715,13 +749,13 @@
 }
 .sel-btn[disabled] {
   opacity: 0.5;
-  cursor: default;
+  cursor: not-allowed;
 }
 .sel-sep {
   width: 1px;
   height: 18px;
-  margin: 0 3px;
-  background: rgb(255 255 255 / 0.14);
+  margin: 0 var(--space-2xs);
+  background: var(--menu-line);
 }
 .sel-highlight {
   position: relative;
@@ -732,8 +766,8 @@
   top: calc(100% + 8px);
   left: 0;
   display: none;
-  gap: 7px;
-  padding: 7px 8px;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-xs);
   border-radius: 10px;
   background: var(--menu);
   box-shadow: var(--shadow-lg);
@@ -774,26 +808,26 @@
   border: 0;
   border-radius: 50%;
   cursor: pointer;
-  background: #f1d670;
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.1);
+  background: var(--swatch-yellow);
+  box-shadow: inset 0 0 0 1px var(--menu-line);
   transition:
     transform 160ms var(--ease-out),
-    box-shadow 150ms ease;
+    box-shadow 150ms ease-out;
 }
 .color-dot[data-color="yellow"] {
-  background: #f1d670;
+  background: var(--swatch-yellow);
 }
 .color-dot[data-color="green"] {
-  background: #a5d5b2;
+  background: var(--swatch-green);
 }
 .color-dot[data-color="blue"] {
-  background: #a7c7ee;
+  background: var(--swatch-blue);
 }
 .color-dot[data-color="pink"] {
-  background: #f1b0bf;
+  background: var(--swatch-pink);
 }
 .color-dot[data-color="purple"] {
-  background: #c4b8f2;
+  background: var(--swatch-purple);
 }
 .color-dot:active {
   transform: scale(0.9);
@@ -806,7 +840,7 @@
 .sel-menu[data-mode="ask"],
 .sel-menu[data-mode="visualize"],
 .sel-menu[data-mode="more"] {
-  padding: 8px;
+  padding: var(--space-xs);
   border-radius: 12px;
   background: var(--raised);
   color: var(--ink);
@@ -820,7 +854,7 @@
 }
 .sel-ask input {
   flex: 1;
-  padding-right: 42px !important;
+  padding-right: 44px !important;
 }
 .sel-send {
   position: absolute;
@@ -837,7 +871,7 @@
   cursor: pointer;
   transition:
     transform 160ms var(--ease-out),
-    opacity 150ms ease;
+    opacity 150ms ease-out;
 }
 .sel-send svg {
   width: 15px;
@@ -847,8 +881,8 @@
   transform: scale(0.92);
 }
 .sel-send[disabled] {
-  opacity: 0.3;
-  cursor: default;
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 .sel-visualize {
   width: 460px;
@@ -863,7 +897,7 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .sel-btn:hover:not([disabled]) {
-    background: rgb(255 255 255 / 0.1);
+    background: var(--menu-hover);
   }
   .sel-btn:hover svg {
     opacity: 1;
@@ -878,6 +912,25 @@
   position: relative;
   overflow: hidden;
   background: var(--bg);
+}
+/* nothing beside this part of the book: where the nearest cards are, before and after */
+.margin-nearest {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2xs);
+  padding: var(--space-md) var(--space-sm);
+}
+.margin-nearest .fine {
+  margin: 0 0 var(--space-2xs) var(--space-xs);
+}
+/* a long chapter's name wraps rather than running off the margin */
+.margin-nearest .button {
+  max-width: 100%;
+  height: auto !important;
+  min-height: 32px;
+  padding-block: var(--space-2xs) !important;
+  text-align: left;
+  white-space: normal;
 }
 .margin-slot {
   position: absolute;
@@ -896,16 +949,17 @@
   overflow-y: auto;
 }
 .margin-empty {
-  padding: 28px 24px;
-  max-width: 440px;
+  padding: var(--space-xl) var(--space-lg);
+  max-width: 460px;
 }
 .margin-empty-title {
-  margin: 0 0 4px;
-  font: 600 15px var(--sans);
+  margin: 0 0 var(--space-xs);
+  font: 500 var(--text-2xl) / 1.2 var(--serif);
+  letter-spacing: var(--tracking-title);
   color: var(--ink);
 }
 .margin-empty .button {
-  margin-top: 14px;
+  margin-top: var(--space-md);
 }
 
 /* each card's kind sets its pastel */
@@ -959,12 +1013,12 @@
   display: block;
   width: 100%;
   text-align: left;
-  font: 13px / 1.5 var(--sans);
+  font: var(--text-sm) / 1.5 var(--sans);
   color: var(--ink-2);
   border: 0;
 }
 .mcard.open {
-  padding: 12px 14px 12px;
+  padding: var(--space-sm) var(--space-md) var(--space-sm);
   border-radius: var(--r-lg);
   background: var(--surface);
   box-shadow:
@@ -985,47 +1039,63 @@
 .mcard.open[data-focused] {
   box-shadow:
     var(--shadow-md),
-    0 0 0 1.5px color-mix(in srgb, var(--k-ink) 55%, transparent);
+    0 0 0 1.5px color-mix(in oklab, var(--k-ink) 55%, transparent);
 }
 .mcard-title {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font: 500 12.5px var(--sans);
+  font: 500 var(--text-xs) var(--sans);
   color: var(--ink-2);
 }
 /* the question it was asked, and follow-ups with their answers: the tutor's conversation */
+/* in the margin a follow-up is a ruled pair, not a chat: the question in the sans, quiet, over a
+   hairline; the answer under it in the reading face */
 .mcard-thread {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: 12px;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
 }
 .mcard-head + .mcard-thread {
-  margin: 0 0 10px;
+  margin: 0 0 var(--space-sm);
 }
-.mcard-thread .msg {
-  max-width: 94%;
-}
+.mcard-thread .msg,
+.mcard-thread .msg[data-role="user"],
 .mcard-thread .msg[data-role="tutor"] {
-  background: var(--bg);
+  align-self: stretch;
+  max-width: none;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.mcard-thread .msg[data-role="user"] {
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
+  font: 600 var(--text-sm) / 1.45 var(--sans);
+}
+.mcard-head + .mcard-thread .msg[data-role="user"]:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 .mcard-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xs);
 }
 .mcard-kind {
   display: inline-flex;
   align-items: center;
   height: 22px;
-  padding: 0 9px;
+  padding: 0 var(--space-xs);
   border-radius: 999px;
   background: var(--k-soft);
   color: var(--k-ink);
-  font: 600 12px / 1 var(--sans);
+  font: 600 var(--text-xs) / 1 var(--sans);
 }
 .mcard-icon {
   appearance: none;
@@ -1040,8 +1110,8 @@
   color: var(--ink-3);
   cursor: pointer;
   transition:
-    background-color 150ms ease,
-    color 150ms ease,
+    background-color 150ms ease-out,
+    color 150ms ease-out,
     transform 160ms var(--ease-out);
 }
 .mcard-icon svg {
@@ -1056,16 +1126,16 @@
 }
 .mcard-body {
   display: grid;
-  gap: 6px;
+  gap: var(--space-xs);
 }
 .mcard-md {
-  font-size: 14.5px;
+  font-size: var(--text-md);
 }
 .mcard-md h2 {
-  margin: 14px 0 6px;
-  padding-top: 12px;
+  margin: var(--space-md) 0 var(--space-xs);
+  padding-top: var(--space-sm);
   border-top: 1px solid var(--line);
-  font: 600 13px / 1.4 var(--sans);
+  font: 600 var(--text-sm) / 1.4 var(--sans);
   color: var(--ink);
 }
 .mcard-md h2:first-child {
@@ -1076,40 +1146,40 @@
 .mcard-md mark {
   background: var(--k-soft);
   color: inherit;
-  padding: 0 2px;
+  padding: 0 var(--space-3xs);
   border-radius: 3px;
 }
 .mcard-foot {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  padding-top: 8px;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+  padding-top: var(--space-xs);
   border-top: 1px solid var(--line);
 }
 .mcard-foot .fine {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--ink-3);
 }
 .mcard-ask {
-  margin-top: 10px;
+  margin-top: var(--space-sm);
 }
 .mcard-comment {
   display: grid;
-  gap: 10px;
+  gap: var(--space-sm);
 }
 .mcard-comment .colors {
   display: flex;
-  gap: 8px;
+  gap: var(--space-xs);
 }
 .mcard-comment textarea {
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   background: var(--bg);
 }
 .mcard .md-figure,
 .mcard .scene {
-  margin: 6px -4px 0;
+  margin: var(--space-xs) calc(var(--space-2xs) * -1) 0;
 }
 @media (hover: hover) and (pointer: fine) {
   .mcard-icon:hover {
@@ -1121,13 +1191,13 @@
 /* ---------- figures: the index of a book's figures, and a figure opened large ---------- */
 .figures-index {
   overflow: auto;
-  padding: 16px 16px 24px;
+  padding: var(--space-md) var(--space-md) var(--space-lg);
 }
 .figures-head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
 }
 .figures-head .fine {
   margin: 0;
@@ -1137,20 +1207,21 @@
   max-width: 420px;
 }
 .figures-group + .figures-group {
-  margin-top: 18px;
+  margin-top: 20px;
 }
 .figures-chapter {
-  margin: 0 0 6px;
-  font: 600 13px / 1.35 var(--sans);
+  margin: 0 0 var(--space-xs);
+  font: 600 var(--text-sm) / 1.35 var(--sans);
   color: var(--ink);
 }
-.figures-chapter span {
+.figures-chapter-sub {
+  display: block;
   font-weight: 400;
   color: var(--ink-3);
 }
 .figures-section {
-  margin: 12px 0 4px;
-  font: 500 12px / 1.35 var(--sans);
+  margin: var(--space-sm) 0 var(--space-2xs);
+  font: 500 var(--text-xs) / 1.35 var(--sans);
   color: var(--ink-3);
 }
 .figure-rows {
@@ -1158,12 +1229,12 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 4px;
+  gap: var(--space-2xs);
 }
 .figure-rows li {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-2xs);
 }
 .figure-row {
   appearance: none;
@@ -1171,15 +1242,15 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px;
+  gap: var(--space-sm);
+  padding: var(--space-xs);
   border: 0;
   border-radius: var(--r-lg);
   background: none;
   text-align: left;
   color: var(--ink);
   cursor: pointer;
-  transition: background-color 150ms ease;
+  transition: background-color 150ms ease-out;
 }
 .figure-row:active {
   background: var(--press);
@@ -1197,8 +1268,8 @@
   color: var(--peach-ink);
 }
 .figure-still[data-kind="animation"] {
-  background: #1d1d20;
-  color: #c8bff3;
+  background: var(--anim-paper-dark);
+  color: var(--anim-lit);
 }
 .figure-still-img {
   width: 100%;
@@ -1230,7 +1301,7 @@
   gap: 1px;
 }
 .figure-fig {
-  font: 500 11.5px var(--sans);
+  font: 500 var(--text-2xs) var(--sans);
   color: var(--peach-ink);
   font-variant-numeric: tabular-nums;
 }
@@ -1238,14 +1309,14 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font: 500 14px / 1.35 var(--sans);
+  font: 500 var(--text-md) / 1.35 var(--sans);
 }
 .figure-caption {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  font: 12.5px / 1.4 var(--sans);
+  font: var(--text-xs) / 1.4 var(--sans);
   color: var(--ink-3);
 }
 .figure-row[data-status="failed"] .figure-caption {
@@ -1263,7 +1334,7 @@
 }
 .lightbox {
   display: grid;
-  gap: 14px;
+  gap: var(--space-md);
 }
 .lightbox .caption {
   margin: 0;
@@ -1275,14 +1346,14 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-xs);
 }
 .lightbox-redraw {
   display: grid;
-  gap: 8px;
+  gap: var(--space-xs);
 }
 .menu-label {
-  font: 600 13px var(--sans);
+  font: 600 var(--text-sm) var(--sans);
   color: var(--ink);
 }
 .demo-frame {
@@ -1307,19 +1378,19 @@
 .tutor-scroll {
   flex: 1;
   overflow: auto;
-  padding: 18px 18px 12px;
+  padding: 20px 20px var(--space-sm);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-sm);
 }
 .tutor-scroll > .fine {
   margin: 0;
 }
 .pinned {
   display: grid;
-  gap: 4px;
+  gap: var(--space-2xs);
   justify-items: start;
-  padding: 12px 14px;
+  padding: var(--space-sm) var(--space-md);
   border-radius: var(--r-lg);
   background: var(--accent-soft);
 }
@@ -1328,61 +1399,61 @@
   font-weight: 600;
 }
 .pinned .quote {
-  margin: 4px 0;
+  margin: var(--space-2xs) 0;
   border-left-color: var(--accent);
 }
 .tutor-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 8px;
-  margin: -6px 0 2px;
+  gap: var(--space-2xs) var(--space-xs);
+  margin: calc(var(--space-xs) * -1) 0 var(--space-3xs);
 }
 .tutor-bar .fine {
   margin: 0;
 }
 /* earlier sessions with the tutor, kept with the book */
 .sessions {
-  margin-top: 8px;
+  margin-top: var(--space-xs);
 }
 .sessions .sub-title {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-xs);
 }
 .session-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 2px;
+  gap: var(--space-3xs);
 }
 .session-list li {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-3xs);
 }
 .session-item {
   appearance: none;
   flex: 1;
   min-width: 0;
   display: grid;
-  gap: 2px;
-  padding: 8px 10px;
+  gap: var(--space-3xs);
+  padding: var(--space-xs) var(--space-sm);
   border: 0;
   border-radius: var(--r);
   background: none;
   text-align: left;
   cursor: pointer;
-  transition: background-color 150ms ease;
+  transition: background-color 150ms ease-out;
 }
 .session-title {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font: 500 14px / 1.35 var(--sans);
+  font: 500 var(--text-md) / 1.35 var(--sans);
   color: var(--ink);
 }
 .session-meta {
-  font: 12px var(--sans);
+  font: var(--text-xs) var(--sans);
   color: var(--ink-3);
 }
 .session-item:active {
@@ -1402,56 +1473,56 @@
 .tutor-input {
   flex: none;
   display: grid;
-  gap: 8px;
-  padding: 10px 12px 12px;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-sm) var(--space-sm);
   border-top: 1px solid var(--line);
   background: var(--bg);
 }
 
 /* ---------- study ---------- */
 .chapter-title {
-  margin: 4px 0 8px;
-  font: 650 22px / 1.25 var(--sans);
+  margin: var(--space-2xs) 0 var(--space-xs);
+  font: 650 var(--text-2xl) / 1.25 var(--sans);
   letter-spacing: -0.02em;
   color: var(--ink);
 }
 .study-tab {
   overflow: auto;
-  padding: 22px 20px;
+  padding: var(--space-lg) 20px;
   display: block;
 }
 .study-actions {
   display: grid;
-  gap: 8px;
-  margin: 16px 0;
+  gap: var(--space-xs);
+  margin: var(--space-md) 0;
 }
 .study-action {
   appearance: none;
   border: 0;
   display: flex;
-  gap: 12px;
+  gap: var(--space-sm);
   align-items: flex-start;
-  padding: 13px 14px;
+  padding: var(--space-sm) var(--space-md);
   border-radius: var(--r-lg);
   background: var(--surface);
   box-shadow: 0 0 0 1px var(--line);
   text-align: left;
   color: var(--ink-3);
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.45;
   cursor: pointer;
 }
 .study-action > span:last-child {
   display: grid;
-  gap: 2px;
+  gap: var(--space-3xs);
 }
 .study-action b {
-  font: 600 14px var(--sans);
+  font: 600 var(--text-md) var(--sans);
   color: var(--ink);
 }
 .study-action[disabled] {
   opacity: 0.5;
-  cursor: default;
+  cursor: not-allowed;
 }
 .chapter-concepts {
   list-style: none;
@@ -1462,15 +1533,15 @@
 .chapter-concepts li {
   display: grid;
   grid-template-columns: 1fr auto auto;
-  gap: 12px;
+  gap: var(--space-sm);
   align-items: center;
-  padding: 8px 0;
+  padding: var(--space-xs) 0;
   border-bottom: 1px solid var(--line);
 }
 .chapter-concepts a {
   color: var(--ink);
   text-decoration: none;
-  font: 500 14px var(--sans);
+  font: 500 var(--text-md) var(--sans);
 }
 .study-tab .quiz {
   padding-bottom: 20px;
@@ -1496,16 +1567,16 @@
 }
 .reader-note-head {
   display: flex;
-  gap: 8px;
+  gap: var(--space-xs);
   align-items: center;
   flex-wrap: wrap;
-  padding: 8px 12px;
+  padding: var(--space-xs) var(--space-sm);
   border-bottom: 1px solid var(--line);
 }
 .reader-note-head select {
   max-width: 240px;
   height: 30px !important;
-  font-size: 13px !important;
+  font-size: var(--text-sm) !important;
 }
 .reader-note-head .fine {
   margin: 0;
@@ -1516,10 +1587,10 @@
   overflow: auto;
 }
 .reader-note-body .cm-content {
-  padding-top: 14px !important;
+  padding-top: var(--space-md) !important;
 }
 .reader-note-others {
-  padding: 10px 14px;
+  padding: var(--space-sm) var(--space-md);
   border-top: 1px solid var(--line);
 }
 .reader-note-others summary {
@@ -1539,11 +1610,11 @@
   top: 14px;
   left: 50%;
   translate: -50% 0;
-  padding: 7px 13px;
+  padding: var(--space-xs) var(--space-sm);
   border-radius: 10px;
   background: var(--menu);
   color: var(--menu-ink);
-  font: 13px var(--sans);
+  font: var(--text-sm) var(--sans);
   box-shadow: var(--shadow-lg);
   pointer-events: none;
   transition:
@@ -1560,15 +1631,15 @@
   position: absolute;
   border: 1.5px solid var(--lavender-ink);
   border-radius: 3px;
-  background: color-mix(in srgb, var(--lavender) 22%, transparent);
+  background: color-mix(in oklab, var(--lavender) 22%, transparent);
   pointer-events: none;
 }
 .capture-pop {
   position: absolute;
   width: 380px;
-  padding: 12px;
+  padding: var(--space-sm);
   display: grid;
-  gap: 10px;
+  gap: var(--space-sm);
   border-radius: var(--r-lg);
   background: var(--raised);
   box-shadow: var(--shadow-lg);
@@ -1590,13 +1661,13 @@
   object-fit: contain;
   border-radius: var(--r-sm);
   box-shadow: 0 0 0 1px var(--line);
-  background: #fff;
+  background: var(--anim-paper-light);
 }
 .capture-text {
   max-height: 200px;
   overflow: auto;
-  font-size: 13.5px;
-  padding: 8px 10px;
+  font-size: var(--text-sm);
+  padding: var(--space-xs) var(--space-sm);
   border-radius: var(--r-sm);
   background: var(--bg);
 }
@@ -1607,12 +1678,13 @@
   top: 58px;
   right: 12px;
   z-index: 40;
-  width: min(390px, calc(100vw - 24px));
-  padding: 18px 20px;
+  width: 390px;
+  max-width: calc(100% - 24px);
+  padding: 20px 20px;
   border-radius: var(--r-lg);
   background: var(--raised);
   box-shadow: var(--shadow-lg);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   transform-origin: top right;
   transition:
     opacity 160ms var(--ease-out),
@@ -1625,18 +1697,18 @@
   }
 }
 .help-pop h3 {
-  margin: 0 0 8px;
-  font: 600 15px var(--sans);
+  margin: 0 0 var(--space-xs);
+  font: 600 var(--text-md) var(--sans);
   color: var(--ink);
 }
 .help-pop p {
-  margin: 0 0 10px;
+  margin: 0 0 var(--space-sm);
 }
 .help-pop ul {
   margin: 0;
-  padding-left: 18px;
+  padding-left: 20px;
   display: grid;
-  gap: 6px;
+  gap: var(--space-xs);
 }
 .help-close {
   position: absolute;
@@ -1678,6 +1750,31 @@
   .sel-ask,
   .sel-visualize {
     width: min(420px, 86vw);
+  }
+}
+/* on a phone the chapter takes the bar's room: the zoom keeps its steps, the theme is in Settings */
+@media (max-width: 600px) {
+  .topbar {
+    gap: 2px;
+    padding: 0 var(--space-2xs);
+  }
+  /* the chapter picker takes the room there is (the sections are a step too many for a phone's bar) */
+  .toc-select {
+    flex: 1 1 0;
+    max-width: none;
+    field-sizing: fixed;
+  }
+  .toc-select.narrow,
+  .topbar > .spacer {
+    display: none;
+  }
+  .zoom-group {
+    flex: none;
+  }
+  .zoom-value,
+  .topbar-sep,
+  .topbar > .icon-button[aria-label="Switch theme"] {
+    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {

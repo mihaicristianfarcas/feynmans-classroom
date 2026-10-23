@@ -119,7 +119,7 @@ export function CardDrafter({
       {saved > 0 ? (
         <div className="done-note">
           <p>
-            Saved {saved} card{saved === 1 ? "" : "s"}. They'll come back in Review just before you'd forget them.
+            Saved {saved} card{saved === 1 ? "" : "s"}. They’ll come back in Review just before you’d forget them.
           </p>
           <button type="button" className="button primary" onClick={onClose}>
             Done
@@ -237,8 +237,8 @@ export function ExplainBack({
       {!feedback ? (
         <>
           <p className="fine">
-            Explain it as if to a smart friend who has never heard of it: plain words, no jargon you can't unpack. Where
-            you get stuck is exactly what you don't understand yet.
+            Explain it as if to a smart friend who has never heard of it: plain words, no jargon you can’t unpack. Where
+            you get stuck is exactly what you don’t understand yet.
           </p>
           {!initial && (
             <label className="field">

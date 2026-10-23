@@ -405,7 +405,7 @@ function EmbeddedFile({
         >
           {target}
         </a>{" "}
-        <span className="fine">doesn't exist yet</span>
+        <span className="fine">doesn’t exist yet</span>
       </span>
     );
   if (!state.resolved) return <span className="md-embed-box fine">Loading {target}…</span>;

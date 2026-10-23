@@ -1,31 +1,21 @@
 /* The app: picks the page from the URL's hash (#/library, #/book/<id>, #/notes/<id>…), sends a new
  * learner to the welcome page first, and puts every page except the reader inside the Shell (Notes
  * and the Brain's graph fill the window below its bar; the rest scroll). The ⌘K palette and the agent
- * (⌘J) sit over every page; old #/ask links open the agent. Each page but Today is its own chunk,
- * loaded on first visit (the reader's, with the PDF engine, is fetched ahead once the app is idle); a
- * page that fails to draw or load says so, with a way to reload. */
-import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from "react";
+ * (⌘J) sit over every page; old #/ask links open the agent. Each page but Today is its own chunk
+ * (app/pages.ts), all fetched ahead once the app is idle; while one arrives its skeleton stands in.
+ * A page that fails to draw or load says so, with a way to reload. */
+import { type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import { AgentPanel } from "../agent/AgentPanel";
 import { openAgent } from "../agent/store";
 import { learn } from "../api";
-import { Loading } from "../components/feedback";
+import { PageSkeleton, ReaderSkeleton } from "../components/Skeletons";
 import { Today } from "../pages/Today";
 import { openLink } from "./navigation";
 import { PageBoundary } from "./PageBoundary";
 import { Palette } from "./Palette";
+import { Brain, Gallery, Journey, Library, Notes, preloadAll, Reader, Review, Settings, Welcome } from "./pages";
 import { Shell } from "./Shell";
 import { useTheme } from "./theme";
-
-const loadReader = () => import("../reader/Reader");
-const Reader = lazy(() => loadReader().then((m) => ({ default: m.Reader })));
-const Notes = lazy(() => import("../notes/Notes").then((m) => ({ default: m.Notes })));
-const Brain = lazy(() => import("../pages/brain/Brain").then((m) => ({ default: m.Brain })));
-const Gallery = lazy(() => import("../pages/Gallery").then((m) => ({ default: m.Gallery })));
-const Journey = lazy(() => import("../pages/Journey").then((m) => ({ default: m.Journey })));
-const Library = lazy(() => import("../pages/Library").then((m) => ({ default: m.Library })));
-const Review = lazy(() => import("../pages/Review").then((m) => ({ default: m.Review })));
-const Settings = lazy(() => import("../pages/Settings").then((m) => ({ default: m.Settings })));
-const Welcome = lazy(() => import("../pages/Welcome").then((m) => ({ default: m.Welcome })));
 
 type Route =
   | { name: "book"; id: string }
@@ -78,27 +68,30 @@ function redirectAsk() {
   setTimeout(() => openAgent(q ? { text: q, send: true } : {}));
 }
 
+const sameRoute = (a: Route, b: Route) =>
+  a.name === b.name &&
+  (a as { id?: string }).id === (b as { id?: string }).id &&
+  (a as { full?: boolean }).full === (b as { full?: boolean }).full;
+
 export function App() {
   const [current, setCurrent] = useState(route);
   const [theme, setTheme] = useTheme();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  const showing = useRef(current);
+  showing.current = current;
   useEffect(() => {
     redirectAsk();
     const onHash = () => {
       redirectAsk();
       const next = route();
-      setCurrent((old) =>
-        old.name === next.name &&
-        (old as { id?: string }).id === (next as { id?: string }).id &&
-        (old as { full?: boolean }).full === (next as { full?: boolean }).full
-          ? old
-          : next,
-      );
+      if (sameRoute(showing.current, next)) return;
+      setCurrent(next);
     };
     window.addEventListener("hashchange", onHash);
-    // the reader is where most visits lead: fetch its code ahead, once nothing else is going on
+    // every page's code, fetched ahead once nothing else is going on, so moving between pages is instant
+    // (a timer only where the browser has no idle callback)
     const idle = window.requestIdleCallback || ((f: () => void) => setTimeout(f, 2000));
-    idle(() => void loadReader().catch(() => {}));
+    idle(preloadAll);
     learn.profile().then(
       (p) => setOnboarded(p.onboarded),
       () => setOnboarded(true),
@@ -127,7 +120,7 @@ export function App() {
     return (
       <>
         <PageBoundary key={current.id}>
-          <Suspense fallback={<Loading label="Opening the book" />}>
+          <Suspense fallback={<ReaderSkeleton />}>
             <Reader key={current.id} bookId={current.id} theme={theme} setTheme={setTheme} />
           </Suspense>
         </PageBoundary>
@@ -142,14 +135,14 @@ export function App() {
   else if (current.name === "review") page = <Review theme={theme} />;
   else if (current.name === "brain") page = <Brain theme={theme} />;
   else if (current.name === "journey") page = <Journey />;
-  else if (current.name === "settings") page = <Settings />;
+  else if (current.name === "settings") page = <Settings theme={theme} setTheme={setTheme} />;
   else if (current.name === "gallery") page = <Gallery theme={theme} />;
   else page = <Today />;
   return (
     <>
       <Shell theme={theme} setTheme={setTheme} full={current.full}>
         <PageBoundary key={current.name}>
-          <Suspense fallback={<Loading />}>{page}</Suspense>
+          <Suspense fallback={<PageSkeleton page={current.name} title={TITLES[current.name]} />}>{page}</Suspense>
         </PageBoundary>
       </Shell>
       <Palette />

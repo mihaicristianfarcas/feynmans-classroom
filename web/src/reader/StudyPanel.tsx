@@ -100,7 +100,7 @@ export function StudyTab({
           className="study-action"
           disabled={!!busy}
           onClick={() =>
-            run("Mapping the chapter's concepts", async () => {
+            run("Mapping the chapter’s concepts", async () => {
               await learn.extractConcepts(book.id, chapter.id);
               await loadConcepts();
             })
@@ -112,7 +112,7 @@ export function StudyTab({
           <span>
             <b>Map concepts</b>
             <span>
-              Find the chapter's key concepts and add them to your knowledge graph, linked to where they appear.
+              Find the chapter’s key concepts and add them to your knowledge graph, linked to where they appear.
             </span>
           </span>
         </button>

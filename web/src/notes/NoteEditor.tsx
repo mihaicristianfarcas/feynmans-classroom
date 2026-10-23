@@ -166,7 +166,8 @@ const theme = EditorView.theme({
   "&": { height: "100%", fontSize: "16px", background: "transparent", color: "var(--ink)" },
   ".cm-scroller": { fontFamily: "var(--serif)", lineHeight: "1.65", overflow: "auto" },
   ".cm-content": { padding: "14px 0 40vh", caretColor: "var(--ink)", maxWidth: "760px" },
-  ".cm-line": { padding: "0 32px" },
+  // the gutter the note's title has too (narrower on a phone: notes.css)
+  ".cm-line": { padding: "0 var(--note-gutter, 32px)" },
   "&.cm-focused": { outline: "none" },
   ".cm-cursor": { borderLeftColor: "var(--ink)", borderLeftWidth: "1.5px" },
   ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection": {
