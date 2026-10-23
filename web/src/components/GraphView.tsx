@@ -659,6 +659,8 @@ export function GraphView({
                     {labelOf(n)}
                   </text>
                 )}
+                {/* a shortened name shows whole on hover */}
+                {labelOf(n) !== n.label && <title>{n.label}</title>}
               </g>
             );
           })}

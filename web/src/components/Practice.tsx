@@ -172,7 +172,7 @@ function PracticeRunner({
       <div className="practice">
         <Markdown text={practice.example.problem} theme={theme} className="quiz-q" />
         <Steps problem={practice.example} theme={theme} />
-        <p className="fine">Each step's label says what the step is for. The problems ahead are solved the same way.</p>
+        <p className="fine">Each step’s label says what the step is for. The problems ahead are solved the same way.</p>
         <div className="form-actions">
           <button type="button" className="button primary" onClick={() => setStarted(true)}>
             Your turn
@@ -250,7 +250,7 @@ function PracticeRunner({
       </div>
       {current.easier && !result && (
         <>
-          <p className="fine">That one wasn't landing, and that's fine: this one has fewer moving parts.</p>
+          <p className="fine">That one wasn’t landing, and that’s fine: this one has fewer moving parts.</p>
           <Foundations concepts={[practice.concept]} lead="It builds on" />
         </>
       )}

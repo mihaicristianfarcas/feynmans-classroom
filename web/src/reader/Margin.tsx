@@ -4,14 +4,17 @@
  * reflowable book) sit side by side in one row; rows never overlap: the focused one (or, when none is,
  * the one for the passage at the reading line) sits exactly by its passage and the others make room
  * above and below it (as comments do in a shared document).
- * Follow-up questions on a card read as a conversation, drawn like the tutor's.
+ * Follow-up questions on a card read as a conversation, drawn like the tutor's. Where no card is beside
+ * the part of the book in view, the margin says where the nearest ones are, before and after, and goes
+ * there.
  *
  * Positions follow the book's scroll without React re-rendering: the reader announces each scroll
  * frame on `bus`, and the margin moves its cards directly. Scrolling over the margin scrolls the book. */
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { Annotation, Book, Demo } from "../api";
+import { type Annotation, type Book, type Demo, posOf } from "../api";
 import { AnnotationCard, DemoCard, type ToNote } from "./MarginCards";
-import { LINE } from "./position";
+import { chapterAt, LINE, locOfAnchor } from "./position";
 import type { ReaderHandle } from "./readers";
 
 export type MarginItem =
@@ -40,7 +43,23 @@ interface Props {
   /** Figure numbers by id ("Fig 3.2"). */
   figs: Map<string, string>;
   toast: (text: string) => void;
+  /** The reading position, and going to a card's passage (with its card lined up). */
+  pos: number;
+  onGo: (item: MarginItem) => void;
 }
+
+/** Where a card's passage is in the book (a position, as the reader counts them). */
+export const itemPos = (item: MarginItem) =>
+  item.annotation ? posOf(locOfAnchor(item.annotation.source)) : posOf(item.demo.anchor);
+
+const KIND_NAME: Record<string, string> = {
+  explain: "An explanation",
+  define: "A definition",
+  ask: "An answer",
+  visualize: "A figure",
+  resources: "Resources",
+  comment: "A comment",
+};
 
 /** Where a passage is on screen: the top of its first line and the bottom of its last. */
 interface Extent {
@@ -61,6 +80,8 @@ export function Margin({
   onOpenFigure,
   figs,
   toast,
+  pos,
+  onGo,
 }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const cards = useRef(new Map<string, HTMLDivElement>());
@@ -292,6 +313,7 @@ export function Margin({
           )}
         </div>
       ))}
+      {visible.length === 0 && <Nearest items={items} pos={pos} book={book} figs={figs} onGo={onGo} />}
       {!items.some((i) => i.annotation && i.annotation.type !== "highlight") && !items.some((i) => i.demo) && (
         <div className="margin-empty rise">
           <p className="margin-empty-title">The margin</p>
@@ -300,6 +322,50 @@ export function Margin({
             the passage, and is saved with the book in your vault.
           </p>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** No card beside this part of the book: where the nearest ones are, before and after, each a way there. */
+function Nearest({
+  items,
+  pos,
+  book,
+  figs,
+  onGo,
+}: {
+  items: MarginItem[];
+  pos: number;
+  book: Book;
+  figs: Map<string, string>;
+  onGo: (item: MarginItem) => void;
+}) {
+  const cards = items
+    .filter((i) => i.demo || (i.annotation && i.annotation.type !== "highlight"))
+    .map((item) => ({ item, at: itemPos(item) }))
+    .sort((a, b) => a.at - b.at);
+  if (!cards.length) return null;
+  const after = cards.find((c) => c.at > pos);
+  const before = [...cards].reverse().find((c) => c.at <= pos);
+  const name = (item: MarginItem) =>
+    figs.get(item.id) || (item.demo ? item.demo.fig || "A figure" : KIND_NAME[item.annotation.type] || "A note");
+  const where = (at: number) =>
+    book.format === "pdf" ? `p. ${Math.floor(at)}` : chapterAt(book, at)?.title || "earlier in the book";
+  return (
+    <div className="margin-nearest">
+      <p className="fine">Nothing in the margin beside this part.</p>
+      {after && (
+        <button type="button" className="button subtle small" onClick={() => onGo(after.item)}>
+          <ArrowDown aria-hidden="true" />
+          Next: {name(after.item)}, {where(after.at)}
+        </button>
+      )}
+      {before && (
+        <button type="button" className="button subtle small" onClick={() => onGo(before.item)}>
+          <ArrowUp aria-hidden="true" />
+          Before: {name(before.item)}, {where(before.at)}
+        </button>
       )}
     </div>
   );

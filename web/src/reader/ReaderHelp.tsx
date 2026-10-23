@@ -20,8 +20,8 @@ export function ReaderHelp({ onClose }: { onClose: () => void }) {
       </p>
       <ul>
         <li>
-          Select, then <kbd>H</kbd> highlight · <kbd>E</kbd> explain · <kbd>V</kbd> visualize (a figure, or an
-          animation) · <kbd>A</kbd> ask · <kbd>D</kbd> define · <kbd>N</kbd> add the passage to your note
+          Select, then <kbd>H</kbd> highlight, <kbd>E</kbd> explain, <kbd>V</kbd> visualize (a figure, or an animation),{" "}
+          <kbd>A</kbd> ask, <kbd>D</kbd> define, <kbd>N</kbd> add the passage to your note
         </li>
         <li>
           Without a mouse: <kbd>Tab</kbd> to the book (or use “Skip to the book”), scroll with the arrow keys, and press{" "}
@@ -30,8 +30,11 @@ export function ReaderHelp({ onClose }: { onClose: () => void }) {
         <li>Click a marked passage to line its card up beside it; ask follow-ups in the card, as with the tutor</li>
         <li>
           <kbd>⌘F</kbd> or <kbd>/</kbd> find in the whole book (<kbd>Enter</kbd> next, <kbd>Shift</kbd>+<kbd>Enter</kbd>{" "}
-          previous, or choose from the list of every place) · <kbd>+</kbd> <kbd>−</kbd> zoom, <kbd>0</kbd> fit to the
-          pane · <kbd>P</kbd> the pages as thumbnails · type in the page number to go there
+          previous, or choose from the list of every place)
+        </li>
+        <li>
+          <kbd>+</kbd> <kbd>−</kbd> zoom, <kbd>0</kbd> fit to the pane; <kbd>P</kbd> the pages as thumbnails; type in
+          the page number to go there
         </li>
         <li>
           <kbd>C</kbd> capture a figure, formula or table from the page into your note (with a transcription if you
@@ -43,7 +46,10 @@ export function ReaderHelp({ onClose }: { onClose: () => void }) {
           quiz, concepts
         </li>
         <li>
-          <kbd>[</kbd> <kbd>]</kbd> previous / next figure · <kbd>⌘K</kbd> searches everything you’ve read and written
+          <kbd>[</kbd> <kbd>]</kbd> previous / next figure
+        </li>
+        <li>
+          <kbd>⌘K</kbd> searches everything you’ve read and written
         </li>
       </ul>
     </div>

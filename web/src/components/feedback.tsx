@@ -38,7 +38,7 @@ export function Mastery({ value, wide = false }: { value: number | null | undefi
   if (value === null || value === undefined)
     return (
       <span className="mastery none" title="Not studied yet">
-        —
+        Not studied
       </span>
     );
   const pct = Math.round(value * 100);

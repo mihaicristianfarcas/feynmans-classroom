@@ -5,8 +5,9 @@ const ACTIVE = '[aria-current="page"], [aria-pressed="true"], [aria-selected="tr
 
 /**
  * Slides an indicator to the active item of a tab list, a segmented control or the side nav: sets
- * --ind-x/--ind-w (or --ind-y/--ind-h) on the container, which draws the indicator in CSS. The first
- * placement is instant (data-ind="instant"), later ones slide (data-ind="on").
+ * --ind-x/--ind-w (or --ind-y/--ind-h) on the container, and the width as a plain number (--ind-s,
+ * for a 1 px line scaled to it), which draws the indicator in CSS. The first placement is instant
+ * (data-ind="instant"), later ones slide (data-ind="on").
  */
 export function useIndicator<T extends HTMLElement>(active: unknown, axis: "x" | "y" = "x") {
   const ref = useRef<T>(null);
@@ -24,6 +25,7 @@ export function useIndicator<T extends HTMLElement>(active: unknown, axis: "x" |
       if (axis === "x") {
         el.style.setProperty("--ind-x", `${on.offsetLeft}px`);
         el.style.setProperty("--ind-w", `${on.offsetWidth}px`);
+        el.style.setProperty("--ind-s", `${on.offsetWidth}`);
       } else {
         el.style.setProperty("--ind-y", `${on.offsetTop}px`);
         el.style.setProperty("--ind-h", `${on.offsetHeight}px`);

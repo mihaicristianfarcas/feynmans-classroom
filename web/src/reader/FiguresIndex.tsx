@@ -111,7 +111,7 @@ export function FiguresIndex({
             {(scope === "book" || scope === "chapter") && (
               <h2 className="figures-chapter">
                 {g.chapter?.title || "Before the first chapter"}
-                {g.chapter?.subtitle ? <span> · {g.chapter.subtitle}</span> : null}
+                {g.chapter?.subtitle ? <span className="figures-chapter-sub">{g.chapter.subtitle}</span> : null}
               </h2>
             )}
             {g.sections.map((s) => (

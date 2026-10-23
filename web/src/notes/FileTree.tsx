@@ -5,7 +5,7 @@ import { ChevronRight, Ellipsis, FolderInput, FolderPlus, SquarePen, Trash2 } fr
 import { useEffect, useMemo, useRef, useState } from "react";
 import { docs, learn } from "../api";
 import { go } from "../app/navigation";
-import { Spinner } from "../components/feedback";
+import { TreeSkeleton } from "../components/Skeletons";
 import { announce, useArrowKeys } from "../lib/a11y";
 import type { Panel } from "../lib/usePanel";
 
@@ -156,7 +156,7 @@ export function FileTree({
         </button>
       </div>
       {!root ? (
-        <Spinner label="Loading" />
+        <TreeSkeleton />
       ) : matches ? (
         <ul className="tree">
           {matches.map((n) => (

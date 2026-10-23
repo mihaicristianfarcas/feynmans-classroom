@@ -60,9 +60,11 @@ export function ConceptPage({ id, theme }: { id: string; theme: "light" | "dark"
         Brain
       </a>
       <header className="page-head">
-        <span className="eyebrow">Concept</span>
         <h1 className="page-title">{c.title}</h1>
-        <Mastery value={c.mastery} wide />
+        <div className="page-meta">
+          <span>Concept</span>
+          <Mastery value={c.mastery} wide />
+        </div>
       </header>
       <div className="concept-actions">
         <button type="button" className="button primary" aria-haspopup="dialog" onClick={() => setTool("explain")}>

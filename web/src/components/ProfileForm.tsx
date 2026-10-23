@@ -69,7 +69,7 @@ export function ProfileForm({
       </label>
       <div className="form-row two">
         <label className="field">
-          <span>Level in what you're studying</span>
+          <span>Level in what you’re studying</span>
           <select value={p.level} onChange={(e) => set("level", e.target.value as Profile["level"])}>
             <option value="beginner">Beginner</option>
             <option value="intermediate">Intermediate</option>

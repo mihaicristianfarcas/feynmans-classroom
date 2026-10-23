@@ -12,6 +12,10 @@ export function NoteSidebar({ note, reload, panel }: { note: NoteDetail; reload:
   const [error, setError] = useState<string | null>(null);
   const suggested = note.connections.filter((c) => c.status === "suggested");
   const accepted = note.connections.filter((c) => c.status === "accepted");
+  // a note can link to the same place twice (in its text and in its concepts): each place is listed once
+  const outgoing = note.outgoing.filter(
+    (o, i, all) => all.findIndex((x) => (x.to || x.target.toLowerCase()) === (o.to || o.target.toLowerCase())) === i,
+  );
   const decide = async (c: SuggestedLink, d: "accept" | "reject" | "remove") => {
     await learn.decideConnection(c.id, d);
     reload();
@@ -84,10 +88,10 @@ export function NoteSidebar({ note, reload, panel }: { note: NoteDetail; reload:
       )}
       <section>
         <h2 className="side-title">
-          Links out <span className="count">{note.outgoing.length}</span>
+          Links out <span className="count">{outgoing.length}</span>
         </h2>
         <ul className="link-list compact">
-          {note.outgoing.map((o, i) => (
+          {outgoing.map((o, i) => (
             <li
               // biome-ignore lint/suspicious/noArrayIndexKey: a read-only list, replaced whole when it reloads
               key={i}

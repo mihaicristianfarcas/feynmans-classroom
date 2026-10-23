@@ -3,13 +3,14 @@
  * sidebar (resized from its edge; the buttons above the note hide and show it and the note list). It
  * follows changes made elsewhere (the agent, another editor) as they land, and if they land while you're
  * typing in it, asks which text to keep. */
-import { ArrowUpRight, History, Trash2 } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, History, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { docs, type Note, type NoteDetail } from "../api";
 import { go } from "../app/navigation";
 import { Markdown } from "../components/Markdown";
 import { PanelEdge, PanelToggle } from "../components/Panel";
 import { NoteContext } from "../components/QuizBlock";
+import { NoteSkeleton } from "../components/Skeletons";
 import { useIndicator } from "../components/ui";
 import { timeAgo } from "../lib/time";
 import type { Panel } from "../lib/usePanel";
@@ -129,7 +130,12 @@ export function NotePane({
   bodyRef.current = body;
 
   if (error) return <div className="note-pane center-note">{error}</div>;
-  if (!note) return <div className="note-pane center-note">Opening…</div>;
+  if (!note)
+    return (
+      <div className="note-pane">
+        <NoteSkeleton />
+      </div>
+    );
   const folder = note.path.split("/").slice(1, -1);
   return (
     <div className="note-pane">
@@ -138,6 +144,9 @@ export function NotePane({
           {/* the title is an editable field below; the heading names the page for screen readers */}
           <h1 className="visually-hidden">{note.title}</h1>
           <div className="note-bar">
+            <a className="icon-button small note-back" href="#/notes" aria-label="All notes" title="All notes">
+              <ChevronLeft aria-hidden="true" />
+            </a>
             <PanelToggle panel={list} side="left" label="note list" className="icon-button small" />
             <div className="crumbs fine">
               notes{folder.map((f) => ` / ${f}`)}

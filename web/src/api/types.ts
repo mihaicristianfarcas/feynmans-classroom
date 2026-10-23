@@ -83,8 +83,19 @@ export interface Book {
   status: "ingesting" | "ready" | "error";
   error?: string;
   tocSource?: "outline" | "nav" | "headings" | "chunks" | "codex";
+  /** Its figures that are ready: the chapters' and those drawn in the margin. */
   demoCount?: number;
   building?: number;
+  /** How far through it the learner is (null: not read yet), and at their recent pace when they'd finish. */
+  progress?: BookProgress | null;
+  /** When the learner last did anything with it (ms; null: nothing yet). */
+  lastOpened?: number | null;
+}
+export interface BookProgress {
+  /** 0–1. */
+  fraction: number;
+  /** "about 5 weeks", at the last two weeks' pace. */
+  finishIn?: string;
 }
 export interface Brief {
   slug: string;
@@ -315,6 +326,7 @@ export interface Today {
     lastTs: number;
     position: number | null;
     chapter: string | null;
+    progress: BookProgress | null;
   }[];
   suggestions: { kind: string; title: string; detail: string; action: Record<string, string> }[];
   profile: Profile;
