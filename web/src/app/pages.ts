@@ -39,6 +39,7 @@ const DATA: Record<string, () => void> = {
   journey: () => quiet(prime("journey", learn.journey)),
   review: () => quiet(prime("decks", learn.decks)),
   notes: () => quiet(prime("tree", learn.tree)),
+  brain: () => quiet(prime("graph", learn.graph)),
   settings: () => quiet(prime("settings", learn.settings)),
 };
 

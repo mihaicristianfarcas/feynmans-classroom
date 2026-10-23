@@ -8,8 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, type Book, learn } from "../api";
 import { ahead } from "../app/pages";
 import { BookCover, Meter, progressText } from "../components/BookCover";
-import { Spinner } from "../components/feedback";
-import { ShelfSkeleton } from "../components/Skeletons";
+import { Loading, Spinner } from "../components/feedback";
 import { useIndicator } from "../components/ui";
 import { BOOK_FORMATS, useBookUpload } from "../lib/useBookUpload";
 import { useLoad } from "../lib/useLoad";
@@ -95,7 +94,7 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
       {view === "figures" ? (
         <Figures theme={theme} />
       ) : books === null ? (
-        <ShelfSkeleton />
+        <Loading label="Opening your shelf" />
       ) : books.length === 0 && !add.uploading ? (
         <div className="empty-drop">
           <h2 className="empty-title">Bring in a hard book</h2>
@@ -151,7 +150,7 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
               {add.uploading && (
                 <li className="book-card" aria-busy="true">
                   <span className="book-link">
-                    <span className="book-cover sk-cover-live">
+                    <span className="book-cover cover-live">
                       <span className="book-cover-title">{add.uploading.replace(/\.[^.]+$/, "")}</span>
                     </span>
                     <Spinner label="Reading the book" />

@@ -6,7 +6,7 @@
 import { Info, Pause, Play, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { learn } from "../../api";
-import { Spinner } from "../../components/feedback";
+import { Loading } from "../../components/feedback";
 import { GraphView } from "../../components/GraphView";
 import { focusToggle, PanelEdge } from "../../components/Panel";
 import { useLoad } from "../../lib/useLoad";
@@ -36,7 +36,7 @@ function useNarrow() {
 }
 
 export function BrainGraph({ theme }: { theme: "light" | "dark" }) {
-  const { data, reload } = useLoad(() => learn.graph());
+  const { data, reload } = useLoad(() => learn.graph(), [], "graph");
   // notes and concepts made or linked elsewhere (the agent, another editor) join the graph as they land
   useVaultEvents(reload, under("notes/", "concepts/", "brain/connections"));
   const narrow = useNarrow();
@@ -149,7 +149,7 @@ export function BrainGraph({ theme }: { theme: "light" | "dark" }) {
     return (
       <div className="brain center-note">
         <h1 className="visually-hidden">Brain</h1>
-        <Spinner label="Drawing your graph" />
+        <Loading label="Drawing your graph" />
       </div>
     );
   if (!data.nodes.some((n) => n.kind !== "book"))

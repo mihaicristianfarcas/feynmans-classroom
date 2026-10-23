@@ -21,9 +21,9 @@ import {
   withFigs,
 } from "../api";
 import { SkipLink } from "../app/Shell";
+import { Loading } from "../components/feedback";
 import { PanelEdge } from "../components/Panel";
 import { PracticeSession } from "../components/Practice";
-import { BookSkeleton } from "../components/Skeletons";
 import { Toast, useToast } from "../components/Toast";
 import { CardDrafter, Connector, ExplainBack } from "../components/tools";
 import { useIndicator } from "../components/ui";
@@ -627,7 +627,7 @@ export function Reader({
               ) : blocks ? (
                 <HtmlReader ref={reader} blocks={blocks} zoom={zoom} onScroll={measure} onReady={onReady} />
               ) : (
-                <BookSkeleton />
+                <Loading label="Opening the book" />
               )}
             </MarksContext.Provider>
           </div>

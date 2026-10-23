@@ -4,7 +4,7 @@ import { CircleHelp, MessageCircleQuestion, Waypoints } from "lucide-react";
 import { useEffect, useState } from "react";
 import { type Book, type ConceptView, learn, type Quiz, type TocEntry } from "../api";
 import { Foundations } from "../components/Foundations";
-import { Mastery, Spinner } from "../components/feedback";
+import { Loading, Mastery, Spinner } from "../components/feedback";
 import { QuizRunner } from "../components/Quiz";
 import { ExplainBack } from "../components/tools";
 
@@ -121,7 +121,7 @@ export function StudyTab({
       {error && <p className="form-error">{error}</p>}
       <h3 className="sub-title">Concepts in this chapter</h3>
       {!concepts ? (
-        <Spinner label="Loading" />
+        <Loading inline label="Finding the chapter’s concepts" />
       ) : concepts.length === 0 ? (
         <p className="fine">None mapped yet. Use Map concepts, or make cards while you read.</p>
       ) : (

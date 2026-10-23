@@ -9,8 +9,7 @@ import { openAgent } from "../agent/store";
 import { type Journey, learn, type Today as TodayData } from "../api";
 import { ahead } from "../app/pages";
 import { BookCover, Meter, progressText } from "../components/BookCover";
-import { Spinner } from "../components/feedback";
-import { TodaySkeleton } from "../components/Skeletons";
+import { Loading, Spinner } from "../components/feedback";
 import { BOOK_FORMATS, useBookUpload } from "../lib/useBookUpload";
 import { useLoad } from "../lib/useLoad";
 import { under, useVaultEvents } from "../lib/useVaultEvents";
@@ -38,7 +37,7 @@ export function Today() {
     under("cards/", "notes/", "concepts/"),
   );
   if (error) return <div className="center-note">Could not load today: {error}</div>;
-  if (!data) return <TodaySkeleton />;
+  if (!data) return <Loading label="Opening today" />;
   const hour = new Date().getHours();
   const greeting = hour < 5 ? "Up late" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   const [reading, ...others] = data.books;

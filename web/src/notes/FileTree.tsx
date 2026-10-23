@@ -1,13 +1,13 @@
 /* The notes page's file tree: the vault's notes/ folder as folders you open and close and the notes
- * in them, with buttons for a new note or a new folder; each folder has a menu to add a note or a
- * folder inside it, rename or move it, or delete it. */
+ * in them (each loading as soon as it is pointed at), with buttons for a new note or a new folder; each
+ * folder has a menu to add a note or a folder inside it, rename or move it, or delete it. */
 import { ChevronRight, Ellipsis, FolderInput, FolderPlus, SquarePen, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { docs, learn } from "../api";
 import { go } from "../app/navigation";
-import { TreeSkeleton } from "../components/Skeletons";
 import { announce, useArrowKeys } from "../lib/a11y";
 import type { Panel } from "../lib/usePanel";
+import { noteAhead } from "./kept";
 
 export type Tree = Awaited<ReturnType<typeof learn.tree>>;
 
@@ -119,6 +119,7 @@ export function FileTree({
             aria-current={n.id === current ? "page" : undefined}
             style={{ paddingLeft: 26 + depth * 14 }}
             title={n.path}
+            {...noteAhead(n.id)}
           >
             {n.title}
           </a>
@@ -155,13 +156,16 @@ export function FileTree({
           <FolderPlus aria-hidden="true" />
         </button>
       </div>
-      {!root ? (
-        <TreeSkeleton />
-      ) : matches ? (
+      {!root ? null : matches ? (
         <ul className="tree">
           {matches.map((n) => (
             <li key={n.id}>
-              <a className="tree-row" href={`#/notes/${n.id}`} aria-current={n.id === current ? "page" : undefined}>
+              <a
+                className="tree-row"
+                href={`#/notes/${n.id}`}
+                aria-current={n.id === current ? "page" : undefined}
+                {...noteAhead(n.id)}
+              >
                 <span className="tree-title">{n.title}</span>{" "}
                 <span className="tree-folder">{n.path.split("/").slice(1, -1).join("/")}</span>
               </a>

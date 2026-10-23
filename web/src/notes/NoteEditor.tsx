@@ -25,7 +25,7 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { learn } from "../api";
 import { openLink } from "../app/navigation";
 
@@ -279,8 +279,9 @@ export function NoteEditor({
   const blur = useRef(onBlur);
   blur.current = onBlur;
 
+  // made before the first paint, so the note shows its text at once instead of growing into it
   // biome-ignore lint/correctness/useExhaustiveDependencies: the editor is made once; new values arrive through the effect below, as transactions
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!host.current) return;
     const v = new EditorView({
       parent: host.current,
