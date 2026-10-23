@@ -108,6 +108,8 @@ export const learn = {
     post<{ suggested: SuggestedLink[]; ms: number }>("/api/connections/suggest", { path }),
   decideConnection: (id: string, decision: "accept" | "reject" | "remove") =>
     post<SuggestedLink>(`/api/connections/${id}/${decision}`),
+  /** Has a model propose what concepts without builds-on links build on (decided like other links). */
+  suggestBuildsOn: () => post<{ suggested: SuggestedLink[] }>("/api/concepts/builds-on/suggest"),
   agents: () => call<AgentRun[]>("/api/agents"),
   runAgent: (input: { task: string; context?: AgentContext; after?: string; tier?: "fast" | "smart" }) =>
     post<AgentRun>("/api/agents", input),

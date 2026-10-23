@@ -211,7 +211,7 @@ export function allEdges(): Edge[] {
   const edges: Edge[] = [];
   const accepted = new Set(
     listConnections()
-      .filter((c) => c.status === "accepted")
+      .filter((c) => c.status === "accepted" && c.kind !== "builds-on")
       .map((c) => `${c.from}\u0000${linkKey(c.to)}`),
   );
   for (const d of docs.list()) {

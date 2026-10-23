@@ -203,7 +203,10 @@ export interface Profile {
 
 export interface Connection {
   id: string;
-  /** Vault path of the note the link goes in. */
+  /** What the link says: left out, that the two are related (it goes into `related`); builds-on, that
+   * `from` (a concept) needs `to` first (it goes into its `builds-on`). */
+  kind?: "builds-on";
+  /** Vault path of the note (or concept) the link goes in. */
   from: string;
   /** The link target as it would be written in [[…]] (a note title, a concept name). */
   to: string;

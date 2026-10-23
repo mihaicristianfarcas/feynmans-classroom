@@ -99,4 +99,8 @@ links out, and **connections**: an agent reads your vault and suggests notes and
 should link to, each with a reason. Accepting writes `related: ["[[…]]"]` into the note's
 frontmatter (so Obsidian and agents see it too); rejected and removed ones are remembered in
 `brain/connections.jsonl` and never suggested again (Settings can make it add them directly).
+Concepts get the same treatment for what they build on: Brain → Suggested links → **Find what builds
+on what** has a model read every concept and propose, for each one with no `builds-on` yet (written
+by hand, say, or in Obsidian), which of the others it needs first; accepting one writes it into the
+concept's `builds-on`.
 Renaming a note moves the file and rewrites every link to it; deleting moves it to `.trash/`.

@@ -283,7 +283,8 @@ export interface GraphData {
     path?: string;
     created: number;
   }[];
-  edges: { from: string; to: string; kind: string; id?: string; why?: string }[];
+  /** A suggestion's id and why it was made, and what it says (builds-on: that `from` needs `to` first). */
+  edges: { from: string; to: string; kind: string; id?: string; why?: string; suggests?: "builds-on" }[];
 }
 export interface SearchHit {
   kind: DocKind | "book";
