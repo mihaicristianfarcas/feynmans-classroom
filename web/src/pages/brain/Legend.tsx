@@ -49,9 +49,11 @@ function Mark({
 
 /** A kind of line as the graph draws it. */
 function Line({ kind }: { kind: string }) {
+  const arrow = kind === "builds-on";
   return (
     <svg className="legend-mark" viewBox="0 0 32 12" width="32" height="12" aria-hidden="true">
-      <line className="g-edge" data-kind={kind} x1="2" y1="6" x2="30" y2="6" />
+      <line className="g-edge" data-kind={kind} x1="2" y1="6" x2={arrow ? 24 : 30} y2="6" />
+      {arrow && <path className="g-arrow" d="M23 2.5 L30 6 L23 9.5 z" />}
     </svg>
   );
 }
@@ -140,6 +142,9 @@ export function Legend({
           <ul className="legend-list">
             <Row mark={<Line kind="link" />} name="A link you wrote">
               A [[link]] or an embed in a note or a concept.
+            </Row>
+            <Row mark={<Line kind="builds-on" />} name="Builds on">
+              From a concept to one that needs it first.
             </Row>
             <Row mark={<Line kind="related" />} name="Related">
               Listed in a note’s properties.

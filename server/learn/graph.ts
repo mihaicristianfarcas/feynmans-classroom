@@ -24,8 +24,9 @@ export interface GraphEdge {
   from: string;
   to: string;
   /** link/embed: written in a note; related: a property link; ai: a connection the learner accepted;
-   * suggested: one waiting for a decision; concept: concept to concept; mentions: note to concept; source: to its book. */
-  kind: "source" | "related" | "about" | "mentions" | "link" | "embed" | "ai" | "suggested" | "concept";
+   * suggested: one waiting for a decision; builds-on: from a concept to one it needs first; concept:
+   * concept to concept; mentions: note to concept; source: to its book. */
+  kind: "source" | "related" | "about" | "mentions" | "link" | "embed" | "ai" | "suggested" | "builds-on" | "concept";
   /** For suggestions: the connection's id and why it was suggested. */
   id?: string;
   why?: string;
@@ -77,13 +78,23 @@ export function knowledgeGraph(): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const edges: GraphEdge[] = [];
   const seen = new Set<string>();
   const add = (e: GraphEdge) => {
-    const key = `${e.from}|${e.to}`;
+    const key = [e.from, e.to].sort().join("|");
     if (e.from === e.to || !ids.has(e.from) || !ids.has(e.to) || seen.has(key)) return;
     seen.add(key);
     edges.push(e);
   };
   // the strongest kind of link between two things is the one drawn: written links first
-  const order: Edge["kind"][] = ["link", "embed", "ai", "related", "about", "concept", "mentions", "source"];
+  const order: Edge["kind"][] = [
+    "link",
+    "embed",
+    "ai",
+    "builds-on",
+    "related",
+    "about",
+    "concept",
+    "mentions",
+    "source",
+  ];
   const all = allEdges().filter((e) => e.to);
   for (const kind of order) for (const e of all) if (e.kind === kind) add({ from: e.from, to: e.to!, kind: e.kind });
   for (const c of listConnections()) {

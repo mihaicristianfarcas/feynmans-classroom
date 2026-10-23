@@ -53,8 +53,9 @@ What each kind adds:
 
 - **note**: `type` note, explanation, summary, quiz, exercises, session, connection or answer; `score`
   (an explanation's grade, 0–100).
-- **concept**: `summary` (a sentence or two), `sources` (a list of `source`s: where the books bring it
-  up); `related` links the concepts it builds on.
+- **concept**: `summary` (a sentence or two), `builds-on` (links to the concepts a learner needs
+  first: `builds-on: ["[[Bayes' rule]]"]`), `sources` (a list of `source`s: where the books bring it
+  up); `related` links the concepts it is close to or contrasts with, but doesn't need first.
 - **card**: `type` basic or cloze (the front has `{{the hidden words}}`), `deck` (a book, or general),
   `figure`, `suspended`.
 - **annotation**: `type` highlight, explain, define, ask, visualize, resources or comment; `source`
