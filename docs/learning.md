@@ -28,5 +28,10 @@ one of them where it's easiest to use.
 | **Today** | what's due, what's fading (explain it back), what to quiz a few days after reading | spacing |
 | **Brain**, **Journey** | the knowledge graph (each item an icon in a circle that shows what you recall; a legend says what the marks mean; click an item to read it in a card beside the graph); study days, recall, concepts from solid to fading | metacognition |
 
-Concept mastery is the FSRS-predicted recall of a concept's cards right now (or your best
-explanation score when it has no cards), so the graph shows what is actually fading.
+Concept mastery is the FSRS-predicted recall of a concept right now, from its cards and from the
+quiz questions you've answered on it, the two weighed the same (or your best explanation score when
+there are neither), so the graph shows what is actually fading. From quizzes (every kind but a
+pretest), it is how well your last few quizzes on the concept went, the latest counting most, times
+how much of that remains: the quizzes are replayed with FSRS like a card's reviews, so successes
+spaced over weeks fade slowly and a miss leaves the memory fragile. An answer the grader couldn't
+check is never scored.
