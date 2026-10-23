@@ -69,6 +69,8 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
       const target = e.target as HTMLElement;
       if (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) && !(e.key === "Enter" && (e.metaKey || e.ctrlKey))) return;
       if (!card || quiz) return;
+      // Space and Enter on a focused button or link are that control's (Show answer reveals by itself)
+      if ((e.key === " " || e.key === "Enter") && target.closest("button, a")) return;
       if (!revealed && (e.key === " " || e.key === "Enter")) {
         e.preventDefault();
         setRevealed(true);
