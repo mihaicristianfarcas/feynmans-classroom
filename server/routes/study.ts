@@ -1,9 +1,11 @@
-/* Routes for the study tools: quizzes and pretests (with grading of short answers), explaining an
- * idea back in your own words, connecting it to the world, and the tutor, whose sessions are kept
- * beside the book (and can be written up as a note). */
+/* Routes for the study tools: quizzes and pretests (with grading of short answers), a worked example
+ * with practice problems (kept as a note if wanted), explaining an idea back in your own words,
+ * connecting it to the world, and the tutor, whose sessions are kept beside the book (and can be
+ * written up as a note). */
 import type { Hono } from "hono";
 import type { Note } from "../../shared/vault-types.ts";
 import { readBody } from "../http.ts";
+import { makePractice, type Practice, savePractice } from "../learn/practice.ts";
 import { listSessions, noteFromSession, recordExchange } from "../learn/sessions.ts";
 import {
   connect,
@@ -22,6 +24,9 @@ export function studyRoutes(app: Hono) {
     return c.json(await gradeShortAnswers(b.items || []));
   });
   app.post("/api/quiz/record", async (c) => c.json(recordQuiz(await readBody(c))));
+
+  app.post("/api/practice", async (c) => c.json(await makePractice(await readBody(c))));
+  app.post("/api/practice/save", async (c) => c.json(savePractice(await readBody<Practice>(c))));
 
   app.post("/api/explain", async (c) => {
     const b = await readBody<{ concept: string; explanation: string; passage?: string; source?: Note["source"] }>(c);

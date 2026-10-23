@@ -164,7 +164,7 @@ export function recordQuiz(input: {
     type: "quiz",
     bookId: input.bookId,
     concepts: [...new Set(ids.values())],
-    text: `${input.mode === "pretest" ? "Pretest" : "Quiz"}: ${input.title} · ${input.score}/${input.total}`,
+    text: `${input.mode === "pretest" ? "Pretest" : input.mode === "practice" ? "Practice" : "Quiz"}: ${input.title} · ${input.score}/${input.total}`,
     data: {
       score: input.score,
       total: input.total,
