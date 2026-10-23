@@ -22,6 +22,7 @@ import {
 } from "../api";
 import { SkipLink } from "../app/Shell";
 import { PanelEdge } from "../components/Panel";
+import { PracticeSession } from "../components/Practice";
 import { Toast, useToast } from "../components/Toast";
 import { CardDrafter, Connector, ExplainBack } from "../components/tools";
 import { useIndicator } from "../components/ui";
@@ -47,7 +48,7 @@ import { savedZoom, saveZoom, stepZoom, useReadingTime, useSavedPosition, useWor
 import { NEW_CONVERSATION, pinnedOf, type TutorConversation, TutorTab } from "./Tutor";
 
 type Tab = "margin" | "figures" | "note" | "tutor" | "study";
-type Tool = "cards" | "explain" | "connect";
+type Tool = "cards" | "explain" | "connect" | "practice";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "margin", label: "Margin" },
@@ -452,6 +453,9 @@ export function Reader({
         case "teach":
           setTool({ kind: "explain", text: sel.text, source });
           break;
+        case "practice":
+          setTool({ kind: "practice", text: sel.text, source });
+          break;
         case "connect":
           setTool({ kind: "connect", text: sel.text, source });
           break;
@@ -666,6 +670,9 @@ export function Reader({
       )}
       {tool?.kind === "explain" && (
         <ExplainBack passage={tool.text} source={tool.source} theme={theme} onClose={() => setTool(null)} />
+      )}
+      {tool?.kind === "practice" && (
+        <PracticeSession passage={tool.text} source={tool.source} theme={theme} onClose={() => setTool(null)} />
       )}
       {tool?.kind === "connect" && (
         <Connector

@@ -225,6 +225,27 @@ export interface Quiz {
   questions: Question[];
   source: { bookId?: string; chapterId?: string };
 }
+/** One step of a worked solution: what it achieves, then its work. */
+export interface PracticeStep {
+  label: string;
+  work: string;
+}
+export interface PracticeProblem {
+  problem: string;
+  answer: string;
+  accept: string[];
+  steps: PracticeStep[];
+}
+/** A worked example, then problems with the same structure, and an easier one (server/learn/practice.ts). */
+export interface Practice {
+  id: string;
+  title: string;
+  concept: string;
+  example: PracticeProblem;
+  problems: PracticeProblem[];
+  easier: PracticeProblem;
+  source?: SourceRef;
+}
 export interface ExplainFeedback {
   score: number;
   verdict: string;
