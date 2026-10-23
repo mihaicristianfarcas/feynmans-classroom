@@ -57,7 +57,12 @@ export function StudyTab({
     if (autoQuiz && chapter) startQuiz(autoQuiz);
   }, [autoQuiz, chapter?.id]);
   if (!chapter) return <p className="fine">Open a chapter to study it.</p>;
-  if (quiz) return <QuizRunner quiz={quiz} theme={theme} onDone={() => setQuiz(null)} deck={book.title} />;
+  if (quiz)
+    return (
+      <div className="study-tab">
+        <QuizRunner quiz={quiz} theme={theme} onDone={() => setQuiz(null)} deck={book.title} />
+      </div>
+    );
   return (
     <div className="study-tab">
       <div className="eyebrow">{chapter.title}</div>
