@@ -1,13 +1,77 @@
-/* The Journey page: how much you study and how much of it stays. A few numbers, your study days over
- * the last six months, and your concepts from best to least known. */
-import { learn } from "../api";
+/* The Journey page: how much you study and how much of it stays. A few numbers (with a streak you can
+ * pause for a break), your study days over the last six months, and your concepts from best to least
+ * known. */
+import { useEffect, useRef, useState } from "react";
+import { type Journey as JourneyData, learn } from "../api";
 import { Mastery, Spinner } from "../components/feedback";
+import { announce } from "../lib/a11y";
 import { useLoad } from "../lib/useLoad";
 
 const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)}%`);
+/** "Friday, 31 October" for a day's key (YYYY-MM-DD). */
+const longDate = (key: string) =>
+  new Date(`${key}T12:00:00`).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+
+/** Pausing the streak for a break, so the days away don't break it; while paused, until when. */
+function StreakPause({ until, onPaused }: { until: string | null; onPaused: (journey: JourneyData) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [paused, setPaused] = useState(false);
+  const note = useRef<HTMLParagraphElement>(null);
+  // the buttons are gone once it is paused: the focus goes to the line that says so
+  useEffect(() => {
+    if (paused && until) note.current?.focus();
+  }, [paused, until]);
+  if (until)
+    return (
+      <p className="fine streak-pause" ref={note} tabIndex={-1}>
+        Your streak is paused until {longDate(until)}. The days you study still count.
+      </p>
+    );
+  const pause = async (days: number) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const journey = await learn.pauseStreak(days);
+      onPaused(journey);
+      setPaused(true);
+      if (journey.pausedUntil) announce(`Streak paused until ${longDate(journey.pausedUntil)}`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <details className="disclosure streak-pause">
+      <summary>Taking a break?</summary>
+      <p className="fine">
+        Pause your streak and the days you're away won't break it. It counts the days you study, nothing more.
+      </p>
+      <div className="row gap">
+        {(
+          [
+            [3, "3 days"],
+            [7, "A week"],
+            [14, "Two weeks"],
+          ] as const
+        ).map(([days, label]) => (
+          <button key={days} type="button" className="button small" disabled={busy} onClick={() => pause(days)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+    </details>
+  );
+}
 
 export function Journey() {
-  const { data } = useLoad(() => learn.journey());
+  const { data, setData } = useLoad(() => learn.journey());
   if (!data)
     return (
       <div className="center-note">
@@ -52,6 +116,7 @@ export function Journey() {
           </dd>
         </div>
       </dl>
+      <StreakPause until={data.pausedUntil} onPaused={setData} />
       <section>
         <h2 className="section-title">Study days</h2>
         <div className="heatmap" style={{ gridTemplateColumns: `repeat(${Math.ceil(cells.length / 7)}, 1fr)` }}>

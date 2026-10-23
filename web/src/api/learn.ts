@@ -56,6 +56,8 @@ export const learn = {
     }>("/api/vault"),
   today: () => call<Today>("/api/today"),
   journey: () => call<Journey>("/api/journey"),
+  /** Pauses the streak for a break of so many days, from today. */
+  pauseStreak: (days: number) => post<Journey>("/api/journey/pause", { days }),
   graph: () => call<GraphData>("/api/graph"),
   search: (q: string) => call<SearchHit[]>(`/api/search?q=${encodeURIComponent(q)}`),
   readPing: (body: { bookId: string; chapter?: string; chapterId?: string; position?: number; page?: number }) =>

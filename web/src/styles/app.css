@@ -2402,6 +2402,14 @@ button.toast-action {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+/* pausing the streak for a break: folded under the numbers */
+.streak-pause {
+  margin: 14px 0 0;
+}
+.streak-pause > p {
+  margin: 6px 0 10px;
+  max-width: 56ch;
+}
 .heatmap {
   display: grid;
   grid-auto-flow: column;
