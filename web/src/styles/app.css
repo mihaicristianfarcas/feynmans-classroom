@@ -1,15 +1,13 @@
 /* The platform's pages: Today, Library, Review, Brain, Ask, Journey, Settings, Welcome, and the
  * study tools that open over them. Each page shows only what it is for, under a title set in the
- * serif and a hairline; tokens and controls come from styles.css. */
+ * serif; tokens and controls come from styles.css. */
 
 /* ---------- page furniture ---------- */
-/* a page's head: its title in the serif, a line on what it holds, its actions at the end, a hairline under */
+/* a page's head: its title in the serif, a line on what it holds, its actions at the end */
 .page-head {
   display: grid;
   gap: var(--space-xs);
-  margin-bottom: var(--space-xl);
-  padding-bottom: var(--space-lg);
-  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--space-2xl);
 }
 .page-head.row {
   display: flex;
@@ -54,14 +52,12 @@
   font: 600 var(--text-xs) / 1.3 var(--sans);
   color: var(--ink-2);
 }
-/* a section beside a page's main column, on the paper under a firm rule: a small title, a number in the
-   serif, a line, an action */
+/* a section beside a page's main column, on the paper: a small title, a number in the serif, a line,
+   an action */
 .side-panel {
   display: grid;
   align-content: start;
   gap: var(--space-xs);
-  padding-top: var(--space-sm);
-  border-top: 1.5px solid var(--ink);
   color: var(--ink-2);
 }
 .panel-title {
@@ -301,9 +297,7 @@
   margin-bottom: var(--space-xl);
 }
 .welcome .section-title {
-  margin-top: var(--space-xl);
-  padding-top: var(--space-lg);
-  border-top: 1px solid var(--line);
+  margin-top: var(--space-2xl);
 }
 
 /* ---------- today: the greeting and the date, the ask field, then the book you were reading and what's
@@ -401,7 +395,6 @@
     gap: var(--space-sm);
     margin-top: var(--space-md);
     padding: var(--space-sm) 0;
-    border-bottom: 1px solid var(--line);
     color: var(--ink-2);
     font: 500 var(--text-md) / 1.3 var(--sans);
     text-decoration: none;
@@ -426,8 +419,6 @@
 }
 .today-label {
   margin: 0 0 var(--space-md);
-  padding-top: var(--space-sm);
-  border-top: 1.5px solid var(--ink);
   font: 600 var(--text-sm) / 1.3 var(--sans);
   color: var(--ink);
 }
@@ -438,7 +429,6 @@
   gap: var(--space-lg);
   padding-bottom: var(--space-lg);
   border-radius: var(--r-xs);
-  border-bottom: 1px solid var(--line);
   color: var(--ink-2);
   text-decoration: none;
 }
@@ -1105,7 +1095,6 @@
 }
 .settings-intro {
   padding-bottom: var(--space-md);
-  border-bottom: 1px solid var(--line);
 }
 .settings-intro .section-title {
   margin: 0 0 var(--space-2xs);
@@ -3090,14 +3079,11 @@ button.toast-action {
     grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   }
 }
-/* the numbers in one row under a firm rule, parted by hairlines: each figure in the serif over what it
-   counts */
+/* the numbers in one row, parted by hairlines: each figure in the serif over what it counts */
 .stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 0;
-  padding-top: var(--space-md);
-  border-top: 1.5px solid var(--ink);
 }
 .stats > div {
   display: flex;
@@ -3147,8 +3133,6 @@ button.toast-action {
 }
 .journey .section-title {
   margin: 0 0 var(--space-md);
-  padding-bottom: var(--space-sm);
-  border-bottom: 1px solid var(--line);
 }
 /* the study days: the months named over their weeks, a key under them */
 .heatmap-wrap {
