@@ -1,7 +1,8 @@
 /* The frame around every page except the reader: a slim bar along the top (the wordmark, the pages
  * beside it with the number of cards due on Review; search drawn as a field, the agent, the theme switch
  * and settings at the right end) and the page itself. On a phone the pages move to a tab bar along the
- * bottom, each with its icon. Pointing at (or focusing) a page's link fetches that page ahead. */
+ * bottom, each with its icon. Pointing at (or focusing) a page's link fetches that page ahead. The
+ * number on Review is drawn with the bar (the last one known), so the row never moves when it arrives. */
 import {
   Brain,
   Layers,
@@ -19,6 +20,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AgentButton } from "../agent/AgentButton";
 import { learn } from "../api";
 import { openPalette, useIndicator } from "../components/ui";
+import { cached, prime } from "../lib/cache";
 import { under, useVaultEvents } from "../lib/useVaultEvents";
 import { ahead } from "./pages";
 
@@ -31,17 +33,41 @@ const NAV: { route: string; label: string; icon: LucideIcon; match: RegExp }[] =
   { route: "#/journey", label: "Journey", icon: Route, match: /^#\/journey/ },
 ];
 
-/** How many cards are waiting, for the nav badge (refreshed every minute and on focus). */
+type TodayData = Awaited<ReturnType<typeof learn.today>>;
+const dueIn = (t: TodayData) => t.queue.due + t.queue.learning + t.queue.fresh;
+/** The last count seen, kept on this device: a reload draws the badge with the bar instead of after it. */
+const DUE_KEY = "classroom-due";
+function lastDue(): number | null {
+  const today = cached<TodayData>("today");
+  if (today) return dueIn(today);
+  try {
+    const kept = localStorage.getItem(DUE_KEY);
+    return kept === null ? null : Number(kept) || 0;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * How many cards are waiting, for the nav badge: the last count known at once, then the count now (asked
+ * with Today's own load, under its key, so the two share one request), again every minute and on focus.
+ */
 export function useDueCount() {
-  const [due, setDue] = useState<number | null>(null);
+  const [due, setDue] = useState<number | null>(lastDue);
   const reload = useRef<() => void>(() => {});
   // cards the agent (or another editor) makes count at once
   useVaultEvents(() => reload.current(), under("cards/"));
   useEffect(() => {
     let alive = true;
     const load = () =>
-      learn.today().then(
-        (t) => alive && setDue(t.queue.due + t.queue.learning + t.queue.fresh),
+      prime("today", learn.today).then(
+        (t) => {
+          const n = dueIn(t);
+          try {
+            localStorage.setItem(DUE_KEY, String(n));
+          } catch {}
+          if (alive) setDue(n);
+        },
         () => {},
       );
     load();
