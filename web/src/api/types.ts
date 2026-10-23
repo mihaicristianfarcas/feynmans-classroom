@@ -298,6 +298,8 @@ export interface SearchHit {
 export interface Journey {
   days: Record<string, { reviews: number; minutes: number; events: number; correct: number }>;
   streak: number;
+  /** The last day of a pause running today or later (YYYY-MM-DD). */
+  pausedUntil: string | null;
   totals: { reviews: number; cards: number; concepts: number; notes: number; figures: number; books: number };
   retention: { now: number | null; month: number | null; mature: number; learning: number; unseen: number };
   mastery: { id: string; title: string; mastery: number | null }[];

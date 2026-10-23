@@ -168,7 +168,9 @@ export type ActivityType =
   | "connect"
   | "ask"
   | "concept"
-  | "book";
+  | "book"
+  /** The streak paused (data: the first and last day, YYYY-MM-DD); not studying. */
+  | "pause";
 
 export interface Activity {
   ts: number;

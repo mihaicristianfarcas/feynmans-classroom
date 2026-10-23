@@ -1,16 +1,52 @@
 /* The learning journey and today's plan: study days and recall over time, what's due, what's
- * fading, and what to do next (with how far through the last book you are, and your pace). */
+ * fading, and what to do next (with how far through the last book you are, and your pace). The
+ * streak counts study days and nothing more (Mathua dropped its streak multiplier and speed bonus:
+ * they paid a long run or a guess more than the same careful work), and it can be paused for a break,
+ * so days away don't break it. */
 import { retrievability } from "../../shared/fsrs.ts";
+import type { Activity } from "../../shared/vault-types.ts";
 import { getBook, listBooks, listDemos } from "../books/store.ts";
-import { activity, docs, getProfile, reviews } from "../vault/index.ts";
+import { activity, docs, getProfile, logActivity, reviews } from "../vault/index.ts";
 import { cardState, reviewQueue } from "./cards.ts";
 import { conceptMastery, learnerSummary } from "./context.ts";
 import { type BookProgress, bookProgress } from "./progress.ts";
 
-const dayKey = (ts: number) => {
-  const d = new Date(ts - 4 * 3600000);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const keyOf = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** A day starts at 4 am, so a late session counts for the night before. */
+const dayKey = (ts: number) => keyOf(new Date(ts - 4 * 3600000));
+const dateOf = (key: string) => {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d);
 };
+const addDays = (key: string, n: number) => {
+  const d = dateOf(key);
+  d.setDate(d.getDate() + n);
+  return keyOf(d);
+};
+
+/** Every day a pause covers: a paused day without study neither counts toward the streak nor breaks it. */
+function pausedDays(acts: Activity[]): Set<string> {
+  const out = new Set<string>();
+  for (const a of acts) {
+    if (a.type !== "pause") continue;
+    const from = String(a.data?.from || "");
+    const until = String(a.data?.until || "");
+    if (!/^\d{4}-\d\d-\d\d$/.test(from) || !/^\d{4}-\d\d-\d\d$/.test(until)) continue;
+    for (let key = from, i = 0; key <= until && i < 31; key = addDays(key, 1), i++) out.add(key);
+  }
+  return out;
+}
+
+/** Pauses the streak for a number of days (1–30) from today. */
+export function pauseStreak(days: number) {
+  const n = Math.min(30, Math.max(1, Math.round(Number(days)) || 1));
+  const from = dayKey(Date.now());
+  const until = addDays(from, n - 1);
+  const last = dateOf(until).toLocaleDateString("en", { weekday: "long", day: "numeric", month: "long" });
+  logActivity({ type: "pause", text: `Paused the streak until ${last}`, data: { from, until } });
+  return journey();
+}
 
 export function journey() {
   const acts = activity();
@@ -27,17 +63,24 @@ export function journey() {
     bump(dayKey(r.ts), "minutes", Math.min(2, (r.took || 12) / 60));
   }
   for (const a of acts) {
+    if (a.type === "pause") continue; // a break, not study
     bump(dayKey(a.ts), "events");
     if (a.type === "read") bump(dayKey(a.ts), "minutes", Number(a.data?.minutes) || 0);
   }
-  // streak: consecutive days with any activity, ending today or yesterday
+  // streak: consecutive days with any activity, ending today or yesterday; paused days are passed over
   let streak = 0;
   const today = dayKey(Date.now());
+  const paused = pausedDays(acts);
   for (let i = 0; i < 3650; i++) {
     const key = dayKey(Date.now() - i * 86400000);
     if (days.has(key)) streak++;
-    else if (key !== today) break;
+    else if (key !== today && !paused.has(key)) break;
   }
+  const pausedUntil =
+    [...paused]
+      .filter((key) => key >= today)
+      .sort()
+      .at(-1) ?? null;
   const at = Date.now();
   const mastery = docs
     .list("concept")
@@ -49,6 +92,8 @@ export function journey() {
   return {
     days: Object.fromEntries(days),
     streak,
+    /** The last day of a pause running today or later (YYYY-MM-DD). */
+    pausedUntil,
     totals: {
       reviews: revs.length,
       cards: docs.count("card"),
