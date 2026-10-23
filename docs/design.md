@@ -68,10 +68,13 @@ shows it at once and quietly loads it anew. Moving between items of one page (no
 one on show until the next is ready, so nothing blanks or jumps; a note pointed at in the list
 starts loading before the click (`notes/kept.ts`).
 
-A note (or a concept) counts as loaded once what it shows from elsewhere is in too: its pictures with
-their sizes, KaTeX and its faces if it has math, and its embedded notes and figures (`prepareMarkdown`
-in `components/markdownReady.ts`), so it is drawn whole, and a picture always gets a space of its own
-shape before it arrives.
+Nothing moves once it is drawn. A reload paints the paper in your theme before anything else
+(index.html), and the first frame waits a moment for the typefaces, so the bar and titles never
+reflow when they swap in (`main.tsx`). The number on Review is drawn with the bar, from the last
+count known. A note (or a concept) counts as loaded once what it shows from elsewhere is in too:
+its pictures with their sizes, KaTeX and its faces if it has math, and its embedded notes and
+figures (`prepareMarkdown` in `components/markdownReady.ts`), so it is drawn whole, and a picture
+always gets a space of its own shape before it arrives.
 
 Side panels (the notes' list and links, the reader's study panel, the Brain's legend and card) are as
 wide as you drag their inner edge, within a default, a narrowest and a widest width (`usePanel` and
