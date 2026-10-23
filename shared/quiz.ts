@@ -85,18 +85,20 @@ export function quizBlocks(markdown: string): string[] {
  * marked right or wrong, and for each miss what was answered and the correction. */
 export function attemptMarkdown(
   quiz: NoteQuiz,
-  answers: ({ choice?: number; text?: string; score: number; feedback?: string } | null)[],
+  answers: ({ choice?: number; text?: string; score: number; feedback?: string; unchecked?: boolean } | null)[],
   when = new Date(),
 ): string {
   const flat = (text: string) => text.replace(/\s*\n+\s*/g, " ").trim();
-  const score = Math.round(answers.reduce((s, a) => s + (a?.score || 0), 0) * 10) / 10;
-  const lines = [
-    `> [!attempt]- ${when.toISOString().slice(0, 10)} · ${score}/${quiz.questions.length} · ${quiz.title}`,
-  ];
+  // an answer the grader couldn't check is listed, but left out of the score
+  const score = Math.round(answers.reduce((s, a) => s + (a && !a.unchecked ? a.score : 0), 0) * 10) / 10;
+  const total = quiz.questions.length - answers.filter((a) => a?.unchecked).length;
+  const lines = [`> [!attempt]- ${when.toISOString().slice(0, 10)} · ${score}/${total} · ${quiz.title}`];
   quiz.questions.forEach((q, i) => {
     const a = answers[i];
-    const right = (a?.score ?? 0) >= 0.7;
-    lines.push(`> ${i + 1}. ${right ? "✓" : "✗"} ${flat(q.question)}`);
+    const right = !a?.unchecked && (a?.score ?? 0) >= 0.7;
+    lines.push(
+      `> ${i + 1}. ${a?.unchecked ? "–" : right ? "✓" : "✗"} ${flat(q.question)}${a?.unchecked ? " (not checked)" : ""}`,
+    );
     if (right) return;
     const mine = q.kind === "mcq" ? (a?.choice !== undefined ? q.choices[a.choice] : "") : a?.text || "";
     lines.push(`>    - Mine: ${flat(mine) || "—"}`);
