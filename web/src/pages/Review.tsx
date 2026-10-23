@@ -1,12 +1,14 @@
 /* Review: flashcards due today, one at a time, interleaved across decks and scheduled with FSRS-6.
- * Space reveals the answer, 1–4 rate it; a quiet bar above picks the deck, asks you to type answers
- * first, or starts the mixed quiz. A card known for weeks is now and then asked a new way (a fresh
+ * The card is the page: under the title (with the deck, typing answers first and the mixed quiz beside
+ * it), how far through the session you are, then the card. Space reveals the answer, 1–4 rate it (the
+ * keys shown on the buttons), each rating saying when the card comes back; at the end, how it went. A card known for weeks is now and then asked a new way (a fresh
  * question on its idea, written while the first cards are reviewed), its own face shown with the answer
  * or instead, if the learner asks. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { humanInterval } from "../../../shared/fsrs.ts";
 import { learn, type QueuedCard, type Quiz } from "../api";
 import { bookLink } from "../app/navigation";
+import { Meter } from "../components/BookCover";
 import { Spinner } from "../components/feedback";
 import { Markdown } from "../components/Markdown";
 import { QuizRunner } from "../components/Quiz";
@@ -19,7 +21,7 @@ const LABELS: Record<1 | 2 | 3 | 4, string> = { 1: "Again", 2: "Hard", 3: "Good"
 export function Review({ theme }: { theme: "light" | "dark" }) {
   const query = new URLSearchParams(location.hash.split("?")[1] || "");
   const [deck, setDeck] = useState(query.get("deck") || "");
-  const { data: decks, reload: reloadDecks } = useLoad(() => learn.decks());
+  const { data: decks, reload: reloadDecks } = useLoad(() => learn.decks(), [], "decks");
   useVaultEvents(reloadDecks, under("cards/"));
   const [queue, setQueue] = useState<QueuedCard[] | null>(null);
   const [stats, setStats] = useState({ done: 0, again: 0 });
@@ -137,10 +139,12 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
     );
   }
 
+  const total = queue ? stats.done + queue.length : 0;
   return (
-    <div className="review">
-      <h1 className="visually-hidden">Review</h1>
-      <div className="review-bar">
+    <div className="review rise">
+      <header className="page-head row review-head">
+        <h1 className="page-title">Review</h1>
+        <span className="spacer" />
         <select className="quiet-select" value={deck} onChange={(e) => setDeck(e.target.value)} aria-label="Deck">
           <option value="">All decks, interleaved</option>
           {decks?.map((d) => (
@@ -160,19 +164,19 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
           />
           Type answers first
         </label>
-        <button type="button" className="button subtle" onClick={startMixed} disabled={quizLoading}>
+        <button type="button" className="button" onClick={startMixed} disabled={quizLoading}>
           {quizLoading ? <Spinner label="Writing a quiz" /> : "Mixed quiz"}
         </button>
-      </div>
-      <div className="quiz-progress">
-        <span style={{ width: `${progress * 100}%` }} />
-      </div>
+      </header>
       {!queue ? (
-        <div className="center-note">
-          <Spinner label="Gathering your cards" />
+        <div className="review-stage" aria-busy="true">
+          <span className="visually-hidden" role="status">
+            Gathering your cards…
+          </span>
+          <span className="sk sk-card" aria-hidden="true" />
         </div>
       ) : !card ? (
-        <div className="review-done">
+        <div className="review-done rise">
           <h2 className="empty-title">{stats.done ? `Done: ${stats.done} reviews` : "Nothing due right now"}</h2>
           <p className="fine">
             {stats.done
@@ -189,103 +193,111 @@ export function Review({ theme }: { theme: "light" | "dark" }) {
           </div>
         </div>
       ) : (
-        <article className="flash" data-revealed={revealed || undefined}>
-          <div className="flash-meta">
-            <span
-              className="eyebrow"
-              title={
-                card.state
-                  ? `${card.state.phase} · seen ${card.state.reps}×${card.state.lapses ? ` · forgot ${card.state.lapses}×` : ""}`
-                  : "new"
-              }
-            >
-              {card.deck}
+        <div className="review-stage">
+          <div className="review-progress">
+            <span>
+              Card {Math.min(stats.done + 1, total)} of {total}
             </span>
-            {asked && (
-              <span className="flash-asked fine">
-                Known for weeks, so asked a new way
-                {!revealed && (
-                  <button
-                    type="button"
-                    className="button subtle small"
-                    onClick={() => {
-                      setPlain(true);
-                      revealButton.current?.focus();
-                      announce("The card itself");
-                    }}
-                  >
-                    Show the card
-                  </button>
-                )}
-              </span>
-            )}
+            <Meter value={progress} tone="sage" />
+            <span>{queue.length} left</span>
           </div>
-          <Markdown
-            text={asked ? asked.question : card.front}
-            theme={theme}
-            className="flash-front"
-            hideCloze={!revealed}
-          />
-          {typing && !revealed && (
-            <textarea
-              className="flash-typed"
-              rows={3}
-              // biome-ignore lint/a11y/noAutofocus: "type it first" was chosen: the field is the next step
-              autoFocus
-              value={typed}
-              onChange={(e) => setTyped(e.target.value)}
-              placeholder="Recall it first: type your answer (⌘↵ to reveal)"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) setRevealed(true);
-              }}
-            />
-          )}
-          {revealed ? (
-            <>
-              {typed && (
-                <div className="flash-yours">
-                  <span className="eyebrow">You wrote</span>
-                  <p>{typed}</p>
-                </div>
-              )}
-              <div className="flash-back">
-                <Markdown text={asked ? asked.answer : card.back} theme={theme} />
-              </div>
+          <article className="flash" data-revealed={revealed || undefined}>
+            <div className="flash-meta">
+              <span
+                className="eyebrow"
+                title={
+                  card.state
+                    ? `${card.state.phase}, seen ${card.state.reps}×${card.state.lapses ? `, forgot ${card.state.lapses}×` : ""}`
+                    : "new"
+                }
+              >
+                {card.deck}
+              </span>
               {asked && (
-                <div className="flash-card">
-                  <span className="eyebrow">The card</span>
-                  <Markdown text={card.front} theme={theme} />
-                  <Markdown text={card.back} theme={theme} className="flash-card-back" />
+                <span className="flash-asked fine">
+                  Known for weeks, so asked a new way
+                  {!revealed && (
+                    <button
+                      type="button"
+                      className="button subtle small"
+                      onClick={() => {
+                        setPlain(true);
+                        revealButton.current?.focus();
+                        announce("The card itself");
+                      }}
+                    >
+                      Show the card
+                    </button>
+                  )}
+                </span>
+              )}
+            </div>
+            <Markdown
+              text={asked ? asked.question : card.front}
+              theme={theme}
+              className="flash-front"
+              hideCloze={!revealed}
+            />
+            {typing && !revealed && (
+              <textarea
+                className="flash-typed"
+                rows={3}
+                // biome-ignore lint/a11y/noAutofocus: "type it first" was chosen: the field is the next step
+                autoFocus
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+                placeholder="Recall it first: type your answer (⌘↵ to reveal)"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) setRevealed(true);
+                }}
+              />
+            )}
+            {revealed ? (
+              <>
+                {typed && (
+                  <div className="flash-yours">
+                    <span className="eyebrow">You wrote</span>
+                    <p>{typed}</p>
+                  </div>
+                )}
+                <div className="flash-back">
+                  <Markdown text={asked ? asked.answer : card.back} theme={theme} />
                 </div>
-              )}
-              {card.source?.bookId && (
-                <a className="fine" href={bookLink(card.source)}>
-                  From the book{card.source.quote ? `: “${card.source.quote.slice(0, 90)}…”` : ""}
-                </a>
-              )}
-              <div className="ratings">
-                {([1, 2, 3, 4] as const).map((r) => (
-                  <button type="button" key={r} className="rating" data-rating={r} onClick={() => rate(r)}>
-                    <span className="rating-label">{LABELS[r]}</span>
-                    <span className="rating-when">{card.next ? humanInterval(card.next[r]) : ""}</span>
-                    <kbd>{r}</kbd>
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="button primary reveal"
-              ref={revealButton}
-              onClick={() => setRevealed(true)}
-            >
-              Show answer <kbd>space</kbd>
-            </button>
-          )}
-        </article>
+                {asked && (
+                  <div className="flash-card">
+                    <span className="eyebrow">The card</span>
+                    <Markdown text={card.front} theme={theme} />
+                    <Markdown text={card.back} theme={theme} className="flash-card-back" />
+                  </div>
+                )}
+                {card.source?.bookId && (
+                  <a className="fine" href={bookLink(card.source)}>
+                    From the book{card.source.quote ? `: “${card.source.quote.slice(0, 90)}…”` : ""}
+                  </a>
+                )}
+                <div className="ratings">
+                  {([1, 2, 3, 4] as const).map((r) => (
+                    <button type="button" key={r} className="rating" data-rating={r} onClick={() => rate(r)}>
+                      <span className="rating-label">{LABELS[r]}</span>
+                      <span className="rating-when">{card.next ? humanInterval(card.next[r]) : ""}</span>
+                      <kbd>{r}</kbd>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="button primary reveal"
+                ref={revealButton}
+                onClick={() => setRevealed(true)}
+              >
+                Show answer <kbd>space</kbd>
+              </button>
+            )}
+          </article>
+        </div>
       )}
-      {queue && card && <p className="fine center">{queue.length} left</p>}
     </div>
   );
 }

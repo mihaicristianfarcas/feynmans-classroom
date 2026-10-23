@@ -5,15 +5,17 @@
  * or what concepts without builds-on links build on. */
 import { X } from "lucide-react";
 import { type ReactNode, type Ref, useEffect, useId, useRef, useState } from "react";
-import { docs, type GraphData, learn, type Note } from "../../api";
+import { type GraphData, learn } from "../../api";
 import { bookLink } from "../../app/navigation";
-import { Mastery, Spinner } from "../../components/feedback";
+import { Loading, Mastery, Spinner } from "../../components/feedback";
 import { levelOf, openNode } from "../../components/GraphView";
 import { Markdown } from "../../components/Markdown";
 import { ExplainBack } from "../../components/tools";
 import { announce } from "../../lib/a11y";
 import { useLoad } from "../../lib/useLoad";
 import { panelId } from "../../lib/usePanel";
+import { fetchNote } from "../../notes/kept";
+import { loadConcept } from "./loadConcept";
 
 type Node = GraphData["nodes"][number];
 
@@ -118,13 +120,16 @@ export function NodeCard({
   ];
   const suggested = data.edges.filter((e) => touching(e) && e.kind === "suggested");
   const [explaining, setExplaining] = useState(false);
+  // kept under the keys a concept's page and the notes page read them by (concept:<id>, note:<id>)
   const { data: concept } = useLoad(
-    () => (node.kind === "concept" ? learn.concept(node.id.slice(8)) : Promise.resolve(null)),
+    () => (node.kind === "concept" ? loadConcept(node.id.slice(8)) : Promise.resolve(null)),
     [node.id],
+    node.kind === "concept" ? node.id : undefined,
   );
   const { data: note } = useLoad(
-    () => (node.kind === "note" ? docs.get<Note>(node.id.slice(5)) : Promise.resolve(null)),
+    () => (node.kind === "note" ? fetchNote(node.id.slice(5)) : Promise.resolve(null)),
     [node.id],
+    node.kind === "note" ? node.id : undefined,
   );
   // useLoad keeps the last item's data until the next arrives: show it only if it's this item's
   const current = <T extends { id: string }>(x: T | null) =>
@@ -177,7 +182,7 @@ export function NodeCard({
             </div>
             {node.detail && <p className="node-card-lede">{node.detail}</p>}
             {!c ? (
-              <Spinner label="Opening" />
+              <Loading inline label="Opening" />
             ) : (
               <>
                 {c.body && <Markdown text={c.body} theme={theme} className="node-card-md" />}
@@ -213,7 +218,7 @@ export function NodeCard({
         )}
         {node.kind === "note" &&
           (!n ? (
-            <Spinner label="Opening" />
+            <Loading inline label="Opening" />
           ) : n.body.trim() ? (
             <Markdown text={n.body} theme={theme} className="node-card-md" base={n.path} />
           ) : (

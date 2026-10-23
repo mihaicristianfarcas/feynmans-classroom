@@ -2,7 +2,7 @@
  * after each answer; misses can become flashcards in one click (and what they build on that is fading
  * is named), and a quiz kept in a note can have the attempt added to it. An answer the grader couldn't check is never scored: it can be checked again,
  * or skipped and left out of the score. */
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { learn, type Question, type Quiz } from "../api";
 import { announce } from "../lib/a11y";
 import { Foundations } from "./Foundations";
@@ -179,7 +179,7 @@ export function QuizRunner({
         </span>
       </div>
       <div className="quiz-progress">
-        <span style={{ width: `${(index / quiz.questions.length) * 100}%` }} />
+        <span style={{ "--p": index / quiz.questions.length } as CSSProperties} />
       </div>
       <Markdown text={q.question} theme={theme} className="quiz-q" />
       {q.kind === "mcq" ? (

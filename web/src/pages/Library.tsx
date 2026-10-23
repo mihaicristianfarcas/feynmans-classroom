@@ -1,14 +1,33 @@
-/* The library: your books as a shelf of covers (add one with the button, or drop a file anywhere on the
- * page) and, under Figures (#/library/figures), the figures you drew. It mentions the model tool only
- * when the one in use isn't ready. */
-import { Plus, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { api, type Book, learn, type SettingsInfo } from "../api";
-import { Spinner } from "../components/feedback";
-import { toneOf, useIndicator } from "../components/ui";
+/* The library: your books as a shelf of covers (its title and author set on each), with how far through
+ * each you are and what it holds under it; find one by its title or author, and order them by the last
+ * one you touched, by title or by author. Add one with the button, or drop a file anywhere on the page:
+ * it stands on the shelf while it's read, then opens. Under Figures (#/library/figures), the figures you
+ * drew. It mentions the model tool only when the one in use isn't ready. */
+import { Plus, Search, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { api, type Book, learn } from "../api";
+import { ahead } from "../app/pages";
+import { BookCover, Meter, progressText } from "../components/BookCover";
+import { Loading, Spinner } from "../components/feedback";
+import { useIndicator } from "../components/ui";
+import { BOOK_FORMATS, useBookUpload } from "../lib/useBookUpload";
+import { useLoad } from "../lib/useLoad";
 import { Figures } from "./Figures";
 
-const FORMATS = "PDF with selectable text, EPUB, Markdown or plain text";
+type Order = "recent" | "title" | "author";
+const ORDERS: { id: Order; label: string }[] = [
+  { id: "recent", label: "Recent" },
+  { id: "title", label: "Title" },
+  { id: "author", label: "Author" },
+];
+const savedOrder = (): Order => {
+  try {
+    const o = localStorage.getItem("classroom-library-order");
+    return o === "title" || o === "author" ? o : "recent";
+  } catch {
+    return "recent";
+  }
+};
 
 export function Library({ theme }: { theme: "light" | "dark" }) {
   const [hash, setHash] = useState(location.hash);
@@ -19,52 +38,29 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
   }, []);
   const view = hash.split("?")[0].startsWith("#/library/figures") ? "figures" : "books";
   const views = useIndicator<HTMLElement>(view);
-  const [books, setBooks] = useState<Book[] | null>(null);
-  const [info, setInfo] = useState<SettingsInfo | null>(null);
-  const [uploading, setUploading] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  // a file dragged over the page: counted, so moving across children doesn't flicker the overlay
-  const [drag, setDrag] = useState(0);
-  const input = useRef<HTMLInputElement>(null);
-
-  const refresh = () => api.books().then(setBooks, (e) => setError(e.message));
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once, when the page opens
-  useEffect(() => {
-    refresh();
-    learn.settings().then(setInfo, () => setInfo(null));
-  }, []);
-
-  const upload = async (file: File | undefined) => {
-    if (!file) return;
-    setError(null);
-    setUploading(file.name);
-    try {
-      const book = await api.upload(file);
-      location.hash = `#/book/${book.id}`;
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setUploading(null);
-      refresh();
-    }
-  };
-  const files = (e: React.DragEvent) => e.dataTransfer.types.includes("Files");
+  const { data: books, error: loadError, reload } = useLoad(() => api.books(), [], "books");
+  const { data: info } = useLoad(() => learn.settings(), [], "settings");
+  const add = useBookUpload(reload);
+  const [query, setQuery] = useState("");
+  const [order, setOrder] = useState<Order>(savedOrder);
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = (books ?? []).filter((b) => !q || `${b.title} ${b.author || ""}`.toLowerCase().includes(q));
+    const when = (b: Book) => b.lastOpened ?? new Date(b.createdAt).getTime();
+    return list.sort((a, b) =>
+      order === "title"
+        ? a.title.localeCompare(b.title)
+        : order === "author"
+          ? (a.author || "~").localeCompare(b.author || "~") || a.title.localeCompare(b.title)
+          : when(b) - when(a),
+    );
+  }, [books, query, order]);
   const ready =
     !info || (info.active === "codex" ? info.codex.installed && info.codex.loggedIn : info.claude.installed);
+  const error = add.error || loadError;
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: dropping a file is a shortcut; "Add a book" does the same
-    <div
-      className="library rise"
-      onDragEnter={(e) => files(e) && setDrag((n) => n + 1)}
-      onDragLeave={(e) => files(e) && setDrag((n) => Math.max(0, n - 1))}
-      onDragOver={(e) => files(e) && e.preventDefault()}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDrag(0);
-        if (view === "books") upload(e.dataTransfer.files[0]);
-      }}
-    >
+    <div className="library rise" {...(view === "books" ? add.dropTarget : {})}>
       <header className="page-head row">
         <h1 className="page-title">Library</h1>
         <nav className="segmented" aria-label="Library" ref={views}>
@@ -76,17 +72,9 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
           </a>
         </nav>
         <span className="spacer" />
-        {view === "books" && books?.length ? (
-          <AddBook uploading={uploading} onClick={() => input.current?.click()} />
-        ) : null}
+        {view === "books" && books?.length ? <AddBook uploading={add.uploading} onClick={add.choose} primary /> : null}
       </header>
-      <input
-        ref={input}
-        type="file"
-        accept=".pdf,.epub,.md,.markdown,.txt"
-        hidden
-        onChange={(e) => upload(e.target.files?.[0])}
-      />
+      <input {...add.field} />
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -106,57 +94,116 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
       {view === "figures" ? (
         <Figures theme={theme} />
       ) : books === null ? (
-        <Spinner label="Loading your shelf" />
-      ) : books.length === 0 ? (
-        <div className="empty-state">
+        <Loading label="Opening your shelf" />
+      ) : books.length === 0 && !add.uploading ? (
+        <div className="empty-drop">
           <h2 className="empty-title">Bring in a hard book</h2>
-          <p className="fine">
-            Read it beside a margin that explains, draws and quizzes. {FORMATS}; or drop a file on this page.
-          </p>
-          <AddBook uploading={uploading} onClick={() => input.current?.click()} primary />
+          <p className="fine">Read it beside a margin that explains, draws and quizzes. {BOOK_FORMATS}.</p>
+          <AddBook uploading={add.uploading} onClick={add.choose} primary />
+          <p className="fine">Or drop the file anywhere on this page.</p>
         </div>
       ) : (
-        <ul className="shelf stagger" aria-label="Your books">
-          {books.map((book) => (
-            <li key={book.id} className="book-card">
-              <a href={`#/book/${book.id}`} className="book-link">
-                <span className="book-cover" data-tone={toneOf(book.id)} aria-hidden="true">
-                  <span className="book-cover-letter">{book.title.replace(/^(the|a|an)\s+/i, "")[0]}</span>
-                </span>
-                <span className="book-title">{book.title}</span>
-                <span className="book-author">
-                  {book.author ||
-                    (book.format === "pdf"
-                      ? `${book.pageCount} pages`
-                      : `${book.toc.length} chapter${book.toc.length === 1 ? "" : "s"}`)}
-                </span>
-                {book.building ? <span className="fine">Drawing {book.building} figures…</span> : null}
-                {book.status === "error" && <span className="form-error">{book.error}</span>}
-              </a>
-              <button
-                type="button"
-                className="icon-button book-delete"
-                aria-label={`Remove ${book.title}`}
-                title="Remove from the library"
-                onClick={async () => {
-                  if (!confirm(`Remove "${book.title}" and its figures?`)) return;
-                  await api.deleteBook(book.id);
-                  refresh();
-                }}
-              >
-                <Trash2 aria-hidden="true" />
-              </button>
-            </li>
-          ))}
-        </ul>
+        <>
+          {books.length > 1 && (
+            <div className="shelf-tools">
+              <label className="search-field">
+                <Search aria-hidden="true" />
+                <span className="visually-hidden">Find a book</span>
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Find by title or author"
+                />
+              </label>
+              <label className="shelf-order">
+                <span>Order</span>
+                <select
+                  className="quiet-select"
+                  value={order}
+                  onChange={(e) => {
+                    const o = e.target.value as Order;
+                    setOrder(o);
+                    try {
+                      localStorage.setItem("classroom-library-order", o);
+                    } catch {}
+                  }}
+                >
+                  {ORDERS.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <span className="fine shelf-count" aria-live="polite">
+                {query.trim()
+                  ? `${shown.length} of ${books.length} books`
+                  : `${books.length} book${books.length === 1 ? "" : "s"}`}
+              </span>
+            </div>
+          )}
+          {shown.length === 0 && !add.uploading ? (
+            <p className="fine shelf-none">No book’s title or author has “{query.trim()}” in it.</p>
+          ) : (
+            <ul className="shelf stagger" aria-label="Your books">
+              {add.uploading && (
+                <li className="book-card" aria-busy="true">
+                  <span className="book-link">
+                    <span className="book-cover cover-live">
+                      <span className="book-cover-title">{add.uploading.replace(/\.[^.]+$/, "")}</span>
+                    </span>
+                    <Spinner label="Reading the book" />
+                  </span>
+                </li>
+              )}
+              {shown.map((book) => (
+                <li key={book.id} className="book-card">
+                  <a href={`#/book/${book.id}`} className="book-link" {...ahead("#/book")}>
+                    <BookCover id={book.id} title={book.title} author={book.author} />
+                    <span className="book-progress">
+                      <Meter value={book.progress?.fraction ?? 0} />
+                      <span>{progressText(book.progress)}</span>
+                    </span>
+                    <span className="book-facts">{facts(book)}</span>
+                    {book.building ? <Spinner label={`Drawing ${book.building} figures`} /> : null}
+                    {book.status === "error" && <span className="form-error">{book.error}</span>}
+                  </a>
+                  <button
+                    type="button"
+                    className="icon-button book-delete"
+                    aria-label={`Remove ${book.title}`}
+                    title="Remove from the library"
+                    onClick={async () => {
+                      if (!confirm(`Remove "${book.title}" and its figures?`)) return;
+                      await api.deleteBook(book.id);
+                      reload();
+                    }}
+                  >
+                    <Trash2 aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
-      {drag > 0 && view === "books" && (
+      {add.dragging && view === "books" && (
         <div className="drop-overlay" aria-hidden="true">
           <span>Drop to add it to your library</span>
         </div>
       )}
     </div>
   );
+}
+
+/** What a book holds: its length, and its figures once there are some. */
+function facts(book: Book): string {
+  const length =
+    book.format === "pdf" && book.pageCount
+      ? `${book.pageCount} pages`
+      : `${book.toc.length} chapter${book.toc.length === 1 ? "" : "s"}`;
+  return book.demoCount ? `${length}, ${book.demoCount} figure${book.demoCount === 1 ? "" : "s"}` : length;
 }
 
 function AddBook({
@@ -174,7 +221,7 @@ function AddBook({
       className={`button ${primary ? "primary" : ""}`}
       onClick={onClick}
       disabled={!!uploading}
-      title={FORMATS}
+      title={BOOK_FORMATS}
     >
       {uploading ? (
         <Spinner label={`Reading “${uploading}”`} />

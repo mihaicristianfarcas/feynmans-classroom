@@ -34,6 +34,7 @@ import {
   useState,
 } from "react";
 import type { Anchor, Annotation, Block, Loc } from "../api";
+import { Loading } from "../components/feedback";
 import { blockRange, pageEls, pdfRects } from "./anchoring";
 
 GlobalWorkerOptions.workerSrc = workerUrl;
@@ -138,7 +139,7 @@ export const PdfReader = forwardRef<ReaderHandle, PdfProps>(function PdfReader(
       className="pdf-root"
       data-pages={pages || undefined}
       colorScheme={dark ? "dark" : "light"}
-      loader={<div className="reader-loading">Opening the book…</div>}
+      loader={<Loading label="Opening the book" />}
     >
       <PdfInner ref={ref} zoom={zoom} onZoomed={onZoomed} onScroll={onScroll} onReady={onReady} />
       {pages && <PageStrip />}

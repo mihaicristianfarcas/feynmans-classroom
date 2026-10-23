@@ -1,9 +1,10 @@
 /* One note on the notes page: its title, properties (tags, aliases, what it's about) and body (edit
  * with a live preview, or read: quizzes play there), its saved versions, and what links to it in the
  * sidebar (resized from its edge; the buttons above the note hide and show it and the note list). It
- * follows changes made elsewhere (the agent, another editor) as they land, and if they land while you're
- * typing in it, asks which text to keep. */
-import { ArrowUpRight, History, Trash2 } from "lucide-react";
+ * opens drawn from the note as last loaded, and loads it anew; it follows changes made elsewhere (the
+ * agent, another editor) as they land, and if they land while you're typing in it, asks which text to
+ * keep. */
+import { ArrowUpRight, ChevronLeft, History, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { docs, type Note, type NoteDetail } from "../api";
 import { go } from "../app/navigation";
@@ -14,29 +15,37 @@ import { useIndicator } from "../components/ui";
 import { timeAgo } from "../lib/time";
 import type { Panel } from "../lib/usePanel";
 import { useVaultEvents } from "../lib/useVaultEvents";
+import { fetchNote, keepNote } from "./kept";
 import { NoteEditor } from "./NoteEditor";
 import { NoteSidebar } from "./NoteSidebar";
 import { Versions } from "./Versions";
 
+/** A note with a quiz opens to be read: that's where the quiz plays. */
+const QUIZ = /^(`{3,}|~{3,})quiz\b/m;
+
 export function NotePane({
   id,
+  initial,
   theme,
   onChanged,
   list,
   links,
 }: {
   id: string;
+  /** The note as it was last loaded, drawn at once (null: nothing yet, so it waits for the load). */
+  initial: NoteDetail | null;
   theme: "light" | "dark";
   onChanged: () => void;
   /** The note list on the left and the links on the right: their buttons sit above the note. */
   list: Panel;
   links: Panel;
 }) {
-  const [note, setNote] = useState<NoteDetail | null>(null);
+  const [note, setNote] = useState<NoteDetail | null>(initial);
   const [error, setError] = useState<string | null>(null);
-  const [body, setBody] = useState("");
-  const [title, setTitle] = useState("");
+  const [body, setBody] = useState(initial?.body ?? "");
+  const [title, setTitle] = useState(initial?.title ?? "");
   const [mode, setMode] = useState<"edit" | "read">(() => {
+    if (initial && QUIZ.test(initial.body)) return "read";
     try {
       return (localStorage.getItem("classroom-note-mode") as "edit" | "read") || "edit";
     } catch {
@@ -47,8 +56,8 @@ export function NotePane({
   const [versions, setVersions] = useState(false);
   /** The note changed on disk while there were unsaved edits here. */
   const [clash, setClash] = useState(false);
-  /** Whether the mode was picked for this note yet (a note with a quiz opens to be read: that's where it plays). */
-  const modeSet = useRef(false);
+  /** Whether the mode was picked for this note yet. */
+  const modeSet = useRef(!!initial);
   const modes = useIndicator<HTMLFieldSetElement>(mode);
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -56,12 +65,13 @@ export function NotePane({
 
   const load = useCallback(
     () =>
-      docs.get<Note>(id).then(
+      fetchNote(id).then(
         (n) => {
+          keepNote(n);
           setNote(n);
           if (!modeSet.current) {
             modeSet.current = true;
-            if (/^(`{3,}|~{3,})quiz\b/m.test(n.body)) setMode("read");
+            if (QUIZ.test(n.body)) setMode("read");
           }
           if (!dirty.current) setBody(n.body);
           setTitle((t) => (document.activeElement === titleRef.current ? t : n.title));
@@ -129,7 +139,8 @@ export function NotePane({
   bodyRef.current = body;
 
   if (error) return <div className="note-pane center-note">{error}</div>;
-  if (!note) return <div className="note-pane center-note">Opening…</div>;
+  // nothing to draw yet: the note's place, empty, for the moment the load takes
+  if (!note) return <div className="note-pane" />;
   const folder = note.path.split("/").slice(1, -1);
   return (
     <div className="note-pane">
@@ -138,6 +149,9 @@ export function NotePane({
           {/* the title is an editable field below; the heading names the page for screen readers */}
           <h1 className="visually-hidden">{note.title}</h1>
           <div className="note-bar">
+            <a className="icon-button small note-back" href="#/notes" aria-label="All notes" title="All notes">
+              <ChevronLeft aria-hidden="true" />
+            </a>
             <PanelToggle panel={list} side="left" label="note list" className="icon-button small" />
             <div className="crumbs fine">
               notes{folder.map((f) => ` / ${f}`)}

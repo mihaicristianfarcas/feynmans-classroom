@@ -4,18 +4,34 @@
  * plus the platform's own: ```figure blocks become interactive figures, ```manim blocks animations
  * (ManimGX, played in a sandboxed frame), ```quiz blocks quizzes to play, and {{cloze}} deletions
  * become blanks. Raw HTML is never rendered. KaTeX (half a megabyte) loads with the first text that
- * has math in it; until then the math shows as its TeX. */
+ * has math in it; until then the math shows as its TeX. What a text shows from elsewhere (pictures,
+ * math, embeds) can be loaded ahead with prepareMarkdown (markdownReady.ts), and is then drawn at once,
+ * each picture in a space of its own size. */
 import type { Blockquote, Paragraph, PhrasingContent, Root, Text } from "mdast";
 import { Children, isValidElement, memo, type ReactNode, useEffect, useState } from "react";
-import ReactMarkdown, { type Components, type Options } from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { SKIP, visit } from "unist-util-visit";
 import { codeRanges } from "../../../shared/links.ts";
-import { type Doc, docs, learn, type Resolved } from "../api";
 import { openLink } from "../app/navigation";
 import { ManimView, sceneTitle } from "../manim/ManimView";
 import { SceneView } from "../scene/SceneView";
+import {
+  type Embedded,
+  hasMath,
+  imageUrl,
+  isPicture,
+  keptEmbed,
+  keptFigure,
+  loadEmbed,
+  loadFigure,
+  loadMath,
+  mathPlugins,
+  pictureSize,
+  pictureUrl,
+  rememberPicture,
+} from "./markdownReady";
 import { QuizBlock } from "./QuizBlock";
 
 /* ---------------- Obsidian syntax, as a remark plugin ---------------- */
@@ -225,13 +241,7 @@ function makeComponents(
       return <pre>{children}</pre>;
     },
     img({ src, alt, node: _node }) {
-      const url =
-        typeof src === "string"
-          ? /^(https?:|data:image\/)/.test(src)
-            ? src
-            : `/api/vault/attachment?path=${encodeURIComponent(src.startsWith("attachments/") ? src : `attachments/${src}`)}`
-          : "";
-      return <img src={url} alt={alt || ""} loading="lazy" />;
+      return <Picture url={typeof src === "string" ? imageUrl(src) : ""} alt={alt || ""} />;
     },
     input({ node: _node, ...props }) {
       // task list checkboxes: shown, not editable here
@@ -242,20 +252,15 @@ function makeComponents(
 
 /* ---------------- math, loaded on first use ---------------- */
 
-type Plugins = NonNullable<Options["rehypePlugins"]>;
-let katex: Plugins | null = null;
-let loadingKatex: Promise<Plugins> | null = null;
-
-/** The KaTeX plugin once it has loaded, starting the load when `needed`. */
-function useKatex(needed: boolean): Plugins | null {
-  const [plugins, setPlugins] = useState(katex);
+/** KaTeX's plugin once it has loaded, starting the load when `needed`. */
+function useKatex(needed: boolean) {
+  const [plugins, setPlugins] = useState(mathPlugins);
   useEffect(() => {
     if (!needed || plugins) return;
     let alive = true;
-    loadingKatex ??= Promise.all([import("rehype-katex"), import("katex/dist/katex.min.css")]).then(
-      ([m]) => (katex = [[m.default, { throwOnError: false, strict: false }]]),
-    );
-    loadingKatex.then((p) => alive && setPlugins(p)).catch(() => {});
+    loadMath()
+      .then((p) => alive && setPlugins(p))
+      .catch(() => {});
     return () => {
       alive = false;
     };
@@ -282,7 +287,7 @@ export const Markdown = memo(function Markdown({
   base?: string;
 }) {
   const source = normalizeMath(text || "");
-  const math = useKatex(source.includes("$"));
+  const math = useKatex(hasMath(source));
   return (
     <div className={`md ${hideCloze ? "hide-cloze" : ""} ${className}`}>
       <ReactMarkdown
@@ -326,47 +331,62 @@ function Embed({
   depth: number;
 }) {
   if (/^figure:/i.test(target)) return <EmbeddedFigure id={target.slice(7).trim()} theme={theme} />;
-  if (/\.(png|jpe?g|gif|webp|svg)$/i.test(target)) {
+  if (isPicture(target)) {
     const width = alias && /^\d+$/.test(alias) ? Number(alias) : undefined;
     return (
-      <img
-        className="md-image"
-        src={`/api/vault/attachment?path=${encodeURIComponent(target.includes("/") ? target : `attachments/${target}`)}`}
-        alt={alias && !width ? alias : target}
-        width={width}
-        loading="lazy"
-      />
+      <Picture url={pictureUrl(target)} alt={alias && !width ? alias : target} width={width} className="md-image" />
     );
   }
   return <EmbeddedFile target={target} sub={sub} theme={theme} depth={depth} />;
 }
 
+/**
+ * A picture, in a space of its own shape from the start when its size is known (it loaded ahead, or
+ * before this visit's last showing of it), so the text around it doesn't move when it arrives. `width`
+ * is the width a note asked for (![[picture.png|300]]).
+ */
+function Picture({ url, alt, width, className }: { url: string; alt: string; width?: number; className?: string }) {
+  const size = pictureSize(url);
+  const w = width ?? size?.w;
+  const h = size && w ? Math.round((w * size.h) / size.w) : undefined;
+  return (
+    <img
+      className={className}
+      src={url}
+      alt={alt}
+      width={w}
+      height={h}
+      loading={size ? undefined : "lazy"}
+      onLoad={(e) => rememberPicture(url, e.currentTarget)}
+    />
+  );
+}
+
+/** ![[figure:<id>]]: the figure, drawn once its scene is here (at once if it was loaded ahead). */
 function EmbeddedFigure({ id, theme }: { id: string; theme: "light" | "dark" }) {
-  const [spec, setSpec] = useState<unknown>(null);
+  const [figure, setFigure] = useState(() => keptFigure(id));
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    docs.get(id).then(
-      (f) => (f.kind === "figure" ? setSpec(f.scene) : setError("not a figure")),
-      (e) => setError(e.message),
+    let alive = true;
+    loadFigure(id).then(
+      (f) => alive && setFigure(f),
+      (e) => alive && setError((e as Error).message),
     );
+    return () => {
+      alive = false;
+    };
   }, [id]);
-  if (error) return <span className="fine">Figure {id} not found.</span>;
-  if (!spec) return <span className="fine">Loading figure…</span>;
+  if (error && !figure) return <span className="fine">Figure {id} not found.</span>;
+  if (!figure) return null;
   return (
     <span className="md-figure">
-      <SceneView spec={spec} theme={theme} compact predict={false} />
+      <SceneView spec={figure.scene} theme={theme} compact predict={false} />
     </span>
   );
 }
 
-/** What an embedded document shows: its body, a concept with its summary first, an annotation under its passage. */
-function embedBody(doc: Doc) {
-  if (doc.kind === "concept") return `**${doc.title}**: ${doc.summary}\n\n${doc.body}`;
-  if (doc.kind === "annotation") return `> ${doc.source.quote.replace(/\n/g, "\n> ")}\n\n${doc.body}`;
-  return doc.body;
-}
-
-/** ![[Note]] or ![[library/…/annotations/…]]: the file's content, framed, with a way to open it. */
+/** ![[Note]] or ![[library/…/annotations/…]]: the file's content, framed, with a way to open it. Shown at
+ * once if it was loaded ahead, and loaded anew. */
 function EmbeddedFile({
   target,
   sub,
@@ -378,15 +398,11 @@ function EmbeddedFile({
   theme: "light" | "dark";
   depth: number;
 }) {
-  const [state, setState] = useState<{ resolved?: Resolved; body?: string; error?: string }>({});
+  const [state, setState] = useState<Partial<Embedded> & { error?: string }>(() => keptEmbed(target, sub) ?? {});
   useEffect(() => {
     let alive = true;
-    learn.resolve(target, sub).then(
-      async (resolved) => {
-        const body =
-          resolved.kind === "book" || resolved.kind === "attachment" ? "" : embedBody(await docs.get(resolved.id));
-        if (alive) setState({ resolved, body });
-      },
+    loadEmbed(target, sub).then(
+      (embedded) => alive && setState(embedded),
       (e) => alive && setState({ error: (e as Error).message }),
     );
     return () => {
@@ -405,10 +421,10 @@ function EmbeddedFile({
         >
           {target}
         </a>{" "}
-        <span className="fine">doesn't exist yet</span>
+        <span className="fine">doesn’t exist yet</span>
       </span>
     );
-  if (!state.resolved) return <span className="md-embed-box fine">Loading {target}…</span>;
+  if (!state.resolved) return null;
   const r = state.resolved;
   return (
     <span className="md-embed-box" data-kind={r.kind}>

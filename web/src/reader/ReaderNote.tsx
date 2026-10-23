@@ -163,7 +163,7 @@ export function ReaderNote({
             where they came from. It’s a Markdown file in your vault’s notes/ folder.
           </p>
           <button type="button" className="button primary" onClick={() => ensureNote()}>
-            Start “{book.title} — notes”
+            Start a note for this book
           </button>
         </div>
       )}

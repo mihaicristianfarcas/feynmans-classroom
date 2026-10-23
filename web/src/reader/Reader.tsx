@@ -21,6 +21,7 @@ import {
   withFigs,
 } from "../api";
 import { SkipLink } from "../app/Shell";
+import { Loading } from "../components/feedback";
 import { PanelEdge } from "../components/Panel";
 import { PracticeSession } from "../components/Practice";
 import { Toast, useToast } from "../components/Toast";
@@ -517,13 +518,13 @@ export function Reader({
           hidden={!study.open}
         >
           <div className="pane-head">
-            <div className="pane-tabs segmented" role="tablist" aria-label="Study panel" ref={tabs}>
+            <div className="pane-tabs tabs" role="tablist" aria-label="Study panel" ref={tabs}>
               {TABS.map(({ id: t, label }) => (
                 <button
                   type="button"
                   key={t}
                   id={`pane-tab-${t}`}
-                  className="pane-tab"
+                  className="pane-tab tab"
                   role="tab"
                   aria-selected={tab === t}
                   aria-controls="pane-panel"
@@ -556,6 +557,11 @@ export function Reader({
                 onOpenFigure={(id) => setLightbox(id)}
                 figs={figs}
                 toast={say}
+                pos={pos}
+                onGo={(item) => {
+                  setFocused(item.id);
+                  jumpTo(item.annotation ? locOfAnchor(item.annotation.source) : item.demo.anchor);
+                }}
               />
             ) : tab === "figures" ? (
               <FiguresIndex
@@ -621,7 +627,7 @@ export function Reader({
               ) : blocks ? (
                 <HtmlReader ref={reader} blocks={blocks} zoom={zoom} onScroll={measure} onReady={onReady} />
               ) : (
-                <div className="reader-loading">Opening the book…</div>
+                <Loading label="Opening the book" />
               )}
             </MarksContext.Provider>
           </div>

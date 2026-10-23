@@ -1,33 +1,73 @@
-/* The frame around every page except the reader: a slim bar along the top (the pages, with the number
- * of cards due on Review; the agent, search, the theme switch and settings at the right end) and the
- * page itself. */
-import { Moon, Search, Settings, Sun } from "lucide-react";
+/* The frame around every page except the reader: a slim bar along the top (the wordmark, the pages
+ * beside it with the number of cards due on Review; search drawn as a field, the agent, the theme switch
+ * and settings at the right end) and the page itself. On a phone the pages move to a tab bar along the
+ * bottom, each with its icon. Pointing at (or focusing) a page's link fetches that page ahead. The
+ * number on Review is drawn with the bar (the last one known), so the row never moves when it arrives. */
+import {
+  Brain,
+  Layers,
+  Library,
+  type LucideIcon,
+  Moon,
+  NotebookPen,
+  Route,
+  Search,
+  Settings,
+  Sun,
+  Sunrise,
+} from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AgentButton } from "../agent/AgentButton";
 import { learn } from "../api";
 import { openPalette, useIndicator } from "../components/ui";
+import { cached, prime } from "../lib/cache";
 import { under, useVaultEvents } from "../lib/useVaultEvents";
+import { ahead } from "./pages";
 
-const NAV: { route: string; label: string; match: RegExp }[] = [
-  { route: "#/", label: "Today", match: /^#\/?$/ },
-  { route: "#/library", label: "Library", match: /^#\/library/ },
-  { route: "#/notes", label: "Notes", match: /^#\/notes/ },
-  { route: "#/review", label: "Review", match: /^#\/review/ },
-  { route: "#/brain", label: "Brain", match: /^#\/brain/ },
-  { route: "#/journey", label: "Journey", match: /^#\/journey/ },
+const NAV: { route: string; label: string; icon: LucideIcon; match: RegExp }[] = [
+  { route: "#/", label: "Today", icon: Sunrise, match: /^#\/?$/ },
+  { route: "#/library", label: "Library", icon: Library, match: /^#\/library/ },
+  { route: "#/notes", label: "Notes", icon: NotebookPen, match: /^#\/notes/ },
+  { route: "#/review", label: "Review", icon: Layers, match: /^#\/review/ },
+  { route: "#/brain", label: "Brain", icon: Brain, match: /^#\/brain/ },
+  { route: "#/journey", label: "Journey", icon: Route, match: /^#\/journey/ },
 ];
 
-/** How many cards are waiting, for the nav badge (refreshed every minute and on focus). */
+type TodayData = Awaited<ReturnType<typeof learn.today>>;
+const dueIn = (t: TodayData) => t.queue.due + t.queue.learning + t.queue.fresh;
+/** The last count seen, kept on this device: a reload draws the badge with the bar instead of after it. */
+const DUE_KEY = "classroom-due";
+function lastDue(): number | null {
+  const today = cached<TodayData>("today");
+  if (today) return dueIn(today);
+  try {
+    const kept = localStorage.getItem(DUE_KEY);
+    return kept === null ? null : Number(kept) || 0;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * How many cards are waiting, for the nav badge: the last count known at once, then the count now (asked
+ * with Today's own load, under its key, so the two share one request), again every minute and on focus.
+ */
 export function useDueCount() {
-  const [due, setDue] = useState<number | null>(null);
+  const [due, setDue] = useState<number | null>(lastDue);
   const reload = useRef<() => void>(() => {});
   // cards the agent (or another editor) makes count at once
   useVaultEvents(() => reload.current(), under("cards/"));
   useEffect(() => {
     let alive = true;
     const load = () =>
-      learn.today().then(
-        (t) => alive && setDue(t.queue.due + t.queue.learning + t.queue.fresh),
+      prime("today", learn.today).then(
+        (t) => {
+          const n = dueIn(t);
+          try {
+            localStorage.setItem(DUE_KEY, String(n));
+          } catch {}
+          if (alive) setDue(n);
+        },
         () => {},
       );
     load();
@@ -58,18 +98,10 @@ export function Shell({
 }) {
   const due = useDueCount();
   const [hash, setHash] = useState(location.hash || "#/");
-  // the bar draws its hairline only once the page scrolls under it
-  const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const onHash = () => setHash(location.hash || "#/");
-    const onScroll = () => setScrolled(window.scrollY > 2);
-    onScroll();
     window.addEventListener("hashchange", onHash);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("hashchange", onHash);
-      window.removeEventListener("scroll", onScroll);
-    };
+    return () => window.removeEventListener("hashchange", onHash);
   }, []);
   const path = hash.split("?")[0];
   const current = NAV.findIndex((item) => item.match.test(path));
@@ -86,8 +118,8 @@ export function Shell({
   return (
     <div className="shell">
       <SkipLink />
-      <header className="topnav" data-line={scrolled || full || undefined}>
-        <a className="brand" href="#/" title="Today">
+      <header className="topnav">
+        <a className="brand" href="#/" title="Today" {...ahead("#/")}>
           <span className="brand-mark" aria-hidden="true" />
           <span className="brand-name">Feynman’s Classroom</span>
         </a>
@@ -95,8 +127,14 @@ export function Shell({
           <ul className="topnav-links" ref={nav}>
             {NAV.map((item, i) => (
               <li key={item.route}>
-                <a href={item.route} className="topnav-link" aria-current={i === current ? "page" : undefined}>
-                  {item.label}
+                <a
+                  href={item.route}
+                  className="topnav-link"
+                  aria-current={i === current ? "page" : undefined}
+                  {...ahead(item.route)}
+                >
+                  <item.icon className="topnav-icon" aria-hidden="true" />
+                  <span className="topnav-label">{item.label}</span>
                   {item.label === "Review" && due ? (
                     <span className="badge">
                       <span className="visually-hidden">, </span>
@@ -110,10 +148,9 @@ export function Shell({
           </ul>
         </nav>
         <div className="topnav-tools">
-          <AgentButton />
           <button
             type="button"
-            className="icon-button"
+            className="topnav-search"
             onClick={openPalette}
             aria-label="Search"
             aria-haspopup="dialog"
@@ -121,7 +158,11 @@ export function Shell({
             title={`Search (${mac ? "⌘K" : "Ctrl K"})`}
           >
             <Search aria-hidden="true" />
+            {/* the label names the button; these only show it */}
+            <span>Search</span>
+            <kbd>{mac ? "⌘K" : "Ctrl K"}</kbd>
           </button>
+          <AgentButton />
           <ThemeButton theme={theme} setTheme={setTheme} />
           <a
             className="icon-button"
@@ -129,6 +170,7 @@ export function Shell({
             aria-label="Settings"
             title="Settings"
             aria-current={path.startsWith("#/settings") ? "page" : undefined}
+            {...ahead("#/settings")}
           >
             <Settings aria-hidden="true" />
           </a>

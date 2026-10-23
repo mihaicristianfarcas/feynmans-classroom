@@ -13,6 +13,8 @@ export function Palette() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
+  // the words the shown results answer: "No matches" waits for the search of what's typed
+  const [found, setFound] = useState("");
   const [index, setIndex] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   useFocusTrap(box, open, { onEscape: () => setOpen(false), initial: "input" });
@@ -32,11 +34,16 @@ export function Palette() {
     };
   }, []);
   useEffect(() => {
-    if (!q.trim()) return setHits([]);
+    if (!q.trim()) {
+      setHits([]);
+      setFound("");
+      return;
+    }
     const t = setTimeout(
       () =>
         learn.search(q).then((h) => {
           setHits(h);
+          setFound(q);
           setIndex(0);
           announce(h.length ? `${h.length} result${h.length === 1 ? "" : "s"}` : "No matches");
         }),
@@ -116,7 +123,7 @@ export function Palette() {
                 {i === index && <CornerDownLeft className="hit-enter" aria-hidden="true" />}
               </div>
             ))}
-            {q.trim() && !hits.length && (
+            {q.trim() && found === q && !hits.length && (
               // biome-ignore lint/a11y/useKeyWithClickEvents: Enter in the field does the same
               <div
                 className="palette-empty"

@@ -1,10 +1,11 @@
 /* Notes and everything written: the notes page (file tree, note, links beside it), the editor, and
- * Markdown as it renders anywhere in the app. Writing reads in the serif; the app around it is sans. */
+ * Markdown as it renders anywhere in the app. Writing reads in the learner's reading face (the serif
+ * unless they chose the sans); the app around it is sans. */
 
 /* ---------- Markdown ---------- */
 .md {
   color: var(--ink);
-  font: 15.5px / 1.65 var(--serif);
+  font: 400 1.0625rem / 1.62 var(--read-font);
   overflow-wrap: anywhere;
 }
 .md > :first-child {
@@ -20,8 +21,10 @@
 .md h2,
 .md h3,
 .md h4 {
-  font-family: var(--serif);
+  font-family: var(--read-font);
+  font-weight: 600;
   line-height: 1.3;
+  text-wrap: balance;
   margin: 1.3em 0 0.5em;
   color: var(--ink);
   letter-spacing: -0.01em;
@@ -48,7 +51,7 @@
 }
 .md blockquote {
   margin: 0 0 0.8em;
-  padding-left: 14px;
+  padding-left: var(--space-md);
   border-left: 2px solid var(--line-strong);
   color: var(--ink-2);
 }
@@ -57,11 +60,11 @@
 }
 .md pre {
   margin: 0 0 0.8em;
-  padding: 12px 14px;
+  padding: var(--space-sm) var(--space-md);
   border-radius: var(--r);
   background: var(--sunken);
   overflow: auto;
-  font: 12.5px / 1.55 var(--mono);
+  font: var(--text-xs) / 1.55 var(--mono);
 }
 .md pre code {
   background: none;
@@ -76,7 +79,7 @@
 .md td,
 .md th {
   border: 1px solid var(--line);
-  padding: 5px 9px;
+  padding: var(--space-2xs) var(--space-xs);
 }
 .md th {
   background: var(--bg);
@@ -85,12 +88,12 @@
 }
 .md a {
   color: var(--ink);
-  text-decoration-color: color-mix(in srgb, var(--sky-ink) 50%, transparent);
+  text-decoration-color: color-mix(in oklab, var(--sky-ink) 50%, transparent);
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
   transition:
-    text-decoration-color 150ms ease,
-    color 150ms ease;
+    text-decoration-color 150ms ease-out,
+    color 150ms ease-out;
 }
 .md a:hover {
   color: var(--sky-ink);
@@ -99,14 +102,14 @@
 .md .wikilink {
   /* underlined too: a link must not be told apart by colour alone */
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--sky-ink) 45%, transparent);
+  text-decoration-color: color-mix(in oklab, var(--sky-ink) 45%, transparent);
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
   color: var(--sky-ink);
-  background: color-mix(in srgb, var(--sky-soft) 70%, transparent);
+  background: color-mix(in oklab, var(--sky-soft) 70%, transparent);
   border-radius: 4px;
-  padding: 0 3px;
-  transition: background-color 150ms ease;
+  padding: 0 var(--space-2xs);
+  transition: background-color 150ms ease-out;
 }
 .md .wikilink:hover {
   background: var(--sky-soft);
@@ -132,7 +135,7 @@
 }
 .md .md-figure {
   display: block;
-  margin: 12px 0;
+  margin: var(--space-sm) 0;
   font-family: var(--sans);
 }
 .md .katex {
@@ -142,7 +145,7 @@
   background: var(--butter-soft);
   box-shadow: inset 0 -0.45em 0 var(--butter);
   color: inherit;
-  padding: 0 2px;
+  padding: 0 var(--space-3xs);
   border-radius: 3px;
 }
 .md img,
@@ -151,7 +154,7 @@
   height: auto;
   border-radius: var(--r);
   display: block;
-  margin: 10px 0;
+  margin: var(--space-sm) 0;
   box-shadow: 0 0 0 1px var(--line);
 }
 .md hr {
@@ -166,7 +169,7 @@
 .md .task-list-item {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--space-xs);
 }
 .md .task-list-item input {
   transform: translateY(2px);
@@ -175,12 +178,12 @@
   font: 500 0.78em var(--sans);
   color: var(--accent-ink);
   background: var(--accent-soft);
-  padding: 1px 7px;
+  padding: 1px var(--space-xs);
   border-radius: 999px;
 }
 .md .callout {
   margin: 0 0 0.9em;
-  padding: 10px 14px;
+  padding: var(--space-sm) var(--space-md);
   border-radius: var(--r);
   background: var(--sky-soft);
   color: var(--ink);
@@ -207,15 +210,15 @@
   background: var(--peach-soft);
 }
 .md .callout-title {
-  margin-bottom: 4px;
-  font: 600 13px / 1.4 var(--sans);
+  margin-bottom: var(--space-2xs);
+  font: 600 var(--text-sm) / 1.4 var(--sans);
   font-style: normal;
   color: var(--ink);
 }
 .md .callout-title a {
   display: inline-block;
-  padding: 3px 0;
-  margin: -3px 0;
+  padding: var(--space-2xs) 0;
+  margin: calc(var(--space-2xs) * -1) 0;
   color: var(--sky-ink);
 }
 .md .callout > p:last-child {
@@ -232,16 +235,16 @@
   background: var(--sunken);
 }
 .md .callout[data-callout="attempt"] ol {
-  margin: 4px 0 0;
+  margin: var(--space-2xs) 0 0;
   padding-left: 1.4em;
   font-family: var(--sans);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
 }
 /* a folded callout ([!type]-) opens with a click, like any disclosure */
 .md details.callout > summary {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-xs);
   min-height: 24px;
   margin-bottom: 0;
   cursor: pointer;
@@ -263,7 +266,7 @@
   transition: transform 160ms var(--ease-out);
 }
 .md details.callout[open] > summary {
-  margin-bottom: 6px;
+  margin-bottom: var(--space-xs);
 }
 .md details.callout[open] > summary::before {
   transform: rotate(90deg);
@@ -277,9 +280,9 @@
 .md .md-quiz {
   display: grid;
   justify-items: start;
-  gap: 6px;
+  gap: var(--space-xs);
   margin: 0 0 1em;
-  padding: 16px 18px;
+  padding: var(--space-md) 20px;
   border-radius: var(--r-lg);
   background: var(--surface);
   box-shadow:
@@ -295,11 +298,11 @@
 }
 .md .md-quiz-title {
   margin: 0;
-  font: 600 16px / 1.35 var(--sans);
+  font: 600 1rem / 1.35 var(--sans);
   color: var(--ink);
 }
 .md .md-quiz .fine {
-  margin: 0 0 6px;
+  margin: 0 0 var(--space-xs);
 }
 .md .md-quiz[data-error] pre {
   max-width: 100%;
@@ -307,8 +310,8 @@
 }
 .md-embed-box {
   display: block;
-  margin: 8px 0 14px;
-  padding: 10px 14px;
+  margin: var(--space-xs) 0 var(--space-md);
+  padding: var(--space-sm) var(--space-md);
   border-radius: var(--r);
   background: var(--bg);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -322,10 +325,10 @@
 }
 .md-embed-head {
   display: flex;
-  gap: 10px;
+  gap: var(--space-sm);
   align-items: baseline;
-  margin-bottom: 4px;
-  font: 12px var(--sans);
+  margin-bottom: var(--space-2xs);
+  font: var(--text-xs) var(--sans);
 }
 .md-embed-head a {
   color: var(--sky-ink);
@@ -352,15 +355,15 @@
 .tree-head {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 12px 10px 8px;
+  gap: var(--space-3xs);
+  padding: var(--space-sm) var(--space-sm) var(--space-xs);
 }
 .tree-head .search {
   width: auto;
   flex: 1;
-  margin-right: 4px;
+  margin-right: var(--space-2xs);
   height: 32px !important;
-  font-size: 13px !important;
+  font-size: var(--text-sm) !important;
 }
 .tree {
   list-style: none;
@@ -370,20 +373,20 @@
 .file-tree > .tree {
   flex: 1;
   overflow: auto;
-  padding: 2px 8px 14px;
+  padding: var(--space-3xs) var(--space-xs) var(--space-md);
 }
 .tree-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-xs);
   width: 100%;
-  height: 30px;
-  padding: 0 8px;
+  height: 32px;
+  padding: 0 var(--space-xs);
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--r);
   background: none;
   color: var(--ink-2);
-  font: 13.5px / 1 var(--sans);
+  font: var(--text-sm) / 1 var(--sans);
   text-decoration: none;
   text-align: left;
   cursor: pointer;
@@ -391,8 +394,8 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   transition:
-    background-color 120ms ease,
-    color 120ms ease;
+    background-color 120ms ease-out,
+    color 120ms ease-out;
 }
 .tree-row[aria-current="page"] {
   background: var(--surface);
@@ -413,7 +416,7 @@
   align-items: center;
 }
 .tree-folder-row .tree-row {
-  padding-right: 30px;
+  padding-right: 32px;
 }
 .tree-folder-menu {
   position: absolute;
@@ -449,15 +452,15 @@
 }
 .tree-folder {
   margin-left: auto;
-  padding-left: 6px;
-  font-size: 11.5px;
+  padding-left: var(--space-xs);
+  font-size: var(--text-2xs);
   color: var(--ink-3);
 }
 .tree-foot {
   margin: 0;
-  padding: 10px 16px;
+  padding: var(--space-sm) var(--space-md);
   border-top: 1px solid var(--line);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 @media (hover: hover) and (pointer: fine) {
   .tree-row:not([aria-current="page"]):hover {
@@ -489,7 +492,7 @@
 }
 .empty-pane .empty {
   max-width: 520px;
-  padding: 24px;
+  padding: var(--space-lg);
 }
 .note-main {
   flex: 1;
@@ -499,54 +502,57 @@
   min-width: 0;
 }
 .note-head {
-  padding: 22px 32px 12px;
+  padding: var(--space-lg) 32px var(--space-sm);
 }
 /* the list's button, the folders, the links' button: the buttons sit in the padding, the folders line up with the title */
 .note-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-xs);
   min-height: 24px;
-  margin: -12px -24px 4px -30px;
+  margin: calc(var(--space-sm) * -1) calc(var(--space-lg) * -1) var(--space-2xs) -32px;
 }
 .crumbs {
   margin: 0;
   display: flex;
-  gap: 8px;
+  gap: var(--space-xs);
   align-items: center;
-  font: 12.5px var(--sans);
+  font: var(--text-xs) var(--sans);
   color: var(--ink-3);
 }
 .badge-type {
   display: inline-flex;
   align-items: center;
   height: 19px;
-  padding: 0 8px;
+  padding: 0 var(--space-xs);
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent-ink);
-  font: 500 11.5px var(--sans);
+  font: 500 var(--text-2xs) var(--sans);
   text-transform: capitalize;
 }
 .note-title-input {
   width: 100%;
   height: auto !important;
-  margin: 6px 0 4px;
-  padding: 2px 0 !important;
+  margin: var(--space-xs) 0 var(--space-2xs);
+  padding: var(--space-3xs) 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
   background: transparent !important;
-  font: 650 30px / 1.2 var(--sans) !important;
-  letter-spacing: -0.024em;
+  font: 500 var(--text-3xl) / 1.15 var(--serif) !important;
+  letter-spacing: var(--tracking-title);
   color: var(--ink) !important;
 }
-.note-title-input:focus {
-  box-shadow: none !important;
+/* the title is edited in place: focus underlines it rather than boxing it */
+.note-title-input:focus,
+.note-title-input:focus-visible {
+  outline: none;
+  box-shadow: inset 0 -2px 0 var(--focus) !important;
 }
 .note-tools {
-  margin-top: 6px;
-  gap: 8px !important;
+  margin-top: var(--space-xs);
+  gap: var(--space-xs) !important;
 }
 .note-tools .fine {
   margin: 0;
@@ -556,7 +562,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--ink-3);
   background: none;
   padding: 0;
@@ -578,24 +584,24 @@
 .properties {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 18px;
+  gap: var(--space-2xs) 20px;
   align-items: center;
-  margin-top: 12px;
-  padding-top: 10px;
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
   border-top: 1px solid var(--line);
 }
 .properties label {
   display: inline-flex;
-  gap: 8px;
+  gap: var(--space-xs);
   align-items: center;
-  font: 12.5px var(--sans);
+  font: var(--text-xs) var(--sans);
   color: var(--ink-3);
 }
 .properties input {
   width: 210px;
   height: 28px !important;
-  padding: 0 8px !important;
-  font-size: 13px !important;
+  padding: 0 var(--space-xs) !important;
+  font-size: var(--text-sm) !important;
   background: transparent !important;
   box-shadow: none !important;
   border-radius: 6px !important;
@@ -619,8 +625,8 @@
 .note-clash {
   flex-wrap: wrap;
   align-items: center;
-  margin: 10px 0 0;
-  padding: 8px 10px 8px 12px;
+  margin: var(--space-sm) 0 0;
+  padding: var(--space-xs) var(--space-sm) var(--space-xs) var(--space-sm);
   border-radius: var(--r);
   background: var(--butter-soft);
   color: var(--butter-ink);
@@ -637,13 +643,13 @@
 .versions {
   display: grid;
   grid-template-columns: 220px 1fr;
-  gap: 18px;
+  gap: 20px;
   min-height: 320px;
 }
 .versions-list {
   list-style: none;
   margin: 0;
-  padding: 0 6px 0 0;
+  padding: 0 var(--space-xs) 0 0;
   max-height: 60vh;
   overflow: auto;
   border-right: 1px solid var(--line);
@@ -653,8 +659,8 @@
   border: 0;
   width: 100%;
   display: grid;
-  gap: 2px;
-  padding: 7px 9px;
+  gap: var(--space-3xs);
+  padding: var(--space-xs) var(--space-xs);
   border-radius: var(--r);
   background: transparent;
   text-align: left;
@@ -670,11 +676,11 @@
   }
 }
 .versions-when {
-  font: 500 13px var(--sans);
+  font: 500 var(--text-sm) var(--sans);
   color: var(--ink);
 }
 .versions-what {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--ink-3);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -683,13 +689,13 @@
 .versions-view {
   display: grid;
   align-content: start;
-  gap: 12px;
+  gap: var(--space-sm);
   min-width: 0;
 }
 .versions-text {
   max-height: 52vh;
   overflow: auto;
-  padding: 4px 4px 12px !important;
+  padding: var(--space-2xs) var(--space-2xs) var(--space-sm) !important;
 }
 @media (max-width: 700px) {
   .versions {
@@ -710,7 +716,7 @@
   height: 100%;
 }
 .note-read {
-  padding: 18px 32px 40vh;
+  padding: 20px 32px 40vh;
   max-width: 760px;
 }
 .note-side {
@@ -720,44 +726,44 @@
   min-width: 0;
   display: grid;
   align-content: start;
-  gap: 22px;
+  gap: var(--space-lg);
   overflow: hidden auto;
-  padding: 18px 16px 32px;
+  padding: 20px var(--space-md) 32px;
   border-left: 1px solid var(--line);
   background: var(--bg);
 }
 .side-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 0 0 8px;
-  font: 600 13px / 1.3 var(--sans);
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-xs);
+  font: 600 var(--text-sm) / 1.3 var(--sans);
   color: var(--ink);
 }
 .side-title .count {
   min-width: 18px;
   height: 18px;
-  padding: 0 5px;
+  padding: 0 var(--space-2xs);
   border-radius: 999px;
   display: inline-grid;
   place-items: center;
   background: var(--sunken);
   color: var(--ink-3);
-  font: 500 11px var(--sans);
+  font: 500 var(--text-2xs) var(--sans);
 }
 .note-side .fine {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-xs);
 }
 .link-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 10px;
-  font-size: 13.5px;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
 }
 .link-list.compact {
-  gap: 5px;
+  gap: var(--space-2xs);
 }
 .link-list a {
   color: var(--sky-ink);
@@ -776,9 +782,9 @@
   vertical-align: middle;
 }
 .link-list .context {
-  margin-top: 3px;
+  margin-top: var(--space-2xs);
   color: var(--ink-3);
-  font-size: 12.5px;
+  font-size: var(--text-xs);
   line-height: 1.45;
   overflow-wrap: anywhere;
   display: -webkit-box;
@@ -790,33 +796,33 @@
   display: inline-flex;
   align-items: center;
   height: 16px;
-  margin-left: 6px;
-  padding: 0 5px;
+  margin-left: var(--space-xs);
+  padding: 0 var(--space-2xs);
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent-ink);
-  font: 600 10px / 1 var(--sans);
+  font: 600 0.6875rem / 1 var(--sans);
   letter-spacing: 0.02em;
   vertical-align: 1px;
 }
 .note-side .suggestion {
   display: grid;
-  gap: 6px;
-  margin-bottom: 8px;
-  padding: 10px 12px;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xs);
+  padding: var(--space-sm) var(--space-sm);
   border-radius: var(--r-lg);
   background: var(--surface);
   box-shadow: 0 0 0 1px var(--line);
-  font-size: 13.5px;
+  font-size: var(--text-sm);
   color: var(--ink);
   animation: rise 240ms var(--ease-out) backwards;
 }
 .note-side .suggestion .context {
   color: var(--ink-2);
-  font-size: 12.5px;
+  font-size: var(--text-xs);
 }
 .note-side section > .button {
-  margin-top: 4px;
+  margin-top: var(--space-2xs);
 }
 
 /* ---------- the editor (CodeMirror) ---------- */
@@ -848,7 +854,7 @@
 }
 .cm-wikilink {
   color: var(--sky-ink);
-  background: color-mix(in srgb, var(--sky-soft) 70%, transparent);
+  background: color-mix(in oklab, var(--sky-soft) 70%, transparent);
   border-radius: 3px;
 }
 .cm-mark {
@@ -883,12 +889,30 @@
     border-top: 1px solid var(--line);
   }
 }
+/* the way back to the list shows only on a phone, where the list and the note take turns */
+.note-back {
+  display: none !important;
+}
 @media (max-width: 760px) {
   .notes-page {
     flex-direction: column;
     height: auto;
   }
   .notes-page > .panel-edge {
+    display: none;
+  }
+  .notes-page[data-open] > .file-tree,
+  .notes-page:not([data-open]) > .note-pane {
+    display: none;
+  }
+  .notes-page:not([data-open]) > .file-tree {
+    max-height: none;
+    border-bottom: 0;
+  }
+  .note-back {
+    display: inline-grid !important;
+  }
+  .note-bar [data-panel-toggle] {
     display: none;
   }
   .file-tree {
@@ -899,12 +923,15 @@
     border-bottom: 1px solid var(--line);
   }
   .note-head {
-    padding: 18px 16px 10px;
+    padding: 20px var(--space-md) var(--space-sm);
+  }
+  .note-body {
+    --note-gutter: var(--space-md);
   }
   .note-bar {
-    margin: -10px -8px 4px;
+    margin: calc(var(--space-sm) * -1) calc(var(--space-xs) * -1) var(--space-2xs);
   }
   .note-read {
-    padding: 16px 16px 40vh;
+    padding: var(--space-md) var(--space-md) 40vh;
   }
 }

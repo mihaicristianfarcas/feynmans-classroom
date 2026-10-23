@@ -291,9 +291,11 @@ try {
   await page.goto(`${BASE}#/notes`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".file-tree .tree", { timeout: 10000 }).catch(() => null);
   check("the Notes page shows the vault's notes", !!(await page.$(".file-tree .tree")));
-  const tree = (await (await fetch(`${BASE}api/vault/tree`)).json()) as { notes: { id: string }[] };
-  if (tree.notes[0]) {
-    await page.goto(`${BASE}#/notes/${tree.notes[0].id}`, { waitUntil: "domcontentloaded" });
+  const tree = (await (await fetch(`${BASE}api/vault/tree`)).json()) as { notes: { id: string; type: string }[] };
+  // a quiz opens to be read (that's where it plays), so take a plain note
+  const plain = tree.notes.find((n) => n.type === "note");
+  if (plain) {
+    await page.goto(`${BASE}#/notes/${plain.id}`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".note-editor .cm-content", { timeout: 10000 });
     check("a note opens in the editor with its links beside it", !!(await page.$(".note-side")));
   }

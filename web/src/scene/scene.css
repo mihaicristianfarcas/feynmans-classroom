@@ -2,69 +2,83 @@
  * off-white, the lit element in the lavender accent, pastel inks for red, green and blue).
  * Tokens follow the theme on .scene itself, so a figure renders the same in the app, in a note,
  * in a flashcard and on a standalone page. */
-.scene {
-  --sc-page: #f8f7f4;
-  --sc-card: #ffffff;
-  --sc-paper: #ffffff;
-  --sc-text: #55555b;
-  --sc-strong: #2b2b2f;
-  --sc-muted: #69696d;
-  --sc-hi: #2b2b2f;
-  --sc-mid: #8a898f;
-  --sc-lo: #bbb8b2;
-  --sc-faint: #e4e1da;
-  --sc-lit: #6a5cc4;
-  --sc-red: #d6606c;
-  --sc-green: #4b986a;
-  --sc-blue: #4c7fc0;
-  --sc-line: #e7e4dd;
-  --sc-line-strong: #d6d2c9;
-  --sc-hover: rgb(43 43 47 / 0.05);
-  --sc-soft: #efecfb;
-  --sc-face-lo: #d8d4cb;
-  --sc-face-hi: #ffffff;
-  --sc-halo: #8a8478;
+/* the figure's palette, the app's paper, ink and pastels; each figure follows its own data-theme,
+   so it can be drawn light inside a dark page and the other way round */
+:root,
+[data-theme="light"] {
+  --sc-page: oklch(97.6% 0.006 85);
+  --sc-card: oklch(99.2% 0.003 85);
+  --sc-paper: oklch(99.2% 0.003 85);
+  --sc-text: oklch(38% 0.01 280);
+  --sc-strong: oklch(23% 0.012 280);
+  --sc-muted: oklch(49% 0.01 280);
+  --sc-hi: oklch(23% 0.012 280);
+  --sc-mid: oklch(62% 0.008 280);
+  --sc-lo: oklch(78% 0.01 85);
+  --sc-faint: oklch(91% 0.008 85);
+  --sc-lit: oklch(52% 0.15 285);
+  --sc-red: oklch(60% 0.14 15);
+  --sc-green: oklch(60% 0.11 155);
+  --sc-blue: oklch(57% 0.12 250);
+  --sc-line: oklch(90.6% 0.008 85);
+  --sc-line-strong: oklch(84.5% 0.01 85);
+  --sc-hover: oklch(30% 0.01 280 / 0.05);
+  --sc-soft: oklch(95.4% 0.02 290);
+  --sc-face-lo: oklch(87% 0.01 85);
+  --sc-face-hi: oklch(99.2% 0.003 85);
+  --sc-halo: oklch(58% 0.02 80);
   --sc-halo-o: 0.26;
-  --sc-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --sc-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --sc-serif: "Iowan Old Style", Charter, "Bitstream Charter", Cambria, Georgia, serif;
+  --sc-thumb-shadow: oklch(20% 0.01 280 / 0.12);
+  --sc-choice-shadow: oklch(20% 0.01 280 / 0.06);
+  --sc-lift: 0 0 0 1px oklch(90.6% 0.008 85), 0 1px 2px oklch(25% 0.01 280 / 0.05);
+  --sc-pop:
+    0 0 0 1px oklch(25% 0.01 280 / 0.07), 0 4px 8px -2px oklch(25% 0.01 280 / 0.06),
+    0 20px 44px -12px oklch(25% 0.01 280 / 0.22);
+  --sc-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --sc-sans: "Hanken Grotesk Variable", "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --sc-serif: "Newsreader Variable", "Newsreader", "Iowan Old Style", Charter, Georgia, serif;
   --sc-ease: cubic-bezier(0.23, 1, 0.32, 1);
-  --sc-lift: 0 0 0 1px #e7e4dd, 0 1px 2px rgb(40 36 30 / 0.05);
-  --sc-pop: 0 0 0 1px rgb(40 36 30 / 0.06), 0 4px 8px -2px rgb(40 36 30 / 0.06), 0 18px 40px -10px rgb(40 36 30 / 0.2);
+}
+[data-theme="dark"] {
+  --sc-page: oklch(19% 0.006 280);
+  --sc-card: oklch(22.5% 0.007 280);
+  --sc-paper: oklch(22.5% 0.007 280);
+  --sc-text: oklch(83% 0.007 85);
+  --sc-strong: oklch(94.5% 0.006 85);
+  --sc-muted: oklch(69% 0.008 280);
+  --sc-hi: oklch(90% 0.006 85);
+  --sc-mid: oklch(64% 0.008 280);
+  --sc-lo: oklch(44% 0.009 280);
+  --sc-faint: oklch(30% 0.008 280);
+  --sc-lit: oklch(83% 0.075 290);
+  --sc-red: oklch(78% 0.09 12);
+  --sc-green: oklch(80% 0.08 155);
+  --sc-blue: oklch(80% 0.07 250);
+  --sc-line: oklch(29% 0.008 280);
+  --sc-line-strong: oklch(36% 0.009 280);
+  --sc-hover: oklch(95% 0.006 85 / 0.06);
+  --sc-soft: oklch(27.5% 0.035 290);
+  --sc-face-lo: oklch(15% 0.005 280);
+  --sc-face-hi: oklch(31% 0.009 280);
+  --sc-halo: oklch(5% 0.005 280);
+  --sc-halo-o: 0.85;
+  --sc-thumb-shadow: oklch(5% 0 0 / 0.3);
+  --sc-choice-shadow: oklch(5% 0 0 / 0.25);
+  --sc-lift: 0 0 0 1px oklch(29% 0.008 280);
+  --sc-pop:
+    0 0 0 1px oklch(95% 0.006 85 / 0.07), 0 6px 12px -4px oklch(5% 0 0 / 0.4), 0 22px 48px -12px oklch(5% 0 0 / 0.65);
+}
+.scene {
   color-scheme: light;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-sm);
   color: var(--sc-text);
   font: 13px / 1.5 var(--sc-sans);
   -webkit-font-smoothing: antialiased;
   min-width: 0;
 }
 .scene[data-theme="dark"] {
-  --sc-page: #1d1d20;
-  --sc-card: #252529;
-  --sc-paper: #252529;
-  --sc-text: #bebcb7;
-  --sc-strong: #edebe6;
-  --sc-muted: #949398;
-  --sc-hi: #dedcd6;
-  --sc-mid: #8c8b90;
-  --sc-lo: #56555b;
-  --sc-faint: #35353b;
-  --sc-lit: #c8bff3;
-  --sc-red: #f0a0a8;
-  --sc-green: #95d1a9;
-  --sc-blue: #9ec2ee;
-  --sc-line: #303035;
-  --sc-line-strong: #3e3e44;
-  --sc-hover: rgb(237 235 230 / 0.06);
-  --sc-soft: #2c2939;
-  --sc-face-lo: #161618;
-  --sc-face-hi: #38383e;
-  --sc-halo: #000000;
-  --sc-halo-o: 0.85;
-  --sc-lift: 0 0 0 1px #303035;
-  --sc-pop: 0 0 0 1px rgb(255 255 255 / 0.06), 0 6px 12px -4px rgb(0 0 0 / 0.4), 0 20px 48px -12px rgb(0 0 0 / 0.65);
   color-scheme: dark;
 }
 .scene * {
@@ -80,7 +94,7 @@
   background: var(--sc-card);
   box-shadow: var(--sc-lift);
   border-radius: 12px;
-  padding: 40px 16px 42px;
+  padding: var(--space-xl) var(--space-md) 44px;
   overflow: hidden;
 }
 .sc-corner {
@@ -329,15 +343,15 @@
 .sc-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 16px;
-  margin-top: 8px;
+  gap: var(--space-2xs) var(--space-md);
+  margin-top: var(--space-xs);
   font: 12.5px var(--sc-sans);
   color: var(--sc-text);
 }
 .sc-key {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-xs);
 }
 .sc-key svg {
   width: 18px;
@@ -357,14 +371,14 @@
 .sc-narration b {
   font: 600 12px var(--sc-sans);
   color: var(--sc-muted);
-  margin-right: 8px;
+  margin-right: var(--space-xs);
 }
 
 /* transport */
 .sc-transport {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-xs);
   flex-wrap: wrap;
 }
 .sc-btn {
@@ -373,7 +387,7 @@
   border-radius: 8px;
   height: 30px;
   min-width: 30px;
-  padding: 0 9px;
+  padding: 0 var(--space-xs);
   display: inline-grid;
   place-items: center;
   background: var(--sc-card);
@@ -395,7 +409,7 @@
 }
 .sc-btn[disabled] {
   opacity: 0.38;
-  cursor: default;
+  cursor: not-allowed;
 }
 .sc-btn svg {
   width: 13px;
@@ -414,7 +428,7 @@
   flex: 1 1 140px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-sm);
   min-width: 120px;
 }
 .sc-range {
@@ -441,12 +455,12 @@
   -webkit-appearance: none;
   width: 15px;
   height: 15px;
-  margin-top: -5.5px;
+  margin-top: calc(var(--space-xs) * -1);
   border-radius: 50%;
   background: var(--sc-card);
   box-shadow:
     0 0 0 1px var(--sc-line-strong),
-    0 1px 2px rgb(0 0 0 / 0.12);
+    0 1px 2px var(--sc-thumb-shadow);
   transition: transform 0.16s var(--sc-ease);
 }
 .sc-range::-moz-range-thumb {
@@ -473,7 +487,7 @@
 }
 .sc-range:disabled {
   opacity: 0.35;
-  cursor: default;
+  cursor: not-allowed;
 }
 .sc-time {
   font: 500 12px var(--sc-sans);
@@ -486,7 +500,7 @@
 .sc-zoom {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-2xs);
   flex: 0 1 150px;
   min-width: 110px;
 }
@@ -497,20 +511,20 @@
   width: 1px;
   height: 18px;
   background: var(--sc-line);
-  margin: 0 4px;
+  margin: 0 var(--space-2xs);
 }
 
 /* params */
 .sc-params {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 18px;
+  gap: var(--space-xs) 20px;
   align-items: center;
 }
 .sc-param {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-sm);
   min-height: 28px;
   font: 13px / 1.2 var(--sc-sans);
   color: var(--sc-text);
@@ -535,8 +549,8 @@
 }
 .sc-choices {
   display: inline-flex;
-  gap: 2px;
-  padding: 3px;
+  gap: var(--space-3xs);
+  padding: var(--space-2xs);
   border-radius: 9px;
   background: var(--sc-page);
   box-shadow: inset 0 0 0 1px var(--sc-line);
@@ -545,7 +559,7 @@
   appearance: none;
   border: 0;
   height: 24px;
-  padding: 0 10px;
+  padding: 0 var(--space-sm);
   border-radius: 6px;
   background: transparent;
   color: var(--sc-muted);
@@ -561,15 +575,15 @@
   color: var(--sc-strong);
   box-shadow:
     0 0 0 1px var(--sc-line),
-    0 1px 2px rgb(0 0 0 / 0.06);
+    0 1px 2px var(--sc-choice-shadow);
 }
 
 /* stats */
 .sc-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px 18px;
-  padding-top: 8px;
+  gap: var(--space-2xs) 20px;
+  padding-top: var(--space-xs);
   border-top: 1px solid var(--sc-line);
   font: 12.5px / 1.6 var(--sc-sans);
   font-variant-numeric: tabular-nums;
@@ -579,7 +593,7 @@
 }
 .sc-stat {
   display: inline-flex;
-  gap: 6px;
+  gap: var(--space-xs);
   white-space: nowrap;
 }
 .sc-stat-label {
@@ -598,24 +612,22 @@
   bottom: 36px;
   z-index: 3;
   display: flex;
-  gap: 8px;
+  gap: var(--space-xs);
   align-items: baseline;
-  padding: 8px 12px;
+  padding: var(--space-xs) var(--space-sm);
   background: var(--sc-card);
   box-shadow: var(--sc-pop);
   border-radius: 10px;
   font-size: 13px;
   color: var(--sc-text);
   pointer-events: none;
-  opacity: 0;
-  transform: translateY(4px);
   transition:
     opacity 0.18s var(--sc-ease),
     transform 0.18s var(--sc-ease);
 }
-.sc-info[data-on] {
-  opacity: 1;
-  transform: none;
+/* the player shows it (data-on) while a part is picked or hovered */
+.sc-info:not([data-on]) {
+  opacity: 0;
 }
 .sc-info b {
   font: 600 12.5px var(--sc-sans);
@@ -629,8 +641,8 @@
   bottom: 40px;
   z-index: 4;
   display: grid;
-  gap: 10px;
-  padding: 16px 18px;
+  gap: var(--space-sm);
+  padding: var(--space-md) 20px;
   background: var(--sc-card);
   box-shadow: var(--sc-pop);
   border-radius: 12px;
@@ -663,11 +675,11 @@
 .sc-predict-choices {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-xs);
 }
 .sc-predict-choices .sc-btn {
   height: auto;
-  padding: 8px 12px;
+  padding: var(--space-xs) var(--space-sm);
   font: 13px var(--sc-sans);
   text-align: left;
 }
@@ -695,7 +707,7 @@
   position: absolute;
   inset: auto 16px 40px 16px;
   z-index: 5;
-  padding: 10px 12px;
+  padding: var(--space-sm) var(--space-sm);
   background: var(--sc-card);
   border-radius: 10px;
   box-shadow: inset 0 0 0 1px var(--sc-red);
@@ -721,7 +733,7 @@
 
 /* compact: embedded in notes and cards */
 .scene[data-compact] .sc-plate {
-  padding: 34px 10px 36px;
+  padding: 36px var(--space-sm) 36px;
 }
 .scene[data-compact] .sc-params,
 .scene[data-compact] .sc-stats {
@@ -730,7 +742,7 @@
 
 @media (max-width: 560px) {
   .sc-plate {
-    padding: 36px 6px 40px;
+    padding: 36px var(--space-xs) var(--space-xl);
   }
   .sc-param[data-kind="slider"] {
     flex-basis: 100%;

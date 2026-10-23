@@ -3,7 +3,7 @@
 import { Shapes, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { docs } from "../api";
-import { Spinner } from "../components/feedback";
+import { Loading } from "../components/feedback";
 import { FigureMaker } from "../components/tools";
 import { useLoad } from "../lib/useLoad";
 import { under, useVaultEvents } from "../lib/useVaultEvents";
@@ -46,7 +46,7 @@ export function Figures({ theme }: { theme: "light" | "dark" }) {
         />
       )}
       {!data ? (
-        <Spinner label="Loading figures" />
+        <Loading label="Opening the figures" />
       ) : !data.length ? (
         <p className="fine">Figures you draw from notes and concepts collect here.</p>
       ) : (

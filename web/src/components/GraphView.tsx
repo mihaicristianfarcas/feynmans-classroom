@@ -1,9 +1,10 @@
 /* The knowledge graph as a force-directed picture that fills its box: concepts, notes, books (and, if
  * shown, annotations) as circles with their kind's icon inside and their name beside them, links as
  * lines. A concept's circle shows how well it's known (NodeMark, which the Brain's legend draws too).
- * Hovering or focusing an item lights it and its links; clicking it (or Enter) selects it,
- * double-clicking opens its page. Arrow keys move between items, dragging moves one, dragging the
- * background pans, ⌘-scroll or the buttons zoom. */
+ * Hovering or focusing an item lights it and its links; clicking it (or Enter) selects it and glides
+ * it to the middle of what the cards over the graph leave clear; double-clicking opens its page. Arrow
+ * keys move between items, dragging moves one, dragging the background pans, ⌘-scroll or the buttons
+ * zoom. */
 import {
   forceCollide,
   forceLink,
@@ -207,6 +208,7 @@ export function GraphView({
   onSelect,
   inset = 0,
   insetLeft = 0,
+  insetBottom = 0,
   tools,
 }: {
   data: GraphData;
@@ -217,7 +219,7 @@ export function GraphView({
   highlight?: string;
   /** Shows the graph as it was at this time (a replay of how it grew: each item and link fades in as it's made). */
   until?: number;
-  /** The selected item's id: ringed, its links lit, kept in view. */
+  /** The selected item's id: ringed, its links lit, centred in the room the cards leave. */
   selected?: string | null;
   /** An item was clicked (or chosen with Enter), or the background was clicked (null). */
   onSelect?: (node: N | null, byKeyboard: boolean) => void;
@@ -225,6 +227,8 @@ export function GraphView({
   inset?: number;
   /** Pixels at the left covered by a card, kept clear the same way. */
   insetLeft?: number;
+  /** Pixels at the bottom covered by a card (a sheet, on a phone), kept clear the same way. */
+  insetBottom?: number;
   /** More buttons for the cluster in the corner. */
   tools?: ReactNode;
 }) {
@@ -262,6 +266,8 @@ export function GraphView({
   // the graph last laid out
   const laidOut = useRef<{ nodes?: N[]; links?: L[]; alpha?: number }>({});
   const drag = useRef<{ node?: N; sx: number; sy: number; v: View; moved: boolean } | null>(null);
+  // a press that ended without moving, for the click that follows it
+  const pressed = useRef<{ node?: N } | null>(null);
   const svg = useRef<SVGSVGElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const helpId = useId();
@@ -286,9 +292,9 @@ export function GraphView({
     return () => ro.disconnect();
   }, []);
 
-  // the cards over either side, read when the view moves
-  const covered = useRef({ left: 0, right: 0 });
-  covered.current = { left: insetLeft, right: inset };
+  // the cards over the sides and the bottom, read when the view moves
+  const covered = useRef({ left: 0, right: 0, bottom: 0 });
+  covered.current = { left: insetLeft, right: inset, bottom: insetBottom };
 
   const named = useMemo(() => namedIn(nodes), [nodes]);
 
@@ -296,7 +302,7 @@ export function GraphView({
    * clear of the find field and the tools. */
   const fit = (list: N[]): View => {
     const { w, h } = sizeRef.current;
-    const { left, right } = covered.current;
+    const { left, right, bottom } = covered.current;
     const mid = (left - right) / 2;
     let x0 = Number.POSITIVE_INFINITY,
       y0 = Number.POSITIVE_INFINITY,
@@ -310,12 +316,12 @@ export function GraphView({
       y0 = Math.min(y0, n.y - b.h / 2);
       y1 = Math.max(y1, n.y + b.h / 2);
     }
-    if (!Number.isFinite(x0)) return { k: 1, x: mid, y: 0 };
+    if (!Number.isFinite(x0)) return { k: 1, x: mid, y: -bottom / 2 };
     const k = Math.min(
       1.25,
-      Math.max(0.3, Math.min((w - left - right - 2 * EDGE_X) / (x1 - x0), (h - 2 * EDGE_Y) / (y1 - y0))),
+      Math.max(0.3, Math.min((w - left - right - 2 * EDGE_X) / (x1 - x0), (h - bottom - 2 * EDGE_Y) / (y1 - y0))),
     );
-    return { k, x: -((x0 + x1) / 2) * k + mid, y: -((y0 + y1) / 2) * k };
+    return { k, x: -((x0 + x1) / 2) * k + mid, y: -((y0 + y1) / 2) * k - bottom / 2 };
   };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: lays out again only when the graph changes (fit reads the size from a ref)
@@ -418,26 +424,41 @@ export function GraphView({
     return map;
   }, [links]);
 
+  /** Moves the view to put an item in the middle of the room the cards leave, gliding unless told not to. */
+  const center = (n: N, glided = true) => {
+    if (n.x === undefined || n.y === undefined) return;
+    const { left, right, bottom } = covered.current;
+    const v = viewRef.current;
+    setGlide(glided);
+    setView({ ...v, x: (left - right) / 2 - n.x * v.k, y: -bottom / 2 - n.y * v.k });
+  };
   /**
-   * Keeps an item clear of the cards and the edges: if it isn't, the view centres it between them, gliding
-   * unless the move came from the arrow keys (what the keyboard does, often, happens at once).
+   * Keeps an item clear of the cards and the edges: if it isn't, the view centres it between them at
+   * once (it's the arrow keys moving focus, and what the keyboard does, often, doesn't animate).
    */
-  const reveal = (n: N, glided = true) => {
+  const reveal = (n: N) => {
     if (n.x === undefined || n.y === undefined) return;
     const { w, h } = sizeRef.current;
-    const { left, right } = covered.current;
+    const { left, right, bottom } = covered.current;
     const v = viewRef.current;
     const sx = n.x * v.k + v.x,
       sy = n.y * v.k + v.y;
-    if (sx > -w / 2 + left + 40 && sx < w / 2 - right - 40 && sy > -h / 2 + EDGE_Y && sy < h / 2 - EDGE_Y) return;
-    setGlide(glided);
-    setView({ ...v, x: (left - right) / 2 - n.x * v.k, y: -n.y * v.k });
+    if (
+      sx > -w / 2 + left + 40 &&
+      sx < w / 2 - right - 40 &&
+      sy > -h / 2 + EDGE_Y &&
+      sy < h / 2 - Math.max(bottom + 24, EDGE_Y)
+    )
+      return;
+    center(n, false);
   };
+  // the item picked (here, from the find field or from a card) and the room around it as cards open,
+  // close or are resized: the item glides to the middle of that room
   // biome-ignore lint/correctness/useExhaustiveDependencies: only when the selection or a card changes
   useEffect(() => {
     const n = selected ? nodes.find((x) => x.id === selected) : null;
-    if (n) reveal(n);
-  }, [selected, inset, insetLeft]);
+    if (n) center(n);
+  }, [selected, inset, insetLeft, insetBottom]);
 
   /** Pointer position in drawing units, from the middle of the box. */
   const toScreen = (event: { clientX: number; clientY: number }) => {
@@ -451,8 +472,10 @@ export function GraphView({
   const zoom = (factor: number) =>
     moveTo((v) => {
       const k = Math.min(4, Math.max(0.3, v.k * factor));
-      const cx = (insetLeft - inset) / 2;
-      return { k, x: cx - (cx - v.x) * (k / v.k), y: v.y * (k / v.k) };
+      // about the middle of the room the cards leave
+      const cx = (insetLeft - inset) / 2,
+        cy = -insetBottom / 2;
+      return { k, x: cx - (cx - v.x) * (k / v.k), y: cy - (cy - v.y) * (k / v.k) };
     });
 
   const q = highlight.trim().toLowerCase();
@@ -473,12 +496,15 @@ export function GraphView({
     "aria-pressed": n.id === selected,
     onFocus: () => {
       setHover(n.id);
-      reveal(n, false);
+      // focus that follows a press is the press's to handle (it glides the item to the middle)
+      if (!drag.current) reveal(n);
     },
     onBlur: () => setHover(null),
     onKeyDown: (e: React.KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
+        // picked again (it stays selected): back to the middle all the same
+        if (n.id === selected) center(n);
         onSelect?.(n, true);
       }
     },
@@ -499,6 +525,7 @@ export function GraphView({
         Double-click an item to open its page.
       </p>
       {/* biome-ignore lint/a11y/useSemanticElements: an SVG can't be a fieldset; role=group names the drawing's items as a set */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: each item has its own keys (Enter picks it, the arrows move between them), and a click on the background only closes the card, as Escape does */}
       <svg
         ref={svg}
         className="graph"
@@ -551,7 +578,16 @@ export function GraphView({
             d.node.fy = null;
             sim.current?.alphaTarget(0);
           }
-          if (d && !d.moved) onSelect?.(d.node ?? null, false);
+          pressed.current = d && !d.moved ? d : null;
+        }}
+        // the pick happens on the click, the press's last event: a card opened sooner (a sheet rising
+        // under a finger, on a phone) would take that click as its own
+        onClick={() => {
+          const d = pressed.current;
+          pressed.current = null;
+          if (!d) return;
+          if (d.node && d.node.id === selected) center(d.node);
+          onSelect?.(d.node ?? null, false);
         }}
         onWheel={(e) => {
           if (!e.ctrlKey && !e.metaKey) return;
@@ -659,6 +695,8 @@ export function GraphView({
                     {labelOf(n)}
                   </text>
                 )}
+                {/* a shortened name shows whole on hover */}
+                {labelOf(n) !== n.label && <title>{n.label}</title>}
               </g>
             );
           })}
