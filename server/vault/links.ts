@@ -11,7 +11,7 @@ import type { Doc, DocKind, SourceRef } from "../../shared/vault-types.ts";
 import { bookFolder, listBooks } from "../books/store.ts";
 import type { Book } from "../books/types.ts";
 import { listConnections } from "./connections.ts";
-import { changed, docs, onVaultChange, VAULT } from "./index.ts";
+import { changed, docs, onVaultChange, vaultDir, vaultState } from "./index.ts";
 import { withBody } from "./kinds.ts";
 
 export type NodeKind = DocKind | "book" | "attachment";
@@ -47,13 +47,13 @@ interface Names {
   byKey: Map<string, Resolved[]>;
   books: Book[];
 }
-let names: Names | null = null;
-let edgesCache: Edge[] | null = null;
+const cached = vaultState(() => ({ names: null as Names | null, edges: null as Edge[] | null }));
 let version = 0;
 export const linkVersion = () => version;
 export function invalidateLinks() {
-  names = null;
-  edgesCache = null;
+  const c = cached();
+  c.names = null;
+  c.edges = null;
   version++;
 }
 onVaultChange(() => invalidateLinks());
@@ -125,11 +125,13 @@ export function resolveLink(target: string, sub?: string): Resolved | null {
   }
   if (/\.(png|jpe?g|gif|webp|svg)$/i.test(t)) {
     const path = t.includes("/") ? t : `attachments/${t}`;
-    return existsSync(join(VAULT, path))
+    return existsSync(join(vaultDir(), path))
       ? { node: `attachment:${path}`, kind: "attachment", id: path, path, title: basename(path) }
       : null;
   }
-  names ||= buildNames();
+  const c = cached();
+  c.names ||= buildNames();
+  const { names } = c;
   let found = names.byKey.get(linkKey(t))?.[0];
   // a file inside a book's folder (its text by chapter, its PDF): the book, at that chapter's first page
   if (!found) {
@@ -172,7 +174,7 @@ export function linkTargets(): { title: string; kind: NodeKind; path?: string; d
 /** How many lines of its file come before a document's body (the frontmatter, a quote callout). */
 function bodyOffset(d: Doc): number {
   try {
-    const text = readFileSync(join(VAULT, d.path), "utf8");
+    const text = readFileSync(join(vaultDir(), d.path), "utf8");
     const head = d.body.trimStart().slice(0, 60);
     const at = head ? text.indexOf(head) : -1;
     return at > 0 ? text.slice(0, at).split("\n").length - 1 : 0;
@@ -207,7 +209,8 @@ function conceptOf(ref: string): Doc | undefined {
 /** Every link in the vault: written in bodies, kept in frontmatter (related, about, a concept's
  * builds-on), to the concepts a document is about, and to the books it comes from. */
 export function allEdges(): Edge[] {
-  if (edgesCache) return edgesCache;
+  const c = cached();
+  if (c.edges) return c.edges;
   const edges: Edge[] = [];
   const accepted = new Set(
     listConnections()
@@ -255,13 +258,13 @@ export function allEdges(): Edge[] {
         edges.push({ from, fromPath, to: `book:${book}`, target: book, kind: "source", line: 1 });
   }
   const seen = new Set<string>();
-  edgesCache = edges.filter((e) => {
+  c.edges = edges.filter((e) => {
     const key = `${e.from}|${e.to ?? `?${e.target}`}|${e.kind}|${e.line}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
-  return edgesCache;
+  return c.edges;
 }
 
 /** Links into a node, each with the line it sits on (for the backlinks panel). */
@@ -274,7 +277,7 @@ export function backlinks(
     if (e.to !== node || e.from === node || !e.fromPath) continue;
     if (!files.has(e.fromPath)) {
       try {
-        files.set(e.fromPath, readFileSync(join(VAULT, e.fromPath), "utf8").split("\n"));
+        files.set(e.fromPath, readFileSync(join(vaultDir(), e.fromPath), "utf8").split("\n"));
       } catch {
         files.set(e.fromPath, []);
       }

@@ -1,11 +1,11 @@
 /* Edits made outside the app (in an editor, in Obsidian, by jj bringing an agent's work in or taking
  * it out) are picked up here: the changed file is re-read as a document, noted in the change in
  * progress, and announced. */
-import { existsSync, statSync, watch } from "node:fs";
+import { existsSync, type FSWatcher, statSync, watch } from "node:fs";
 import { join } from "node:path";
 import { takeSelfWrite, touched } from "./changes.ts";
+import { vaultDir, vaultState } from "./current.ts";
 import { docs, isGenerated } from "./docs.ts";
-import { VAULT } from "./files.ts";
 import { changed } from "./jj.ts";
 import { forgetLog } from "./logs.ts";
 
@@ -17,11 +17,18 @@ export function reloadFile(rel: string): boolean {
   return isDoc || rel.startsWith("log/");
 }
 
+const watching = vaultState(() => ({
+  watcher: null as FSWatcher | null,
+  debounce: new Map<string, ReturnType<typeof setTimeout>>(),
+}));
+
 /** Watches the vault for edits made outside the app and loads them (debounced per file). */
 export function startWatching() {
+  const state = watching();
+  if (state.watcher) return;
+  const { debounce } = state;
   try {
-    const debounce = new Map<string, ReturnType<typeof setTimeout>>();
-    watch(VAULT, { recursive: true }, (_event, file) => {
+    state.watcher = watch(vaultDir(), { recursive: true }, (_event, file) => {
       if (!file) return;
       const rel = String(file).replace(/\\/g, "/");
       if (
@@ -41,7 +48,7 @@ export function startWatching() {
           debounce.delete(rel);
           if (takeSelfWrite(rel)) return;
           // a folder that appeared, moved or went: rescan what lives in it (the files in it are the change)
-          const full = join(VAULT, rel);
+          const full = join(vaultDir(), rel);
           if ((existsSync(full) && statSync(full).isDirectory()) || (!existsSync(full) && !/\.\w+$/.test(rel))) {
             docs.loadDir(rel);
             touched(rel);
@@ -56,4 +63,13 @@ export function startWatching() {
   } catch (error) {
     console.warn("[vault] not watching for outside edits:", (error as Error).message);
   }
+}
+
+/** Stops watching (the vault is being closed); edits made from now on are read when it is opened again. */
+export function stopWatching() {
+  const state = watching();
+  state.watcher?.close();
+  state.watcher = null;
+  for (const timer of state.debounce.values()) clearTimeout(timer);
+  state.debounce.clear();
 }

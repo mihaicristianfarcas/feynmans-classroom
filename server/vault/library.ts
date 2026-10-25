@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { bookDir, bookFolder, listBooks } from "../books/store.ts";
 import type { Book } from "../books/types.ts";
 import { chapterText } from "../ingest/index.ts";
-import { slugify, VAULT } from "./index.ts";
+import { slugify, vaultDir } from "./index.ts";
 
 /** The book's folder name under library/. */
 export const bookSlug = (book: Book) => bookFolder(book.id) || book.id;
@@ -23,7 +23,7 @@ export function exportBook(book: Book) {
   book.toc.forEach((chapter, i) => {
     const text = chapterText(book, chapter, 400000);
     writeFileSync(
-      join(VAULT, chapterFile(book, i)),
+      join(vaultDir(), chapterFile(book, i)),
       `# ${chapter.title}${chapter.subtitle ? ` — ${chapter.subtitle}` : ""}\n\n${book.title}${book.author ? `, ${book.author}` : ""} · chapter id ${chapter.id}\n\n${text}\n`,
     );
   });

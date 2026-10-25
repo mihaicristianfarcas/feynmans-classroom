@@ -1,8 +1,9 @@
 /* Reading sessions: while a book is open the reader pings every so often, and each sitting becomes
  * one entry in the learning journey ("Read 24 min of Calculus Made Easy (Chapter III)"). A sitting
- * ends after six quiet minutes, when the chapter changes, or when the server stops. */
+ * ends after six quiet minutes, when the chapter changes, when the vault is closed or when the server
+ * stops. */
 import { getBook } from "../books/store.ts";
-import { logActivity } from "../vault/index.ts";
+import { logActivity, vaultState } from "../vault/index.ts";
 
 /** What the reader reports while open. */
 export interface ReadingPing {
@@ -25,13 +26,13 @@ interface Session {
 }
 
 const QUIET = 6 * 60000;
-const sessions = new Map<string, Session>();
+const sittings = vaultState(() => new Map<string, Session>());
 
 /** Ends a book's sitting and logs it, if it lasted a minute or more. */
 function flush(bookId: string) {
-  const s = sessions.get(bookId);
+  const s = sittings().get(bookId);
   if (!s) return;
-  sessions.delete(bookId);
+  sittings().delete(bookId);
   clearTimeout(s.timer);
   if (s.minutes < 1) return;
   const book = getBook(bookId);
@@ -49,21 +50,23 @@ function flush(bookId: string) {
     },
   });
 }
-process.on("exit", () => {
-  for (const bookId of [...sessions.keys()]) flush(bookId);
-});
+/** Ends every sitting (the vault is being closed, or the server stops). */
+export function endReading() {
+  for (const bookId of [...sittings().keys()]) flush(bookId);
+}
+process.on("exit", endReading);
 
 /** Counts a ping toward the current sitting (at most 1.5 minutes per ping); returns its minutes so far. */
 export function recordReading(ping: ReadingPing): number {
   const at = Date.now();
-  let s = sessions.get(ping.bookId);
+  let s = sittings().get(ping.bookId);
   if (s && (ping.chapterId !== s.chapterId || at - s.last > QUIET)) {
     flush(ping.bookId);
     s = undefined;
   }
   if (!s) {
     s = { start: at, last: at, minutes: 0, pages: new Set() };
-    sessions.set(ping.bookId, s);
+    sittings().set(ping.bookId, s);
   } else s.minutes += Math.min(1.5, (at - s.last) / 60000);
   Object.assign(s, { last: at, chapter: ping.chapter, chapterId: ping.chapterId, position: ping.position });
   if (ping.page) s.pages.add(ping.page);

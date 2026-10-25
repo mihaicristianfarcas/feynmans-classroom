@@ -57,7 +57,7 @@ describe("annotations", () => {
       },
     });
     expect(a.path).toMatch(/^library\/tiny-physics\/annotations\/p1-highlight-a-pendulum-trades-height-for-\w{4}\.md$/);
-    const text = readFileSync(join(V.VAULT, a.path), "utf8");
+    const text = readFileSync(join(V.vaultDir(), a.path), "utf8");
     expect(text).toMatch(/^kind: annotation$/m);
     expect(text).toMatch(/^type: highlight$/m);
     expect(text).not.toMatch(/^title:/m);
@@ -66,7 +66,7 @@ describe("annotations", () => {
     expect(text).toMatch(/> \[!quote\] p\. 1\n> A pendulum trades height for speed/);
     // found in the book's Markdown text, with its line
     expect(a.source.md?.file).toMatch(/^library\/tiny-physics\/text\/01-.*\.md$/);
-    const chapter = readFileSync(join(V.VAULT, a.source.md!.file), "utf8").split("\n");
+    const chapter = readFileSync(join(V.vaultDir(), a.source.md!.file), "utf8").split("\n");
     expect(chapter[a.source.md!.line - 1]).toContain("pendulum trades height");
     // and read back the same
     V.docs.load();
@@ -92,7 +92,7 @@ describe("annotations", () => {
       anchor: { page: 2, quote: "In a collision the total momentum stays the same." },
     });
     expect(D.updateDoc(a.id, { type: "comment", body: "Even in 2D?" })).toMatchObject({ type: "comment" });
-    expect(readFileSync(join(V.VAULT, a.path), "utf8")).toMatch(/^type: comment$/m);
+    expect(readFileSync(join(V.vaultDir(), a.path), "utf8")).toMatch(/^type: comment$/m);
     expect(D.updateDoc(a.id, { type: "highlight", body: "" })).toMatchObject({ type: "highlight" });
     expect(D.updateDoc(a.id, { type: "explain" })).toMatchObject({ type: "highlight" });
   });
@@ -115,13 +115,15 @@ describe("annotations", () => {
     const note = N.bookNote(book.id);
     expect(note.title).toBe("Tiny Physics — notes");
     D.appendToDoc(note.id, R.noteMarkdown(a, "passage"));
-    expect(readFileSync(join(V.VAULT, note.path), "utf8")).toContain("> [!quote] [[library/tiny-physics/annotations/");
+    expect(readFileSync(join(V.vaultDir(), note.path), "utf8")).toContain(
+      "> [!quote] [[library/tiny-physics/annotations/",
+    );
     expect(N.bookNote(book.id).id).toBe(note.id);
   });
   it("written outside the app are picked up and placed", async () => {
     const rel = "library/tiny-physics/annotations/p2-explain-agent.md";
     writeFileSync(
-      join(V.VAULT, rel),
+      join(V.vaultDir(), rel),
       // the way an agent might write one: its type as the kind, only a page and the quote
       `---\nid: aagent01\nkind: explain\nsource:\n  book: ${book.id}\n  page: 2\n  quote: Elastic collisions also keep kinetic energy.\n---\n\nThey bounce without losing energy to heat or sound.\n`,
     );

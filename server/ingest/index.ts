@@ -11,6 +11,9 @@ import { ingestEpub } from "./epub.ts";
 import { ingestPdf, pagesText } from "./pdf.ts";
 import { ingestText } from "./text.ts";
 
+/** Which edition a file is: the first 16 hex digits of its SHA-256 (Book.sha256). */
+export const fileHash = (data: Buffer) => createHash("sha256").update(data).digest("hex").slice(0, 16);
+
 export function formatOf(name: string): BookFormat | null {
   const ext = extname(name).toLowerCase();
   if (ext === ".pdf") return "pdf";
@@ -50,10 +53,7 @@ export async function ingestBook(
   if ("data" in input) writeFileSync(join(dir, file), input.data);
   else copyFileSync(input.path, join(dir, file));
   // which edition this is: annotations record it, so a different file of the same book can be told apart
-  book.sha256 = createHash("sha256")
-    .update(readFileSync(join(dir, file)))
-    .digest("hex")
-    .slice(0, 16);
+  book.sha256 = fileHash(readFileSync(join(dir, file)));
 
   try {
     if (format === "pdf") {

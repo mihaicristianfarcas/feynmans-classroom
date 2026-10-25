@@ -4,7 +4,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Profile } from "../../shared/vault-types.ts";
 import { wroteItself } from "./changes.ts";
-import { asArray, atomicWrite, parseFrontmatter, stringifyFrontmatter, VAULT } from "./files.ts";
+import { vaultDir } from "./current.ts";
+import { asArray, atomicWrite, parseFrontmatter, stringifyFrontmatter } from "./files.ts";
 import { changed } from "./jj.ts";
 
 export const DEFAULT_PROFILE: Profile = {
@@ -22,7 +23,7 @@ export const DEFAULT_PROFILE: Profile = {
 };
 
 export function getProfile(): Profile {
-  const path = join(VAULT, "profile.md");
+  const path = join(vaultDir(), "profile.md");
   if (!existsSync(path)) return { ...DEFAULT_PROFILE };
   const { data, body } = parseFrontmatter(readFileSync(path, "utf8"));
   const styles = (data.styles || {}) as Partial<Profile["styles"]>;
@@ -43,7 +44,7 @@ export function saveProfile(patch: Partial<Profile>): Profile {
   const { notes: body, ...data } = next;
   wroteItself("profile.md");
   atomicWrite(
-    join(VAULT, "profile.md"),
+    join(vaultDir(), "profile.md"),
     stringifyFrontmatter(
       data as unknown as Record<string, unknown>,
       body || "_Anything about how you learn best: write it here, and the tutor will read it._",

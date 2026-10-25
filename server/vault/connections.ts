@@ -4,17 +4,18 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Connection } from "../../shared/vault-types.ts";
-import { atomicWrite, changed, onVaultChange, touched, VAULT, wroteItself } from "./index.ts";
+import { atomicWrite, changed, onVaultChange, touched, vaultDir, vaultState, wroteItself } from "./index.ts";
 
 const FILE = "brain/connections.jsonl";
-let cache: Connection[] | null = null;
+const cached = vaultState(() => ({ list: null as Connection[] | null }));
 onVaultChange((rel) => {
-  if (rel === FILE) cache = null;
+  if (rel === FILE) cached().list = null;
 });
 
 export function listConnections(): Connection[] {
+  const cache = cached().list;
   if (cache) return cache;
-  const path = join(VAULT, FILE);
+  const path = join(vaultDir(), FILE);
   const out: Connection[] = [];
   if (existsSync(path))
     for (const line of readFileSync(path, "utf8").split("\n")) {
@@ -24,15 +25,15 @@ export function listConnections(): Connection[] {
         if (c?.id && c.from && c.to) out.push(c);
       } catch {}
     }
-  cache = out;
+  cached().list = out;
   return out;
 }
 
 export function saveConnections(list: Connection[], what = "connections") {
-  cache = list;
+  cached().list = list;
   wroteItself(FILE);
-  atomicWrite(join(VAULT, FILE), list.map((c) => JSON.stringify(c)).join("\n") + (list.length ? "\n" : ""));
+  atomicWrite(join(vaultDir(), FILE), list.map((c) => JSON.stringify(c)).join("\n") + (list.length ? "\n" : ""));
   changed(what);
   touched(FILE);
-  cache = list;
+  cached().list = list;
 }

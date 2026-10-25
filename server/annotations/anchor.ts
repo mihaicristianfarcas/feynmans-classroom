@@ -14,7 +14,7 @@ import type { Anchor } from "../../shared/vault-types.ts";
 import { chapterAt } from "../books/locate.ts";
 import { getBlocks, getPages } from "../books/store.ts";
 import type { Book, TocEntry } from "../books/types.ts";
-import { VAULT } from "../vault/index.ts";
+import { vaultDir } from "../vault/index.ts";
 import { chapterFile } from "../vault/library.ts";
 
 /** The chapter a passage belongs to (a passage before the first chapter counts as the first). */
@@ -54,7 +54,7 @@ export function locateInText(book: Book, anchor: Anchor): Anchor["md"] | undefin
   for (const index of [chapter.index, chapter.index + 1, chapter.index - 1]) {
     if (index < 0 || index >= book.toc.length) continue;
     const file = chapterFile(book, index);
-    const path = join(VAULT, file);
+    const path = join(vaultDir(), file);
     if (!existsSync(path)) continue;
     const text = readFileSync(path, "utf8");
     const marker = anchor.page !== undefined ? `[[page ${anchor.page}]]` : `[[block ${anchor.block}]]`;

@@ -7,7 +7,7 @@
 import { CREDIT, credit, DAY, type MemoryState, preview, type Rating, review } from "../../shared/fsrs.ts";
 import type { Card, SourceRef } from "../../shared/vault-types.ts";
 import { structured } from "../llm/index.ts";
-import { docs, getProfile, logActivity, logReview, onVaultChange, reviews } from "../vault/index.ts";
+import { docs, getProfile, logActivity, logReview, onVaultChange, reviews, vaultState } from "../vault/index.ts";
 import { allEdges } from "../vault/links.ts";
 import { upsertConcept } from "./concepts.ts";
 import { bookContext, learnerSummary, sourceLine } from "./context.ts";
@@ -16,10 +16,12 @@ import { asksNewWay, type CardVariant, forgetVariant, variantOf, writeVariants }
 
 /* ---------------- memory state ---------------- */
 
-let cache: { count: number; retention: number; states: Map<string, MemoryState | null> } | null = null;
+const memory = vaultState(() => ({
+  cache: null as { count: number; retention: number; states: Map<string, MemoryState | null> } | null,
+}));
 // what the concepts build on, and which cards test which, live in these folders
 onVaultChange((rel) => {
-  if (rel.startsWith("concepts/") || rel.startsWith("cards/")) cache = null;
+  if (rel.startsWith("concepts/") || rel.startsWith("cards/")) memory().cache = null;
 });
 
 /** For each card, the cards on the concepts its own concepts build on directly (not their foundations). */
@@ -49,6 +51,7 @@ function foundations(): Map<string, string[]> {
 function states(): Map<string, MemoryState | null> {
   const log = reviews();
   const retention = getProfile().retention;
+  const { cache } = memory();
   if (cache && cache.count === log.length && cache.retention === retention) return cache.states;
   const under = foundations();
   const map = new Map<string, MemoryState | null>();
@@ -67,7 +70,7 @@ function states(): Map<string, MemoryState | null> {
       credited.set(id, r.ts);
     }
   }
-  cache = { count: log.length, retention, states: map };
+  memory().cache = { count: log.length, retention, states: map };
   return map;
 }
 

@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from
 import { dirname, join } from "node:path";
 import type { Note, SourceRef } from "../../shared/vault-types.ts";
 import { getBook } from "../books/store.ts";
-import { changed, docs, touched, trash, VAULT } from "../vault/index.ts";
+import { changed, docs, touched, trash, vaultDir } from "../vault/index.ts";
 import { cleanFolder, createDoc, updateDoc } from "./docs.ts";
 
 /** The note a book's reading session writes into by default: "<Book title>" in notes/, made on first use. */
@@ -50,13 +50,13 @@ export function linkMention(targetId: string, inPath: string) {
 export function noteTree() {
   const folders: string[] = [];
   const walk = (rel: string) => {
-    for (const entry of readdirSync(join(VAULT, rel), { withFileTypes: true })) {
+    for (const entry of readdirSync(join(vaultDir(), rel), { withFileTypes: true })) {
       if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
       folders.push(`${rel}/${entry.name}`.replace(/^notes\//, ""));
       walk(`${rel}/${entry.name}`);
     }
   };
-  if (existsSync(join(VAULT, "notes")) && statSync(join(VAULT, "notes")).isDirectory()) walk("notes");
+  if (existsSync(join(vaultDir(), "notes")) && statSync(join(vaultDir(), "notes")).isDirectory()) walk("notes");
   return {
     notes: docs
       .list("note")
@@ -68,7 +68,7 @@ export function noteTree() {
 
 /* ---------------- folders ---------------- */
 
-const folderDir = (folder: string) => join(VAULT, "notes", folder);
+const folderDir = (folder: string) => join(vaultDir(), "notes", folder);
 const notesIn = (folder: string) => docs.list("note").filter((n) => n.path.startsWith(`notes/${folder}/`));
 
 /** Makes a folder under notes/ (an empty one shows in the tree until something is put in it). */

@@ -1,12 +1,13 @@
 /* HTTP helpers shared by the routes: reading JSON bodies, sending files with the right type and
- * headers, joining untrusted paths safely, streaming live events, and the guard that keeps the API
- * to the learner's own machine. */
+ * headers, joining untrusted paths safely, streaming live events, the guard that keeps the API to the
+ * learner's own machine, and running each request in the open vault. */
 import { createReadStream, statSync } from "node:fs";
 import { extname } from "node:path";
 import { Readable } from "node:stream";
 import type { Context, MiddlewareHandler } from "hono";
 import { streamSSE } from "hono/streaming";
 import { type Channel, subscribe } from "./events.ts";
+import { currentVault, inVisit } from "./vault/current.ts";
 
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -99,5 +100,22 @@ export function localOnly(): MiddlewareHandler {
         return c.json({ error: "requests from other sites are not allowed" }, 403);
     }
     await next();
+  };
+}
+
+/** The answer to a page still showing a vault that has been closed: it loads the open one. */
+export const vaultChanged = (c: Context) =>
+  c.json({ error: "Another vault was opened.", vault: currentVault().id }, 409);
+
+/**
+ * Every request runs in the open vault's visit (vault/current.ts), and so does what it starts. A page
+ * says which vault it shows (the x-vault header); one still showing a vault that has been closed
+ * since (another tab opened another) is answered with 409, and loads the open one.
+ */
+export function inOpenVault(): MiddlewareHandler {
+  return async (c, next) => {
+    const shown = c.req.header("x-vault");
+    if (shown && shown !== currentVault().id) return vaultChanged(c);
+    await inVisit(next);
   };
 }

@@ -14,7 +14,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_DIR } from "../config.ts";
-import { VAULT } from "./files.ts";
+import { assertOpen, vaultDir, vaultState } from "./current.ts";
 
 const BIN = process.env.JJ_BIN || "jj";
 
@@ -52,7 +52,7 @@ function env() {
 }
 
 /** Runs jj in the vault (or `cwd`), synchronously: one call at a time, so multi-step rewrites never interleave. */
-export function jj(args: string[], cwd = VAULT, extraEnv: Record<string, string> = {}) {
+export function jj(args: string[], cwd = vaultDir(), extraEnv: Record<string, string> = {}) {
   const run = spawnSync(BIN, args, {
     cwd,
     encoding: "utf8",
@@ -66,29 +66,33 @@ export function jj(args: string[], cwd = VAULT, extraEnv: Record<string, string>
 export const fileset = (rel: string) => `root-file:${JSON.stringify(rel)}`;
 
 /** One field of a revision, by template. */
-const field = (rev: string, template: string, cwd = VAULT) =>
+const field = (rev: string, template: string, cwd = vaultDir()) =>
   jj(["log", "-r", rev, "--no-graph", "-T", template], cwd).stdout.trim();
 
 /** A revision's full change id (stable across rewrites); "" if there's no such revision. */
-export const changeIdOf = (rev: string, cwd = VAULT) => field(rev, "change_id", cwd);
+export const changeIdOf = (rev: string, cwd = vaultDir()) => field(rev, "change_id", cwd);
 /** A revision's commit id (a hidden commit is still reachable by it, e.g. for its diff). */
-export const commitIdOf = (rev: string, cwd = VAULT) => field(rev, "commit_id", cwd);
+export const commitIdOf = (rev: string, cwd = vaultDir()) => field(rev, "commit_id", cwd);
 const isEmpty = (rev: string) => field(rev, "empty") === "true";
 
 /* ---------------- the change in progress ---------------- */
 
-/** What changed since the last snapshot was named, and since the sitting began. */
-const pending: string[] = [];
-let sitting: string[] = [];
-let snapTimer: ReturnType<typeof setTimeout> | null = null;
-let sittingTimer: ReturnType<typeof setTimeout> | null = null;
+/** What changed since the last snapshot was named, and since the sitting began, and when each is due. */
+const progress = vaultState(() => ({
+  pending: [] as string[],
+  sitting: [] as string[],
+  snapTimer: null as ReturnType<typeof setTimeout> | null,
+  sittingTimer: null as ReturnType<typeof setTimeout> | null,
+}));
 
 /** Something in the vault changed: the change in progress is named a few seconds from now. */
 export function changed(what: string) {
-  pending.push(what);
-  if (snapTimer) clearTimeout(snapTimer);
-  snapTimer = setTimeout(snapshot, 3000);
-  snapTimer.unref?.();
+  assertOpen();
+  const p = progress();
+  p.pending.push(what);
+  if (p.snapTimer) clearTimeout(p.snapTimer);
+  p.snapTimer = setTimeout(snapshot, 3000);
+  p.snapTimer.unref?.();
 }
 
 /** Bookkeeping the app does alongside everything (the activity log, the agent's run log). */
@@ -117,33 +121,38 @@ function subjectFromFiles(): string {
 }
 
 /** The change in progress's name: what was said to happen in it, else the files it touches. */
-const nameOfChange = () => (sitting.some((i) => !quiet(i)) ? subjectOf(sitting) : subjectFromFiles());
+function nameOfChange() {
+  const { sitting } = progress();
+  return sitting.some((i) => !quiet(i)) ? subjectOf(sitting) : subjectFromFiles();
+}
 
 /** Snapshots the working copy and names the change in progress after everything in this sitting. */
 function snapshot() {
-  snapTimer = null;
-  sitting.push(...pending.splice(0).filter(Boolean));
+  const p = progress();
+  p.snapTimer = null;
+  p.sitting.push(...p.pending.splice(0).filter(Boolean));
   // nothing differs on disk (jj itself just updated the files, or an edit was taken back)
   if (isEmpty("@")) return;
   jj(["describe", "-m", nameOfChange()]);
-  if (sittingTimer) clearTimeout(sittingTimer);
-  sittingTimer = setTimeout(() => checkpoint(), SITTING_MS);
-  sittingTimer.unref?.();
+  if (p.sittingTimer) clearTimeout(p.sittingTimer);
+  p.sittingTimer = setTimeout(() => checkpoint(), SITTING_MS);
+  p.sittingTimer.unref?.();
 }
 
 /** Closes the change in progress (named after what happened in it) and begins a new one, unless only
  * the app's logs changed. Returns the change id of the latest change in the history, which agents
  * start from. */
 export function checkpoint(): string | null {
-  for (const t of [snapTimer, sittingTimer]) if (t) clearTimeout(t);
-  snapTimer = sittingTimer = null;
-  sitting.push(...pending.splice(0).filter(Boolean));
+  const p = progress();
+  for (const t of [p.snapTimer, p.sittingTimer]) if (t) clearTimeout(t);
+  p.snapTimer = p.sittingTimer = null;
+  p.sitting.push(...p.pending.splice(0).filter(Boolean));
   // the app's logs alone don't make an entry in the history: they wait for the next real change
   const files = filesOf("@");
   if (files.some((f) => !f.path.startsWith("log/"))) {
     jj(["commit", "-m", nameOfChange()]);
     keepMainBookmark();
-    sitting = [];
+    p.sitting = [];
   }
   return changeIdOf("@-") || null;
 }
@@ -208,7 +217,7 @@ const FILES =
   'self.diff().files().map(|f| f.status_char() ++ "\\t" ++ f.source().path() ++ "\\t" ++ f.path() ++ "\\n").join("")';
 
 /** The files a revision added, modified or deleted (a rename counts as a deletion and an addition). */
-export function filesOf(rev: string, cwd = VAULT): FileChange[] {
+export function filesOf(rev: string, cwd = vaultDir()): FileChange[] {
   const out: FileChange[] = [];
   for (const line of field(rev, FILES, cwd).split("\n").filter(Boolean)) {
     const [status, from, to] = line.split("\t");
@@ -239,7 +248,7 @@ function rewriteCleanly(args: string[], base: string): { ok: true } | { ok: fals
   const before = currentOp();
   // the trial's commits get a made-up time: jj can't write the same commit twice, and the real run
   // (within the same second) would otherwise make exactly the same ones
-  const trial = jj(["--ignore-working-copy", ...args], VAULT, { JJ_TIMESTAMP: trialTime() });
+  const trial = jj(["--ignore-working-copy", ...args], vaultDir(), { JJ_TIMESTAMP: trialTime() });
   if (!trial.ok) return { ok: false, error: trial.stderr };
   const clashes = conflictsFrom(base).length > 0;
   jj(["--ignore-working-copy", "op", "restore", before]);

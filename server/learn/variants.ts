@@ -8,7 +8,7 @@
 import type { MemoryState } from "../../shared/fsrs.ts";
 import type { Card } from "../../shared/vault-types.ts";
 import { structured } from "../llm/index.ts";
-import { docs, reviews } from "../vault/index.ts";
+import { docs, reviews, vaultState } from "../vault/index.ts";
 import { learnerSummary } from "./context.ts";
 
 export interface CardVariant {
@@ -25,17 +25,18 @@ const BATCH = 8;
 
 /* ---------------- which cards ---------------- */
 
-let latest: { count: number; newWay: Set<string> } | null = null;
+const asked = vaultState(() => ({ latest: null as { count: number; newWay: Set<string> } | null }));
 
 /** True when the card's last review asked it a new way. */
 function askedNewWayLast(id: string): boolean {
   const log = reviews();
-  if (!latest || latest.count !== log.length) {
+  const state = asked();
+  if (!state.latest || state.latest.count !== log.length) {
     const last = new Map<string, { ts: number; variant?: boolean }>();
     for (const r of log) if (!last.has(r.card) || r.ts >= last.get(r.card)!.ts) last.set(r.card, r);
-    latest = { count: log.length, newWay: new Set([...last].filter(([, r]) => r.variant).map(([id]) => id)) };
+    state.latest = { count: log.length, newWay: new Set([...last].filter(([, r]) => r.variant).map(([id]) => id)) };
   }
-  return latest.newWay.has(id);
+  return state.latest.newWay.has(id);
 }
 
 /** Whether this review asks the card a new way: known for weeks, and shown by its face last time. */
@@ -48,19 +49,21 @@ export function asksNewWay(card: Card, state: MemoryState | null): boolean {
 /* ---------------- the questions ---------------- */
 
 /** Written questions, until used; a changed card's question is written again. */
-const written = new Map<string, { key: string; variant: CardVariant }>();
-const writing = new Map<string, Promise<void>>();
+const questions = vaultState(() => ({
+  written: new Map<string, { key: string; variant: CardVariant }>(),
+  writing: new Map<string, Promise<void>>(),
+}));
 const keyOf = (card: Card) => `${card.front}\u0000${card.back}`;
 
 /** The card's question, when one is written. */
 export function variantOf(card: Card): CardVariant | undefined {
-  const w = written.get(card.id);
+  const w = questions().written.get(card.id);
   return w && w.key === keyOf(card) ? w.variant : undefined;
 }
 
 /** Drops a card's question once it has been asked, so the next time it is a new one. */
 export function forgetVariant(id: string) {
-  written.delete(id);
+  questions().written.delete(id);
 }
 
 const SCHEMA = {
@@ -120,21 +123,24 @@ Return JSON: one question for each card, with its id.`;
   for (const q of result.data.questions || []) {
     const card = cards.find((c) => c.id === q.card);
     if (card && q.question?.trim() && q.answer?.trim())
-      written.set(card.id, { key: keyOf(card), variant: { question: q.question.trim(), answer: q.answer.trim() } });
+      questions().written.set(card.id, {
+        key: keyOf(card),
+        variant: { question: q.question.trim(), answer: q.answer.trim() },
+      });
   }
 }
 
 /** Writes the questions these cards don't have yet (a batch at a time; those already being written
  * are waited for) and returns every one that is ready. */
 export async function writeVariants(cards: Card[]): Promise<Record<string, CardVariant>> {
-  const todo = cards.filter((c) => !variantOf(c) && !writing.has(c.id)).slice(0, BATCH);
+  const todo = cards.filter((c) => !variantOf(c) && !questions().writing.has(c.id)).slice(0, BATCH);
   if (todo.length) {
     const job = ask(todo).finally(() => {
-      for (const c of todo) writing.delete(c.id);
+      for (const c of todo) questions().writing.delete(c.id);
     });
-    for (const c of todo) writing.set(c.id, job);
+    for (const c of todo) questions().writing.set(c.id, job);
   }
-  const jobs = [...new Set(cards.map((c) => writing.get(c.id)).filter((j) => !!j))];
+  const jobs = [...new Set(cards.map((c) => questions().writing.get(c.id)).filter((j) => !!j))];
   const settled = await Promise.allSettled(jobs);
   const ready = Object.fromEntries(cards.flatMap((c) => (variantOf(c) ? [[c.id, variantOf(c)!]] : [])));
   const failed = settled.find((s) => s.status === "rejected");

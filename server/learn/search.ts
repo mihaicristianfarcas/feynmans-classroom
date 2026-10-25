@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Doc, DocKind } from "../../shared/vault-types.ts";
 import { listBooks } from "../books/store.ts";
-import { docs, VAULT } from "../vault/index.ts";
+import { docs, vaultDir } from "../vault/index.ts";
 import { chapterFile } from "../vault/library.ts";
 
 export interface SearchHit {
@@ -88,7 +88,7 @@ export function search(q: string, limit = 40): SearchHit[] {
     b.toc.forEach((ch, i) => {
       let body = "";
       try {
-        body = readFileSync(join(VAULT, chapterFile(b, i)), "utf8");
+        body = readFileSync(join(vaultDir(), chapterFile(b, i)), "utf8");
       } catch {
         return;
       }

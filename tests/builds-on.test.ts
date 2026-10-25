@@ -82,7 +82,7 @@ describe("what a concept builds on", () => {
   });
 
   it("is kept in the concept's file as builds-on, and read back", () => {
-    const text = readFileSync(join(V.VAULT, "concepts", "Conditional probability.md"), "utf8");
+    const text = readFileSync(join(V.vaultDir(), "concepts", "Conditional probability.md"), "utf8");
     expect(text).toMatch(/^builds-on: \["\[\[Probability\]\]"\]$/m);
     expect(V.docs.get(id("Conditional probability"), "concept")!.buildsOn).toEqual(["[[Probability]]"]);
   });

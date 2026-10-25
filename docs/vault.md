@@ -19,6 +19,9 @@ data/vault/
   log/*.jsonl               reviews, the journey, agent runs
 ```
 
+Each vault is a folder like this one (see [Several vaults](#several-vaults) below); the first is
+`DATA_DIR/vault`.
+
 **Files, not a database.** Markdown with frontmatter (and JSONL for logs) is the only source of truth:
 you, Obsidian, jj, git and any agent with `rg`, `sed` or `cat` can read and change it, and there's no
 second copy to keep in sync. The bookkeeping a database would do is kept as **generated files**,
@@ -63,6 +66,37 @@ Notes can hold more than prose:
   attempt can be added under it as a folded `> [!attempt]-` callout with the corrections;
 - a folded callout, `> [!solution]-`, opens with a click: exercises keep their answers hidden;
 - `type` says what a note is (summary, explanation, quiz, exercises, session…).
+
+## Several vaults
+
+Keep separate vaults for separate parts of your life (a subject, work, a language): each is a folder
+of its own with its own notes, cards, concepts, profile, journey and history, and opens in Obsidian
+as its own vault. Make, rename, open and delete them in Settings, under Vaults; once there are two or
+more, the open one's name sits beside the wordmark in the top bar, and its menu opens another.
+
+```
+DATA_DIR/
+  vault/                 the first vault ("My vault" until you rename it)
+  vaults/<name>/         the vaults made in the app
+  vaults.json            their names, and which one is open (the server opens it on the next start)
+  settings.json          the app's settings: the same in every vault
+  agent-runs/<vault>/    the agent's working copies, by vault
+```
+
+- **One vault open at a time, no restart.** Opening another closes the one that was open: the change
+  in progress is closed in its history and the agent's runs in it are stopped. Work still going there
+  (an answer being written, a figure being drawn) stops too and picks up again the next time you open
+  that vault, as after a restart. Every open tab starts again at Today in the vault now open.
+- **A book is kept once.** A book in several vaults has its own folder in each (`library/<book>/`),
+  where that vault's margin, tutor sessions and figures go, but the book itself (`book.json`, its file,
+  its text, pages and pictures) is one file on disk, hard-linked into every vault that has it. Bring a
+  book from another vault from the Library (or when you make a vault), or just add the same file
+  again: it is recognised and linked, not read a second time. Each vault stays a complete folder you
+  can copy or open anywhere; the space is freed when the last vault that has the book lets it go.
+- **A new vault** starts empty, with your profile (who you are and how you learn) copied from the vault
+  you're in.
+- **Deleting a vault** deletes its folder for good (open another one first). A book it shares with
+  another vault stays there.
 
 ## History, with Jujutsu
 
