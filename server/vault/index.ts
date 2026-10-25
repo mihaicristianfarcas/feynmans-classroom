@@ -19,10 +19,23 @@
  * Every Markdown record is a document of one shape whose `kind` says what it is (docs.ts, kinds.ts);
  * books and logs are the only other things kept. It is a valid Obsidian vault, and what agents read
  * best. The server keeps an index in memory, writes through, notices edits made outside the app, and
- * keeps the vault's history with Jujutsu (jj).
+ * keeps the vault's history with Jujutsu (jj). There can be several vaults (vaults.ts), one open at a
+ * time (current.ts): everything here works on the open one.
  *
  * This module is the vault's public face; the work happens in the files it re-exports from. */
 export { onVaultChange, takeSelfWrite, touched, wroteItself } from "./changes.ts";
+export {
+  assertOpen,
+  currentVault,
+  enterVault,
+  inVisit,
+  stillOpen,
+  VaultClosed,
+  vaultDir,
+  vaultRel,
+  vaultState,
+  visitSignal,
+} from "./current.ts";
 export { docs, GENERATED, isGenerated, trash } from "./docs.ts";
 export {
   atomicWrite,
@@ -32,8 +45,6 @@ export {
   shortId,
   slugify,
   stringifyFrontmatter,
-  VAULT,
-  vaultRel,
 } from "./files.ts";
 export {
   changed,

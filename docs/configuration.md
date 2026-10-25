@@ -5,7 +5,7 @@ Every setting has a default; set environment variables to change them (for `npm 
 | Variable | Default | Meaning |
 |---|---|---|
 | `PORT` | `8787` | API (and production app) port |
-| `DATA_DIR` | `./data` | books, figures, the vault, settings |
+| `DATA_DIR` | `./data` | the vaults (`vault/`, `vaults/<name>/`, listed in `vaults.json`), settings, caches |
 | `LLM_PROVIDER` | `auto` | `codex`, `claude` or `auto` (Settings overrides) |
 | `CODEX_BIN` / `CLAUDE_BIN` | `codex` / `claude` | the CLIs |
 | `JJ_BIN` | `jj` | Jujutsu, which keeps the vault's history (required: the server won't start without it) |

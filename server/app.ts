@@ -1,13 +1,13 @@
-/* The HTTP app: the local-only guard, errors as JSON, every group of API routes, and (in production)
- * the built web app with its client-side routing. Building the app has no side effects, so tests
- * can create one; server/index.ts prepares the vault and starts listening. */
+/* The HTTP app: the local-only guard, the open vault around every request, errors as JSON, every group
+ * of API routes, and (in production) the built web app with its client-side routing. Building the app
+ * has no side effects, so tests can create one; server/index.ts opens the vault and starts listening. */
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { Hono } from "hono";
 import { PROD, WEB_DIST } from "./config.ts";
 import { NotFound } from "./errors.ts";
 import { safeJoin } from "./fs.ts";
-import { localOnly, sendFile } from "./http.ts";
+import { inOpenVault, localOnly, sendFile, vaultChanged } from "./http.ts";
 import { agentRoutes } from "./routes/agents.ts";
 import { annotationRoutes } from "./routes/annotations.ts";
 import { attachmentRoutes } from "./routes/attachments.ts";
@@ -22,17 +22,23 @@ import { manimRoutes } from "./routes/manim.ts";
 import { noteRoutes } from "./routes/notes.ts";
 import { settingsRoutes } from "./routes/settings.ts";
 import { studyRoutes } from "./routes/study.ts";
+import { vaultRoutes } from "./routes/vaults.ts";
+import { VaultClosed } from "./vault/current.ts";
 
 export function createApp() {
   const app = new Hono();
   app.use("*", localOnly());
+  app.use("/api/*", inOpenVault());
   app.onError((error, c) => {
     if (error instanceof NotFound) return c.json({ error: error.message }, 404);
+    // the vault was closed while this request was being answered
+    if (error instanceof VaultClosed) return vaultChanged(c);
     console.error("[api]", error);
     return c.json({ error: error.message }, 400);
   });
 
   settingsRoutes(app);
+  vaultRoutes(app);
   bookRoutes(app);
   demoRoutes(app);
   docRoutes(app);

@@ -1,7 +1,7 @@
 # Architecture
 
 Feynman's Classroom is one Node process (the API, and in production the built app) and a React app,
-working on one folder of plain files: the vault. Models are reached through the learner's own
+working on one folder of plain files: the vault. There can be several vaults; one is open at a time. Models are reached through the learner's own
 Codex or Claude Code CLI, never an API key.
 
 ```
@@ -17,16 +17,20 @@ browser (React, web/)  ──HTTP + server-sent events──▶  server/ (Hono o
 
 ```
 server/            the API and everything behind it (Node, TypeScript, run with tsx)
-  index.ts         start: prepare the vault, resume interrupted work, listen
-  app.ts           the HTTP app: the local-only guard, errors, every route group, the built web app
+  index.ts         start: open the vault that was open last, listen
+  vaults.ts        the vaults from the app's side: what each holds, making, opening (closing the one open)
+                   and deleting one
+  app.ts           the HTTP app: the local-only guard, the open vault around each request, errors, every
+                   route group, the built web app
   http.ts fs.ts    HTTP and file helpers; errors.ts, events.ts (live updates), jobs.ts (queue)
   config.ts        paths, ports and tuning from the environment; settings.ts: the learner's settings
   routes/          one file per API area (documents, books, demos, annotations, notes, cards, study, brain,
                    agents…)
-  vault/           the vault as files: the document store, each kind's file format (kinds.ts), history
-                   (jj), logs, watching, indexes, links
-  books/           the book store, types, finding quotes (locate.ts), find in a book (find.ts), figure
-                   placement and numbers
+  vault/           the vault as files: the list of vaults (vaults.ts), the one open and the work that
+                   belongs to it (current.ts), the document store, each kind's file format (kinds.ts),
+                   history (jj), logs, watching, indexes, links
+  books/           the book store, books shared between vaults (shared.ts), types, finding quotes
+                   (locate.ts), find in a book (find.ts), figure placement and numbers
   ingest/          reading uploaded books: PDF, EPUB, Markdown, text, chapter detection
   annotations/     the margin: anchors, files, model-written answers, live updates, sending to notes
   learn/           documents of any kind (docs.ts: make, change, rename, delete, versions), then what
@@ -42,6 +46,8 @@ shared/            code the server and the browser both run
   scene/           the figure engine: spec types, the expression language, five renderers, validation
   fsrs.ts links.ts textmatch.ts thread.ts chapters.ts vault-types.ts
 web/src/           the React app (Vite)
+  vaults/          the vault switch in the top bar, the vaults in Settings, making one, the books of the
+                   other vaults, and starting the page again when another vault opens
   app/             the shell (a slim bar along the top): routing (each page its own chunk, loaded on
                    first visit), navigation, theme, the ⌘K palette, what a page shows when it fails
   agent/           the agent's panel (⌘J), its button, the runs it shows, where the learner is
@@ -84,6 +90,22 @@ lands as one change after whatever happened meanwhile (see [agents.md](agents.md
 
 Slow work (finding chapters, drawing figures, building demos, writing animations) runs in `jobs.ts`, reporting progress
 on the book's event stream, and resumes after a restart.
+
+## Opening another vault
+
+The server opens another vault without restarting (`server/vaults.ts`). Each opening is a *visit*
+(`server/vault/current.ts`): every request runs in the visit that was current when it came in
+(AsyncLocalStorage), and so does everything it starts. Two rules keep vaults apart:
+
+- **Paths into the vault come from `vaultDir()`.** Work of a visit that has ended (an answer arriving
+  after the learner switched) gets `VaultClosed` there instead of the new vault's folder, and its model
+  calls are stopped with the visit. What it was doing is still marked pending in its own vault's
+  files, so it starts again when that vault is next opened.
+- **What a module keeps about the vault lives in `vaultState()`**: an index, a cache, a timer is made
+  afresh for each visit, so a vault opened again starts from its files and late work only sees its own.
+
+Pages say which vault they show (the `x-vault` header); one still showing a closed vault gets 409,
+and every tab starts again at Today when it hears `vault-open` on the event stream.
 
 ## Security model
 

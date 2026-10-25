@@ -1,4 +1,4 @@
-/* Where things live and how the server is tuned: the data and vault folders, the port, and the
+/* Where things live and how the server is tuned: the data folder, the port, and the
  * Codex, Claude Code and generation settings, each overridable from the environment (the full list
  * is in docs/configuration.md). Also finds a Chrome for the browser checks. */
 import { existsSync, readdirSync } from "node:fs";
@@ -7,12 +7,9 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+/** The settings, the vaults (vault/vaults.ts lists them; one is open at a time) and the caches. */
 export const DATA_DIR = resolve(process.env.DATA_DIR || join(ROOT, "data"));
-/** The second brain: plain files a person, Obsidian or an AI agent can work with directly. */
-export const VAULT_DIR = join(DATA_DIR, "vault");
-/** One folder per book inside the vault: the file, its text, annotations and figures. */
-export const BOOKS_DIR = join(VAULT_DIR, "library");
-/** Scratch working copies of the vault for agents that write (outside the vault, never versioned). */
+/** Scratch working copies of the vaults for agents that write (outside them, never versioned), by vault. */
 export const RUNS_DIR = join(DATA_DIR, "agent-runs");
 export const RUNTIME_DIR = join(ROOT, "runtime");
 export const VENDOR_DIR = join(ROOT, "vendor", "anatomy");

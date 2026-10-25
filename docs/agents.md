@@ -60,8 +60,8 @@ commands under the Codex sandbox):
 | reach the network | no |
 
 - Connection suggestions run read-only, directly in the vault.
-- **The agent** works in a **jj workspace of the vault** (`DATA_DIR/agent-runs/<id>`, outside the
-  vault), starting from the latest saved change, with the books' text and the indexes linked in
+- **The agent** works in a **jj workspace of the vault** (`DATA_DIR/agent-runs/<vault>/<id>`, outside
+  the vault), starting from the latest saved change, with the books' text and the indexes linked in
   read-only, so it never edits a note you have open. When it's done, what it wrote becomes one jj
   change, checked: app-owned files (logs, profile, `book.json`, `AGENTS.md`…) must be untouched (or
   the run fails and nothing lands), and every file must still parse, quizzes included (or it waits

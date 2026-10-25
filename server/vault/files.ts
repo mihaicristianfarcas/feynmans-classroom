@@ -1,22 +1,11 @@
 /* Reading and writing vault files: paths, ids, atomic writes, YAML frontmatter, and the small
  * coercions that turn hand-edited frontmatter into typed fields. */
 import { createHash, randomUUID } from "node:crypto";
-import { relative } from "node:path";
 import { Document, isScalar, parse as parseYaml, visit } from "yaml";
-import { VAULT_DIR } from "../config.ts";
 
 export { atomicWrite } from "../fs.ts";
 
-/** The vault folder (DATA_DIR/vault). */
-export const VAULT = VAULT_DIR;
-
 export const now = () => new Date().toISOString();
-
-/** A vault-relative path from an absolute one (or null when it's outside the vault). */
-export function vaultRel(abs: string) {
-  const rel = relative(VAULT, abs).replace(/\\/g, "/");
-  return rel.startsWith("..") ? null : rel;
-}
 
 /** Lowercase ASCII words joined by dashes, for file and folder names. */
 export function slugify(text: string, max = 60): string {

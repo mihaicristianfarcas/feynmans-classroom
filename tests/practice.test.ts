@@ -113,7 +113,7 @@ describe("a practice session", () => {
       tags: ["practice"],
       title: "Practice — Adding fractions with different denominators",
     });
-    const text = readFileSync(join(V.VAULT, note.path), "utf8");
+    const text = readFileSync(join(V.vaultDir(), note.path), "utf8");
     expect(text).toContain("## Worked example");
     expect(text).toContain("**1. Find the common denominator**");
     expect(text).toContain("> [!exercise] Problem 1\n> Add $\\frac{1}{3}$ and $\\frac{1}{4}$.");

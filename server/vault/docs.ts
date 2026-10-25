@@ -7,7 +7,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync 
 import { basename, dirname, join } from "node:path";
 import type { Doc, DocKind, DocOf } from "../../shared/vault-types.ts";
 import { touched, wroteItself } from "./changes.ts";
-import { atomicWrite, pathId, VAULT } from "./files.ts";
+import { vaultDir, vaultState } from "./current.ts";
+import { atomicWrite, pathId } from "./files.ts";
 import { docFromFile, docToFile, kindOfPath, placeOf } from "./kinds.ts";
 
 /** Files the server writes from the others (indexes); never read as documents, never committed. */
@@ -19,9 +20,21 @@ export const isGenerated = (rel: string) => GENERATED.includes(rel) || /^library
 const ROOTS = ["notes", "concepts", "cards", "figures", "library"];
 
 class DocStore {
-  private items = new Map<string, Doc>();
-  private files = new Map<string, string>();
-  private kinds = new Map<DocKind, Set<string>>();
+  /** The open vault's documents: by id, their files, and the ids of each kind. */
+  private state = vaultState(() => ({
+    items: new Map<string, Doc>(),
+    files: new Map<string, string>(),
+    kinds: new Map<DocKind, Set<string>>(),
+  }));
+  private get items() {
+    return this.state().items;
+  }
+  private get files() {
+    return this.state().files;
+  }
+  private get kinds() {
+    return this.state().kinds;
+  }
 
   /** Whether a vault-relative path is a document's file. */
   owns(rel: string) {
@@ -39,9 +52,10 @@ class DocStore {
 
   /** (Re)reads the documents in a folder (one that appeared or moved), forgetting those no longer there. */
   loadDir(dir: string) {
-    for (const [id, rel] of this.files) if (rel.startsWith(`${dir}/`) && !existsSync(join(VAULT, rel))) this.forget(id);
+    for (const [id, rel] of this.files)
+      if (rel.startsWith(`${dir}/`) && !existsSync(join(vaultDir(), rel))) this.forget(id);
     const walk = (rel: string) => {
-      const full = join(VAULT, rel);
+      const full = join(vaultDir(), rel);
       if (!existsSync(full) || !statSync(full).isDirectory()) return;
       for (const entry of readdirSync(full, { withFileTypes: true })) {
         if (entry.name.startsWith(".")) continue;
@@ -56,7 +70,7 @@ class DocStore {
   /** (Re)reads one file, given its vault-relative path; a missing file is forgotten. */
   loadFile(rel: string): Doc | undefined {
     for (const [id, f] of this.files) if (f === rel) this.forget(id);
-    const path = join(VAULT, rel);
+    const path = join(vaultDir(), rel);
     if (!existsSync(path)) return undefined;
     try {
       const doc = docFromFile(rel, readFileSync(path, "utf8"), statSync(path).mtime.toISOString());
@@ -122,7 +136,7 @@ class DocStore {
   /** A free vault-relative path for `base` (no extension): "Title", then "Title 2", … */
   freePath(base: string, except?: string) {
     let rel = `${base}.md`;
-    for (let n = 2; existsSync(join(VAULT, rel)) && rel !== except; n++) rel = `${base} ${n}.md`;
+    for (let n = 2; existsSync(join(vaultDir(), rel)) && rel !== except; n++) rel = `${base} ${n}.md`;
     return rel;
   }
 
@@ -131,10 +145,10 @@ class DocStore {
   save<D extends Doc>(doc: D, at?: string): D {
     let rel = this.files.get(doc.id);
     if (!rel) rel = this.freePath(at ?? placeOf(doc));
-    mkdirSync(dirname(join(VAULT, rel)), { recursive: true });
+    mkdirSync(dirname(join(vaultDir(), rel)), { recursive: true });
     const text = docToFile(doc);
     wroteItself(rel);
-    atomicWrite(join(VAULT, rel), text);
+    atomicWrite(join(vaultDir(), rel), text);
     Object.assign(doc, docFromFile(rel, text, doc.updated), { id: doc.id });
     this.remember(doc, rel);
     touched(rel);
@@ -148,12 +162,12 @@ class DocStore {
     if (!from || !doc) return null;
     const to = this.freePath(toBase, from);
     if (to === from) return from;
-    mkdirSync(dirname(join(VAULT, to)), { recursive: true });
+    mkdirSync(dirname(join(vaultDir(), to)), { recursive: true });
     wroteItself(from);
     wroteItself(to);
-    renameSync(join(VAULT, from), join(VAULT, to));
+    renameSync(join(vaultDir(), from), join(vaultDir(), to));
     this.files.set(id, to);
-    const text = readFileSync(join(VAULT, to), "utf8");
+    const text = readFileSync(join(vaultDir(), to), "utf8");
     Object.assign(doc, docFromFile(to, text, doc.updated), { id });
     touched(from);
     touched(to);
@@ -175,9 +189,9 @@ export const docs = new DocStore();
 
 /** Moves a file to the vault's .trash/. */
 export function trash(rel: string) {
-  const from = join(VAULT, rel);
+  const from = join(vaultDir(), rel);
   if (!existsSync(from)) return;
-  const to = join(VAULT, ".trash", `${new Date().toISOString().replace(/[:.]/g, "-")} ${basename(rel)}`);
+  const to = join(vaultDir(), ".trash", `${new Date().toISOString().replace(/[:.]/g, "-")} ${basename(rel)}`);
   mkdirSync(dirname(to), { recursive: true });
   wroteItself(rel);
   renameSync(from, to);

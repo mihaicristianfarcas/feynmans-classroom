@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { extname, join } from "node:path";
 import { fileNameOf } from "../../shared/links.ts";
 import { safeJoin } from "../fs.ts";
-import { VAULT } from "./files.ts";
+import { vaultDir } from "./current.ts";
 import { changed } from "./jj.ts";
 
 const PICTURE_TYPES: Record<string, string> = {
@@ -21,7 +21,7 @@ const MAX_BYTES = 12 * 1024 * 1024;
 export function attachmentPath(rel: string): string | null {
   const clean = rel.replace(/\\/g, "/");
   if (!clean.startsWith("attachments/")) return null;
-  const path = safeJoin(VAULT, clean);
+  const path = safeJoin(vaultDir(), clean);
   return path && existsSync(path) ? path : null;
 }
 
@@ -38,9 +38,9 @@ export function saveAttachment(dataUrl: string, name?: string): { path: string; 
   const stamp = new Date().toISOString().slice(0, 19).replace("T", " ").replace(/:/g, ".");
   const base = fileNameOf((name || `Pasted ${stamp}`).replace(/\.(png|jpe?g|webp|gif)$/i, ""), 90);
   let rel = `attachments/${base}.${ext}`;
-  for (let n = 2; existsSync(join(VAULT, rel)); n++) rel = `attachments/${base} ${n}.${ext}`;
-  mkdirSync(join(VAULT, "attachments"), { recursive: true });
-  writeFileSync(join(VAULT, rel), bytes);
+  for (let n = 2; existsSync(join(vaultDir(), rel)); n++) rel = `attachments/${base} ${n}.${ext}`;
+  mkdirSync(join(vaultDir(), "attachments"), { recursive: true });
+  writeFileSync(join(vaultDir(), rel), bytes);
   changed(`attachment ${base}`);
   return { path: rel, name: rel.slice("attachments/".length) };
 }

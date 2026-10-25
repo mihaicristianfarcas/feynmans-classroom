@@ -9,7 +9,7 @@ import type { Connection } from "../../shared/vault-types.ts";
 import { agent } from "../llm/index.ts";
 import { getSettings } from "../settings.ts";
 import { listConnections, saveConnections } from "../vault/connections.ts";
-import { changed, docs, logActivity, now, shortId, VAULT } from "../vault/index.ts";
+import { changed, docs, logActivity, now, shortId, vaultDir } from "../vault/index.ts";
 import { writeIndexes } from "../vault/indexes.ts";
 import { resolveLink } from "../vault/links.ts";
 import { upsertConcept } from "./concepts.ts";
@@ -78,7 +78,7 @@ ${learnerSummary()}
 
 Return JSON.`;
   const result = await agent({
-    cwd: VAULT,
+    cwd: vaultDir(),
     prompt,
     schema: SCHEMA,
     tier: "smart",

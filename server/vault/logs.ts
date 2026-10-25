@@ -4,15 +4,14 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Activity, ReviewLog } from "../../shared/vault-types.ts";
 import { wroteItself } from "./changes.ts";
-import { VAULT } from "./files.ts";
+import { vaultDir, vaultState } from "./current.ts";
 import { changed } from "./jj.ts";
 
-let reviewCache: ReviewLog[] | null = null;
-let activityCache: Activity[] | null = null;
+const cached = vaultState(() => ({ reviews: null as ReviewLog[] | null, activity: null as Activity[] | null }));
 
 /** Every entry of log/<name>; unreadable lines are skipped. */
 export function readLog<T>(name: string): T[] {
-  const path = join(VAULT, "log", name);
+  const path = join(vaultDir(), "log", name);
   if (!existsSync(path)) return [];
   const out: T[] = [];
   for (const line of readFileSync(path, "utf8").split("\n")) {
@@ -24,17 +23,19 @@ export function readLog<T>(name: string): T[] {
   return out;
 }
 export function appendLog(name: string, entry: unknown) {
-  mkdirSync(join(VAULT, "log"), { recursive: true });
+  mkdirSync(join(vaultDir(), "log"), { recursive: true });
   wroteItself(`log/${name}`);
-  appendFileSync(join(VAULT, "log", name), `${JSON.stringify(entry)}\n`);
+  appendFileSync(join(vaultDir(), "log", name), `${JSON.stringify(entry)}\n`);
 }
 export function reviews(): ReviewLog[] {
-  reviewCache ??= readLog<ReviewLog>("reviews.jsonl");
-  return reviewCache;
+  const c = cached();
+  c.reviews ??= readLog<ReviewLog>("reviews.jsonl");
+  return c.reviews;
 }
 export function activity(): Activity[] {
-  activityCache ??= readLog<Activity>("activity.jsonl");
-  return activityCache;
+  const c = cached();
+  c.activity ??= readLog<Activity>("activity.jsonl");
+  return c.activity;
 }
 export function logReview(entry: ReviewLog) {
   const log = reviews(); // load first: loading after the append would read the new line and then add it twice
@@ -53,6 +54,6 @@ export function logActivity(entry: Omit<Activity, "ts"> & { ts?: number }) {
 
 /** Forgets a cached log after the file changed outside the app. */
 export function forgetLog(rel: string) {
-  if (rel === "log/reviews.jsonl") reviewCache = null;
-  else if (rel === "log/activity.jsonl") activityCache = null;
+  if (rel === "log/reviews.jsonl") cached().reviews = null;
+  else if (rel === "log/activity.jsonl") cached().activity = null;
 }

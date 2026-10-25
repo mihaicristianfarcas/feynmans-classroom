@@ -16,7 +16,7 @@ import { positionOf } from "../books/locate.ts";
 import { bookFolder, listBooks, onBooksChange } from "../books/store.ts";
 import type { Book, TocEntry } from "../books/types.ts";
 import { conceptMastery } from "../learn/context.ts";
-import { atomicWrite, docs, onVaultChange, VAULT, whereOf, wroteItself } from "./index.ts";
+import { atomicWrite, docs, onVaultChange, vaultDir, vaultState, whereOf, wroteItself } from "./index.ts";
 import { chapterFile } from "./library.ts";
 import { allEdges, invalidateLinks } from "./links.ts";
 
@@ -34,7 +34,7 @@ const pagesOf = (e: TocEntry, book: Book) =>
 
 function write(rel: string, text: string) {
   wroteItself(rel);
-  atomicWrite(join(VAULT, rel), `${HEADER}\n${text.trim()}\n`);
+  atomicWrite(join(vaultDir(), rel), `${HEADER}\n${text.trim()}\n`);
 }
 
 /** The chapter at a reading position (before the first chapter counts as the first). */
@@ -171,13 +171,13 @@ export function writeIndexes() {
     ...edges.filter((e) => e.to).map((e) => `${e.fromPath}\t${e.toPath || e.to}\t${e.kind}\t${e.line}`),
   ];
   wroteItself("brain/links.tsv");
-  atomicWrite(join(VAULT, "brain/links.tsv"), `${tsv.join("\n")}\n`);
+  atomicWrite(join(vaultDir(), "brain/links.tsv"), `${tsv.join("\n")}\n`);
   const missing = [
     "from\ttarget\tline",
     ...edges.filter((e) => !e.to).map((e) => `${e.fromPath}\t${e.target}\t${e.line}`),
   ];
   wroteItself("brain/unresolved.tsv");
-  atomicWrite(join(VAULT, "brain/unresolved.tsv"), `${missing.join("\n")}\n`);
+  atomicWrite(join(vaultDir(), "brain/unresolved.tsv"), `${missing.join("\n")}\n`);
 
   /* the map */
   const recent = docs
@@ -210,12 +210,13 @@ export function writeIndexes() {
   );
 }
 
-let timer: ReturnType<typeof setTimeout> | null = null;
+const due = vaultState(() => ({ timer: null as ReturnType<typeof setTimeout> | null }));
 /** Rewrites the indexes a moment from now (changes come in bursts). */
 export function scheduleIndexes(delay = 1500) {
-  if (timer) clearTimeout(timer);
-  timer = setTimeout(() => {
-    timer = null;
+  const d = due();
+  if (d.timer) clearTimeout(d.timer);
+  d.timer = setTimeout(() => {
+    d.timer = null;
     try {
       writeIndexes();
     } catch (error) {
@@ -224,13 +225,27 @@ export function scheduleIndexes(delay = 1500) {
   }, delay);
 }
 
+let listening = false;
+/** Writes the open vault's indexes soon, and again a moment after anything changes. */
 export function startIndexing() {
-  onBooksChange(() => {
-    invalidateLinks();
-    scheduleIndexes();
-  });
-  onVaultChange((rel) => {
-    if (!rel.startsWith("brain/links") && !rel.startsWith("brain/unresolved")) scheduleIndexes();
-  });
+  if (!listening) {
+    listening = true;
+    onBooksChange(() => {
+      invalidateLinks();
+      scheduleIndexes();
+    });
+    onVaultChange((rel) => {
+      if (!rel.startsWith("brain/links") && !rel.startsWith("brain/unresolved")) scheduleIndexes();
+    });
+  }
   scheduleIndexes(200);
+}
+
+/** Before the vault is closed: indexes that were about to be rewritten are written now. */
+export function finishIndexing() {
+  const d = due();
+  if (!d.timer) return;
+  clearTimeout(d.timer);
+  d.timer = null;
+  writeIndexes();
 }

@@ -12,8 +12,9 @@
  *
  * Codex runs as `codex exec` (ChatGPT login); Claude Code as `claude -p` (Claude subscription).
  * Neither needs an API key. Calls share a small concurrency limit so a burst of requests never
- * hammers the user's plan. */
+ * hammers the user's plan. A call stops when the vault it was made for is closed (VaultClosed). */
 import { activeProvider, getSettings, type Provider } from "../settings.ts";
+import { VaultClosed, visitSignal } from "../vault/current.ts";
 import { runClaude } from "./claude.ts";
 import { callCodex } from "./codex-call.ts";
 import { codexConfiguredModel } from "./codex-config.ts";
@@ -69,23 +70,36 @@ function modelName(provider: Provider, model: string) {
   return codexConfiguredModel() || "codex (default)";
 }
 
+/** The call's options, with a signal of its own that also stops it when the vault it is made for is
+ * closed (its own, so the listeners a call adds go with it). */
+function untilClosed<O extends CallOptions>(options: O): O {
+  return { ...options, signal: AbortSignal.any([visitSignal(), ...(options.signal ? [options.signal] : [])]) };
+}
+
 /** Runs one call in a concurrency slot, on the active provider, and times it. */
 function call<T>(
   options: CallOptions,
   defaultTier: Tier,
   run: (provider: Provider, model: string, effort: string) => Promise<T>,
 ): Promise<CallResult<T>> {
+  const closed = visitSignal();
   return slot(async () => {
+    if (closed.aborted) throw new VaultClosed();
     const provider = activeProvider();
     const { model, effort } = modelFor(provider, options.tier || defaultTier);
     const started = Date.now();
-    const data = await run(provider, model, options.effort || effort);
-    return { data, ms: Date.now() - started, provider, model: modelName(provider, model) };
+    try {
+      const data = await run(provider, model, options.effort || effort);
+      return { data, ms: Date.now() - started, provider, model: modelName(provider, model) };
+    } catch (error) {
+      throw closed.aborted ? new VaultClosed() : error;
+    }
   });
 }
 
 /** JSON matching `schema` (strict structured output on Codex; --json-schema on Claude Code). */
-export function structured<T>(options: CallOptions & { schema: object }): Promise<CallResult<T>> {
+export function structured<T>(input: CallOptions & { schema: object }): Promise<CallResult<T>> {
+  const options = untilClosed(input);
   return call(options, "fast", async (provider, model, effort) => {
     if (provider === "claude") return (await runClaude({ ...options, model, effort })).structured as T;
     return parseJsonLoose(await callCodex({ ...options, model, effort, sandbox: "read-only" })) as T;
@@ -93,7 +107,8 @@ export function structured<T>(options: CallOptions & { schema: object }): Promis
 }
 
 /** A plain-text answer. */
-export function text(options: CallOptions): Promise<CallResult<string>> {
+export function text(input: CallOptions): Promise<CallResult<string>> {
+  const options = untilClosed(input);
   return call(options, "fast", async (provider, model, effort) => {
     if (provider === "claude") return (await runClaude({ ...options, model, effort })).text;
     return callCodex({ ...options, model, effort, sandbox: "read-only" });
@@ -101,7 +116,8 @@ export function text(options: CallOptions): Promise<CallResult<string>> {
 }
 
 /** An agent with a shell, confined to `cwd` by the CLI's OS sandbox: it reads there (and `readRoots`), writes there only if `write`, no network. */
-export function agent(options: AgentOptions): Promise<CallResult<string | unknown>> {
+export function agent(input: AgentOptions): Promise<CallResult<string | unknown>> {
+  const options = untilClosed(input);
   return call(options, "smart", async (provider, model, effort) => {
     if (provider === "claude") {
       const tools = options.write

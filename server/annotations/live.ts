@@ -6,14 +6,18 @@
 import type { Annotation } from "../../shared/vault-types.ts";
 import { getBook } from "../books/store.ts";
 import { publish } from "../events.ts";
-import { docs, onVaultChange } from "../vault/index.ts";
+import { docs, onVaultChange, vaultState } from "../vault/index.ts";
 import { chapterOf, completeAnchor } from "./anchor.ts";
 
-/** The last known path → (id, book) of each annotation file, to tell the margin when one disappears. */
-const known = new Map<string, { id: string; bookId: string }>();
+const seen = vaultState(() => ({
+  /** The last known path → (id, book) of each annotation file, to tell the margin when one disappears. */
+  known: new Map<string, { id: string; bookId: string }>(),
+  /** Annotations already given a place (tried once each: one whose quote can't be found stays as it is). */
+  placed: new Set<string>(),
+}));
 /** Notes where an annotation's file is, so its removal can be announced. */
 export function remember(a: Annotation) {
-  known.set(a.path, { id: a.id, bookId: a.source.bookId });
+  seen().known.set(a.path, { id: a.id, bookId: a.source.bookId });
 }
 /** Tells the book's open pages an annotation is new or changed. */
 export function announce(a: Annotation) {
@@ -25,20 +29,19 @@ onVaultChange((rel) => {
   const a = docs.at(rel, "annotation");
   if (a) {
     // written by an agent or in another editor: give it what the app would have (a place in the margin)
+    const { placed } = seen();
     if (a.source.bookId && a.source.y === undefined && a.source.block === undefined && !placed.has(a.id)) {
       placed.add(a.id);
       completeFromFile(a);
     }
     announce(a);
   } else {
+    const { known } = seen();
     const was = known.get(rel);
     known.delete(rel);
     if (was) publish(was.bookId, { type: "annotation-removed", data: { id: was.id } });
   }
 });
-
-/** Annotations already given a place (tried once each: one whose quote can't be found stays as it is). */
-const placed = new Set<string>();
 
 function completeFromFile(a: Annotation) {
   const book = getBook(a.source.bookId);

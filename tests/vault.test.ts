@@ -31,7 +31,7 @@ describe("the vault", () => {
       back: "The delay before a follower reflects a write.",
       deck: "DDIA",
     });
-    const text = readFileSync(join(V.VAULT, card.path), "utf8");
+    const text = readFileSync(join(V.vaultDir(), card.path), "utf8");
     expect(text).toMatch(/^kind: card$/m);
     expect(text).toMatch(/## Front\s+What is replication lag\?/);
     expect(card.title).toBe("What is replication lag?");
@@ -44,17 +44,17 @@ describe("the vault", () => {
     const state = C.cardState(card.id)!;
     expect(state.reps).toBe(1);
     expect(state.phase).toBe("learning");
-    const lines = readFileSync(join(V.VAULT, "log", "reviews.jsonl"), "utf8")
+    const lines = readFileSync(join(V.vaultDir(), "log", "reviews.jsonl"), "utf8")
       .trim()
       .split("\n");
     expect(lines.filter((l) => l.includes(card.id))).toHaveLength(1);
   });
   it("keeps the learner's profile in profile.md", () => {
     V.saveProfile({ name: "Ada", goals: "Learn distributed systems", styles: { visual: 0.9, reader: 0.2, doer: 0.7 } });
-    expect(readFileSync(join(V.VAULT, "profile.md"), "utf8")).toMatch(/name: Ada/);
+    expect(readFileSync(join(V.vaultDir(), "profile.md"), "utf8")).toMatch(/name: Ada/);
     expect(V.getProfile().styles.visual).toBe(0.9);
   });
   it("explains itself to agents", () => {
-    expect(readFileSync(join(V.VAULT, "AGENTS.md"), "utf8")).toMatch(/Feynman's Classroom vault/);
+    expect(readFileSync(join(V.vaultDir(), "AGENTS.md"), "utf8")).toMatch(/Feynman's Classroom vault/);
   });
 });

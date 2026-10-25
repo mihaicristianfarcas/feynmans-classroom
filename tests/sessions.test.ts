@@ -63,7 +63,7 @@ describe("tutoring sessions", () => {
     expect(session!.path).toMatch(
       /^library\/tiny-physics\/sessions\/\d{4}-\d{2}-\d{2} Why does a pendulum slow down\.md$/,
     );
-    const text = readFileSync(join(V.VAULT, session!.path), "utf8");
+    const text = readFileSync(join(V.vaultDir(), session!.path), "utf8");
     expect(text).toMatch(/^kind: session$/m);
     expect(text).toMatch(/^mode: socratic$/m);
     expect(text).toContain("> [!quote] p. 1\n> A pendulum trades height for speed.");
@@ -96,7 +96,10 @@ describe("tutoring sessions", () => {
 
   it("can be written by hand, and are listed with the book's", () => {
     const rel = "library/tiny-physics/sessions/by hand.md";
-    writeFileSync(join(V.VAULT, rel), `---\nsource:\n  book: ${book.id}\n---\n\n## You\n\nHello?\n\n## Tutor\n\nHi.\n`);
+    writeFileSync(
+      join(V.vaultDir(), rel),
+      `---\nsource:\n  book: ${book.id}\n---\n\n## You\n\nHello?\n\n## Tutor\n\nHi.\n`,
+    );
     V.docs.loadFile(rel);
     const mine = S.listSessions(book.id);
     expect(mine).toHaveLength(2);
@@ -131,7 +134,7 @@ describe("tutoring sessions", () => {
     expect(note.path).toBe("notes/Why a pendulum stops.md");
     expect(note.body).toContain(`From [[${session.path.replace(/\.md$/, "")}|a session with the tutor]]`);
     // the session links to its note in its frontmatter, as any document can
-    const file = readFileSync(join(V.VAULT, session.path), "utf8");
+    const file = readFileSync(join(V.vaultDir(), session.path), "utf8");
     expect(file).toMatch(/^related: \["\[\[Why a pendulum stops\]\]"\]$/m);
     V.docs.load();
     expect(S.getSession(id).note).toEqual({ id: note.id, title: "Why a pendulum stops" });
@@ -144,7 +147,7 @@ describe("tutoring sessions", () => {
     // renamed, it is still the session's note (the link follows); deleted, it no longer is
     D.updateDoc(note.id, { title: "Damping" });
     expect(S.listSessions(book.id).find((s) => s.id === id)?.note?.title).toBe("Damping");
-    expect(readFileSync(join(V.VAULT, session.path), "utf8")).toMatch(/^related: \["\[\[Damping\]\]"\]$/m);
+    expect(readFileSync(join(V.vaultDir(), session.path), "utf8")).toMatch(/^related: \["\[\[Damping\]\]"\]$/m);
     D.deleteDoc(note.id);
     expect(S.getSession(id).note).toBeUndefined();
   });
@@ -153,7 +156,7 @@ describe("tutoring sessions", () => {
     const D = await import("../server/learn/docs.ts");
     const path = S.getSession(id).path;
     expect(D.deleteDoc(id)).toBe(true);
-    expect(existsSync(join(V.VAULT, path))).toBe(false);
+    expect(existsSync(join(V.vaultDir(), path))).toBe(false);
     expect(() => S.getSession(id)).toThrow(/not found/);
   });
 });

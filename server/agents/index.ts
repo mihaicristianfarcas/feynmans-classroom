@@ -20,6 +20,7 @@ import { createDoc } from "../learn/docs.ts";
 import { agent } from "../llm/index.ts";
 import {
   appendLog,
+  assertOpen,
   changed,
   checkpoint,
   diffOf,
@@ -30,7 +31,8 @@ import {
   shortId,
   takeSelfWrite,
   touched,
-  VAULT,
+  vaultDir,
+  vaultState,
   wroteItself,
 } from "../vault/index.ts";
 import { writeIndexes } from "../vault/indexes.ts";
@@ -43,14 +45,17 @@ import { cleanUpWorkingCopies, createWorkingCopy, removeWorkingCopy, unlinkDeriv
 /** How many requests may be worked on at once (the model calls share a smaller limit besides). */
 const MAX_RUNNING = 4;
 
-const runs = new Map<string, AgentRun>();
-let loaded = false;
-/** Reads the run log once; a run that was going when the server stopped is marked failed. */
+/** The vault's runs, read from its log once per visit. */
+const known = vaultState(() => ({ runs: new Map<string, AgentRun>(), loaded: false }));
+const runsOf = () => known().runs;
+/** Reads the run log once; a run that was going when the server stopped (or the vault was closed) is
+ * marked failed. */
 function load() {
-  if (loaded) return;
-  loaded = true;
-  for (const r of readLog<AgentRun>("agents.jsonl")) runs.set(r.id, r);
-  for (const r of runs.values()) {
+  const state = known();
+  if (state.loaded) return;
+  state.loaded = true;
+  for (const r of readLog<AgentRun>("agents.jsonl")) state.runs.set(r.id, r);
+  for (const r of state.runs.values()) {
     if (r.status === "running")
       save({ ...r, status: "failed", activity: undefined, error: "the server stopped during the run" });
   }
@@ -58,7 +63,8 @@ function load() {
 }
 /** Records a run's new state in the log and announces it. */
 function save(run: AgentRun) {
-  runs.set(run.id, run);
+  assertOpen();
+  runsOf().set(run.id, run);
   appendLog("agents.jsonl", run);
   if (run.status !== "running") changed(`agent ${run.status}`);
   publish("global", { type: "agent", data: run });
@@ -66,17 +72,27 @@ function save(run: AgentRun) {
 }
 const get = (id: string) => {
   load();
-  const run = runs.get(id);
+  const run = runsOf().get(id);
   if (!run) throw new Error("run not found");
   return run;
 };
 
-/** At startup: settles runs a restart interrupted and clears their working copies. */
+/** At startup (or on opening the vault): settles runs a restart interrupted and clears their working copies. */
 export const prepareAgents = () => load();
+
+/** Before the vault is closed: its runs that are still going are stopped (their model calls stop with the
+ * vault's visit) and recorded as such. */
+export function stopRuns() {
+  const state = known();
+  if (!state.loaded) return;
+  for (const r of state.runs.values())
+    if (r.status === "running")
+      save({ ...r, status: "failed", activity: undefined, error: "stopped: another vault was opened" });
+}
 
 export function listRuns(): AgentRun[] {
   load();
-  return [...runs.values()].sort((a, b) => b.started.localeCompare(a.started)).slice(0, 60);
+  return [...runsOf().values()].sort((a, b) => b.started.localeCompare(a.started)).slice(0, 60);
 }
 
 /** Starts a request; returns at once (the run continues, and announces itself on the global event stream). */
@@ -90,9 +106,9 @@ export function startRun(input: {
   load();
   const task = input.task.trim().slice(0, 4000);
   if (!task) throw new Error("say what the agent should do");
-  if ([...runs.values()].filter((r) => r.status === "running").length >= MAX_RUNNING)
+  if ([...runsOf().values()].filter((r) => r.status === "running").length >= MAX_RUNNING)
     throw new Error(`${MAX_RUNNING} requests are already being worked on; wait for one to finish`);
-  const previous = input.after ? runs.get(input.after) : undefined;
+  const previous = input.after ? runsOf().get(input.after) : undefined;
   const where = describeWhere(input.context);
   const id = shortId("r");
   const run = save({
@@ -112,7 +128,7 @@ export function startRun(input: {
 /** The earlier turns of a run's conversation, oldest first. */
 function turnsBefore(run: AgentRun): AgentRun[] {
   if (!run.thread) return [];
-  return [...runs.values()]
+  return [...runsOf().values()]
     .filter((r) => (r.id === run.thread || r.thread === run.thread) && r.id !== run.id && r.started <= run.started)
     .sort((a, b) => a.started.localeCompare(b.started));
 }
@@ -123,7 +139,7 @@ function reporter(id: string) {
   return (text: string) => {
     if (Date.now() - last < 1500) return;
     last = Date.now();
-    const current = runs.get(id);
+    const current = runsOf().get(id);
     if (current?.status === "running") save({ ...current, activity: text });
   };
 }
@@ -133,7 +149,7 @@ async function execute(run: AgentRun, where: string[]) {
   const started = Date.now();
   const prompt = agentPrompt({ task: run.task, where, turns: turnsBefore(run) });
   const finish = (patch: Partial<AgentRun>) =>
-    save({ ...runs.get(run.id)!, activity: undefined, ms: Date.now() - started, ...patch });
+    save({ ...runsOf().get(run.id)!, activity: undefined, ms: Date.now() - started, ...patch });
   let workspace = false;
   try {
     writeIndexes();
@@ -141,11 +157,11 @@ async function execute(run: AgentRun, where: string[]) {
     if (!start) throw new Error("the vault's history isn't available");
     const { dir, linked } = createWorkingCopy(run.id, start);
     workspace = true;
-    save({ ...runs.get(run.id)!, activity: "reading your vault" });
+    save({ ...runsOf().get(run.id)!, activity: "reading your vault" });
     const result = await agent({
       cwd: dir,
       write: true,
-      readRoots: [VAULT],
+      readRoots: [vaultDir()],
       prompt,
       schema: REPLY_SCHEMA,
       tier: run.tier,
@@ -161,7 +177,7 @@ async function execute(run: AgentRun, where: string[]) {
       answer: String(reply.reply || "").trim(),
       open: open && !open.includes("..") ? open : undefined,
     };
-    const existing = base.open && existsSync(join(VAULT, base.open)) ? base.open : undefined;
+    const existing = base.open && existsSync(join(vaultDir(), base.open)) ? base.open : undefined;
     unlinkDerived(dir, linked);
     const change = describeIn(dir, `agent: ${run.task.split("\n")[0].slice(0, 100)}`);
     const files = filesOf("@", dir);
@@ -184,7 +200,15 @@ async function execute(run: AgentRun, where: string[]) {
       return;
     }
     save(
-      bringIn({ ...runs.get(run.id)!, ...base, activity: undefined, ms: Date.now() - started, files, change, commit }),
+      bringIn({
+        ...runsOf().get(run.id)!,
+        ...base,
+        activity: undefined,
+        ms: Date.now() - started,
+        files,
+        change,
+        commit,
+      }),
     );
   } catch (error) {
     if (workspace) removeWorkingCopy(run.id);
