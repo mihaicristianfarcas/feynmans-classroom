@@ -229,6 +229,33 @@ async function open(page: Page, route: string, theme: "light" | "dark") {
 }
 
 /** Resolves once what is fading or growing in has finished (its colours are only then its own). */
+/** Resolves once focus is inside `selector` (at once if it already is): a menu takes focus just after
+ * it is drawn, so its keys are tried only then. */
+const focusInside = (page: Page, selector: string) =>
+  page.evaluate(
+    (sel) =>
+      new Promise<boolean>((resolve) => {
+        if (document.activeElement?.closest(sel)) return resolve(true);
+        // (listeners passed inline: a function named in here would need tsx's __name, which pages lack)
+        const done = new AbortController();
+        document.addEventListener(
+          "focusin",
+          (e) => {
+            if (!(e.target as Element | null)?.closest?.(sel)) return;
+            done.abort();
+            resolve(true);
+          },
+          { signal: done.signal },
+        );
+        // a deadline only so that a menu that never takes focus fails its check instead of hanging the run
+        setTimeout(() => {
+          done.abort();
+          resolve(false);
+        }, 5000);
+      }),
+    selector,
+  );
+
 const settled = (page: Page) =>
   page.evaluate(() => Promise.allSettled(document.getAnimations().map((a) => a.finished)).then(() => {}));
 
@@ -361,6 +388,7 @@ async function keyboard(page: Page, bookRoute: string | undefined) {
     await vaultButton.focus();
     await page.keyboard.press("Enter");
     await page.waitForSelector(".vault-menu");
+    await focusInside(page, ".vault-menu");
     const onOpen = await page.evaluate(() => document.activeElement?.getAttribute("aria-checked") === "true");
     check("the vault menu opens on the open vault", onOpen, await focused(page));
     await page.keyboard.press("ArrowDown");
@@ -384,6 +412,7 @@ async function keyboard(page: Page, bookRoute: string | undefined) {
     await folderButton.focus();
     await page.keyboard.press("Enter");
     await page.waitForSelector('.tree-folder-menu [role="menu"]');
+    await focusInside(page, '.tree-folder-menu [role="menu"]');
     const at = () =>
       page.evaluate(() =>
         [...document.querySelectorAll('.tree-folder-menu [role="menuitem"]')].indexOf(
@@ -546,6 +575,7 @@ async function readerStates(page: Page, bookRoute: string, theme: "light" | "dar
     await cardMenu.focus();
     await page.keyboard.press("Enter");
     await page.waitForSelector('.mcard.open [role="menu"]');
+    await focusInside(page, '.mcard.open [role="menu"]');
     const at = () =>
       page.evaluate(() =>
         [...document.querySelectorAll('.mcard.open [role="menuitem"]')].indexOf(document.activeElement as Element),

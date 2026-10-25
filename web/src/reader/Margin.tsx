@@ -248,9 +248,12 @@ export function Margin({
     if (!focused || focused === was) return;
     const active = document.activeElement;
     if (active && active !== document.body && !box.current?.contains(active)) return;
-    requestAnimationFrame(() =>
-      cards.current.get(focused)?.querySelector<HTMLElement>(".mcard")?.focus({ preventScroll: true }),
-    );
+    requestAnimationFrame(() => {
+      const card = cards.current.get(focused);
+      // unless focus is in it already: in its menu, say, opened by the press that focused the card
+      if (!card || card.contains(document.activeElement)) return;
+      card.querySelector<HTMLElement>(".mcard")?.focus({ preventScroll: true });
+    });
   }, [focused]);
 
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
