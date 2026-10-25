@@ -79,10 +79,12 @@ export function useFocusTrap(
  * Arrow keys move focus between the items (`selector`) inside `ref`; Home and End go to the first and
  * last. Horizontal lists use Left/Right, vertical ones Up/Down, "both" either pair. With `select`, moving to an item also
  * clicks it (tabs that show their panel as you arrow through them). Only the current item is in the
- * Tab order (roving tabindex), so Tab leaves the list instead of walking through it.
+ * Tab order (roving tabindex), so Tab leaves the list instead of walking through it. The element behind
+ * `ref` may come and go (a menu drawn only while it is open): the keys follow whichever one is there.
  */
 /** Something that can take focus: an HTML element or an SVG one (a node in a drawn graph). */
 type Item = Element & HTMLOrSVGElement;
+type Orientation = "horizontal" | "vertical" | "both";
 
 export function useArrowKeys(
   ref: RefObject<Element | null>,
@@ -90,74 +92,86 @@ export function useArrowKeys(
     selector,
     orientation = "horizontal",
     select = false,
-  }: { selector: string; orientation?: "horizontal" | "vertical" | "both"; select?: boolean },
+  }: { selector: string; orientation?: Orientation; select?: boolean },
 ) {
+  const attached = useRef<{ root: Element; options: string; detach: () => void } | null>(null);
+  // after every render: the element may have appeared, gone or been replaced since the last one
   useEffect(() => {
     const root = ref.current;
-    if (!root) return;
-    const items = () =>
-      [...root.querySelectorAll<Item & Element>(selector)].filter((el) => !el.hasAttribute("disabled"));
-    const current = (list: Item[]) =>
-      Math.max(
-        0,
-        list.findIndex(
-          (el) =>
-            el === document.activeElement ||
-            el.getAttribute("aria-selected") === "true" ||
-            el.getAttribute("aria-checked") === "true" ||
-            el.getAttribute("aria-pressed") === "true" ||
-            el.getAttribute("aria-current") === "true",
-        ),
-      );
-    const rove = () => {
-      const list = items();
-      const at = current(list);
-      list.forEach((el, i) => {
-        el.tabIndex = i === at ? 0 : -1;
-      });
-    };
-    rove();
-    const observer = new MutationObserver(rove);
-    observer.observe(root, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      attributeFilter: ["aria-selected", "aria-pressed", "aria-checked", "aria-current"],
+    const options = `${selector}\u0000${orientation}\u0000${select}`;
+    const was = attached.current;
+    if (was?.root === root && was.options === options) return;
+    was?.detach();
+    attached.current = root ? { root, options, detach: arrowKeys(root, selector, orientation, select) } : null;
+  });
+  useEffect(
+    () => () => {
+      attached.current?.detach();
+      attached.current = null;
+    },
+    [],
+  );
+}
+
+/** Wires the arrow keys and the roving tabindex into `root`; returns what undoes it. */
+function arrowKeys(root: Element, selector: string, orientation: Orientation, select: boolean): () => void {
+  const items = () => [...root.querySelectorAll<Item & Element>(selector)].filter((el) => !el.hasAttribute("disabled"));
+  const current = (list: Item[]) =>
+    Math.max(
+      0,
+      list.findIndex(
+        (el) =>
+          el === document.activeElement ||
+          el.getAttribute("aria-selected") === "true" ||
+          el.getAttribute("aria-checked") === "true" ||
+          el.getAttribute("aria-pressed") === "true" ||
+          el.getAttribute("aria-current") === "true",
+      ),
+    );
+  const rove = () => {
+    const list = items();
+    const at = current(list);
+    list.forEach((el, i) => {
+      el.tabIndex = i === at ? 0 : -1;
     });
-    const next =
-      orientation === "horizontal"
-        ? ["ArrowRight"]
-        : orientation === "vertical"
-          ? ["ArrowDown"]
-          : ["ArrowRight", "ArrowDown"];
-    const prev =
-      orientation === "horizontal"
-        ? ["ArrowLeft"]
-        : orientation === "vertical"
-          ? ["ArrowUp"]
-          : ["ArrowLeft", "ArrowUp"];
-    const onKey = (e: Event) => {
-      if (!(e instanceof KeyboardEvent)) return;
-      if (![...next, ...prev, "Home", "End"].includes(e.key)) return;
-      const list = items();
-      const at = list.indexOf(document.activeElement as unknown as Item);
-      if (at < 0) return;
-      e.preventDefault();
-      const to =
-        e.key === "Home"
-          ? 0
-          : e.key === "End"
-            ? list.length - 1
-            : (at + (next.includes(e.key) ? 1 : -1) + list.length) % list.length;
-      list[to].focus();
-      if (select) (list[to] as unknown as HTMLElement).click?.();
-    };
-    root.addEventListener("keydown", onKey);
-    return () => {
-      observer.disconnect();
-      root.removeEventListener("keydown", onKey);
-    };
-  }, [ref, selector, orientation, select]);
+  };
+  rove();
+  const observer = new MutationObserver(rove);
+  observer.observe(root, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    attributeFilter: ["aria-selected", "aria-pressed", "aria-checked", "aria-current"],
+  });
+  const next =
+    orientation === "horizontal"
+      ? ["ArrowRight"]
+      : orientation === "vertical"
+        ? ["ArrowDown"]
+        : ["ArrowRight", "ArrowDown"];
+  const prev =
+    orientation === "horizontal" ? ["ArrowLeft"] : orientation === "vertical" ? ["ArrowUp"] : ["ArrowLeft", "ArrowUp"];
+  const onKey = (e: Event) => {
+    if (!(e instanceof KeyboardEvent)) return;
+    if (![...next, ...prev, "Home", "End"].includes(e.key)) return;
+    const list = items();
+    const at = list.indexOf(document.activeElement as unknown as Item);
+    if (at < 0) return;
+    e.preventDefault();
+    const to =
+      e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? list.length - 1
+          : (at + (next.includes(e.key) ? 1 : -1) + list.length) % list.length;
+    list[to].focus();
+    if (select) (list[to] as unknown as HTMLElement).click?.();
+  };
+  root.addEventListener("keydown", onKey);
+  return () => {
+    observer.disconnect();
+    root.removeEventListener("keydown", onKey);
+  };
 }
 
 let region: HTMLElement | null = null;
