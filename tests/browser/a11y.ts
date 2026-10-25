@@ -1,9 +1,9 @@
 // Accessibility checks of the running app: axe-core's WCAG 2.2 A and AA rules on every page, in both
 // themes (and the reader's states: its margin cards, the find bar, the figures and an animation, the
 // tutor's sessions; the vault menu and the dialogs to make and delete a vault), and the keyboard
-// essentials (a skip link, focus that can always be seen, the ⌘K palette, the vault menu and dialogs that
-// keep focus and close with Escape, side panels resized and closed from their edge, the reader usable
-// without a mouse).
+// essentials (a skip link, focus that can always be seen, the ⌘K palette, the vault menu, a folder's
+// menu and dialogs that keep focus and close with Escape, side panels resized and closed from their
+// edge, the reader usable without a mouse).
 //   npm run test:a11y                  checks APP_URL (default http://localhost:5173/, so npm run dev)
 //   npm run test:a11y -- --serve       starts the built app (npm run build first) on a throwaway vault
 //                                      seeded with a small book, and checks that (what CI does)
@@ -376,6 +376,36 @@ async function keyboard(page: Page, bookRoute: string | undefined) {
     check("Escape closes the vault menu and focus returns to its button", back, await focused(page));
   }
 
+  // a folder's menu in the notes, drawn only while open: Enter opens it on its first item, the arrow keys
+  // move through it, and Escape closes it with focus back on its button
+  await open(page, "#/notes", "light");
+  const folderButton = await page.$('.tree-folder-menu button[aria-haspopup="menu"]');
+  if (folderButton) {
+    await folderButton.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForSelector('.tree-folder-menu [role="menu"]');
+    const at = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('.tree-folder-menu [role="menuitem"]')].indexOf(
+          document.activeElement as Element,
+        ),
+      );
+    const first = await at();
+    await page.keyboard.press("ArrowDown");
+    const second = await at();
+    await page.keyboard.press("End");
+    const last = await at();
+    check(
+      "the arrow keys move through a folder's menu",
+      first === 0 && second === 1 && last > 1,
+      `${first} → ${second} → ${last}: ${await focused(page)}`,
+    );
+    await page.keyboard.press("Escape");
+    await page.waitForSelector('.tree-folder-menu [role="menu"]', { hidden: true });
+    const home = await page.evaluate(() => document.activeElement?.getAttribute("aria-haspopup") === "menu");
+    check("Escape closes a folder's menu and focus returns to its button", home, await focused(page));
+  } else check("a folder's menu can be opened from the keyboard", false, "no folder in the notes' tree");
+
   // a dialog keeps focus inside while open, and Escape returns focus to what opened it
   const concept = (await routes()).find((r) => r.startsWith("#/brain/concept/"));
   if (concept) await open(page, concept, "light");
@@ -510,6 +540,22 @@ async function readerStates(page: Page, bookRoute: string, theme: "light" | "dar
       (await page.$(present)) ? describe(await axe(page)) : `${present} not found`,
     );
   await ax("margin cards", ".mcard.open .mcard-thread .msg");
+  // the open card's menu, drawn only while open: the arrow keys move through it (once is enough)
+  const cardMenu = theme === "light" ? await page.$('.mcard.open .mcard-icon[aria-label="More"]') : null;
+  if (cardMenu) {
+    await cardMenu.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForSelector('.mcard.open [role="menu"]');
+    const at = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('.mcard.open [role="menuitem"]')].indexOf(document.activeElement as Element),
+      );
+    const first = await at();
+    await page.keyboard.press("ArrowDown");
+    const second = await at();
+    check("the arrow keys move through a margin card's menu", first === 0 && second === 1, `${first} → ${second}`);
+    await page.keyboard.press("Escape");
+  }
   if (await page.$(".pdf-root")) {
     await page.keyboard.press("p");
     await wait(1200);
