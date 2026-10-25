@@ -1,8 +1,9 @@
-/* The frame around every page except the reader: a slim bar along the top (the wordmark, the pages
- * beside it with the number of cards due on Review; search drawn as a field, the agent, the theme switch
- * and settings at the right end) and the page itself. On a phone the pages move to a tab bar along the
- * bottom, each with its icon. Pointing at (or focusing) a page's link fetches that page ahead. The
- * number on Review is drawn with the bar (the last one known), so the row never moves when it arrives. */
+/* The frame around every page except the reader: a slim bar along the top (the wordmark, with the open
+ * vault's name to switch vaults once there are several; the pages beside it with the number of cards due
+ * on Review; search drawn as a field, the agent, the theme switch and settings at the right end) and the
+ * page itself. On a phone the pages move to a tab bar along the bottom, each with its icon. Pointing at
+ * (or focusing) a page's link fetches that page ahead. The number on Review is drawn with the bar (the
+ * last one known), so the row never moves when it arrives. */
 import {
   Brain,
   Layers,
@@ -22,6 +23,7 @@ import { learn } from "../api";
 import { openPalette, useIndicator } from "../components/ui";
 import { cached, prime } from "../lib/cache";
 import { under, useVaultEvents } from "../lib/useVaultEvents";
+import { VaultSwitch } from "../vaults/VaultSwitch";
 import { ahead } from "./pages";
 
 const NAV: { route: string; label: string; icon: LucideIcon; match: RegExp }[] = [
@@ -119,10 +121,13 @@ export function Shell({
     <div className="shell">
       <SkipLink />
       <header className="topnav">
-        <a className="brand" href="#/" title="Today" {...ahead("#/")}>
-          <span className="brand-mark" aria-hidden="true" />
-          <span className="brand-name">Feynman’s Classroom</span>
-        </a>
+        <div className="topnav-start">
+          <a className="brand" href="#/" title="Today" {...ahead("#/")}>
+            <span className="brand-mark" aria-hidden="true" />
+            <span className="brand-name">Feynman’s Classroom</span>
+          </a>
+          <VaultSwitch />
+        </div>
         <nav className="topnav-nav" aria-label="Main">
           <ul className="topnav-links" ref={nav}>
             {NAV.map((item, i) => (

@@ -1324,6 +1324,94 @@ input[type="range"][disabled] {
 .topnav .brand {
   align-self: center;
 }
+/* the wordmark, and beside it the open vault's name (a menu of the others) once there are several */
+.topnav-start {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+.vault-switch {
+  position: relative;
+  min-width: 0;
+}
+.vault-switch-button {
+  appearance: none;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  max-width: 200px;
+  height: 32px;
+  padding: 0 var(--space-xs);
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--ink-2);
+  font: 550 var(--text-sm) / 1 var(--sans);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-micro) ease-out,
+    color var(--dur-micro) ease-out;
+}
+.vault-switch-button > svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--ink-3);
+}
+.vault-switch-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vault-switch-button:active:not([disabled]) {
+  transform: scale(0.97);
+}
+.vault-switch-button[aria-expanded="true"] {
+  background: var(--press);
+  color: var(--ink);
+}
+@media (hover: hover) and (pointer: fine) {
+  .vault-switch-button:hover:not([disabled]) {
+    background: var(--hover);
+    color: var(--ink);
+  }
+}
+/* under the name, growing from its left: each vault, the open one checked, what it holds under its name */
+.vault-menu {
+  left: 0;
+  right: auto;
+  transform-origin: top left;
+}
+.vault-menu [role="menuitemradio"] {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: var(--space-sm);
+  row-gap: var(--space-3xs);
+  align-items: center;
+}
+.vault-menu-check {
+  visibility: hidden;
+}
+.vault-menu [aria-checked="true"] .vault-menu-check {
+  visibility: visible;
+  color: var(--ink);
+}
+.vault-menu-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vault-menu [aria-checked="true"] .vault-menu-name {
+  font-weight: 600;
+}
+.vault-menu-facts {
+  grid-column: 2;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
 .topnav-nav {
   min-width: 0;
   display: flex;
@@ -1753,6 +1841,13 @@ input[type="range"][disabled] {
   /* with the pages in the tab bar, the bar above has room for the name again */
   .topnav .brand-name {
     display: inline;
+  }
+  /* …unless the vault's name is there too: then the mark stands for the app */
+  .topnav-start:has(.vault-switch) .brand-name {
+    display: none;
+  }
+  .vault-switch-button {
+    max-width: 40vw;
   }
   .topnav-nav {
     position: fixed;

@@ -1,9 +1,10 @@
 /* The library: your books as a shelf of covers (its title and author set on each), with how far through
  * each you are and what it holds under it; find one by its title or author, and order them by the last
  * one you touched, by title or by author. Add one with the button, or drop a file anywhere on the page:
- * it stands on the shelf while it's read, then opens. Under Figures (#/library/figures), the figures you
- * drew. It mentions the model tool only when the one in use isn't ready. */
-import { Plus, Search, Trash2 } from "lucide-react";
+ * it stands on the shelf while it's read, then opens. A book one of your other vaults has can be added
+ * from there as it is (kept once). Under Figures (#/library/figures), the figures you drew. It mentions
+ * the model tool only when the one in use isn't ready. */
+import { Plus, Search, Library as Shelves, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, type Book, learn } from "../api";
 import { ahead } from "../app/pages";
@@ -12,6 +13,7 @@ import { Loading, Spinner } from "../components/feedback";
 import { useIndicator } from "../components/ui";
 import { BOOK_FORMATS, useBookUpload } from "../lib/useBookUpload";
 import { useLoad } from "../lib/useLoad";
+import { BooksElsewhere } from "../vaults/BooksElsewhere";
 import { Figures } from "./Figures";
 
 type Order = "recent" | "title" | "author";
@@ -38,7 +40,13 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
   }, []);
   const view = hash.split("?")[0].startsWith("#/library/figures") ? "figures" : "books";
   const views = useIndicator<HTMLElement>(view);
-  const { data: books, error: loadError, reload } = useLoad(() => api.books(), [], "books");
+  const { data: books, error: loadError, reload: reloadBooks } = useLoad(() => api.books(), [], "books");
+  const { data: elsewhere, reload: reloadElsewhere } = useLoad(() => api.elsewhere(), [], "books-elsewhere");
+  const [bringing, setBringing] = useState(false);
+  const reload = () => {
+    reloadBooks();
+    reloadElsewhere();
+  };
   const { data: info } = useLoad(() => learn.settings(), [], "settings");
   const add = useBookUpload(reload);
   const [query, setQuery] = useState("");
@@ -72,6 +80,12 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
           </a>
         </nav>
         <span className="spacer" />
+        {view === "books" && books?.length && elsewhere?.length ? (
+          <button type="button" className="button subtle" onClick={() => setBringing(true)} aria-haspopup="dialog">
+            <Shelves aria-hidden="true" />
+            From other vaults
+          </button>
+        ) : null}
         {view === "books" && books?.length ? <AddBook uploading={add.uploading} onClick={add.choose} primary /> : null}
       </header>
       <input {...add.field} />
@@ -101,6 +115,11 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
           <p className="fine">Read it beside a margin that explains, draws and quizzes. {BOOK_FORMATS}.</p>
           <AddBook uploading={add.uploading} onClick={add.choose} primary />
           <p className="fine">Or drop the file anywhere on this page.</p>
+          {elsewhere?.length ? (
+            <button type="button" className="link" onClick={() => setBringing(true)} aria-haspopup="dialog">
+              Add one from your other vaults ({elsewhere.length})
+            </button>
+          ) : null}
         </div>
       ) : (
         <>
@@ -175,7 +194,17 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
                     aria-label={`Remove ${book.title}`}
                     title="Remove from the library"
                     onClick={async () => {
-                      if (!confirm(`Remove "${book.title}" and its figures?`)) return;
+                      const also = book.alsoIn?.length
+                        ? ` It stays in ${book.alsoIn.join(", ")}; the margin and figures made here go.`
+                        : "";
+                      if (
+                        !confirm(
+                          also
+                            ? `Remove "${book.title}" from this vault?${also}`
+                            : `Remove "${book.title}" and its figures?`,
+                        )
+                      )
+                        return;
                       await api.deleteBook(book.id);
                       reload();
                     }}
@@ -187,6 +216,16 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
             </ul>
           )}
         </>
+      )}
+      {bringing && elsewhere && (
+        <BooksElsewhere
+          books={elsewhere}
+          onAdded={reloadBooks}
+          onClose={() => {
+            setBringing(false);
+            reloadElsewhere();
+          }}
+        />
       )}
       {add.dragging && view === "books" && (
         <div className="drop-overlay" aria-hidden="true">

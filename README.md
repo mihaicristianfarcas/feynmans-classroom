@@ -25,7 +25,8 @@ does its thinking on **your own Codex or Claude Code subscription** (no API keys
   plain files (a valid Obsidian vault), versioned by Jujutsu (jj), with indexes kept for people and
   agents. Organise it in folders by subject, book or topic, link notes to what they're about, and
   see it as a graph built from your links (and the connections an agent suggests, which you accept
-  or reject). Every note keeps its versions.
+  or reject). Every note keeps its versions. Keep several vaults (a subject, work, a language) and
+  switch between them in the app; a book in more than one is kept once.
 - **One agent, one field.** Press ⌘J anywhere (or the sparkle in the top bar) and say what you want:
   "summarise this chapter into my folder for this book", "quiz me on my highlights", "turn this note
   into exercises", "what have I written about consensus?". It knows where you are, does it in its

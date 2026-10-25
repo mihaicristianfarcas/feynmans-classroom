@@ -1,8 +1,9 @@
 // Accessibility checks of the running app: axe-core's WCAG 2.2 A and AA rules on every page, in both
 // themes (and the reader's states: its margin cards, the find bar, the figures and an animation, the
-// tutor's sessions), and the keyboard essentials (a skip link, focus that can always be seen, the ⌘K palette and
-// dialogs that keep focus and close with Escape, side panels resized and closed from their edge, the
-// reader usable without a mouse).
+// tutor's sessions; the vault menu and the dialogs to make and delete a vault), and the keyboard
+// essentials (a skip link, focus that can always be seen, the ⌘K palette, the vault menu and dialogs that
+// keep focus and close with Escape, side panels resized and closed from their edge, the reader usable
+// without a mouse).
 //   npm run test:a11y                  checks APP_URL (default http://localhost:5173/, so npm run dev)
 //   npm run test:a11y -- --serve       starts the built app (npm run build first) on a throwaway vault
 //                                      seeded with a small book, and checks that (what CI does)
@@ -84,6 +85,8 @@ async function serve() {
       (r) => r.json(),
     );
   await json("api/profile", "PUT", { name: "Ada", goals: "Understand calculus", onboarded: true });
+  // a second vault (not opened), so every page's bar shows the vault switch
+  await json("api/vaults", "POST", { name: "Physics" });
   const book = new FormData();
   book.append(
     "file",
@@ -346,6 +349,29 @@ async function keyboard(page: Page, bookRoute: string | undefined) {
   await wait(200);
   check("Escape closes the agent", !(await page.$("[role=dialog]")));
 
+  // the vault menu: Enter opens it on the open vault, the arrow keys move through it, and Escape closes it
+  // with focus back on its button
+  await open(page, "#/", "light");
+  const vaultButton = await page.$(".vault-switch-button");
+  if (vaultButton) {
+    await vaultButton.focus();
+    await page.keyboard.press("Enter");
+    await page.waitForSelector(".vault-menu");
+    const onOpen = await page.evaluate(() => document.activeElement?.getAttribute("aria-checked") === "true");
+    check("the vault menu opens on the open vault", onOpen, await focused(page));
+    await page.keyboard.press("ArrowDown");
+    const moved = await page.evaluate(
+      () =>
+        !!document.activeElement?.closest(".vault-menu") &&
+        document.activeElement?.getAttribute("aria-checked") !== "true",
+    );
+    check("the arrow keys move through the vault menu", moved, await focused(page));
+    await page.keyboard.press("Escape");
+    await page.waitForSelector(".vault-menu", { hidden: true });
+    const back = await page.evaluate(() => !!document.activeElement?.classList.contains("vault-switch-button"));
+    check("Escape closes the vault menu and focus returns to its button", back, await focused(page));
+  }
+
   // a dialog keeps focus inside while open, and Escape returns focus to what opened it
   const concept = (await routes()).find((r) => r.startsWith("#/brain/concept/"));
   if (concept) await open(page, concept, "light");
@@ -598,6 +624,28 @@ try {
       describe(await axe(page)),
     );
     await page.click('.graph-tools [aria-label="Legend"]');
+    // the vault menu, and the dialogs to make and to delete a vault (when there is more than one)
+    await open(page, "#/settings/vault", theme);
+    if (await page.$(".vault-switch-button")) {
+      // from the top of the page: what the sticky bar covers once it scrolls isn't a target
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.click(".vault-switch-button");
+      await page.waitForSelector(".vault-menu");
+      check(`axe: the vault menu (${theme})`, (await axe(page)).length === 0, describe(await axe(page)));
+      await page.keyboard.press("Escape");
+      for (const [what, opener] of [
+        ["making a vault", '[data-section="vault"] .button[aria-haspopup="dialog"]'],
+        ["deleting a vault", '[data-section="vault"] .icon-button[aria-haspopup="dialog"]'],
+      ]) {
+        await page.click(opener);
+        await page.waitForSelector(".modal");
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await wait(300);
+        check(`axe: the dialog for ${what} (${theme})`, (await axe(page)).length === 0, describe(await axe(page)));
+        await page.keyboard.press("Escape");
+        await page.waitForSelector(".modal", { hidden: true });
+      }
+    }
   }
   const seededBook = list.find((r) => r.startsWith("#/book/"));
   if (seededBook && dataDir && (!arg("only") || "reader".includes(arg("only")!)))

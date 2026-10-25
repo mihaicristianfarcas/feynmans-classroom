@@ -31,8 +31,8 @@ applies them before the first paint.
 
 Every page shows only what it is for, under its title in the serif, in one container capped at
 1120 px. Space, not rules, parts a page's sections; hairlines only part the rows of a list. A slim bar
-along the top holds the wordmark, the pages beside it (the current one underlined, with the cards due
-on Review), search drawn as a field (⌘K), the agent (a sparkle, with a dot while it works), the theme
+along the top holds the wordmark (with the open vault's name beside it, a menu of the others, once
+there are several), the pages beside it (the current one underlined, with the cards due on Review), search drawn as a field (⌘K), the agent (a sparkle, with a dot while it works), the theme
 and settings; the reader keeps its own bar of the same height. On a phone the pages move to a tab bar
 along the bottom, each its icon over its name.
 

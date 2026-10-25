@@ -1,6 +1,7 @@
 /* The app: picks the page from the URL's hash (#/library, #/book/<id>, #/notes/<id>…), sends a new
  * learner to the welcome page first, and puts every page except the reader inside the Shell (Notes
- * and the Brain's graph fill the window below its bar; the rest scroll). The ⌘K palette and the agent
+ * and the Brain's graph fill the window below its bar; the rest scroll). It starts again at Today when
+ * another vault is opened. The ⌘K palette and the agent
  * (⌘J) sit over every page; old #/ask links open the agent. Each page but Today is its own chunk
  * (app/pages.ts), all fetched ahead once the app is idle; one that isn't here yet shows nothing (or,
  * after a moment, a spinner).
@@ -8,9 +9,12 @@
 import { type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import { AgentPanel } from "../agent/AgentPanel";
 import { openAgent } from "../agent/store";
-import { learn } from "../api";
+import { learn, vaults } from "../api";
+import { showVault } from "../api/client";
 import { Loading } from "../components/feedback";
+import { prime } from "../lib/cache";
 import { Today } from "../pages/Today";
+import { followOpenVault } from "../vaults/open";
 import { openLink } from "./navigation";
 import { PageBoundary } from "./PageBoundary";
 import { Palette } from "./Palette";
@@ -97,7 +101,19 @@ export function App() {
       (p) => setOnboarded(p.onboarded),
       () => setOnboarded(true),
     );
-    return () => window.removeEventListener("hashchange", onHash);
+    // which vault this page shows (every call says so), and a fresh start when another one is opened
+    prime("vaults", vaults.list).then(
+      (list) => {
+        const open = list.find((v) => v.open);
+        if (open) showVault(open.id);
+      },
+      () => {},
+    );
+    const unfollow = followOpenVault();
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      unfollow();
+    };
   }, []);
   useEffect(() => {
     if (onboarded === false && current.name === "today") location.hash = "#/welcome";

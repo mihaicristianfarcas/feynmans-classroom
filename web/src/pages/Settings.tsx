@@ -1,9 +1,9 @@
 /* Settings: how the app looks and how you like to read (the theme, and the typeface, size and line
  * width of what you read, kept on this device), which subscription does the thinking (Codex or Claude
  * Code), the models and effort for quick and careful work (folded away until wanted), what agents may
- * do, who you are, and the vault's folder and history. Each section says what it is for over its
- * controls; the list at the left (across the top on a phone) marks the one you're in and goes to any
- * of them (#/settings/<section> opens there). */
+ * do, who you are, and your vaults (open, make, rename or delete one), with the open one's folder and
+ * history. Each section says what it is for over its controls; the list at the left (across the top on
+ * a phone) marks the one you're in and goes to any of them (#/settings/<section> opens there). */
 import { Bot, Cpu, FolderGit2, type LucideIcon, Palette, User } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { learn, type SettingsInfo } from "../api";
@@ -15,13 +15,14 @@ import { useIndicator } from "../components/ui";
 import { announce } from "../lib/a11y";
 import { timeAgo } from "../lib/time";
 import { useLoad } from "../lib/useLoad";
+import { VaultList } from "../vaults/VaultList";
 
 const SECTIONS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "thinking", label: "Thinking", icon: Cpu },
   { id: "agents", label: "Agents", icon: Bot },
   { id: "you", label: "You", icon: User },
-  { id: "vault", label: "Vault", icon: FolderGit2 },
+  { id: "vault", label: "Vaults", icon: FolderGit2 },
 ];
 /** The section the address names (#/settings/you), if any. */
 const sectionOf = (hash: string) => {
@@ -390,25 +391,32 @@ export function Settings({ theme, setTheme }: { theme: "light" | "dark"; setThem
             />
           </Section>
 
-          {vault && (
-            <Section anchor="vault" title="Your vault" about="Where everything you make is kept, and its history.">
-              <p className="fine">
-                Plain Markdown in <code>{vault.path}</code>: {vault.notes} notes, {vault.concepts} concepts,{" "}
-                {vault.cards} cards, {vault.figures} figures. Open it in any editor or Obsidian. Jujutsu (jj) keeps
-                every version, and each agent request can be undone.
-              </p>
-              {vault.history.length > 0 && (
-                <ul className="history">
-                  {vault.history.slice(0, 6).map((h) => (
-                    <li key={h.commit}>
-                      <code>{h.change.slice(0, 8)}</code> <span>{h.subject}</span>{" "}
-                      <span className="muted">{timeAgo(h.when)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Section>
-          )}
+          <Section
+            anchor="vault"
+            title="Vaults"
+            about="Where everything you make is kept: each vault a folder of its own, with its own history. A book in several vaults is kept once."
+          >
+            <VaultList />
+            {vault && (
+              <>
+                <p className="fine">
+                  The open one is plain Markdown in <code>{vault.path}</code>: {vault.notes} notes, {vault.concepts}{" "}
+                  concepts, {vault.cards} cards, {vault.figures} figures. Open it in any editor or Obsidian. Jujutsu
+                  (jj) keeps every version, and each agent request can be undone.
+                </p>
+                {vault.history.length > 0 && (
+                  <ul className="history">
+                    {vault.history.slice(0, 6).map((h) => (
+                      <li key={h.commit}>
+                        <code>{h.change.slice(0, 8)}</code> <span>{h.subject}</span>{" "}
+                        <span className="muted">{timeAgo(h.when)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </Section>
         </div>
       </div>
     </div>

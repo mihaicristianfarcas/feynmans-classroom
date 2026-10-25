@@ -90,6 +90,33 @@ export interface Book {
   progress?: BookProgress | null;
   /** When the learner last did anything with it (ms; null: nothing yet). */
   lastOpened?: number | null;
+  /** The other vaults that have it too (it is kept once for all of them). */
+  alsoIn?: string[];
+}
+/** A book another vault has and this one doesn't. */
+export interface BookElsewhere {
+  id: string;
+  title: string;
+  author?: string;
+  format: Book["format"];
+  pageCount?: number;
+  chapters: number;
+  /** The vaults that have it. */
+  vaults: string[];
+}
+/** A vault, with what it holds. */
+export interface VaultSummary {
+  id: string;
+  name: string;
+  /** Its folder: relative to the data folder, and in full. */
+  dir: string;
+  path: string;
+  created?: string;
+  open: boolean;
+  books: number;
+  notes: number;
+  cards: number;
+  concepts: number;
 }
 export interface BookProgress {
   /** 0–1. */
