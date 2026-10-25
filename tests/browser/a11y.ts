@@ -228,6 +228,10 @@ async function open(page: Page, route: string, theme: "light" | "dark") {
   await wait(route.startsWith("#/book/") ? 3000 : 1200);
 }
 
+/** Resolves once what is fading or growing in has finished (its colours are only then its own). */
+const settled = (page: Page) =>
+  page.evaluate(() => Promise.allSettled(document.getAnimations().map((a) => a.finished)).then(() => {}));
+
 interface AxeViolation {
   id: string;
   impact: string;
@@ -631,7 +635,9 @@ try {
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.click(".vault-switch-button");
       await page.waitForSelector(".vault-menu");
-      check(`axe: the vault menu (${theme})`, (await axe(page)).length === 0, describe(await axe(page)));
+      await settled(page);
+      const inMenu = await axe(page);
+      check(`axe: the vault menu (${theme})`, inMenu.length === 0, describe(inMenu));
       await page.keyboard.press("Escape");
       for (const [what, opener] of [
         ["making a vault", '[data-section="vault"] .button[aria-haspopup="dialog"]'],
@@ -640,8 +646,9 @@ try {
         await page.click(opener);
         await page.waitForSelector(".modal");
         await page.evaluate(() => window.scrollTo(0, 0));
-        await wait(300);
-        check(`axe: the dialog for ${what} (${theme})`, (await axe(page)).length === 0, describe(await axe(page)));
+        await settled(page);
+        const inDialog = await axe(page);
+        check(`axe: the dialog for ${what} (${theme})`, inDialog.length === 0, describe(inDialog));
         await page.keyboard.press("Escape");
         await page.waitForSelector(".modal", { hidden: true });
       }
