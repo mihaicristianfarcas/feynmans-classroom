@@ -1269,6 +1269,148 @@
   font-size: var(--text-2xs);
   color: var(--ink-3);
 }
+/* the vaults: one row each (its name in the serif, what it holds under it, its actions at the end),
+   parted by hairlines; the open one marked */
+.vault-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.vault-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+  min-height: 60px;
+  padding: var(--space-sm) 0;
+}
+.vault-row + .vault-row {
+  border-top: 1px solid var(--line);
+}
+.vault-row-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3xs);
+}
+.vault-row-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  font: 500 var(--text-lg) / 1.25 var(--serif);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.vault-row-facts {
+  font: 400 var(--text-xs) / 1.4 var(--sans);
+  color: var(--ink-3);
+}
+.vault-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+.vault-rename {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.vault-rename .field {
+  flex: 1;
+  min-width: min(240px, 100%);
+}
+.vault-rename .form-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+.vault-warning {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.vault-warning code {
+  overflow-wrap: anywhere;
+}
+/* making a vault: its name, then the books to bring along */
+.new-vault {
+  display: grid;
+  gap: var(--space-md);
+}
+.new-vault > .fine {
+  margin: calc(var(--space-xs) * -1) 0 0;
+}
+.new-vault-books {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.new-vault-books legend {
+  padding: 0;
+  margin-bottom: var(--space-xs);
+  font: 550 var(--text-xs) var(--sans);
+  color: var(--ink-2);
+}
+.new-vault-books ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  max-height: 280px;
+  overflow: auto;
+}
+.new-vault-books li + li {
+  border-top: 1px solid var(--line);
+}
+.new-vault-books .check {
+  display: flex;
+  align-items: flex-start;
+  padding: var(--space-xs) 0;
+  white-space: normal;
+}
+.new-vault-books input {
+  margin-top: 3px;
+}
+.new-vault-book,
+.elsewhere-text {
+  display: grid;
+  gap: var(--space-3xs);
+  min-width: 0;
+}
+.new-vault-title,
+.elsewhere-title {
+  font: 500 var(--text-md) / 1.3 var(--serif);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.new-vault-book .fine,
+.elsewhere-text .fine {
+  margin: 0;
+}
+/* the books other vaults have: each its small cover, title and where it is, and Add */
+.elsewhere-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  max-height: 60vh;
+  overflow: auto;
+}
+.elsewhere-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+}
+.elsewhere-list li + li {
+  border-top: 1px solid var(--line);
+}
 @media (hover: hover) and (pointer: fine) {
   .provider:not([data-on]):hover {
     box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--line-strong), var(--ink) 22%);

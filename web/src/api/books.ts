@@ -2,7 +2,7 @@
  * figures the same way the server does. */
 import { figurePrefix } from "../../../shared/chapters.ts";
 import { call, post } from "./client";
-import type { Block, Book, Demo, FindHit, Job, Loc, Status } from "./types";
+import type { Block, Book, BookElsewhere, Demo, FindHit, Job, Loc, Status } from "./types";
 
 export const api = {
   status: () => call<Status>("/api/status"),
@@ -17,6 +17,10 @@ export const api = {
     return call<Book>("/api/books", { method: "POST", body: form });
   },
   deleteBook: (id: string) => call(`/api/books/${id}`, { method: "DELETE" }),
+  /** The books other vaults have and this one doesn't. */
+  elsewhere: () => call<BookElsewhere[]>("/api/books/elsewhere"),
+  /** Adds a book another vault has to this one (the same book, kept once). */
+  bringIn: (id: string) => post<Book>(`/api/books/elsewhere/${id}`),
   detectChapters: (id: string) => post<Job>(`/api/books/${id}/detect-chapters`),
   visualize: (
     id: string,
