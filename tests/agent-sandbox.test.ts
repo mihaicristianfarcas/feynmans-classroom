@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { bwrapArgs, claudeSandbox, codexProfile, sandboxedShell, seatbeltProfile } from "../server/llm/sandbox.ts";
 
 describe("the agents' sandbox settings", () => {
@@ -144,8 +144,13 @@ describe.skipIf(!hasSandbox)("an agent's shell under OpenCode's sandbox", () => 
     mkdirSync(join(run, "tmp"));
     return sandboxedShell({ cwd: folder, write, readRoots: [live] }, run, join(run, "tmp"));
   };
-  const writable = shells(true);
-  const readOnly = shells(false);
+  // made before the tests, not while they are collected, which happens even when the block is skipped
+  let writable = "";
+  let readOnly = "";
+  beforeAll(() => {
+    writable = shells(true);
+    readOnly = shells(false);
+  });
   const run = (command: string, write = true) =>
     spawnSync(write ? writable : readOnly, ["-c", command], { cwd: folder, encoding: "utf8", timeout: 30000 });
   it("can read and write its own folder, and read the live vault", () => {
