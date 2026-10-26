@@ -41,6 +41,8 @@ export const learn = {
   profile: () => call<Profile>("/api/profile"),
   saveProfile: (p: Partial<Profile>) => put<Profile>("/api/profile", p),
   settings: () => call<SettingsInfo>("/api/settings"),
+  /** The models OpenCode offers (provider/model), to pick from. */
+  opencodeModels: () => call<{ models: string[] }>("/api/settings/opencode-models"),
   saveSettings: (s: Partial<SettingsInfo["settings"]>) =>
     put<{ settings: SettingsInfo["settings"]; active: string }>("/api/settings", s),
   vault: () =>

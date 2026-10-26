@@ -1,12 +1,13 @@
 /* Settings: how the app looks and how you like to read (the theme, and the typeface, size and line
- * width of what you read, kept on this device), which subscription does the thinking (Codex or Claude
- * Code), the models and effort for quick and careful work (folded away until wanted), what agents may
- * do, who you are, and your vaults (open, make, rename or delete one), with the open one's folder and
- * history. Each section says what it is for over its controls; the list at the left (across the top on
+ * width of what you read, kept on this device), which subscription does the thinking (Codex, Claude
+ * Code or OpenCode), the models and effort for quick and careful work (folded away until wanted, with
+ * OpenCode's models to pick from once unfolded), what agents may do, who you are, and your vaults
+ * (open, make, rename or delete one), with the open one's folder and history. Each section says what it is for over its controls; the list at the left (across the top on
  * a phone) marks the one you're in and goes to any of them (#/settings/<section> opens there). */
 import { Bot, Cpu, FolderGit2, type LucideIcon, Palette, User } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { learn, type SettingsInfo } from "../api";
+import { learn, type Provider, type SettingsInfo } from "../api";
+import { PROVIDER_NAMES } from "../app/provider";
 import { DEFAULT_READING, type Reading, savedReading, saveReading } from "../app/reading";
 import { type ThemeChoice, themeChoice } from "../app/theme";
 import { Loading } from "../components/feedback";
@@ -183,6 +184,9 @@ export function Settings({ theme, setTheme }: { theme: "light" | "dark"; setThem
   const { data: vault } = useLoad(() => learn.vault(), [], "vault");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
+  // the models OpenCode offers, listed once the models are unfolded
+  const [opencodeModels, setOpencodeModels] = useState<string[]>([]);
+  const askedModels = useRef(false);
   // the section in view, marked in the list as you scroll
   const [active, setActive] = useState(SECTIONS[0].id);
   const content = useRef<HTMLDivElement>(null);
@@ -237,7 +241,20 @@ export function Settings({ theme, setTheme }: { theme: "light" | "dark"; setThem
     setSaved("Saved");
     setTimeout(() => setSaved(null), 1600);
   };
-  const tier = (provider: "codex" | "claude") => {
+  const listModels = () => {
+    if (askedModels.current || !info.opencode.installed) return;
+    askedModels.current = true;
+    learn.opencodeModels().then(
+      (r) => setOpencodeModels(r.models),
+      () => {},
+    );
+  };
+  const placeholders: Record<Provider, [string, string]> = {
+    codex: ["e.g. gpt-6-luna", "(your Codex default)"],
+    claude: ["e.g. sonnet", "e.g. opus"],
+    opencode: ["provider/model", "(your OpenCode default)"],
+  };
+  const tier = (provider: Provider) => {
     const t = s[provider];
     const field = (key: keyof typeof t, label: string, placeholder: string) => (
       <label className="field">
@@ -245,6 +262,7 @@ export function Settings({ theme, setTheme }: { theme: "light" | "dark"; setThem
         <input
           defaultValue={t[key]}
           placeholder={placeholder}
+          list={provider === "opencode" && key.endsWith("Model") ? "opencode-models" : undefined}
           onBlur={(e) =>
             e.target.value !== t[key] &&
             save({ [provider]: { ...t, [key]: e.target.value } } as Partial<SettingsInfo["settings"]>)
@@ -254,9 +272,9 @@ export function Settings({ theme, setTheme }: { theme: "light" | "dark"; setThem
     );
     return (
       <div className="form-row four">
-        {field("fastModel", "Quick model", provider === "codex" ? "e.g. gpt-6-luna" : "e.g. sonnet")}
+        {field("fastModel", "Quick model", placeholders[provider][0])}
         {field("fastEffort", "Quick effort", "low")}
-        {field("smartModel", "Careful model", provider === "codex" ? "(your Codex default)" : "e.g. opus")}
+        {field("smartModel", "Careful model", placeholders[provider][1])}
         {field("smartEffort", "Careful effort", "medium")}
       </div>
     );
@@ -294,7 +312,7 @@ export function Settings({ theme, setTheme }: { theme: "light" | "dark"; setThem
             about="Your own subscription, through its command-line tool. No API keys."
           >
             <div className="providers">
-              {(["auto", "codex", "claude"] as const).map((p) => (
+              {(["auto", "codex", "claude", "opencode"] as const).map((p) => (
                 <label key={p} className="provider" data-on={s.provider === p || undefined}>
                   <input
                     type="radio"
@@ -302,11 +320,9 @@ export function Settings({ theme, setTheme }: { theme: "light" | "dark"; setThem
                     checked={s.provider === p}
                     onChange={() => save({ provider: p })}
                   />
-                  <span className="provider-name">
-                    {p === "auto" ? "Automatic" : p === "codex" ? "Codex" : "Claude Code"}
-                  </span>
+                  <span className="provider-name">{p === "auto" ? "Automatic" : PROVIDER_NAMES[p]}</span>
                   <span className="provider-status">
-                    {p === "auto" && `uses ${info.active === "codex" ? "Codex" : "Claude Code"} now`}
+                    {p === "auto" && `uses ${PROVIDER_NAMES[info.active]} now`}
                     {p === "codex" &&
                       (info.codex.installed
                         ? info.codex.loggedIn
@@ -317,16 +333,29 @@ export function Settings({ theme, setTheme }: { theme: "light" | "dark"; setThem
                       (info.claude.installed
                         ? `${info.claude.version}`
                         : "not installed: npm i -g @anthropic-ai/claude-code")}
+                    {p === "opencode" &&
+                      (info.opencode.installed
+                        ? `${info.opencode.version} · ${info.opencode.accounts.join(", ") || "free models (opencode auth login for more)"}`
+                        : info.opencode.version
+                          ? "needs OpenCode 2: run opencode upgrade --major"
+                          : "not installed: npm i -g @opencode/cli")}
                   </span>
                 </label>
               ))}
             </div>
-            <details className="disclosure">
+            <details className="disclosure" onToggle={(e) => e.currentTarget.open && listModels()}>
               <summary>Models and speed</summary>
               <h3 className="sub-title">Codex models</h3>
               {tier("codex")}
               <h3 className="sub-title">Claude Code models</h3>
               {tier("claude")}
+              <h3 className="sub-title">OpenCode models</h3>
+              {tier("opencode")}
+              <datalist id="opencode-models">
+                {opencodeModels.map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
               <div className="form-row two">
                 <label className="field">
                   <span>Model calls at once</span>
