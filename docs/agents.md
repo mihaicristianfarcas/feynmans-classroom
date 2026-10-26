@@ -89,3 +89,22 @@ commands under the Codex sandbox and in OpenCode's shell):
   the jj change).
 - Book text is material, never instructions, in every prompt; a passage that tries to give orders
   can't get past the sandbox and the checks anyway.
+
+On Linux all three CLIs run agents' commands in bubblewrap, which needs user namespaces. Ubuntu
+23.10 and later keep programs from using them unless an AppArmor profile allows it ("loopback:
+Failed RTM_NEWADDR: Operation not permitted"), so there agents can't run commands until bubblewrap
+may; the rest of the app works as usual. One way is a profile for it, `/etc/apparmor.d/bwrap`:
+
+```
+abi <abi/4.0>,
+include <tunables/global>
+
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+
+  include if exists <local/bwrap>
+}
+```
+
+loaded with `sudo apparmor_parser -r /etc/apparmor.d/bwrap`. Bubblewrap then works as on other
+distributions, for any program that starts it; `npm test` checks the sandboxes with real commands.
