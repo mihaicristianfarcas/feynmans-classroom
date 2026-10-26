@@ -50,7 +50,8 @@ because Compose names them after the folder.
 
 ## Platforms
 
-- **macOS, Linux:** works as is. Files the container writes belong to you.
+- **macOS, Linux:** works as is, but for agents' commands on Debian and Ubuntu hosts and in colima
+  (see [the agents' sandbox](#the-agents-sandbox)). Files the container writes belong to you.
 - **Windows:** clone inside WSL 2 and run Docker from there. A clone on the Windows drive is slow
   and edits won't reload.
 
@@ -63,6 +64,10 @@ second. Don't swap them for `privileged`, and don't use Claude Code's `enableWea
 which would show agents the files the sandbox hides.
 
 Without them the CLIs refuse to run agents' commands. `npm test` checks the sandbox with real
-commands (`tests/agent-sandbox.test.ts`), so a host where it doesn't hold fails the tests. On
-Ubuntu 23.10 and later, AppArmor may be what blocks it; if so, add `apparmor=unconfined` under
-`security_opt` in a `compose.override.yaml` (ignored by git).
+commands (`tests/agent-sandbox.test.ts`), so a host where it doesn't hold fails the tests. On Linux
+hosts with AppArmor (Debian, Ubuntu), Docker's AppArmor profile stops bubblewrap's mounts too
+("Failed to make / slave"): agents' commands work there only with `apparmor=unconfined` under
+`security_opt` in a `compose.override.yaml` (ignored by git). Ubuntu 23.10 and later (and colima,
+whose VM is Ubuntu) also keep programs from using user namespaces without an AppArmor profile that
+allows it ("setting up uid map"), which only the host can change. Either way the rest of the app
+works as usual.
