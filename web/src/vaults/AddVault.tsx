@@ -69,7 +69,7 @@ export function AddVault({ onClose, onAdded }: { onClose: () => void; onAdded: (
         <p className="fine">
           {live
             ? "Or use a folder on your computer (an Obsidian vault, or any folder of Markdown). Edits made here are saved to it, and changes made in Obsidian show up here, while the app is open in this browser."
-            : "Or use a folder on your computer (an Obsidian vault, or any folder of Markdown). To bring in later changes made in Obsidian, choose it again. This browser can't save into the folder, so edits made here stay in the app."}
+            : "Or use a folder on your computer (an Obsidian vault, or any folder of Markdown). To bring in later changes made in Obsidian, choose it again. This browser can't save into the folder, so edits made here stay in the app; Chrome, Edge and Arc can, and Brave can once File System Access API is turned on in brave://flags."}
         </p>
         <button type="button" className="button" onClick={choose} disabled={busy}>
           <FolderOpen aria-hidden="true" />

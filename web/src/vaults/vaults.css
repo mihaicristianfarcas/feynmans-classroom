@@ -240,3 +240,34 @@
   justify-content: center;
   text-align: center;
 }
+.folder-help {
+  display: grid;
+  gap: 12px;
+  max-width: 52ch;
+}
+.folder-help p {
+  margin: 0;
+}
+.folder-help-lead {
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--butter-soft);
+  color: var(--butter-ink);
+}
+.folder-help-lead code {
+  background: none;
+  padding: 0;
+}
+.folder-help-flag {
+  user-select: all;
+}
+.folder-help p .icon-button {
+  vertical-align: middle;
+}
+.folder-help-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}

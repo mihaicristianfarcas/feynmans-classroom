@@ -9,6 +9,7 @@ import { PanelEdge, PanelToggle } from "../components/Panel";
 import { useLoad } from "../lib/useLoad";
 import { type Panel, usePanel } from "../lib/usePanel";
 import { setActiveVault, storedVault } from "./active";
+import { FolderHelpOnOpen } from "./FolderHelp";
 import { noteRoute, openVaultLink, parseVaultRoute, vaultRoute } from "./routes";
 import { SyncNotice } from "./SyncNotice";
 import { useVaultChanges } from "./useVaultChanges";
@@ -87,6 +88,7 @@ export function Vaults({ theme }: { theme: "light" | "dark" }) {
   const path = route.view === "note" ? route.path : undefined;
   return (
     <div className="notes-page">
+      {vault.synced && <FolderHelpOnOpen id={vault.id} />}
       {fileList.open && (
         <VaultTree
           key={vault.id}
