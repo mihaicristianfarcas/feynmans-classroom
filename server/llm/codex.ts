@@ -42,7 +42,8 @@ export interface CodexResult {
   commands: number;
 }
 
-const short = (text: string, n = 160) => {
+/** `text` on one line, cut to `n` characters. */
+export const short = (text: string, n = 160) => {
   const one = text.replace(/\s+/g, " ").trim();
   return one.length > n ? `${one.slice(0, n - 1)}…` : one;
 };
