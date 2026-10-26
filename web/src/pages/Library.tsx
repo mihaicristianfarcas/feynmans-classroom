@@ -8,6 +8,7 @@ import { Plus, Search, Library as Shelves, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, type Book, learn } from "../api";
 import { ahead } from "../app/pages";
+import { providerProblem, providerReady } from "../app/provider";
 import { BookCover, Meter, progressText } from "../components/BookCover";
 import { Loading, Spinner } from "../components/feedback";
 import { useIndicator } from "../components/ui";
@@ -63,8 +64,7 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
           : when(b) - when(a),
     );
   }, [books, query, order]);
-  const ready =
-    !info || (info.active === "codex" ? info.codex.installed && info.codex.loggedIn : info.claude.installed);
+  const ready = !info || providerReady(info);
   const error = add.error || loadError;
 
   return (
@@ -96,12 +96,7 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
       )}
       {!ready && info && (
         <p className="fine notice">
-          {info.active === "codex"
-            ? info.codex.installed
-              ? "Codex isn’t logged in (run codex login), so nothing can be explained or drawn yet."
-              : "Codex isn’t installed (npm i -g @openai/codex), so nothing can be explained or drawn yet."
-            : "Claude Code isn’t installed (npm i -g @anthropic-ai/claude-code), so nothing can be explained or drawn yet."}{" "}
-          <a href="#/settings">Settings</a>
+          {providerProblem(info)}, so nothing can be explained or drawn yet. <a href="#/settings">Settings</a>
         </p>
       )}
 

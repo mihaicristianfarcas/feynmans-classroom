@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { learn, type Profile } from "../api";
 import { go } from "../app/navigation";
+import { PROVIDER_NAMES, providerReady } from "../app/provider";
 import { ProfileForm } from "../components/ProfileForm";
 import { useLoad } from "../lib/useLoad";
 
@@ -11,10 +12,7 @@ export function Welcome() {
   const { data: settings } = useLoad(() => learn.settings());
   const [saving, setSaving] = useState(false);
   if (!profile) return <div className="center-note">Opening…</div>;
-  const ready =
-    settings &&
-    ((settings.active === "codex" && settings.codex.installed && settings.codex.loggedIn) ||
-      (settings.active === "claude" && settings.claude.installed));
+  const ready = settings && providerReady(settings);
   return (
     <div className="welcome">
       <div className="brand big">
@@ -25,7 +23,7 @@ export function Welcome() {
       <p className="lede">
         Read hard books beside figures you can play with, test yourself at the right moments, explain ideas back in your
         own words, and watch your knowledge grow as a graph. Everything stays on this machine, in plain files you own,
-        and the thinking runs on your own Codex or Claude subscription.
+        and the thinking runs on your own Codex, Claude or OpenCode subscription.
       </p>
       <div className="callout" data-ok={ready ? "true" : "false"}>
         {settings ? (
@@ -33,16 +31,14 @@ export function Welcome() {
             <>
               Using{" "}
               <b>
-                {settings.active === "codex"
-                  ? `Codex (${settings.codex.version})`
-                  : `Claude Code (${settings.claude.version})`}
+                {PROVIDER_NAMES[settings.active]} ({settings[settings.active].version})
               </b>
               . You can switch in Settings.
             </>
           ) : (
             <>
-              No model is ready. Install and log in to the Codex CLI (<code>codex login</code>) or Claude Code (
-              <code>claude</code>), then reload.
+              No model is ready. Install and log in to the Codex CLI (<code>codex login</code>), Claude Code (
+              <code>claude</code>) or OpenCode (<code>opencode auth login</code>), then reload.
             </>
           )
         ) : (

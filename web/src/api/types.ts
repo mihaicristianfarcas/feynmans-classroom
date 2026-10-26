@@ -359,17 +359,22 @@ export interface Today {
   profile: Profile;
   summary: string;
 }
+/** Who does the thinking: the CLI behind every model call. */
+export type Provider = "codex" | "claude" | "opencode";
 export interface SettingsInfo {
   settings: {
-    provider: "auto" | "codex" | "claude";
+    provider: "auto" | Provider;
     codex: Tier;
     claude: Tier;
+    opencode: Tier;
     concurrency: number;
     connections?: "suggest" | "auto";
   };
-  active: "codex" | "claude";
+  active: Provider;
   codex: { installed: boolean; version?: string; loggedIn: boolean; detail?: string };
   claude: { installed: boolean; version?: string };
+  /** `accounts`: the integrations OpenCode has credentials for (its free models need none). */
+  opencode: { installed: boolean; version?: string; accounts: string[]; detail?: string };
   load: { running: number; waiting: number };
 }
 interface Tier {
