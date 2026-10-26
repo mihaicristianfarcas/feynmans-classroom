@@ -1,6 +1,6 @@
-/* Where things live and how the server is tuned: the data folder, the port, and the
- * Codex, Claude Code and generation settings, each overridable from the environment (the full list
- * is in docs/configuration.md). Also finds a Chrome for the browser checks. */
+/* Where things live and how the server is tuned: the data folder, the port, and the Codex, Claude
+ * Code, OpenCode and generation settings, each overridable from the environment (the full list is in
+ * docs/configuration.md). Also finds a Chrome for the browser checks. */
 import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -44,6 +44,11 @@ export const CODEX = {
 /** How the platform drives Claude Code. */
 export const CLAUDE = {
   bin: process.env.CLAUDE_BIN || "claude",
+};
+
+/** How the platform drives OpenCode (2 or later). */
+export const OPENCODE = {
+  bin: process.env.OPENCODE_BIN || "opencode",
 };
 
 export function chromePath(): string | null {

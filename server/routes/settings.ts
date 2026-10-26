@@ -1,5 +1,5 @@
 /* Routes for the app's state and setup: what's installed (/api/status), the learner's profile, the
- * provider and model settings, and the vault's counts and history. */
+ * provider and model settings (with the models OpenCode offers), and the vault's counts and history. */
 import type { Hono } from "hono";
 import { CODEX, chromePath } from "../config.ts";
 import { readBody } from "../http.ts";
@@ -7,6 +7,7 @@ import { queue } from "../jobs.ts";
 import { claudeStatus } from "../llm/claude.ts";
 import { codexStatus } from "../llm/codex.ts";
 import { llmLoad } from "../llm/index.ts";
+import { opencodeModels, opencodeStatus } from "../llm/opencode.ts";
 import { activeProvider, getSettings, saveSettings } from "../settings.ts";
 import { getProfile, saveProfile, vaultHistory, vaultStats } from "../vault/index.ts";
 
@@ -25,9 +26,14 @@ export function settingsRoutes(app: Hono) {
       active: activeProvider(settings),
       codex: codexStatus(),
       claude: claudeStatus(),
+      opencode: opencodeStatus(),
       load: llmLoad(),
     });
   });
+  // a list to pick OpenCode's models from (provider/model), asked for when the models are shown
+  app.get("/api/settings/opencode-models", async (c) =>
+    c.json({ models: opencodeStatus().installed ? await opencodeModels() : [] }),
+  );
   app.put("/api/settings", async (c) => {
     const settings = saveSettings(await readBody(c));
     return c.json({ settings, active: activeProvider(settings) });

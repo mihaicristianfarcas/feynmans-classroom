@@ -69,7 +69,7 @@ export function initVault() {
   state.ready = true;
   for (const dir of DIRS) mkdirSync(join(vaultDir(), dir), { recursive: true });
   copyFileSync(join(TEMPLATES, "AGENTS.md"), join(vaultDir(), "AGENTS.md"));
-  // Claude Code reads CLAUDE.md; Codex reads AGENTS.md
+  // Claude Code reads CLAUDE.md; Codex reads AGENTS.md, and OpenCode is pointed at it
   writeFileSync(join(vaultDir(), "CLAUDE.md"), "@AGENTS.md\n");
   writeGitignore();
   initRepository();
