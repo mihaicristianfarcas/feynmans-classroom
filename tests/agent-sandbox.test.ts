@@ -110,10 +110,12 @@ describe.skipIf(!hasCodex)("an agent's shell under the Codex profile", () => {
     expect(existsSync(join(folder, "readonly.md"))).toBe(false);
   });
   it("cannot look around the home folder, or at Codex's login", () => {
-    // denied (macOS), or empty but for the way to Codex's helper links (Linux)
+    // denied (macOS), or empty but for the way to Codex's helper links and to the agent's folder, when
+    // it is in the home folder (Linux: bubblewrap makes empty folders on the way to those it binds)
     const r = run('for d in "$HOME" "$HOME/.codex" "$HOME/.codex/tmp"; do ls -A "$d" 2>&1; done; echo DONE');
     expect(r.stdout).toContain("DONE");
-    const seen = r.stdout.split("\n").filter((line) => line && line !== "DONE");
+    const onTheWay = relative(homedir(), folder).split(sep)[0];
+    const seen = r.stdout.split("\n").filter((line) => line && line !== "DONE" && line !== onTheWay);
     expect(seen.filter((line) => !/^(\.codex|tmp|arg0)$|Operation not permitted|No such file/.test(line))).toEqual([]);
   });
   it("cannot reach the network", () => {
