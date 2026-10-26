@@ -5,14 +5,16 @@
  *   agent()       an agent with a real shell (rg, sed, ls, jq…) in a folder: read-only, or allowed to
  *                 write there and nowhere else
  *
- * Agents run inside the CLI's own OS sandbox (Seatbelt on macOS, bubblewrap/Landlock on Linux): they
- * can read only their folder (plus system tools), write only their folder when allowed, never touch
- * .git, and have no network. Codex gets a custom permission profile; Claude Code runs restricted with
- * its sandbox settings. (Both verified: tests/agent-sandbox.test.ts.)
+ * Agents run inside an OS sandbox (Seatbelt on macOS, bubblewrap/Landlock on Linux): they can read
+ * only their folder (plus system tools), write only their folder when allowed, never touch .git, and
+ * have no network. Codex gets a custom permission profile; Claude Code runs restricted with its
+ * sandbox settings; OpenCode, which has no sandbox of its own, gets only its shell, and that runs each
+ * command under one we set up. (All verified: tests/agent-sandbox.test.ts.)
  *
- * Codex runs as `codex exec` (ChatGPT login); Claude Code as `claude -p` (Claude subscription).
- * Neither needs an API key. Calls share a small concurrency limit so a burst of requests never
- * hammers the user's plan. A call stops when the vault it was made for is closed (VaultClosed). */
+ * Codex runs as `codex exec` (ChatGPT login); Claude Code as `claude -p` (Claude subscription);
+ * OpenCode as `opencode run` (whatever the learner connected it to, or its free models). None needs
+ * an API key from us. Calls share a small concurrency limit so a burst of requests never hammers the
+ * user's plan. A call stops when the vault it was made for is closed (VaultClosed). */
 import { activeProvider, getSettings, type Provider } from "../settings.ts";
 import { VaultClosed, visitSignal } from "../vault/current.ts";
 import { runClaude } from "./claude.ts";
@@ -20,6 +22,8 @@ import { callCodex } from "./codex-call.ts";
 import { codexConfiguredModel } from "./codex-config.ts";
 import { parseJsonLoose } from "./json.ts";
 import { slot } from "./limit.ts";
+import { runOpencode } from "./opencode.ts";
+import { opencodeConfiguredModel } from "./opencode-config.ts";
 import { type Confinement, claudeSandbox, codexProfile } from "./sandbox.ts";
 
 export { llmLoad } from "./limit.ts";
@@ -35,7 +39,7 @@ export interface CallOptions {
   signal?: AbortSignal;
   onActivity?: (text: string) => void;
   timeoutMs?: number;
-  /** Append the raw event stream here (Codex). */
+  /** Append the raw event stream here (Codex, OpenCode). */
   log?: string;
   /** Let the model search the web (live). */
   search?: boolean;
@@ -56,8 +60,7 @@ export interface AgentOptions extends CallOptions, Confinement {
 
 /** The model and effort a tier uses on a provider (Settings). An empty model means the CLI's default. */
 function modelFor(provider: Provider, tier: Tier) {
-  const s = getSettings();
-  const conf = provider === "codex" ? s.codex : s.claude;
+  const conf = getSettings()[provider];
   return tier === "fast"
     ? { model: conf.fastModel, effort: conf.fastEffort }
     : { model: conf.smartModel, effort: conf.smartEffort };
@@ -67,6 +70,7 @@ function modelFor(provider: Provider, tier: Tier) {
 function modelName(provider: Provider, model: string) {
   if (model) return model;
   if (provider === "claude") return "claude (default)";
+  if (provider === "opencode") return opencodeConfiguredModel() || "opencode (default)";
   return codexConfiguredModel() || "codex (default)";
 }
 
@@ -97,11 +101,13 @@ function call<T>(
   });
 }
 
-/** JSON matching `schema` (strict structured output on Codex; --json-schema on Claude Code). */
+/** JSON matching `schema` (strict structured output on Codex; --json-schema on Claude Code; asked for
+ * in the prompt on OpenCode). */
 export function structured<T>(input: CallOptions & { schema: object }): Promise<CallResult<T>> {
   const options = untilClosed(input);
   return call(options, "fast", async (provider, model, effort) => {
     if (provider === "claude") return (await runClaude({ ...options, model, effort })).structured as T;
+    if (provider === "opencode") return (await runOpencode({ ...options, model, effort })).structured as T;
     return parseJsonLoose(await callCodex({ ...options, model, effort, sandbox: "read-only" })) as T;
   });
 }
@@ -111,6 +117,7 @@ export function text(input: CallOptions): Promise<CallResult<string>> {
   const options = untilClosed(input);
   return call(options, "fast", async (provider, model, effort) => {
     if (provider === "claude") return (await runClaude({ ...options, model, effort })).text;
+    if (provider === "opencode") return (await runOpencode({ ...options, model, effort })).text;
     return callCodex({ ...options, model, effort, sandbox: "read-only" });
   });
 }
@@ -131,6 +138,16 @@ export function agent(input: AgentOptions): Promise<CallResult<string | unknown>
         sandbox: claudeSandbox(options),
         restricted: true,
         addDirs: options.readRoots,
+      });
+      return options.schema ? out.structured : out.text;
+    }
+    if (provider === "opencode") {
+      const out = await runOpencode({
+        ...options,
+        model,
+        effort,
+        confine: { cwd: options.cwd, write: options.write, readRoots: options.readRoots },
+        timeoutMs: options.timeoutMs ?? 8 * 60 * 1000,
       });
       return options.schema ? out.structured : out.text;
     }
