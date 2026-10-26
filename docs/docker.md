@@ -32,6 +32,7 @@ inside; the login is kept in a volume until `docker compose down -v`.
 ```bash
 docker compose run --rm app codex login --device-auth
 docker compose run --rm app claude        # follow the link, then /exit
+docker compose run --rm app opencode auth login
 ```
 
 ## Settings
@@ -55,10 +56,11 @@ because Compose names them after the folder.
 
 ## The agents' sandbox
 
-Agents run in their CLI's sandbox (bubblewrap on Linux), which needs user namespaces and a `/proc`
-it can mount. `docker/seccomp.json` is Docker's default seccomp profile plus the six syscalls for
-the first; `systempaths=unconfined` gives the second. Don't swap them for `privileged`, and don't
-use Claude Code's `enableWeakerNestedSandbox`, which would show agents the files the sandbox hides.
+Agents run in an OS sandbox (bubblewrap on Linux: their CLI's own, or for OpenCode the image's
+`bwrap`), which needs user namespaces and a `/proc` it can mount. `docker/seccomp.json` is Docker's
+default seccomp profile plus the six syscalls for the first; `systempaths=unconfined` gives the
+second. Don't swap them for `privileged`, and don't use Claude Code's `enableWeakerNestedSandbox`,
+which would show agents the files the sandbox hides.
 
 Without them the CLIs refuse to run agents' commands. `npm test` checks the sandbox with real
 commands (`tests/agent-sandbox.test.ts`), so a host where it doesn't hold fails the tests. On
