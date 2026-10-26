@@ -7,10 +7,10 @@ open a pull request. For how the code is organised, read [docs/architecture.md](
 
 You need Node 22 or newer (`.nvmrc` has the version CI uses), git, [Jujutsu](https://www.jj-vcs.dev/)
 (`brew install jj`: the vault's history, Undo and the agent's changes go through it, so the server
-and the tests won't run without it), and, to use the model features, the Codex CLI (`codex login`) or
-Claude Code (run `claude` once). Chrome or Chromium is only needed for hand-built demos and the
-browser tests. Or skip all of that and use the development container, which needs only Docker:
-see [docs/docker.md](docs/docker.md).
+and the tests won't run without it), and, to use the model features, the Codex CLI (`codex login`),
+Claude Code (run `claude` once) or OpenCode 2 (`opencode auth login`, or its free models). Chrome or
+Chromium is only needed for hand-built demos and the browser tests. Or skip all of that and use the
+development container, which needs only Docker: see [docs/docker.md](docs/docker.md).
 
 ```bash
 git clone <your fork> && cd feynmans-classroom
@@ -59,7 +59,7 @@ rules on GitHub enforce it for everyone.
 
 Some ground rules the project depends on:
 
-- **No API keys.** Model work goes through `server/llm/` (the learner's Codex or Claude Code login).
+- **No API keys.** Model work goes through `server/llm/` (the learner's Codex, Claude Code or OpenCode login).
 - **The vault is plain files.** Markdown with frontmatter and JSONL are the only source of truth;
   anything else is a generated, disposable index.
 - **Book content is untrusted.** Sanitize it, sandbox it, and never treat it as instructions.

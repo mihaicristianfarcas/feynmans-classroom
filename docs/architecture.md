@@ -2,15 +2,15 @@
 
 Feynman's Classroom is one Node process (the API, and in production the built app) and a React app,
 working on one folder of plain files: the vault. There can be several vaults; one is open at a time. Models are reached through the learner's own
-Codex or Claude Code CLI, never an API key.
+Codex, Claude Code or OpenCode CLI, never an API key.
 
 ```
 browser (React, web/)  ──HTTP + server-sent events──▶  server/ (Hono on 127.0.0.1)
                                                           │
                      ┌────────────────────────────────────┼─────────────────────────┐
                      ▼                                    ▼                         ▼
-          DATA_DIR/vault (Markdown, JSONL, books)    codex exec / claude -p      Chrome (optional:
-          the only source of truth, versioned by jj   (server/llm/)              hand-built demo checks)
+          DATA_DIR/vault (Markdown, JSONL, books)    codex exec / claude -p /    Chrome (optional:
+          the only source of truth, versioned by jj   opencode run (server/llm/)  hand-built demo checks)
 ```
 
 ## The repository
@@ -40,7 +40,7 @@ server/            the API and everything behind it (Node, TypeScript, run with 
   manim/           animations (ManimGX): the guide, writing and checking a scene in headless Chrome,
                    the sandboxed page it plays in, the local mirror of Pyodide and PyPI it runs on
   handbuilt/       hand-built demos: Codex writes demo.js in a sandboxed workspace, checked in Chrome
-  llm/             the one door to models: structured(), text(), agent(); Codex and Claude drivers, sandboxes
+  llm/             the one door to models: structured(), text(), agent(); Codex, Claude and OpenCode drivers, sandboxes
   agents/          the agent: where the learner is, the prompt, its jj workspace, checks, landing, undo
 shared/            code the server and the browser both run
   scene/           the figure engine: spec types, the expression language, five renderers, validation

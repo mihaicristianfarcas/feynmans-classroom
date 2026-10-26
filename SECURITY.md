@@ -30,9 +30,10 @@ what counts as a vulnerability.
   that lets it fetch only from the app's own read-only mirror of Pyodide and a short list of PyPI
   packages (`/api/manim/…`). The server never runs them itself; its checks run them the same way, in
   headless Chrome.
-- **Agents are confined.** Agents that read or change the vault run in the Codex or Claude Code
-  OS sandbox: they can read only their folder, write only their working copy (a jj workspace
-  outside the vault), never touch `.jj` or `.git`, and have no network. Their changes are checked
+- **Agents are confined.** Agents that read or change the vault run in an OS sandbox (Codex's or
+  Claude Code's own; for OpenCode, which has none, each command its shell runs goes through Seatbelt
+  or bubblewrap, and it gets no other tool): they can read only their folder, write only their
+  working copy (a jj workspace outside the vault), never touch `.jj` or `.git`, and have no network. Their changes are checked
   (the app's own files may not change, every file must still parse) before they land, they never
   overwrite edits you made meanwhile, and every run can be undone. `tests/agent-sandbox.test.ts`
   verifies the sandbox.

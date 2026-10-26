@@ -28,7 +28,7 @@ body:
     id: provider
     attributes:
       label: Model provider
-      options: [Codex, Claude Code, Not related to models]
+      options: [Codex, Claude Code, OpenCode, Not related to models]
   - type: input
     id: environment
     attributes:

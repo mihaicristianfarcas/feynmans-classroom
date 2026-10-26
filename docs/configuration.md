@@ -6,14 +6,15 @@ Every setting has a default; set environment variables to change them (for `npm 
 |---|---|---|
 | `PORT` | `8787` | API (and production app) port |
 | `DATA_DIR` | `./data` | the vaults (`vault/`, `vaults/<name>/`, listed in `vaults.json`), settings, caches |
-| `LLM_PROVIDER` | `auto` | `codex`, `claude` or `auto` (Settings overrides) |
-| `CODEX_BIN` / `CLAUDE_BIN` | `codex` / `claude` | the CLIs |
+| `LLM_PROVIDER` | `auto` | `codex`, `claude`, `opencode` or `auto` (Settings overrides) |
+| `CODEX_BIN` / `CLAUDE_BIN` / `OPENCODE_BIN` | `codex` / `claude` / `opencode` | the CLIs (OpenCode 2 or later) |
 | `JJ_BIN` | `jj` | Jujutsu, which keeps the vault's history (required: the server won't start without it) |
 | `VAULT_SITTING_MS` | `180000` | how long the vault stays quiet before the change in progress is closed (a new entry in its history) |
 | `CODEX_FAST_MODEL` | Codex's "fast and affordable" model | quick tier on Codex |
 | `CODEX_FAST_EFFORT` | `low` | quick tier effort |
 | `CODEX_MODEL` | from `~/.codex/config.toml` | careful tier, and hand-built demos |
 | `CLAUDE_FAST_MODEL` / `CLAUDE_SMART_MODEL` | `sonnet` / `opus` | Claude Code tiers |
+| `OPENCODE_FAST_MODEL` / `OPENCODE_SMART_MODEL` | the `model` in your OpenCode config, else OpenCode's default | OpenCode tiers, as `provider/model` |
 | `LLM_CONCURRENCY` | `3` | model calls at once |
 | `CODEX_CONCURRENCY`, `CODEX_FIX_ROUNDS`, `CODEX_TIMEOUT_MS`, `CHROME_PATH` | | hand-built demos (see `server/config.ts`) |
 | `HOST` | `127.0.0.1` | interface the server listens on (the Vite dev server too). The API has no accounts: keep it on your machine (see [SECURITY.md](../SECURITY.md)) |

@@ -11,10 +11,18 @@ with a shell in a folder, read-only or writing. Behind it:
 - **Claude Code**: `claude -p` with your Claude login (`--json-schema`; agents get Bash, Read, Grep,
   Glob (and Edit, Write when they may write) under `--restricted` and the sandbox; no MCP servers, no
   session files).
+- **OpenCode** (2 or later): `opencode run` on a private server (not your background service), with
+  whatever you connected it to (`opencode auth login`: ChatGPT, Claude, Copilot…) or its free models.
+  Each run gets a config of its own: your models and providers carried over, none of your plugins,
+  MCP servers, agents or project config, and its session is deleted afterwards. Calls get no tools
+  (web search and fetch when they search) and see pictures as attached files; JSON is asked for in
+  the prompt (and once more if the answer isn't JSON). Models are `provider/model`, and the effort is
+  the model's variant (left out for a model that has none). Agents get only OpenCode's shell, and
+  every command it runs goes through the OS sandbox (below).
 
-**Settings** picks the provider (automatic: Codex when it's logged in, else Claude Code), the quick
-and careful model and effort for each, and how many calls may run at once (3 by default, so a burst
-never hammers your plan).
+**Settings** picks the provider (automatic: Codex when it's logged in, else Claude Code, else
+OpenCode), the quick and careful model and effort for each (OpenCode's models to pick from), and how
+many calls may run at once (3 by default, so a burst never hammers your plan).
 
 ## The agent: one field for anything
 
@@ -46,10 +54,13 @@ The reader's **Tutor** stays as it is: a conversation about the passage, beside 
 ## The guardrails
 
 Agents get no custom tools and no MCP: they work on the files with the shell they already have
-(`rg`, `sed`, `ls`, `jq`, `sqlite3`…), confined by the CLI's own OS sandbox (Seatbelt on macOS,
+(`rg`, `sed`, `ls`, `jq`, `sqlite3`…), confined by an OS sandbox (Seatbelt on macOS,
 bubblewrap/Landlock on Linux). Codex runs with a custom permission profile, Claude Code with
-`--restricted` and its sandbox settings; both verified (`tests/agent-sandbox.test.ts` runs real shell
-commands under the Codex sandbox):
+`--restricted` and its sandbox settings. OpenCode has no sandbox of its own, so its agents get its
+shell and no other tool, and the shell is a script that runs each command under Seatbelt, or
+bubblewrap on Linux (which must be installed), with a profile built for that run; the commands also
+get none of the server's environment. All verified (`tests/agent-sandbox.test.ts` runs real shell
+commands under the Codex sandbox and in OpenCode's shell):
 
 | the agent tries to | allowed? |
 |---|---|
