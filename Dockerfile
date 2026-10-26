@@ -1,4 +1,4 @@
-# The development environment: Node, Jujutsu, Chromium, the agents' sandbox and both model CLIs.
+# The development environment: Node, Jujutsu, Chromium, the agents' sandbox and the model CLIs.
 # The source is mounted, not copied (compose.yaml, docs/docker.md).
 
 FROM node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 AS base
@@ -25,7 +25,9 @@ RUN apt-get update \
 
 ARG CODEX_VERSION=0.162.1
 ARG CLAUDE_CODE_VERSION=2.1.300
+ARG OPENCODE_VERSION=2.1.4
 RUN npm install -g "@openai/codex@${CODEX_VERSION}" "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+    "@opencode/cli@${OPENCODE_VERSION}" \
   && npm cache clean --force
 
 COPY --from=jj /usr/local/bin/jj /usr/local/bin/jj
