@@ -7,9 +7,10 @@ welcome to read it too; [CONTRIBUTING.md](CONTRIBUTING.md) is the longer version
 
 A local-first learning platform: read books beside interactive figures and a margin of model-written
 answers, with notes, flashcards (FSRS-6), quizzes and a knowledge graph, all kept as plain files in a
-vault, and all model work done through the user's own Codex or Claude Code CLI. Node + TypeScript
-(Hono) on the server, React + Vite in the browser. Layout: [docs/architecture.md](docs/architecture.md).
-Every source file opens with a comment saying what it is for.
+vault, and all model work done through the user's own Codex, Claude Code or OpenCode CLI. Node +
+TypeScript (Hono) on the server, React + Vite in the browser. Layout:
+[docs/architecture.md](docs/architecture.md). Every source file opens with a comment saying what it
+is for.
 
 ## Commands
 
@@ -33,7 +34,7 @@ PORT=8797 WEB_PORT=5183 npx vite
 ## Rules
 
 - **No API keys, ever.** Models are reached only through `server/llm/` (`structured`, `text`,
-  `agent`), which drives the `codex` or `claude` CLI with the user's login.
+  `agent`), which drives the `codex`, `claude` or `opencode` CLI with the user's login.
 - **The vault is files.** Markdown with frontmatter and JSONL in the open vault (`DATA_DIR/vault`, or
   `DATA_DIR/vaults/<name>`) are the source of truth; indexes are generated. Write through
   `server/vault/` so changes are announced and committed. Paths into the vault come from `vaultDir()`

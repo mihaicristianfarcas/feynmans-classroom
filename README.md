@@ -3,7 +3,7 @@
 A learning platform for students, professors and professionals: read hard books beside figures you
 can play with, test yourself at the right moments, explain ideas back in your own words, and watch
 what you know grow as a graph. It runs on your machine, keeps everything in plain files you own, and
-does its thinking on **your own Codex or Claude Code subscription** (no API keys).
+does its thinking on **your own Codex, Claude Code or OpenCode subscription** (no API keys).
 
 - **Read with a living margin.** Upload a PDF, EPUB, Markdown or text book. Select any passage and
   choose Explain, Define, Ask or Visualize: the answer appears in the margin **beside the passage**
@@ -39,6 +39,7 @@ does its thinking on **your own Codex or Claude Code subscription** (no API keys
 npm install
 codex login          # Codex with your ChatGPT account (check: codex login status)
 #   or: install Claude Code and log in by running `claude` once
+#   or: install OpenCode 2 (npm i -g @opencode/cli) and connect an account: opencode auth login
 npm run dev          # API on :8787, app on http://localhost:5173
 ```
 
@@ -48,9 +49,9 @@ select a passage.
 
 Production: `npm run build && npm start` serves the app and the API from one port (8787).
 
-Requirements: Node 22+, the Codex CLI or Claude Code, [Jujutsu](https://www.jj-vcs.dev/) (`brew install
-jj`; required: it keeps the vault's history and the agent's changes), and Chrome or Chromium only for
-the optional hand-built demos and the screenshot tests.
+Requirements: Node 22+, the Codex CLI, Claude Code or OpenCode 2, [Jujutsu](https://www.jj-vcs.dev/)
+(`brew install jj`; required: it keeps the vault's history and the agent's changes), and Chrome or
+Chromium only for the optional hand-built demos and the screenshot tests.
 
 Or, with only Docker installed: `docker compose up` ([Running it in Docker](docs/docker.md)).
 
@@ -62,7 +63,7 @@ Or, with only Docker installed: `docker compose up` ([Running it in Docker](docs
 | [Reading with a margin](docs/reading.md) | the margin, anchoring passages, notes like Obsidian |
 | [Figures](docs/figures.md) | declarative scene specs, the five kinds, animations (ManimGX), hand-built demos |
 | [The vault](docs/vault.md) | plain files, indexes for agents, versioning |
-| [Models and agents](docs/agents.md) | Codex and Claude Code, the sandbox and the guardrails |
+| [Models and agents](docs/agents.md) | Codex, Claude Code and OpenCode, the sandbox and the guardrails |
 | [Design](docs/design.md) | the look, motion, and accessibility rules |
 | [Configuration](docs/configuration.md) | environment variables, running a test copy, limits |
 | [Docker](docs/docker.md) | the development container: everything above without installing it |
