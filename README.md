@@ -5,15 +5,16 @@ can play with, test yourself at the right moments, explain ideas back in your ow
 what you know grow as a graph. It runs on your machine, keeps everything in plain files you own, and
 does its thinking on **your own Codex, Claude Code or OpenCode subscription** (no API keys).
 
-- **Read with a living margin.** Upload a PDF, EPUB, Markdown or text book. Select any passage and
-  choose Explain, Define, Ask or Visualize: the answer appears in the margin **beside the passage**
-  (an explanation in about 8 seconds, a figure in 15–30), whole, side by side with others on the same
-  passage, and you can ask follow-ups there as a conversation. Figures are interactive: a graph you
-  can drag, a protocol you can scrub, a network with packets flowing, a 2D physics sketch, a 3D object
-  you can turn and take apart. Or ask for an **animation**: a short film written for
-  [ManimGX](https://manimgx.academa.ai/) (3Blue1Brown's Manim, on a GPU engine), checked before you
-  see it, and played step by step right in the margin. Find anything in the book (⌘F), zoom, jump to a
-  page, follow the PDF's own links, and see every figure of a section, chapter or book in one index.
+- **Read with a living margin.** Upload a PDF, EPUB, Markdown or text book, or a whole folder of
+  them at once. Select any passage and choose Explain, Define, Ask or Visualize: the answer appears
+  in the margin **beside the passage** (an explanation in about 8 seconds, a figure in 15–30),
+  whole, side by side with others on the same passage, and you can ask follow-ups there as a
+  conversation. Figures are interactive: a graph you can drag, a protocol you can scrub, a network
+  with packets flowing, a 2D physics sketch, a 3D object you can turn and take apart. Or ask for an
+  **animation**: a short film written for [ManimGX](https://manimgx.academa.ai/) (3Blue1Brown's
+  Manim, on a GPU engine), checked before you see it, and played step by step right in the margin.
+  Find anything in the book (⌘F), zoom, jump to a page, follow the PDF's own links, and see every
+  figure of a section, chapter or book in one index.
 - **Notes like Obsidian.** Write while you read; send passages, answers, figures and captured
   formulas or pictures to a note in one keystroke. Notes are Markdown files named by their title,
   with `[[links]]`, embeds, backlinks and unlinked mentions, edited in CodeMirror with a live preview.

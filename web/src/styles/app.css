@@ -752,6 +752,48 @@
 .shelf-none {
   margin: var(--space-xl) 0;
 }
+/* several books being added: how far it has got, and a way to stop the rest */
+.adding {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs) var(--space-sm);
+  margin: calc(var(--space-lg) * -1) 0 var(--space-xl);
+}
+.adding .fine {
+  margin: 0;
+}
+/* the files that weren't added, and why (clear of the find field under it) */
+.adding-failed {
+  margin-bottom: var(--space-xl);
+}
+.adding-failed > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.adding-failed p {
+  margin: 0;
+}
+.adding-failed ul {
+  margin: var(--space-2xs) 0 0;
+  padding-left: var(--space-md);
+}
+.adding-failed details {
+  margin-top: var(--space-2xs);
+}
+.adding-failed summary {
+  cursor: pointer;
+  color: var(--rose-ink);
+  font-weight: 600;
+}
+.adding-name {
+  color: var(--ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.first-book .adding-failed {
+  margin: 0;
+}
 .shelf {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));

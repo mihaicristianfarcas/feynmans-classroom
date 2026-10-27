@@ -1,14 +1,17 @@
 /* The library: your books as a shelf of covers (its title and author set on each), with how far through
  * each you are and what it holds under it; find one by its title or author, and order them by the last
- * one you touched, by title or by author. Add one with the button, or drop a file anywhere on the page:
- * it stands on the shelf while it's read, then opens. A book one of your other vaults has can be added
- * from there as it is (kept once). Under Figures (#/library/figures), the figures you drew. It mentions
- * the model tool only when the one in use isn't ready. */
-import { Plus, Search, Library as Shelves, Trash2 } from "lucide-react";
+ * one you touched, by title or by author. Add books with the button (several at once) or a whole folder,
+ * or drop files or folders anywhere on the page: each stands on the shelf while it's read, and a book
+ * added on its own then opens; with several, how far it has got and what wasn't added show under the
+ * title. A book one of your other vaults has can be added from there as it is (kept once). Under
+ * Figures (#/library/figures), the figures you drew. It mentions the model tool only when the one in
+ * use isn't ready. */
+import { FolderPlus, Plus, Search, Library as Shelves, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, type Book, learn } from "../api";
 import { ahead } from "../app/pages";
 import { providerProblem, providerReady } from "../app/provider";
+import { AddingBooks } from "../components/AddingBooks";
 import { BookCover, Meter, progressText } from "../components/BookCover";
 import { Loading, Spinner } from "../components/feedback";
 import { useIndicator } from "../components/ui";
@@ -65,7 +68,6 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
     );
   }, [books, query, order]);
   const ready = !info || providerReady(info);
-  const error = add.error || loadError;
 
   return (
     <div className="library rise" {...(view === "books" ? add.dropTarget : {})}>
@@ -86,12 +88,22 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
             From other vaults
           </button>
         ) : null}
-        {view === "books" && books?.length ? <AddBook uploading={add.uploading} onClick={add.choose} primary /> : null}
+        {view === "books" && books?.length ? (
+          <>
+            <button type="button" className="button subtle" onClick={add.chooseFolder}>
+              <FolderPlus aria-hidden="true" />
+              Add a folder
+            </button>
+            <AddBooks onClick={add.choose} />
+          </>
+        ) : null}
       </header>
       <input {...add.field} />
-      {error && (
+      <input {...add.folderField} />
+      {view === "books" && <AddingBooks add={add} />}
+      {loadError && (
         <p className="form-error" role="alert">
-          {error}
+          {loadError}
         </p>
       )}
       {!ready && info && (
@@ -104,12 +116,17 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
         <Figures theme={theme} />
       ) : books === null ? (
         <Loading label="Opening your shelf" />
-      ) : books.length === 0 && !add.uploading ? (
+      ) : books.length === 0 && add.current === null ? (
         <div className="empty-drop">
           <h2 className="empty-title">Bring in a hard book</h2>
           <p className="fine">Read it beside a margin that explains, draws and quizzes. {BOOK_FORMATS}.</p>
-          <AddBook uploading={add.uploading} onClick={add.choose} primary />
-          <p className="fine">Or drop the file anywhere on this page.</p>
+          <AddBooks onClick={add.choose} />
+          <p className="fine">
+            Choose several at once, or drop files anywhere on this page.{" "}
+            <button type="button" className="link" onClick={add.chooseFolder}>
+              Add a whole folder
+            </button>
+          </p>
           {elsewhere?.length ? (
             <button type="button" className="link" onClick={() => setBringing(true)} aria-haspopup="dialog">
               Add one from your other vaults ({elsewhere.length})
@@ -157,15 +174,15 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
               </span>
             </div>
           )}
-          {shown.length === 0 && !add.uploading ? (
+          {shown.length === 0 && add.current === null ? (
             <p className="fine shelf-none">No book’s title or author has “{query.trim()}” in it.</p>
           ) : (
             <ul className="shelf stagger" aria-label="Your books">
-              {add.uploading && (
+              {add.current !== null && (
                 <li className="book-card" aria-busy="true">
                   <span className="book-link">
                     <span className="book-cover cover-live">
-                      <span className="book-cover-title">{add.uploading.replace(/\.[^.]+$/, "")}</span>
+                      <span className="book-cover-title">{titleOf(add.current)}</span>
                     </span>
                     <Spinner label="Reading the book" />
                   </span>
@@ -224,12 +241,19 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
       )}
       {add.dragging && view === "books" && (
         <div className="drop-overlay" aria-hidden="true">
-          <span>Drop to add it to your library</span>
+          <span>Drop to add them to your library</span>
         </div>
       )}
     </div>
   );
 }
+
+/** The title a file being read stands under until the book gives its own: its name, without the ending. */
+const titleOf = (path: string) =>
+  path
+    .split("/")
+    .pop()!
+    .replace(/\.[^.]+$/, "");
 
 /** What a book holds: its length, and its figures once there are some. */
 function facts(book: Book): string {
@@ -240,31 +264,12 @@ function facts(book: Book): string {
   return book.demoCount ? `${length}, ${book.demoCount} figure${book.demoCount === 1 ? "" : "s"}` : length;
 }
 
-function AddBook({
-  uploading,
-  onClick,
-  primary,
-}: {
-  uploading: string | null;
-  onClick: () => void;
-  primary?: boolean;
-}) {
+/** Opens the file field: one book, or several at once. */
+function AddBooks({ onClick }: { onClick: () => void }) {
   return (
-    <button
-      type="button"
-      className={`button ${primary ? "primary" : ""}`}
-      onClick={onClick}
-      disabled={!!uploading}
-      title={BOOK_FORMATS}
-    >
-      {uploading ? (
-        <Spinner label={`Reading “${uploading}”`} />
-      ) : (
-        <>
-          <Plus aria-hidden="true" />
-          Add a book
-        </>
-      )}
+    <button type="button" className="button primary" onClick={onClick} title={BOOK_FORMATS}>
+      <Plus aria-hidden="true" />
+      Add books
     </button>
   );
 }

@@ -62,7 +62,7 @@ web/src/           the React app (Vite)
   manim/           an animation in the app: ManimGX's player in its sandboxed frame
   api/             typed calls to the server (documents of any kind: docs.ts), and the live book hook
   lib/             small helpers: accessibility (focus traps, arrow keys, announcements), loading, time,
-                   side panels' widths
+                   side panels' widths, adding books from files and folders
   styles/          the design system and page styles
 runtime/           the runtime hand-built demos run on, in a sandboxed iframe; runtime/manim: ManimGX's
                    browser player (MIT, adapted), bundled into the page animations play in
