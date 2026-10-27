@@ -300,11 +300,23 @@ try {
     check("a note opens in the editor with its links beside it", !!(await page.$(".note-side")));
   }
   await page.goto(`${BASE}#/brain`, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".graph, .empty-state", { timeout: 10000 });
-  check("the brain's graph loads", !!(await page.$(".graph, .empty-state")));
-  const item = await page.$("[data-node] .g-shape");
+  await page.waitForSelector(".graph[data-ready], .empty-state", { timeout: 10000 });
+  check("the brain's graph loads", !!(await page.$(".graph[data-ready], .empty-state")));
+  // an item in view: its button sits over the place the canvas draws it, and the canvas takes the click
+  await wait(500);
+  const item = await page.evaluate(() => {
+    const room = document.querySelector(".graph")?.getBoundingClientRect();
+    for (const b of document.querySelectorAll("[data-node]")) {
+      const r = b.getBoundingClientRect();
+      const x = r.x + r.width / 2,
+        y = r.y + r.height / 2;
+      if (room && x > room.left + 60 && x < room.right - 60 && y > room.top + 80 && y < room.bottom - 80)
+        return { x, y };
+    }
+    return null;
+  });
   if (item) {
-    await item.click();
+    await page.mouse.click(item.x, item.y);
     await page.waitForSelector(".node-card", { timeout: 5000 }).catch(() => null);
     check("clicking an item in the graph opens its card", !!(await page.$(".node-card h2")));
   }

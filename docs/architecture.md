@@ -58,7 +58,8 @@ web/src/           the React app (Vite)
                    index and a figure opened large, note, tutor (with its sessions), capture, gutter
   notes/           notes: the file tree (with folders), the note pane, its versions and links sidebar, the editor
   components/      shared pieces: Markdown, dialogs and study tools, quiz, graph, side panels' edges and
-                   buttons, profile form
+                   buttons, profile form; graph/: the graph drawn on a canvas, laid out in a worker (where
+                   items were kept for each vault), its look read from the styles, finding items by place
   scene/           the figure player (the universal frame around every figure), and figure stills
   manim/           an animation in the app: ManimGX's player in its sandboxed frame
   api/             typed calls to the server (documents of any kind: docs.ts), and the live book hook

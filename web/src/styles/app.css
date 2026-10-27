@@ -2069,6 +2069,7 @@
   position: absolute;
   inset: 0;
 }
+/* the graph is drawn on a canvas (GraphView), from the .g-* styles below: it fades in once laid out */
 .graph {
   display: block;
   width: 100%;
@@ -2076,13 +2077,52 @@
   cursor: grab;
   touch-action: none;
   user-select: none;
+  opacity: 0;
+  transition: opacity 200ms var(--ease-out);
+}
+.graph[data-ready] {
+  opacity: 1;
 }
 .graph:active {
   cursor: grabbing;
 }
-/* the view glides when it moves on its own (fit, zoom buttons, bringing a picked item into view) */
-.g-view[data-glide] {
-  transition: transform 320ms var(--ease-in-out);
+/* each item's button, over its circle: for the keyboard and screen readers (the canvas draws the item and
+   the keyboard's ring, and takes the pointer) */
+.graph-items {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  pointer-events: none;
+}
+.graph-item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  outline: none;
+  pointer-events: none;
+}
+/* the marks and lines the canvas reads its look from, never shown (and read at once, so never moving) */
+.graph-probe {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.graph-probe * {
+  transition: none !important;
+  animation: none !important;
+}
+.graph-wait {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
 }
 .g-edge {
   stroke: var(--line-strong);
@@ -2155,10 +2195,7 @@
 .g-node[data-selected] text {
   font-weight: 650;
 }
-/* hovering grows the mark a little; picking (or focusing) an item rings it */
-.g-shape {
-  transition: transform 160ms var(--ease-out);
-}
+/* picking (or focusing) an item rings it */
 .g-halo {
   fill: var(--accent-soft);
   stroke: none;
@@ -2169,25 +2206,6 @@
   opacity: 1;
   stroke: var(--accent-ink);
   stroke-width: 1.5;
-}
-/* the keyboard's item: its halo ringed, and a ring round the item and its name */
-.g-node:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 4px;
-  border-radius: var(--r-lg);
-}
-.g-node:focus-visible .g-halo {
-  opacity: 1;
-  stroke: var(--accent-ink);
-  stroke-width: 2;
-}
-@media (hover: hover) and (pointer: fine) {
-  .g-node:hover .g-shape {
-    transform: scale(1.12);
-  }
-  .g-node:hover .g-halo {
-    opacity: 0.8;
-  }
 }
 /* every item is a circle with its kind's icon inside: filled ones carry the icon in the opposite tone */
 .g-disc {
@@ -2260,23 +2278,6 @@
 }
 .g-concept[data-level="strong"] .g-icon {
   color: var(--on-pastel);
-}
-/* replaying how the graph grew: each item and link fades in as it's made, and the item's mark grows into place */
-.graph[data-replay] :is(.g-node, .g-edge) {
-  animation: fade 600ms var(--ease-out) backwards;
-}
-.graph[data-replay] .g-shape {
-  animation: g-grow 600ms var(--ease-out) backwards;
-}
-@keyframes g-grow {
-  from {
-    transform: scale(0.7);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .graph[data-replay] .g-shape {
-    animation: none;
-  }
 }
 /* what the find field matches */
 .g-node[data-hit] .g-disc {
