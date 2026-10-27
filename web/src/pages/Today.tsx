@@ -2,12 +2,13 @@
  * do), the book you were reading (its cover, where you were, how far through, and a button to carry
  * on) with the others you've started under it, and the few other things worth doing next; beside them,
  * what's waiting in Review and the week's study days with your streak. With no book yet, the book to
- * add is the page's one thing: choose a file or drop one on it. */
+ * add is the page's one thing: choose files or drop them on it (several are added in the library). */
 import { ArrowRight, ArrowUp, Layers, ListChecks, type LucideIcon, Shuffle, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { openAgent } from "../agent/store";
 import { type Journey, learn, type Today as TodayData } from "../api";
 import { ahead } from "../app/pages";
+import { AddingBooks } from "../components/AddingBooks";
 import { BookCover, Meter, progressText } from "../components/BookCover";
 import { Loading, Spinner } from "../components/feedback";
 import { BOOK_FORMATS, useBookUpload } from "../lib/useBookUpload";
@@ -277,24 +278,22 @@ function WeekPanel({ journey }: { journey: Journey }) {
   );
 }
 
-/** No book yet: choose one, or drop it here. */
+/** No book yet: choose one (or several, which are added in the library), or drop it here. */
 function FirstBook({ onAdded }: { onAdded: () => void }) {
   const add = useBookUpload(onAdded);
+  const reading = add.current?.split("/").pop();
   return (
     <section className="first-book" data-dragging={add.dragging || undefined} {...add.dropTarget}>
       <h2 className="first-book-title">Bring in a hard book</h2>
       <p className="side-detail">
-        Read it beside a margin that explains, draws and quizzes. {BOOK_FORMATS}: choose one, or drop it here.
+        Read it beside a margin that explains, draws and quizzes. {BOOK_FORMATS}: choose one or several, or drop them
+        here.
       </p>
       <input {...add.field} />
-      <button type="button" className="button primary" onClick={add.choose} disabled={!!add.uploading}>
-        {add.uploading ? <Spinner label={`Reading “${add.uploading}”`} /> : "Choose a book"}
+      <button type="button" className="button primary" onClick={add.choose} disabled={!!reading}>
+        {reading ? <Spinner label={`Reading “${reading}”`} /> : "Choose books"}
       </button>
-      {add.error && (
-        <p className="form-error" role="alert">
-          {add.error}
-        </p>
-      )}
+      <AddingBooks add={add} />
     </section>
   );
 }

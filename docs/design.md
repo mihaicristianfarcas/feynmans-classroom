@@ -43,8 +43,9 @@ agent, the book you were reading (its cover, where you were, how far through, a 
 with the others you've started under it, and what else is next; beside them what's waiting in Review
 and the week's study days. A book's cover carries its title and author; under it, how far through
 you are (a thin bar, `.meter`) and what it holds. The Library finds books by title or author and
-orders them by the last one touched, by title or by author; a file dropped anywhere on it (or on
-Today, before the first book) is added. Review is the card, under the title, the deck and how far
+orders them by the last one touched, by title or by author; files or folders dropped anywhere on it
+(or on Today, before the first book) are added, one at a time, with how far it has got and what
+wasn't added (and why) under the title. Review is the card, under the title, the deck and how far
 through the session you are. Journey is its numbers on tiles, the study days with the months named and
 a key, and what you've made and did lately beside them. Settings are sections one under another,
 listed at the left (across the top on a phone) with the one in view marked; `#/settings/<section>`
