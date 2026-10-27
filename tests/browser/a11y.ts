@@ -1,6 +1,7 @@
 // Accessibility checks of the running app: axe-core's WCAG 2.2 A and AA rules on every page, in both
 // themes (and the reader's states: its margin cards, the find bar, the figures and an animation, the
-// tutor's sessions; the vault menu and the dialogs to make and delete a vault), and the keyboard
+// tutor's sessions; the vault menu and the dialogs to make and delete a vault; the dialog to change a
+// book's details), and the keyboard
 // essentials (a skip link, focus that can always be seen, the ⌘K palette, the vault menu, a folder's
 // menu and dialogs that keep focus and close with Escape, side panels resized and closed from their
 // edge, the reader usable without a mouse).
@@ -728,6 +729,19 @@ try {
         await page.keyboard.press("Escape");
         await page.waitForSelector(".modal", { hidden: true });
       }
+    }
+    // the dialog to change a book's details, with its chapters' names shown
+    await open(page, "#/library", theme);
+    if (await page.$(".book-actions [aria-haspopup=dialog]")) {
+      await page.hover(".book-card");
+      await page.click(".book-actions [aria-haspopup=dialog]");
+      await page.waitForSelector(".modal");
+      if (await page.$(".book-chapters summary")) await page.click(".book-chapters summary");
+      await settled(page);
+      const inDialog = await axe(page);
+      check(`axe: the dialog for a book's details (${theme})`, inDialog.length === 0, describe(inDialog));
+      await page.keyboard.press("Escape");
+      await page.waitForSelector(".modal", { hidden: true });
     }
   }
   const seededBook = list.find((r) => r.startsWith("#/book/"));

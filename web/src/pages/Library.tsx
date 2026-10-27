@@ -3,16 +3,18 @@
  * one you touched, by title or by author. Add books with the button (several at once) or a whole folder,
  * or drop files or folders anywhere on the page: each stands on the shelf while it's read, and a book
  * added on its own then opens; with several, how far it has got and what wasn't added show under the
- * title. A book one of your other vaults has can be added from there as it is (kept once). Under
+ * title. A book one of your other vaults has can be added from there as it is (kept once). A book's
+ * title, author and chapter names can be changed from the corner of its cover, beside Remove. Under
  * Figures (#/library/figures), the figures you drew. It mentions the model tool only when the one in
  * use isn't ready. */
-import { FolderPlus, Plus, Search, Library as Shelves, Trash2 } from "lucide-react";
+import { FolderPlus, Plus, Search, Library as Shelves, SquarePen, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, type Book, learn } from "../api";
 import { ahead } from "../app/pages";
 import { providerProblem, providerReady } from "../app/provider";
 import { AddingBooks } from "../components/AddingBooks";
 import { BookCover, Meter, progressText } from "../components/BookCover";
+import { BookDetails } from "../components/BookDetails";
 import { Loading, Spinner } from "../components/feedback";
 import { useIndicator } from "../components/ui";
 import { BOOK_FORMATS, useBookUpload } from "../lib/useBookUpload";
@@ -47,6 +49,7 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
   const { data: books, error: loadError, reload: reloadBooks } = useLoad(() => api.books(), [], "books");
   const { data: elsewhere, reload: reloadElsewhere } = useLoad(() => api.elsewhere(), [], "books-elsewhere");
   const [bringing, setBringing] = useState(false);
+  const [editing, setEditing] = useState<Book | null>(null);
   const reload = () => {
     reloadBooks();
     reloadElsewhere();
@@ -200,29 +203,43 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
                     {book.building ? <Spinner label={`Drawing ${book.building} figures`} /> : null}
                     {book.status === "error" && <span className="form-error">{book.error}</span>}
                   </a>
-                  <button
-                    type="button"
-                    className="icon-button book-delete"
-                    aria-label={`Remove ${book.title}`}
-                    title="Remove from the library"
-                    onClick={async () => {
-                      const also = book.alsoIn?.length
-                        ? ` It stays in ${book.alsoIn.join(", ")}; the margin and figures made here go.`
-                        : "";
-                      if (
-                        !confirm(
-                          also
-                            ? `Remove "${book.title}" from this vault?${also}`
-                            : `Remove "${book.title}" and its figures?`,
+                  <div className="book-actions">
+                    {book.status === "ready" && (
+                      <button
+                        type="button"
+                        className="icon-button book-action"
+                        aria-label={`Edit the details of ${book.title}`}
+                        title="Edit the title, author and chapter names"
+                        aria-haspopup="dialog"
+                        onClick={() => setEditing(book)}
+                      >
+                        <SquarePen aria-hidden="true" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="icon-button book-action remove"
+                      aria-label={`Remove ${book.title}`}
+                      title="Remove from the library"
+                      onClick={async () => {
+                        const also = book.alsoIn?.length
+                          ? ` It stays in ${book.alsoIn.join(", ")}; the margin and figures made here go.`
+                          : "";
+                        if (
+                          !confirm(
+                            also
+                              ? `Remove "${book.title}" from this vault?${also}`
+                              : `Remove "${book.title}" and its figures?`,
+                          )
                         )
-                      )
-                        return;
-                      await api.deleteBook(book.id);
-                      reload();
-                    }}
-                  >
-                    <Trash2 aria-hidden="true" />
-                  </button>
+                          return;
+                        await api.deleteBook(book.id);
+                        reload();
+                      }}
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -237,6 +254,16 @@ export function Library({ theme }: { theme: "light" | "dark" }) {
             setBringing(false);
             reloadElsewhere();
           }}
+        />
+      )}
+      {editing && (
+        <BookDetails
+          book={editing}
+          onSaved={() => {
+            setEditing(null);
+            reloadBooks();
+          }}
+          onClose={() => setEditing(null)}
         />
       )}
       {add.dragging && view === "books" && (

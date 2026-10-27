@@ -29,8 +29,9 @@ server/            the API and everything behind it (Node, TypeScript, run with 
   vault/           the vault as files: the list of vaults (vaults.ts), the one open and the work that
                    belongs to it (current.ts), the document store, each kind's file format (kinds.ts),
                    history (jj), logs, watching, indexes, links
-  books/           the book store, books shared between vaults (shared.ts), types, finding quotes
-                   (locate.ts), find in a book (find.ts), figure placement and numbers
+  books/           the book store, books shared between vaults (shared.ts), changing a book's details
+                   (edit.ts), types, finding quotes (locate.ts), find in a book (find.ts), figure placement
+                   and numbers
   ingest/          reading uploaded books: PDF, EPUB, Markdown, text, chapter detection
   annotations/     the margin: anchors, files, model-written answers, live updates, sending to notes
   learn/           documents of any kind (docs.ts: make, change, rename, delete, versions), then what

@@ -1,7 +1,7 @@
 /* The API for books and their figures, and the reading-order helpers the reader uses to number
  * figures the same way the server does. */
 import { figurePrefix } from "../../../shared/chapters.ts";
-import { call, post } from "./client";
+import { call, patch, post } from "./client";
 import type { Block, Book, BookElsewhere, Demo, FindHit, Job, Loc, Status } from "./types";
 
 export const api = {
@@ -17,6 +17,11 @@ export const api = {
     return call<Book>("/api/books", { method: "POST", body: form });
   },
   deleteBook: (id: string) => call(`/api/books/${id}`, { method: "DELETE" }),
+  /** Changes a book's title, author or chapter names (an empty author takes it away). */
+  editBook: (
+    id: string,
+    details: { title?: string; author?: string; chapters?: { id: string; title?: string; subtitle?: string }[] },
+  ) => patch<Book>(`/api/books/${id}`, details),
   /** The books other vaults have and this one doesn't. */
   elsewhere: () => call<BookElsewhere[]>("/api/books/elsewhere"),
   /** Adds a book another vault has to this one (the same book, kept once). */

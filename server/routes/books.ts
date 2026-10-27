@@ -1,11 +1,13 @@
 /* Routes for books: the library, uploading (any PDF, EPUB, Markdown or text file; one another vault
- * has already is brought in as it is), the books of the other vaults and bringing one in, a book's
- * file, text blocks and pictures, finding its chapters, its live event stream, and reading sessions. */
+ * has already is brought in as it is), the books of the other vaults and bringing one in, changing a
+ * book's details (title, author, chapter names), a book's file, text blocks and pictures, finding its
+ * chapters, its live event stream, and reading sessions. */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { formatOf, MAX_BOOK_BYTES } from "../../shared/book-files.ts";
+import { type BookDetails, editBook } from "../books/edit.ts";
 import { findInBook } from "../books/find.ts";
 import { booksElsewhere, bookWithFile, bringBook, elsewhereById } from "../books/shared.ts";
 import { bookDir, bookFolder, deleteBook, getBlocks, getBook, listBooks, listDemos } from "../books/store.ts";
@@ -104,6 +106,9 @@ export function bookRoutes(app: Hono) {
     const book = getBook(c.req.param("id"));
     return book ? c.json({ ...book, folder: bookFolder(book.id) }) : c.json({ error: "not found" }, 404);
   });
+
+  /** Changes a book's title, author or chapter names. */
+  app.patch("/api/books/:id", async (c) => c.json(editBook(c.req.param("id"), await readBody<BookDetails>(c))));
 
   app.delete("/api/books/:id", (c) => {
     const id = c.req.param("id");
