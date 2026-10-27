@@ -105,7 +105,7 @@ export function BrainGraph({ theme }: { theme: "light" | "dark" }) {
     // focus goes back to the item the card was about (or stays in the graph)
     if (hadFocus && selected)
       requestAnimationFrame(() =>
-        document.querySelector<SVGElement>(`[data-node="${CSS.escape(selected)}"]`)?.focus({ preventScroll: true }),
+        document.querySelector<HTMLElement>(`[data-node="${CSS.escape(selected)}"]`)?.focus({ preventScroll: true }),
       );
   };
 

@@ -460,9 +460,9 @@ async function keyboard(page: Page, bookRoute: string | undefined) {
   // the Brain's graph: arrow keys reach its items, Enter reads one in the card beside it (focus goes into the
   // card), and Escape closes the card and gives focus back to the item
   await open(page, "#/brain", "light");
-  // an SVG item: focused from the page (puppeteer's focus() takes only HTML elements)
+  // the item in the Tab order (each item is a button over its place in the drawing)
   const node = await page.evaluate(() => {
-    const item = document.querySelector<SVGElement>("[data-node][tabindex='0']");
+    const item = document.querySelector<HTMLElement>("[data-node][tabindex='0']");
     item?.focus();
     return !!item;
   });
@@ -691,13 +691,20 @@ try {
     }
     await open(page, "#/brain", theme);
     await page.click('.graph-tools [aria-label="Legend"]');
-    // a press on an item, as it comes: down, up, then the click that picks it
-    await page.evaluate(() => {
-      const disc = document.querySelector("[data-node] .g-disc");
-      disc?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
-      disc?.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
-      disc?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    // a click on an item in view, where the canvas draws it (its button is over it)
+    await page.waitForSelector(".graph[data-ready]");
+    const item = await page.evaluate(() => {
+      const room = document.querySelector(".graph")?.getBoundingClientRect();
+      for (const b of document.querySelectorAll("[data-node]")) {
+        const r = b.getBoundingClientRect();
+        const x = r.x + r.width / 2,
+          y = r.y + r.height / 2;
+        if (room && x > room.left + 60 && x < room.right - 340 && y > room.top + 80 && y < room.bottom - 80)
+          return { x, y };
+      }
+      return null;
     });
+    if (item) await page.mouse.click(item.x, item.y);
     await wait(500);
     check(
       `axe: the Brain's legend and a card (${theme})`,

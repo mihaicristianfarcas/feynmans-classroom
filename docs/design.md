@@ -55,8 +55,11 @@ opens at one. Notes on a phone are the list or the note, with a way back to the 
 The agent is one field over any page (⌘J), never a page or a form of its own: a request, a short
 reply, the change shown where it lands. The Brain is the graph alone, filling the window, with Find
 at the top (⌘K there), the item you pick in a card at its left and, if you open it, the legend in a
-card like it at its right; each item is its kind's icon in a circle, with its name beside it. The item
-you pick glides to the middle of the graph the cards leave in view (above the card, on a phone).
+card like it at its right; each item is its kind's icon in a circle, with its name beside it (as many
+names as fit without overlapping, the most important first, more as you zoom in). The graph is drawn
+on a canvas and laid out off the page's thread, so a vault of thousands of concepts pans as smoothly as
+a small one. The item you pick glides to the middle of the graph the cards leave in view (above the
+card, on a phone).
 Secondary controls stay quiet (subtle buttons, a disclosure for advanced settings) and explanations
 are one line.
 
@@ -118,8 +121,8 @@ page in both themes, plus keyboard checks) on every pull request.
   (`announce()`, or `role="status"` / `role="alert"`).
 - **Mouse-only gestures have a keyboard way.** In the reader, `S` selects the passage at the
   reading line and opens the selection menu with focus in it; capture places its box with the arrow
-  keys; the knowledge graph is navigated with the arrow keys, Enter reads an item in the card beside
-  it and Escape gives focus back to the item; a figure's parts are picked and read
+  keys; in the knowledge graph the arrow keys move to the nearest item that way, Enter reads an item in
+  the card beside it and Escape gives focus back to the item; a figure's parts are picked and read
   with the up and down arrows, and Shift + arrows drag the picked one (or pan, or turn the view); a
   side panel's edge is a separator you can Tab to: the arrow keys resize it, Home and End go to its
   narrowest and widest, Enter closes it (its button opens it again).
