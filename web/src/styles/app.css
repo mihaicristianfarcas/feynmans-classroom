@@ -978,11 +978,15 @@
 .empty-drop .button {
   margin: var(--space-xs) 0;
 }
-/* remove: on the cover's corner, shown on hover or focus */
-.book-delete {
+/* edit and remove: on the cover's corner, shown on hover or focus */
+.book-actions {
   position: absolute;
   top: var(--space-xs);
   right: var(--space-xs);
+  display: flex;
+  gap: var(--space-2xs);
+}
+.book-action {
   width: 28px !important;
   height: 28px !important;
   background: var(--raised) !important;
@@ -993,26 +997,29 @@
     background-color var(--dur-micro) ease-out,
     color var(--dur-micro) ease-out;
 }
-.book-delete svg {
+.book-action svg {
   width: 15px;
   height: 15px;
 }
-.book-card:focus-within .book-delete {
+.book-card:focus-within .book-action {
   opacity: 1;
 }
 /* on a touch screen (no hover to show it) it stays out, under the cover at the end of the line of facts,
    clear of the title */
 @media (hover: none) {
-  .book-delete {
+  .book-actions {
     top: auto;
     bottom: calc(var(--space-2xs) * -1);
     right: 0;
+    gap: 0;
+  }
+  .book-action {
     opacity: 1;
     background: transparent !important;
     box-shadow: none;
   }
   .book-facts {
-    padding-right: 32px;
+    padding-right: 60px;
   }
 }
 @media (hover: hover) and (pointer: fine) {
@@ -1020,10 +1027,10 @@
   .book-card:hover .book-cover {
     box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--t-ink) 45%, transparent);
   }
-  .book-card:hover .book-delete {
+  .book-card:hover .book-action {
     opacity: 1;
   }
-  .book-delete:hover {
+  .book-action.remove:hover {
     color: var(--rose-ink) !important;
     background: var(--rose-soft) !important;
   }
@@ -1377,6 +1384,39 @@
 }
 .vault-warning code {
   overflow-wrap: anywhere;
+}
+/* a book's details: its title and author, then its chapters' names folded away, numbered */
+.book-details {
+  display: grid;
+  gap: var(--space-md);
+}
+.book-details > .fine {
+  margin: 0;
+}
+.book-chapters ol {
+  list-style: none;
+  margin: var(--space-xs) 0 0;
+  padding: 0 var(--space-2xs) var(--space-2xs) 0;
+  display: grid;
+  gap: var(--space-xs);
+  max-height: 320px;
+  overflow: auto;
+}
+.book-chapters li {
+  display: grid;
+  grid-template-columns: 2.5ch minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-xs);
+  row-gap: var(--space-2xs);
+}
+.book-chapters li > input + input {
+  grid-column: 2;
+}
+.book-chapter-n {
+  font: 400 var(--text-xs) var(--sans);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 /* making a vault: its name, then the books to bring along */
 .new-vault {

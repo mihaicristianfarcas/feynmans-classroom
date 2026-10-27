@@ -93,6 +93,9 @@ DATA_DIR/
   book from another vault from the Library (or when you make a vault), or just add the same file
   again: it is recognised and linked, not read a second time. Each vault stays a complete folder you
   can copy or open anywhere; the space is freed when the last vault that has the book lets it go.
+  Changing a book's title, author or chapter names (Edit details in the Library) changes it in every
+  vault that has it; the book's folder keeps its name, and links to its old title in the open vault
+  follow the new one.
 - **A new vault** starts empty, with your profile (who you are and how you learn) copied from the vault
   you're in.
 - **Deleting a vault** deletes its folder for good (open another one first). A book it shares with
