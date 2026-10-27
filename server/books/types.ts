@@ -1,7 +1,9 @@
 /* The shapes of books and their figures as the server stores them (book.json, demo.json): the book,
  * its chapters and text (positioned PDF lines or sanitized blocks), a figure's brief and record,
  * the checks a hand-built demo passes, and queued jobs. */
-export type BookFormat = "pdf" | "epub" | "text";
+import type { BookFormat } from "../../shared/book-files.ts";
+
+export type { BookFormat };
 
 /** A place in the book: a PDF page (1-based) and a fraction of its height, or a block index. */
 export interface Loc {
