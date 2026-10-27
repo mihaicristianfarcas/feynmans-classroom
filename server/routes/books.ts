@@ -5,21 +5,20 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { formatOf, MAX_BOOK_BYTES } from "../../shared/book-files.ts";
 import { findInBook } from "../books/find.ts";
 import { booksElsewhere, bookWithFile, bringBook, elsewhereById } from "../books/shared.ts";
 import { bookDir, bookFolder, deleteBook, getBlocks, getBook, listBooks, listDemos } from "../books/store.ts";
 import { safeJoin } from "../fs.ts";
 import { CONTENT_ONLY, eventStream, readBody, sendFile } from "../http.ts";
 import { detectChapters } from "../ingest/chapters.ts";
-import { fileHash, formatOf, ingestBook } from "../ingest/index.ts";
+import { fileHash, ingestBook } from "../ingest/index.ts";
 import { queue } from "../jobs.ts";
 import { bookNote } from "../learn/notes.ts";
 import { bookProgress, lastTouched } from "../learn/progress.ts";
 import { type ReadingPing, recordReading } from "../learn/reading.ts";
 import { activity, docs, logActivity } from "../vault/index.ts";
 import { exportBook } from "../vault/library.ts";
-
-const MAX_UPLOAD = 200 * 1024 * 1024;
 
 export function bookRoutes(app: Hono) {
   /** Every book, with how many of its figures are ready (the chapter's and those drawn in the margin) and
@@ -59,13 +58,13 @@ export function bookRoutes(app: Hono) {
   app.post(
     "/api/books",
     bodyLimit({
-      maxSize: MAX_UPLOAD + 1024 * 1024,
+      maxSize: MAX_BOOK_BYTES + 1024 * 1024,
       onError: (c) => c.json({ error: "file too large (200 MB max)" }, 413),
     }),
     async (c) => {
       const file = (await c.req.parseBody()).file;
       if (!(file instanceof File)) return c.json({ error: "send the book as multipart field 'file'" }, 400);
-      if (file.size > MAX_UPLOAD) return c.json({ error: "file too large (200 MB max)" }, 413);
+      if (file.size > MAX_BOOK_BYTES) return c.json({ error: "file too large (200 MB max)" }, 413);
       if (!formatOf(file.name)) return c.json({ error: "Upload a PDF, EPUB, Markdown or plain-text book." }, 415);
       const data = Buffer.from(await file.arrayBuffer());
       // a file this vault has already opens as it is; one another vault has comes in as the same book

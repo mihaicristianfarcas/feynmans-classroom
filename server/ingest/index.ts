@@ -4,8 +4,9 @@
 import { createHash } from "node:crypto";
 import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { extname, join } from "node:path";
+import { formatOf } from "../../shared/book-files.ts";
 import { createBookDir, getBlocks, getMarkdown, getPages, newId, renameBookDir, saveBook } from "../books/store.ts";
-import type { Book, BookFormat, TocEntry } from "../books/types.ts";
+import type { Book, TocEntry } from "../books/types.ts";
 import { writeJson } from "../fs.ts";
 import { ingestEpub } from "./epub.ts";
 import { ingestPdf, pagesText } from "./pdf.ts";
@@ -13,14 +14,6 @@ import { ingestText } from "./text.ts";
 
 /** Which edition a file is: the first 16 hex digits of its SHA-256 (Book.sha256). */
 export const fileHash = (data: Buffer) => createHash("sha256").update(data).digest("hex").slice(0, 16);
-
-export function formatOf(name: string): BookFormat | null {
-  const ext = extname(name).toLowerCase();
-  if (ext === ".pdf") return "pdf";
-  if (ext === ".epub") return "epub";
-  if ([".txt", ".md", ".markdown", ".text"].includes(ext)) return "text";
-  return null;
-}
 
 /** Stores an uploaded file and extracts text, outline and anchors-ready lines or blocks. */
 export async function ingestBook(
