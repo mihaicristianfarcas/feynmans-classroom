@@ -71,7 +71,8 @@ export class Layout {
     this.gen++;
     this.send({ type: "graph", gen: this.gen, nodes, links, ...room, alpha });
   }
-  /** Holds an item where the pointer has it, the others moving round it. */
+  /** Holds an item where the pointer has it: what it links to follows, what it meets steps aside, and the
+   * rest of the graph keeps still. */
   drag(i: number, x: number, y: number) {
     this.send({ type: "drag", i, x, y });
   }
