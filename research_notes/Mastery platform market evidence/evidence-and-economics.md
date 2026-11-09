@@ -258,7 +258,7 @@ The evidence supports "content + accumulated learner state is the moat" more str
 ### Inferences
 
 - The doc should **decouple the product claim from the mastery claim**. The Course Pack does not need to promise 2 sigma or prerequisite repair; it needs to promise (a) a specific book taught well, (b) scheduled retrieval that saves time, (c) an instructor's assessment loop, and (d) a learner record that compounds. Each of those has direct evidence; the grand claims do not.
-- The **moat argument is strongest in the local-first/GPLv3 detail**: because inference runs on the user's own login, COGS does not scale with usage, and because the pack is tied to a book's structure and an instructor's syllabus, a competitor's better model does not substitute for it. That is a more defensible position than "our AI is better", which StudentBench shows is a losing race (frontier models converge on tutoring equivalence).
+- The **moat argument is strongest in the local-first/bring-your-own-subscription detail**: because inference runs on the user's own login, COGS does not scale with usage, and because the pack is tied to a book's structure and an instructor's syllabus, a competitor's better model does not substitute for it. That is a more defensible position than "our AI is better", which StudentBench shows is a losing race (frontier models converge on tutoring equivalence).
 - The **weakest link is retention**, and it is a product-design problem, not a content problem. Khanmigo's usage data (median student messages on one third of practice days; 17% of error moments) is the best available evidence that AI tutoring is opened rarely. A book-centred app's advantage is that reading is already a scheduled activity; the doc should say that explicitly and treat "attaches to assigned reading" as the retention mechanism.
 - The **pricing implication**: at $44/year (Khanmigo) the consumer ceiling is low; selling per-course to an instructor at $10–$30/student with a class-sized minimum is the only way to get contribution margin above CAC without a large marketing spend. That is an inference from the margin/retention arithmetic, not a tested pricing study.
 
@@ -266,7 +266,7 @@ The evidence supports "content + accumulated learner state is the moat" more str
 
 - No experimental evidence that a "course pack" sold to instructors improves learning versus the same content free — the central claim is untested.
 - No data on instructor conversion, renewal, or price sensitivity.
-- The GPLv3/fork risk (a competitor hosting the same pack) is not addressed by any evidence found; it is a legal/strategy question, not an empirical one.
+- The AGPLv3/fork risk (a competitor hosting the same pack) is reduced but not eliminated: AGPL requires a modified network service to offer its source, so a competitor cannot take this code and run a closed hosted clone; it can still build its own app or pack. This is a legal/strategy question, not an empirical one.
 
 ---
 

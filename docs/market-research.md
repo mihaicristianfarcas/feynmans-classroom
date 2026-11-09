@@ -8,13 +8,17 @@ replace with data, not a fact.
 **Extended 26 Oct 2026:** the mastery-platform set — Math Academy, ALEKS, Khanmigo, Knewton Alta,
 Kumon — is now in §3.5. It revises the price ceiling in §5 and adds a buyer in §9.4.
 
+**License note, 9 Nov 2026:** the app moved from GPL-3.0-or-later to AGPL-3.0-or-later. This closes
+the fork-and-host loophole (a modified network service must offer its source); the content, trust
+and review-history moat is unchanged.
+
 ---
 
 ## 1. The decision this document serves
 
 Not "describe the market". Two decisions:
 
-1. **Who is the first paying customer**, given the app itself is GPLv3 and free.
+1. **Who is the first paying customer**, given the app itself is AGPLv3 and free.
 2. **What we charge them for** — because the free app cannot be the product.
 
 Everything below is written to answer those two, and to be wrong in public if it is wrong.
@@ -300,7 +304,7 @@ must be something the room can point at and say "that's me".
 
 | Tier                    | Price                                | What it is                                                      | Anchor that makes it legible                       |
 | ----------------------- | ------------------------------------ | --------------------------------------------------------------- | -------------------------------------------------- |
-| **Free (GPL)**          | €0                                   | Self-hosted, bring your own Codex/Claude login                  | Anki, Obsidian personal                            |
+| **Free (AGPL)**         | €0                                   | Self-hosted, bring your own Codex/Claude login                  | Anki, Obsidian personal                            |
 | **Classroom Cloud**     | **€8/mo or €60/yr**                  | Hosted vault, sync, GPU figures, no terminal, no `jj`           | NotebookLM $7.99–20/mo; Obsidian Sync $4–8/mo      |
 | **Pro**                 | €15/mo                               | Multi-vault, version history, priority figures                  | ChatGPT Plus $20/mo                                |
 | **Course / department** | **€10–40/seat/yr** (€10–20/semester) | Shared course vault, lecturer-authored figures and quizzes, SSO | Tassomai £5–15/student/yr; Dr Frost £650/school/yr |
@@ -374,6 +378,11 @@ Nothing paid. The segment is reachable by writing, not by buying.
 9. **We believe our own evidence.** If we repeat "mastery", "two sigma" or "we fix prerequisite
    gaps", a buyer who knows VanLehn or Slavin will stop listening. The defensible claim is
    0.1–0.2 SD, coverage and retention — not 2.0.
+10. **AGPL is on some institutional banned-license lists.** Universities are usually comfortable with
+    copyleft; enterprise procurement and some legal teams are not. Mitigation: a plain-language page
+    (unmodified self-hosting is fine; only modified network services must share) and a commercial
+    licence for institutions that need one. The same clause is what stops a competitor from running
+    a closed hosted clone, so it cuts both ways.
 
 ---
 
@@ -413,8 +422,9 @@ reason they believe it works.**
   (Math Academy's graph took ~250 expert-hours for a first pass, before a decade of item data).
   200 verified figures and quizzes for one specific book is work, not a feature — and it is work our
   own agent already does.
-- The code is GPLv3, so code was never the moat. Content, trust, and the switching cost of a
-  student's review history are. All three point at courses, not downloads.
+- The code is AGPLv3, so code was never the moat; the license only closes the fork-and-host
+  loophole. Content, trust, and the switching cost of a student's review history are. All three
+  point at courses, not downloads.
 - The 84/17 split says people still pay to be _taught_. So sell to the teachers, and let them use
   the engine to teach better.
 
@@ -428,7 +438,7 @@ reason they believe it works.**
   it or it is openly licensed. Otherwise the pack ships as the **derived layer** — anchors, figures,
   pretests, quizzes, tutor prompts — and each student brings their own copy of the book to match
   against it.
-- The free GPL app stays free and stays the top of the funnel: "this is what your students get, and
+- The free AGPL app stays free and stays the top of the funnel: "this is what your students get, and
   it runs on their own laptop with their own ChatGPT or Claude."
 - Marginal cost of the next course is agent time plus your review — the cost curve is model calls,
   not content production. That is the whole model.
@@ -548,7 +558,7 @@ the Kumon bill.
 
 Use the four tables in §4 — one row, one sticky. Add a fifth card outside the frames:
 
-> **No revenue model yet: the app is GPLv3 and free. The segment we pick must be the one that pays
+> **No revenue model yet: the app is AGPLv3 and free. The segment we pick must be the one that pays
 > for hosted, or this canvas leads somewhere the project cannot fund.**
 
 And a sixth, because the research found it after the board was first drawn:
