@@ -94,5 +94,5 @@ described in [SECURITY.md](SECURITY.md). By taking part you agree to the
 
 ## License
 
-The project is licensed under the [GPL, version 3 or later](LICENSE). By contributing, you agree
-that your contributions are licensed the same way.
+The project is licensed under the [GNU Affero General Public License, version 3 or
+later](LICENSE). By contributing, you agree that your contributions are licensed the same way.
