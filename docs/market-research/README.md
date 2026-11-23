@@ -5,7 +5,14 @@ competitive research). It replaces the Course Pack research (lecturers and cours
 the first buyer), which stays in this branch's history at commit `081b7e7`. The proposal it tests
 is [issue #45](https://github.com/mihaicristianfarcas/feynmans-classroom/issues/45).
 
-This page is the decision and the argument. The evidence is in five notes beside it:
+**Update, 23 November 2026: the direction is decided.** The app stays general, a second brain for
+learning, and engineers are the first group we sell to and test with. A teacher and mentor view
+comes second, and paid, self-hosted plans for institutions third. The order and the reasons are in
+[direction.md](direction.md); the five forces for the Miro board are in
+[five-forces.md](five-forces.md). Sections 1, 3, 8 and 12 below are updated to match.
+
+This page is the decision and the argument. The evidence is in five notes beside it, and two newer
+notes build on them:
 
 | Note | What it answers |
 |---|---|
@@ -14,6 +21,8 @@ This page is the decision and the argument. The evidence is in five notes beside
 | [model-access.md](model-access.md) | Whether the "your own AI plan" model is allowed, and what it does to costs |
 | [packs-and-rights.md](packs-and-rights.md) | What a prepared book pack can contain without breaking copyright |
 | [sizing-and-pricing.md](sizing-and-pricing.md) | Market size, comparable businesses, prices to test |
+| [direction.md](direction.md) | Who it's for and in what order: engineers, then teachers and mentors, then institutions (23 November) |
+| [five-forces.md](five-forces.md) | Porter's five forces for the Miro board, each factor with its source (23 November) |
 
 **How to read the sources.** Every number carries a label: **[primary]** is the vendor's, author's
 or court's own page, a filing or a paper; **[secondary]** is press, an aggregator or a review site;
@@ -26,7 +35,9 @@ or court's own page, a filing or a paper; **[secondary]** is press, an aggregato
 
 - **The first paying customer is a working software engineer** who has to understand a hard
   technical book for a deadline: a system-design interview, a promotion case, or a move into a new
-  field. Not students, not lecturers.
+  field. The app itself stays general (a second brain for learning, free for anyone); students
+  and their teachers come second, through a shared teacher view, and institutions third
+  ([direction.md](direction.md)).
 - **The product is the loop we already have, aimed at their books:** read *Designing
   Data-Intensive Applications* (DDIA) or *Computer Networks: A Systems Approach* with a margin, see
   the protocol or the replication scheme as a figure you can scrub, explain it back and get your
@@ -86,9 +97,11 @@ loud (replication, partitioning, consensus, congestion control, caching, queues)
    May 2026, 71% was for senior roles [secondary, citing Indeed Hiring Lab].
 3. **A move into a new field** (distributed systems, ML infrastructure, networking).
 
-**Who it is not for, at first:** students and juniors (they mostly lack a paid plan and budgets),
-non-engineers (no CLI, and plan usage in apps covers ChatGPT Plus and Pro only), and companies
-(a team tier comes later).
+**Who we don't sell to first:** students and juniors (they mostly lack a paid plan and budgets),
+non-engineers (no CLI, and plan usage in apps covers ChatGPT Plus and Pro only), and companies.
+They are welcome in the free app. Students come back in step two, through a teacher who reviews
+what they choose to share; companies and universities in step three, as buyers of a self-hosted
+server ([direction.md](direction.md)).
 
 Details and sources: [demand.md](demand.md).
 
@@ -193,7 +206,8 @@ pricing shut down Apollo and other third-party clients [secondary].
 | **Free** | The AGPL app: local, on the user's own plan | €0 |
 | **Book pack** | One standard book's checked figures, concept graph and question banks; no book text; updates for that book's edition | **A:** €19 one-off per book |
 | **Campaign** | All packs, sync, phone review, "explain the design" sessions, for a fixed period | **B:** €39 for three months |
-| **Team** (later) | Shared packs for internal docs; the same vault as context for the team's coding agents | Per seat, from learning budgets |
+| **Teacher and mentor view** (step two) | A learner shares a view of how they understand (explain-backs, gaps, concept map, progress) with a teacher or mentor; adults first | To learn in a four-week pilot |
+| **Institution** (step three) | A self-hosted server: single sign-on, admin, shared packs (also for internal docs), the organisation's own AI account, support | Per seat, from learning budgets |
 
 Why these numbers ([sizing-and-pricing.md](sizing-and-pricing.md)):
 
@@ -278,14 +292,21 @@ Interview questions for week 1 (don't pitch; ask about the last time):
 
 ## 12. Decisions for the team
 
-1. Do we change the first customer to engineers (issue #45)?
+1. ~~Do we change the first customer to engineers (issue #45)?~~ **Decided 23 November 2026:**
+   yes, as the first group we sell to and test with; the app stays general
+   ([direction.md](direction.md)).
 2. The wedge: system-design interviews, promotions, or "moving into a new field"?
 3. The first three packs. Recommended: *Computer Networks: A Systems Approach* (CC BY 4.0),
    *Dive into Deep Learning* (CC BY-SA 4.0), and DDIA only with the authors' or O'Reilly's
    agreement.
-4. "No API keys, ever": a rule for the product, or only the default?
+4. "No API keys, ever": a rule for the product, or only the default? Proposed in
+   [direction.md](direction.md) §4: no key needed for individuals, and organisations bring their
+   own AI account.
 5. Offer A or offer B first, if the week-4 test can only run one?
 6. A new name: now, or after validation?
+7. The step-two pilot: which adult course or bootcamp, and which engineering team?
+8. The first institutional buyer: companies or universities? Recommended: companies.
+9. Paid code we own outright, or dual licensing with a contributor agreement (issue #43)?
 
 ---
 
