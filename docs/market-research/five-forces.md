@@ -21,11 +21,19 @@ note.
 | Bargaining power of buyers | **High** | Free alternatives, plain files that make leaving easy, and fast churn in AI apps; a deadline and learning budgets soften it |
 | Threat of substitutes | **High** | "I'll just ask ChatGPT", or skip the book for a course; evidence that delegating to AI stops learning works for us |
 
-**What it means:** four forces out of five are High, so this is a hard market for a generic AI study
-app. The slot we can hold is narrow: *the book you own, drawn as figures, explained back and kept,
-on the AI plan you already pay for.* So we host no model, sell one-off packs or fixed-length
-campaigns rather than subscriptions, and compete on what is left three weeks later, not on
-explaining a passage.
+**What it means:** four forces out of five are High, so this is a hard market for a *generic* AI
+study app. It is the same kind of market notes apps face, where Obsidian still built a loved,
+profitable product by being clearly best at one thing. Ours is narrow: *the book you own, drawn as
+figures, explained back and kept, on the AI plan you already pay for.* So the app is Obsidian for
+learning, with a small core and methods you switch on; we host no model; we charge for software
+(sync and phone review, then a teacher view per seat), not for content; and we compete on what is
+left three weeks later, not on explaining a passage ([direction.md](direction.md)).
+
+The board's takeaway note:
+
+```
+Takeaway: a hard market for a generic AI study app, the same forces notes apps face, where Obsidian still built a loved, profitable product. We win by being clearly best at one thing: the system in your book drawn as a figure, explained back, and remembered. Free app on the AI plan you already pay for; pay for sync and phone review; later, a teacher view for classes and teams.
+```
 
 ---
 
@@ -57,7 +65,8 @@ for), reviewers (pack checking) and payment providers.
 
 **Why Medium and not High:** only two vendors set terms (Anthropic's rules for third-party apps
 tightened in 2026; OpenAI must approve paid apps), but we pay them nothing and already switch
-between three. Publishers matter only for paid packs of closed books.
+between three. Publishers matter only for packs of closed books, and since 23 November packs are
+no longer what we sell.
 
 ## 3. Rivalry among existing competitors: High
 
@@ -79,7 +88,7 @@ between three. Publishers matter only for paid packs of closed books.
 | ↑ | AI apps churn fast: 6.1% of monthly subscribers stay a year, against 9.5% for apps without AI | High | [secondary, RevenueCat 2026], [sizing-and-pricing.md](sizing-and-pricing.md) §3 |
 | ↑ | Price-sensitive: they already pay ~$20 a month for ChatGPT Plus and won't pay twice for "AI" | Medium | [sizing-and-pricing.md](sizing-and-pricing.md) §4 |
 | ↓ | An urgent need with a deadline: a system-design interview, a promotion, a move into a new field | Medium | [demand.md](demand.md) §4 |
-| ↓ | Cheap next to budgets: €19–39 is 2–4% of a $1,000–2,000 learning stipend | Medium | [secondary], [demand.md](demand.md) §6 |
+| ↓ | Cheap next to budgets: €39–48 is 2–5% of a $1,000–2,000 learning stipend | Medium | [secondary], [demand.md](demand.md) §6 |
 | ↓ | Many small buyers (individual engineers): none can dictate terms | Low | Our judgment |
 
 ## 5. Threat of substitutes: High

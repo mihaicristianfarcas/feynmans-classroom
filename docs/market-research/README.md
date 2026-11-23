@@ -5,11 +5,15 @@ competitive research). It replaces the Course Pack research (lecturers and cours
 the first buyer), which stays in this branch's history at commit `081b7e7`. The proposal it tests
 is [issue #45](https://github.com/mihaicristianfarcas/feynmans-classroom/issues/45).
 
-**Update, 23 November 2026: the direction is decided.** The app stays general, a second brain for
-learning, and engineers are the first group we sell to and test with. A teacher and mentor view
-comes second, and paid, self-hosted plans for institutions third. The order and the reasons are in
-[direction.md](direction.md); the five forces for the Miro board are in
-[five-forces.md](five-forces.md). Sections 1, 3, 8 and 12 below are updated to match.
+**Update, 23 November 2026: the direction is decided.** The app is *Obsidian for learning*: your
+books and proven learning methods, with a small core and each method a switch
+([Incipit #36](https://github.com/mihaicristianfarcas/incipit/issues/36)). Engineers are the first
+people we win over. We charge for software, not content: sync and phone review for individuals,
+then a teacher and mentor view per seat for classes and teams, then self-hosted plans for
+institutions; packs for open books become free demos. The reasons are in
+[direction.md](direction.md), and the five forces behind the Miro board in
+[five-forces.md](five-forces.md). Sections 1, 3, 8, 11 and 12 below are updated; the rest is the
+research of 9 November as it was.
 
 This page is the decision and the argument. The evidence is in five notes beside it, and two newer
 notes build on them:
@@ -21,7 +25,7 @@ notes build on them:
 | [model-access.md](model-access.md) | Whether the "your own AI plan" model is allowed, and what it does to costs |
 | [packs-and-rights.md](packs-and-rights.md) | What a prepared book pack can contain without breaking copyright |
 | [sizing-and-pricing.md](sizing-and-pricing.md) | Market size, comparable businesses, prices to test |
-| [direction.md](direction.md) | Who it's for and in what order: engineers, then teachers and mentors, then institutions (23 November) |
+| [direction.md](direction.md) | What the app is (Obsidian for learning), who first, what we charge for, and in what order (23 November) |
 | [five-forces.md](five-forces.md) | Porter's five forces for the Miro board, each factor with its source (23 November) |
 
 **How to read the sources.** Every number carries a label: **[primary]** is the vendor's, author's
@@ -33,11 +37,12 @@ or court's own page, a filing or a paper; **[secondary]** is press, an aggregato
 
 ## 1. The answer in one page
 
-- **The first paying customer is a working software engineer** who has to understand a hard
+- **The app is Obsidian for learning** (updated 23 November): your books and proven learning
+  methods, a small core, each method a switch, free for anyone ([direction.md](direction.md)).
+- **The first people to win over are working software engineers** who have to understand a hard
   technical book for a deadline: a system-design interview, a promotion case, or a move into a new
-  field. The app itself stays general (a second brain for learning, free for anyone); students
-  and their teachers come second, through a shared teacher view, and institutions third
-  ([direction.md](direction.md)).
+  field. Students and their teachers come second, through a shared teacher view, and institutions
+  third.
 - **The product is the loop we already have, aimed at their books:** read *Designing
   Data-Intensive Applications* (DDIA) or *Computer Networks: A Systems Approach* with a margin, see
   the protocol or the replication scheme as a figure you can scrub, explain it back and get your
@@ -46,16 +51,18 @@ or court's own page, a filing or a paper; **[secondary]** is press, an aggregato
   installed and logged in, so the terminal requirement costs us almost nothing with them. Since
   DevDay 2026, OpenAI also documents a self-serve way for open-source local apps to use a ChatGPT
   plan, so the CLI isn't even needed for Plus and Pro users. We pay for no model calls.
-- **We sell what a chatbot gives away last: prepared packs and continuity.** A pack per standard
-  book (checked figures, a concept graph, question banks, no book text), sync, and review on a
-  phone. Priced as a campaign or a one-off per book, because the market already sells that way
-  (lifetime and yearly plans dominate interview prep) and because AI subscriptions churn fast.
+- **We sell software, not content** (updated 23 November): sync and review on a phone for
+  individuals, yearly or as a three-month campaign; a teacher and mentor view per seat for classes
+  and teams; self-hosted plans for institutions. The 9 November plan sold a pack per standard book;
+  packs for openly licensed books are now free demos, because paid packs are a content business
+  with rights deals and expert review for every book.
 - **The honest size is a small business first:** about €0.05–0.5M a year after two years
-  [assumption], with comparable bootstrapped businesses at $1–6M. A team tier for onboarding,
-  paid from learning budgets, is the path past that.
-- **Two things must change in the app:** a "Sign in with ChatGPT" path (and not building the
-  business on Claude plans, which Anthropic's terms forbid third-party apps to route requests
-  through), and packs whose anchors carry no book text.
+  [assumption], with comparable bootstrapped businesses at $1–6M. Classes and teams, paid per seat
+  from learning budgets, are the path past that ([direction.md](direction.md) §5).
+- **Three things must change in the app:** a small core with methods you switch on
+  ([Incipit #36](https://github.com/mihaicristianfarcas/incipit/issues/36)); a "Sign in with
+  ChatGPT" path (and not building the business on Claude plans, which Anthropic's terms forbid
+  third-party apps to route requests through); and packs whose anchors carry no book text.
 
 ---
 
@@ -203,11 +210,17 @@ pricing shut down Apollo and other third-party clients [secondary].
 
 | Tier | What it is | Price hypothesis |
 |---|---|---|
-| **Free** | The AGPL app: local, on the user's own plan | €0 |
-| **Book pack** | One standard book's checked figures, concept graph and question banks; no book text; updates for that book's edition | **A:** €19 one-off per book |
-| **Campaign** | All packs, sync, phone review, "explain the design" sessions, for a fixed period | **B:** €39 for three months |
-| **Teacher and mentor view** (step two) | A learner shares a view of how they understand (explain-backs, gaps, concept map, progress) with a teacher or mentor; adults first | To learn in a four-week pilot |
+| **Free** | The AGPL app: local, on the user's own plan; packs for openly licensed books | €0 |
+| **Sync and phone** (step one, updated 23 November) | Sync between computers and review on a phone | **A:** €48 a year |
+| **Campaign** | Sync, phone review and every open pack, for a fixed period | **B:** €39 for three months |
+| **Teacher and mentor view** (step two) | A learner shares a view of how they understand (explain-backs, gaps, concept map, progress) with a teacher or mentor; adults first | Per seat, set in a four-week pilot |
 | **Institution** (step three) | A self-hosted server: single sign-on, admin, shared packs (also for internal docs), the organisation's own AI account, support | Per seat, from learning budgets |
+
+The 9 November plan had a paid **book pack** (one standard book's checked figures, concept graph and
+question banks, no book text, €19 one-off) as offer A. It was replaced on 23 November by sync and
+phone review, because a paid pack is a content business: rights deals and about 40 hours of expert
+review per book [assumption] ([direction.md](direction.md) §4). The reasoning below was written for
+the packs and still holds for the shapes:
 
 Why these numbers ([sizing-and-pricing.md](sizing-and-pricing.md)):
 
@@ -220,8 +233,8 @@ Why these numbers ([sizing-and-pricing.md](sizing-and-pricing.md)):
   date, doesn't fight that curve.
 - Both fit inside a typical $1,000–2,000 learning stipend without anyone's approval [secondary].
 
-The validation plan tests **A against B**: does this customer buy *ownership of a book layer* or
-*access for a campaign*?
+The validation plan tests **A against B**: does this customer pay *yearly for a tool they keep
+using*, or *for a campaign with an end date*?
 
 ---
 
@@ -276,7 +289,7 @@ Swimm survey]; learning budgets average $1,254 per employee [primary, ATD]) is w
 | 1 | **15 interviews** with engineers who read DDIA or prepared a system-design interview in the last year (r/ExperiencedDevs, colleagues, alumni). Ask what they did, where they stalled, what they paid for, and who paid | ≥10 describe stalling, forgetting, or not being able to explain it, *unprompted* | The problem isn't felt: stop |
 | 2 | **Landing page** with a 30-second clip: passage → protocol figure → explain-back score. Post to Show HN, r/ExperiencedDevs, r/systemdesign | **500** sign-ups | <150: the message is wrong, rewrite before building |
 | 3 | **30–50 users** on the *Computer Networks: A Systems Approach* pack (openly licensed, so no rights question), with opt-in usage counts | **≥30%** return after a week; ≥3 explain-backs each | <15%: the loop doesn't hold |
-| 4 | **Price test**: half the waitlist sees A (€19 per book), half sees B (€39 for three months), as pre-orders | **≥5%** of the waitlist pays | <2%: back to the Course Pack for bootcamps and interview-prep course makers |
+| 4 | **Price test** (updated 23 November): half the waitlist sees A (sync and phone review, €48 a year), half sees B (€39 for three months), as pre-orders | **≥5%** of the waitlist pays | <2%: individuals won't pay; go to classes and teams (step two) first |
 
 **The one number that decides it:** paid pre-orders from the waitlist. Interest is free.
 
@@ -293,20 +306,22 @@ Interview questions for week 1 (don't pitch; ask about the last time):
 ## 12. Decisions for the team
 
 1. ~~Do we change the first customer to engineers (issue #45)?~~ **Decided 23 November 2026:**
-   yes, as the first group we sell to and test with; the app stays general
+   yes, as the first people we win over; the app is Obsidian for learning, open to anyone
    ([direction.md](direction.md)).
 2. The wedge: system-design interviews, promotions, or "moving into a new field"?
-3. The first three packs. Recommended: *Computer Networks: A Systems Approach* (CC BY 4.0),
-   *Dive into Deep Learning* (CC BY-SA 4.0), and DDIA only with the authors' or O'Reilly's
-   agreement.
+3. ~~The first three packs.~~ **Changed 23 November:** packs are no longer sold. Free packs for
+   *Computer Networks: A Systems Approach* (CC BY 4.0) and *Dive into Deep Learning* (CC BY-SA 4.0)
+   stay as demos; DDIA only with the authors' or O'Reilly's agreement.
 4. "No API keys, ever": a rule for the product, or only the default? Proposed in
-   [direction.md](direction.md) §4: no key needed for individuals, and organisations bring their
+   [direction.md](direction.md) §7: no key needed for individuals, and organisations bring their
    own AI account.
 5. Offer A or offer B first, if the week-4 test can only run one?
 6. A new name: now, or after validation?
 7. The step-two pilot: which adult course or bootcamp, and which engineering team?
 8. The first institutional buyer: companies or universities? Recommended: companies.
 9. Paid code we own outright, or dual licensing with a contributor agreement (issue #43)?
+10. The app's methods: is the concept map on or off by default
+    ([Incipit #36](https://github.com/mihaicristianfarcas/incipit/issues/36))?
 
 ---
 
